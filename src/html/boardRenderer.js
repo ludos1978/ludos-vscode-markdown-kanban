@@ -1180,6 +1180,81 @@ function renderBoard(options = null) {
         return;
     }
 
+    /**
+     * Adds a margin element after the last column in a stack (for drop target)
+     */
+    function addMarginAfterLastColumn(stack, columns) {
+        const lastColumn = columns[columns.length - 1];
+
+        // Check if margin already exists
+        const existingMargin = lastColumn.querySelector('.column-margin-bottom');
+        if (existingMargin) {
+            return; // Already has margin
+        }
+
+        // Create margin element
+        const margin = document.createElement('div');
+        margin.className = 'column-margin column-margin-bottom';
+
+        // Append to last column
+        lastColumn.appendChild(margin);
+    }
+
+    /**
+     * Removes empty kanban-column-stack containers and adds drop zones between remaining stacks/columns
+     */
+    function cleanupStacksAndAddDropZones(rowContainer) {
+        // 1. Remove all empty kanban-column-stack elements
+        const allStacks = rowContainer.querySelectorAll('.kanban-column-stack');
+        allStacks.forEach(stack => {
+            const columns = stack.querySelectorAll('.kanban-full-height-column');
+            if (columns.length === 0) {
+                stack.remove();
+            } 
+            // else {
+            //     // Add margin after last column in stack (for drop target)
+            //     addMarginAfterLastColumn(stack, columns);
+            // }
+        });
+
+        // 2. Get all remaining children (stacks and single columns)
+        const children = Array.from(rowContainer.children).filter(child =>
+            child.classList.contains('kanban-column-stack') ||
+            child.classList.contains('kanban-full-height-column')
+        );
+
+        if (children.length === 0) return;
+
+        // 3. Insert drop zones before, between, and after stacks/columns
+        // Insert before first element
+        const firstDropZoneStack = createDropZoneStack('before');
+        rowContainer.insertBefore(firstDropZoneStack, children[0]);
+
+        // Insert between elements
+        for (let i = 0; i < children.length - 1; i++) {
+            const betweenDropZoneStack = createDropZoneStack('between');
+            children[i].parentNode.insertBefore(betweenDropZoneStack, children[i].nextSibling);
+        }
+
+        // Insert after last element
+        const lastDropZoneStack = createDropZoneStack('after');
+        children[children.length - 1].parentNode.insertBefore(lastDropZoneStack, children[children.length - 1].nextSibling);
+    }
+
+    /**
+     * Creates a drop zone stack wrapper with a drop zone inside
+     */
+    function createDropZoneStack(position) {
+        const dropZoneStack = document.createElement('div');
+        dropZoneStack.className = 'kanban-column-stack column-drop-zone-stack';
+
+        const dropZone = document.createElement('div');
+        dropZone.className = `column-drop-zone column-drop-zone-${position}`;
+
+        dropZoneStack.appendChild(dropZone);
+        return dropZoneStack;
+    }
+
     // Detect number of rows from the board
     const detectedRows = detectRowsFromBoard(window.cachedBoard);
     const numRows = Math.max(currentLayoutRows, detectedRows);
@@ -1265,9 +1340,7 @@ function renderBoard(options = null) {
             });
 
             // Clean up empty stacks and add drop zones
-            if (typeof window.cleanupAndRecreateDropZones === 'function') {
-                window.cleanupAndRecreateDropZones(rowContainer);
-            }
+            cleanupStacksAndAddDropZones(rowContainer);
 
             // Add the "Add Column" button to each row
             const addColumnBtn = document.createElement('button');
