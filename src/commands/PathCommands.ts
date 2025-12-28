@@ -638,6 +638,19 @@ export class PathCommands extends SwitchBasedCommand {
     // ============= HELPER METHODS =============
 
     /**
+     * Normalize a path for comparison
+     * Decodes URL encoding, normalizes separators, and lowercases
+     * This ensures paths match regardless of encoding or separator differences
+     */
+    private normalizePath(p: string): string {
+        try {
+            return decodeURIComponent(p).replace(/\\/g, '/').toLowerCase();
+        } catch {
+            return p.replace(/\\/g, '/').toLowerCase();
+        }
+    }
+
+    /**
      * Replace a path in markdown files and refresh the board
      * Common logic used by handleSearchForFile and handleBrowseForImage
      * If taskId and columnId are provided, sends targeted update instead of full refresh
@@ -755,7 +768,9 @@ export class PathCommands extends SwitchBasedCommand {
                     const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
 
                     // Check if include paths changed - if so, trigger include switch to reload content
-                    const oldPathWasInclude = oldIncludePaths.some(p => p === oldPath);
+                    // Use normalized comparison to handle URL encoding differences
+                    const normalizedOldPath = this.normalizePath(oldPath);
+                    const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
                     if (oldPathWasInclude && newIncludePaths.length > 0) {
                         // Trigger include file switch to reload content from new path
                         await context.handleIncludeSwitch({
@@ -783,27 +798,48 @@ export class PathCommands extends SwitchBasedCommand {
                 await context.onBoardUpdate();
             }
         } else if (taskId && columnId) {
-            // Image is in task - update task only
+            // Include/image is in task - update task only
             const board = context.boardStore.getBoard();
             if (board) {
                 const column = board.columns.find(c => c.id === columnId);
                 const task = column?.tasks.find(t => t.id === taskId);
                 if (task && column) {
+                    // Extract old include paths before updating
+                    const oldIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
+                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
+
                     // Manually update the task object with the new path
-                    // This avoids full board reparsing
                     task.title = LinkOperations.replaceSingleLink(task.title, oldPath, newPath, 0);
                     if (task.description) {
                         task.description = LinkOperations.replaceSingleLink(task.description, oldPath, newPath, 0);
                     }
 
-                    // Send targeted task update with the modified task
-                    this.postMessage({
-                        type: 'updateTaskContent',
-                        taskId: taskId,
-                        columnId: columnId,
-                        task: task,
-                        imageMappings: {}
-                    });
+                    // Extract new include paths after updating
+                    const newIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
+                    const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
+
+                    // Check if include paths changed - if so, trigger include switch to reload content
+                    // Use normalized comparison to handle URL encoding differences
+                    const normalizedOldPath = this.normalizePath(oldPath);
+                    const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
+                    if (oldPathWasInclude && newIncludePaths.length > 0) {
+                        // Trigger include file switch to reload content from new path
+                        await context.handleIncludeSwitch({
+                            taskId: taskId,
+                            oldFiles: oldIncludePaths,
+                            newFiles: newIncludePaths,
+                            newTitle: task.title
+                        });
+                    } else {
+                        // Not an include change, just send targeted task update
+                        this.postMessage({
+                            type: 'updateTaskContent',
+                            taskId: taskId,
+                            columnId: columnId,
+                            task: task,
+                            imageMappings: {}
+                        });
+                    }
                 } else {
                     // Task/column not found, fall back to full update
                     context.boardStore.invalidateCache();

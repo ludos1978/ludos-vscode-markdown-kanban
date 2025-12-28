@@ -354,11 +354,13 @@ export class MarkdownKanbanParser {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
                 // Show error in task so user knows what's wrong
                 fullFileContent = `**Error:** Include file not found: \`${filePath}\``;
+                task.includeError = true;
               }
             } catch (error) {
               console.error(`[Parser] Error processing task include ${filePath}:`, error);
               // Show error in task so user knows what's wrong
               fullFileContent = `**Error:** Failed to read include file: \`${filePath}\``;
+              task.includeError = true;
             }
           }
 

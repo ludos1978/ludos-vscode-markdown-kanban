@@ -245,13 +245,28 @@ function togglePathMenu(container, filePath, mediaType) {
     const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
 
     // Determine if the item is broken based on media type
-    const isBroken = mediaType === 'include'
-        ? (container.classList.contains('include-broken') ||
-           container.closest('.include-error') !== null ||
-           container.closest('.include-container.include-error') !== null)
-        : mediaType === 'video'
-        ? container.classList.contains('video-broken')
-        : container.classList.contains('image-broken');
+    let isBroken = false;
+    if (mediaType === 'include') {
+        // For includes, check window.cachedBoard for the includeError flag set by backend
+        // This is reliable because it uses the backend's actual file existence check
+        if (window.cachedBoard && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (column) {
+                // Check column's includeError flag OR any task with includeError
+                isBroken = column.includeError === true ||
+                    column.tasks?.some(t => t.includeError === true);
+            }
+            // For task includes, check the specific task
+            if (!isBroken && taskId && column) {
+                const task = column.tasks?.find(t => t.id === taskId);
+                isBroken = task?.includeError === true;
+            }
+        }
+    } else if (mediaType === 'video') {
+        isBroken = container.classList.contains('video-broken');
+    } else {
+        isBroken = container.classList.contains('image-broken');
+    }
 
     // Create floating menu - use consistent styling for all types
     const menu = document.createElement('div');
@@ -266,10 +281,8 @@ function togglePathMenu(container, filePath, mediaType) {
     // Build menu HTML based on broken state
     // Broken: Open disabled, Search/Browse enabled
     // Valid: Open enabled, Search/Browse disabled
-    // Exception: For includes, always enable Search/Browse since column includes
-    // don't get marked as broken in the DOM (error only shows in content area)
     const openDisabled = isBroken;
-    const searchBrowseEnabled = isBroken || mediaType === 'include';
+    const searchBrowseEnabled = isBroken;
 
     menu.innerHTML = `
         <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}')"`}>📄 Open</button>
@@ -900,3 +913,128 @@ window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFound
 
 // DOM updates
 window.updatePathInDOM = updatePathInDOM;
+
+// ============================================================================
+// DIAGRAM MENUS (Mermaid, PlantUML)
+// ============================================================================
+
+/**
+ * Toggle diagram menu for Mermaid/PlantUML diagrams
+ * @param {HTMLElement} container - The diagram container element
+ * @param {string} diagramType - 'mermaid' or 'plantuml'
+ */
+function toggleDiagramMenu(container, diagramType) {
+    // Close any existing floating menus
+    closeAllPathMenus();
+    document.getElementById('floating-diagram-menu')?.remove();
+
+    const button = container.querySelector('.diagram-menu-btn');
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const code = container.dataset.diagramCode || '';
+
+    // Create floating menu
+    const menu = document.createElement('div');
+    menu.id = 'floating-diagram-menu';
+    menu.className = 'image-path-menu visible';
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 2) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '999999';
+
+    const typeLabel = diagramType === 'mermaid' ? 'Mermaid' : 'PlantUML';
+
+    menu.innerHTML = `
+        <button class="image-path-menu-item" data-action="convert-svg">💾 Convert to SVG file</button>
+        <button class="image-path-menu-item" data-action="copy-svg">📋 Copy SVG to clipboard</button>
+        <button class="image-path-menu-item" data-action="copy-code">📝 Copy ${typeLabel} code</button>
+    `;
+
+    // Handle menu actions
+    menu.addEventListener('click', (e) => {
+        const action = e.target.dataset?.action;
+        if (!action) return;
+
+        e.stopPropagation();
+        menu.remove();
+
+        switch (action) {
+            case 'convert-svg':
+                convertDiagramToSVG(container, diagramType, code);
+                break;
+            case 'copy-svg':
+                copyDiagramSVG(container);
+                break;
+            case 'copy-code':
+                copyDiagramCode(code);
+                break;
+        }
+    });
+
+    document.body.appendChild(menu);
+
+    // Adjust position if menu goes off screen
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
+    }
+    if (menuRect.bottom > window.innerHeight) {
+        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
+    }
+
+    // Close menu when clicking outside
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !container.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+/**
+ * Convert diagram to SVG file (sends to backend)
+ */
+function convertDiagramToSVG(container, diagramType, code) {
+    if (typeof vscode !== 'undefined') {
+        const messageType = diagramType === 'mermaid' ? 'convertMermaidToSVG' : 'convertPlantUMLToSVG';
+        vscode.postMessage({
+            type: messageType,
+            code: code
+        });
+    }
+}
+
+/**
+ * Copy SVG content to clipboard
+ */
+function copyDiagramSVG(container) {
+    const svgElement = container.querySelector('svg');
+    if (svgElement) {
+        const svgString = new XMLSerializer().serializeToString(svgElement);
+        navigator.clipboard.writeText(svgString).then(() => {
+            // Could show a toast notification here
+            console.log('[Diagram] SVG copied to clipboard');
+        }).catch(err => {
+            console.error('[Diagram] Failed to copy SVG:', err);
+        });
+    }
+}
+
+/**
+ * Copy diagram source code to clipboard
+ */
+function copyDiagramCode(code) {
+    navigator.clipboard.writeText(code).then(() => {
+        console.log('[Diagram] Code copied to clipboard');
+    }).catch(err => {
+        console.error('[Diagram] Failed to copy code:', err);
+    });
+}
+
+// Diagram menus
+window.toggleDiagramMenu = toggleDiagramMenu;
+window.convertDiagramToSVG = convertDiagramToSVG;
+window.copyDiagramSVG = copyDiagramSVG;
+window.copyDiagramCode = copyDiagramCode;

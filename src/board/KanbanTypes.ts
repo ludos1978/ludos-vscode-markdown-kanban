@@ -17,6 +17,7 @@ export interface KanbanTask {
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
+  includeError?: boolean;  // When true, include file was not found (broken include)
   includeContext?: {  // Context for dynamic image path resolution in include files
     includeFilePath: string;  // Absolute path to the include file
     includeDir: string;       // Directory of the include file
@@ -34,6 +35,7 @@ export interface KanbanColumn {
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
+  includeError?: boolean;  // When true, include file was not found (broken include)
 }
 
 export interface KanbanBoard {

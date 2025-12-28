@@ -410,8 +410,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         column.tasks = [{
                             id: `error-${column.id}-${Date.now()}`,
                             title: 'Include Error',
-                            description: `**Error:** Column include file not found: \`${relativePath}\``
+                            description: `**Error:** Column include file not found: \`${relativePath}\``,
+                            includeError: true
                         }];
+                        // Mark column as having include error
+                        (column as any).includeError = true;
                     }
                 }
             }
@@ -429,6 +432,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                             console.warn(`[MarkdownFileRegistry] generateBoard() - Task include not found: ${relativePath}`);
                             // Show error in task so user knows what's wrong
                             task.description = `**Error:** Include file not found: \`${relativePath}\``;
+                            // Mark task as having include error
+                            (task as any).includeError = true;
                         }
                     }
                 }

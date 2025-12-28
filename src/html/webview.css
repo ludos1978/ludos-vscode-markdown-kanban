@@ -3787,6 +3787,43 @@ blockquote {
 }
 
 /* ============================================================================
+   DIAGRAM OVERLAY CONTAINER - Mermaid, PlantUML burger menus
+   ============================================================================ */
+
+.diagram-overlay-container {
+  position: relative;
+  display: block;
+}
+
+.diagram-overlay-container .diagram-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-overlay-container:hover .diagram-menu-btn {
+  opacity: 1;
+}
+
+.diagram-overlay-container .diagram-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================================================
    RESOURCE PATH MENUS - Consolidated styles for image/include path menus
    ============================================================================ */
 
@@ -3914,12 +3951,14 @@ blockquote {
   opacity: 1 !important;
 }
 
-/* COLUMN/TASK INCLUDES WITH ERRORS: Show warning outline when the column/task content has include errors */
-/* Uses :has() to detect error state in content area and apply warning to the title's include menu button */
-.kanban-full-height-column:has(.include-error) .column-title .include-path-overlay-container .include-menu-btn,
+/* COLUMN/TASK INCLUDES WITH ERRORS: Show warning outline when the column/task has include errors */
+/* Two methods: 1) Direct .include-error class on column/task (from backend flag)
+                2) :has() to detect error state in content area (fallback for runtime errors) */
+.kanban-full-height-column.include-error .column-title .include-path-overlay-container .include-menu-btn,
 .kanban-full-height-column:has(.include-container.include-error) .column-title .include-path-overlay-container .include-menu-btn,
-.task-item:has(.include-error) .task-title .include-path-overlay-container .include-menu-btn,
+.task-item.include-error .task-title .include-path-overlay-container .include-menu-btn,
 .task-item:has(.include-container.include-error) .task-title .include-path-overlay-container .include-menu-btn {
+  opacity: 1 !important;
   outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
   outline-offset: -1px;
   background: rgba(190, 140, 0, 0.3);

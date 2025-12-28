@@ -1394,25 +1394,33 @@ async function processPlantUMLQueue() {
 
         try {
             const svg = await renderPlantUML(item.code);
+            const escapedCode = escapeHtml(item.code).replace(/'/g, "\\'").replace(/"/g, '\\"');
+
+            // Create wrapper with burger menu
+            const wrapper = document.createElement('div');
+            wrapper.className = 'diagram-overlay-container plantuml-wrapper';
+            wrapper.dataset.diagramType = 'plantuml';
+            wrapper.dataset.diagramCode = item.code;
 
             // Replace placeholder with diagram container
             const container = document.createElement('div');
             container.className = 'plantuml-diagram';
             container.innerHTML = svg;
 
-            // Add convert button
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'plantuml-actions';
-            buttonContainer.innerHTML = `
-                <button class="plantuml-convert-btn"
-                        data-code="${escapeHtml(item.code)}"
-                        title="Convert to SVG file">
-                    💾 Convert to SVG
-                </button>
-            `;
-            container.appendChild(buttonContainer);
+            // Add burger menu button
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'diagram-menu-btn';
+            menuBtn.title = 'Diagram options';
+            menuBtn.textContent = '☰';
+            menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                toggleDiagramMenu(wrapper, 'plantuml');
+            };
 
-            element.replaceWith(container);
+            wrapper.appendChild(container);
+            wrapper.appendChild(menuBtn);
+
+            element.replaceWith(wrapper);
         } catch (error) {
             console.error('[PlantUML] Rendering error:', error);
 
@@ -1609,25 +1617,33 @@ async function processMermaidQueue() {
 
         try {
             const svg = await renderMermaid(item.code);
+            const escapedCode = escapeHtml(item.code).replace(/'/g, "\\'").replace(/"/g, '\\"');
+
+            // Create wrapper with burger menu
+            const wrapper = document.createElement('div');
+            wrapper.className = 'diagram-overlay-container mermaid-wrapper';
+            wrapper.dataset.diagramType = 'mermaid';
+            wrapper.dataset.diagramCode = item.code;
 
             // Replace placeholder with diagram container
             const container = document.createElement('div');
             container.className = 'mermaid-diagram';
             container.innerHTML = svg;
 
-            // Add convert button
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'mermaid-actions';
-            buttonContainer.innerHTML = `
-                <button class="mermaid-convert-btn"
-                        data-code="${escapeHtml(item.code)}"
-                        title="Convert to SVG file">
-                    💾 Convert to SVG
-                </button>
-            `;
-            container.appendChild(buttonContainer);
+            // Add burger menu button
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'diagram-menu-btn';
+            menuBtn.title = 'Diagram options';
+            menuBtn.textContent = '☰';
+            menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                toggleDiagramMenu(wrapper, 'mermaid');
+            };
 
-            element.replaceWith(container);
+            wrapper.appendChild(container);
+            wrapper.appendChild(menuBtn);
+
+            element.replaceWith(wrapper);
         } catch (error) {
             console.error('[Mermaid] Rendering error:', error);
 
