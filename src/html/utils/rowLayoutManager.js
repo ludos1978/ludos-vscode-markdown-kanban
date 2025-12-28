@@ -8,7 +8,7 @@
  *
  * Dependencies:
  * - window.tagUtils (for getColumnDisplayTitle)
- * - window.filterTagsFromText (for title rendering)
+ * - window.removeTagsForDisplay (for title rendering)
  */
 
 // ============================================================================
@@ -142,7 +142,7 @@ function updateColumnRowTag(columnId, newRow, options) {
         // Update the displayed title using shared function
         const titleElement = columnElement.querySelector('.column-title-text');
         if (titleElement) {
-            const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
+            const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay) : (column.title || '');
             titleElement.innerHTML = renderedTitle;
         }
 

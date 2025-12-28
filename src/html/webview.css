@@ -207,6 +207,27 @@ body {
   opacity: 0.9;
 }
 
+/* Color variants - Overlay (semi-transparent buttons on content) */
+/* Shared base for: .diagram-menu-btn, .include-menu-btn */
+.btn-overlay-icon,
+.diagram-overlay-container .diagram-menu-btn,
+.include-path-overlay-container .include-menu-btn {
+  border: none;
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-overlay-icon:hover,
+.diagram-overlay-container .diagram-menu-btn:hover,
+.include-path-overlay-container .include-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
 /* ============================================
    UTILITY CLASSES
    Common reusable patterns
@@ -3795,32 +3816,21 @@ blockquote {
   display: block;
 }
 
+/* Diagram menu button - size and position specific (shared styles in btn-overlay-icon) */
 .diagram-overlay-container .diagram-menu-btn {
   position: absolute;
   top: 4px;
   right: 4px;
   width: 24px;
   height: 24px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 4px;
-  color: white;
   font-size: 14px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
 }
 
 .diagram-overlay-container:hover .diagram-menu-btn {
   opacity: 1;
-}
-
-.diagram-overlay-container .diagram-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
 }
 
 /* ============================================================================
@@ -3907,30 +3917,19 @@ blockquote {
   align-items: center;
 }
 
+/* Include menu button - size specific (shared styles in btn-overlay-icon) */
 .include-path-overlay-container .include-menu-btn {
   width: 16px;
   height: 16px;
   margin-left: 2px;
   background: rgba(0, 0, 0, 0.4);
-  border: none;
   border-radius: 3px;
-  color: white;
   font-size: 10px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   vertical-align: middle;
 }
 
 .include-path-overlay-container:hover .include-menu-btn {
   opacity: 1;
-}
-
-.include-path-overlay-container .include-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.7);
 }
 
 /* BROKEN STATE: Always show menu button on broken includes with warning outline */
@@ -4129,26 +4128,27 @@ blockquote {
 }
 
 /* Ensure tags in task descriptions are strictly inline without any card-level styling */
-.task-description-display .kanban-tag {
+/* Double class selector increases specificity to override [data-tag] rules without !important */
+.task-description-display .kanban-tag.kanban-tag {
   vertical-align: middle;
-  display: inline !important;
-  position: static !important;
+  display: inline;
+  position: static;
   /* Ensure inline-only styling - no headers/footers */
-  border: 1px solid var(--vscode-badge-background) !important;
-  background-color: var(--vscode-badge-background) !important;
-  margin: 0 !important;
-  padding: 0px 2px !important;
-  /* Explicitly remove any pseudo-elements that might create header/footer appearance */
-  border-top: none !important;
-  border-bottom: none !important;
-  box-shadow: none !important;
+  border: 1px solid var(--vscode-badge-background);
+  background-color: var(--vscode-badge-background);
+  margin: 0;
+  padding: 0px 2px;
+  /* Reset any overrides from specialized tag rules */
+  color: var(--vscode-badge-foreground);
+  opacity: 1;
+  box-shadow: none;
 }
 
 /* Explicitly prevent any pseudo-elements on description tags */
-.task-description-display .kanban-tag::before,
-.task-description-display .kanban-tag::after {
-  display: none !important;
-  content: none !important;
+.task-description-display .kanban-tag.kanban-tag::before,
+.task-description-display .kanban-tag.kanban-tag::after {
+  display: none;
+  content: none;
 }
 
 /* Corner badge containers - flexbox based positioning */
@@ -4256,53 +4256,21 @@ blockquote {
  */
 
 /* Temporal highlighting for columns and tasks */
-/* Border style (default) - apply to column elements, not container */
-/* Week highlighting */
-.kanban-full-height-column[data-current-week="true"] .column-header,
-.kanban-full-height-column[data-current-week="true"] .column-title,
-.kanban-full-height-column[data-current-week="true"] .column-inner,
-.kanban-full-height-column[data-current-week="true"] .column-footer,
-.task-item[data-current-week="true"] {
-  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-/* Day/Date highlighting */
-.kanban-full-height-column[data-current-day="true"] .column-header,
-.kanban-full-height-column[data-current-day="true"] .column-title,
-.kanban-full-height-column[data-current-day="true"] .column-inner,
-.kanban-full-height-column[data-current-day="true"] .column-footer,
-.task-item[data-current-day="true"] {
-  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-/* Weekday highlighting */
-.kanban-full-height-column[data-current-weekday="true"] .column-header,
-.kanban-full-height-column[data-current-weekday="true"] .column-title,
-.kanban-full-height-column[data-current-weekday="true"] .column-inner,
-.kanban-full-height-column[data-current-weekday="true"] .column-footer,
-.task-item[data-current-weekday="true"] {
-  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-/* Time slot highlighting */
-.kanban-full-height-column[data-current-time="true"] .column-header,
-.kanban-full-height-column[data-current-time="true"] .column-title,
-.kanban-full-height-column[data-current-time="true"] .column-inner,
-.kanban-full-height-column[data-current-time="true"] .column-footer {
-  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-.task-item[data-current-time="true"],
-.task-item:not([data-task-tag])[data-current-time="true"] {
-  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-/* Hour highlighting */
-.kanban-full-height-column[data-current-hour="true"] .column-header,
-.kanban-full-height-column[data-current-hour="true"] .column-title,
-.kanban-full-height-column[data-current-hour="true"] .column-inner,
-.kanban-full-height-column[data-current-hour="true"] .column-footer,
-.task-item[data-current-hour="true"] {
+/* Border style (default) - consolidated using :is() for week/day/weekday/time/hour */
+.kanban-full-height-column:is(
+  [data-current-week="true"],
+  [data-current-day="true"],
+  [data-current-weekday="true"],
+  [data-current-time="true"],
+  [data-current-hour="true"]
+) :is(.column-header, .column-title, .column-inner, .column-footer),
+.task-item:is(
+  [data-current-week="true"],
+  [data-current-day="true"],
+  [data-current-weekday="true"],
+  [data-current-time="true"],
+  [data-current-hour="true"]
+) {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
@@ -5100,8 +5068,6 @@ s {
     border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
     animation: pulse 2s infinite;
 }
-
-/* Deprecated - include-icon now handled via ::before pseudo-element */
 
 .include-error {
     display: inline-block;

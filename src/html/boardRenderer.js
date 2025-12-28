@@ -1571,7 +1571,7 @@ function createColumnElement(column, columnIndex) {
     const cornerBadgesHtml = '';
 
     // Get display title using shared utility function
-    const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
+    const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay) : (column.title || '');
 
     // For editing, always use the full title including include syntax
     const editTitle = column.title || '';
@@ -1774,7 +1774,7 @@ function createTaskElement(task, columnId, taskIndex) {
     } else {
         // Normal title rendering
         renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
-            ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
+            ((task.displayTitle || (task.title ? window.removeTagsForDisplay(task.title) : '')) &&
              typeof (task.displayTitle || task.title) === 'string' &&
              (task.displayTitle || task.title).trim()) ?
             renderMarkdown(task.displayTitle || task.title, task.includeContext) : '';

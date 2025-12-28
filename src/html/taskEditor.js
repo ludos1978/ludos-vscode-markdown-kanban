@@ -1063,7 +1063,7 @@ class TaskEditor {
         if (!this.currentEditor || !this.currentEditor.displayElement) { return; }
 
         if (window.tagUtils) {
-            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay);
             this.currentEditor.displayElement.innerHTML = renderedTitle;
         } else {
             this.currentEditor.displayElement.innerHTML = column.title || '';

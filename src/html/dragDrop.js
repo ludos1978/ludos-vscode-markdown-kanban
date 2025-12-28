@@ -2841,7 +2841,7 @@ function updateColumnTitleDisplay(columnId) {
     }
 
     // Get display title using shared utility function
-    const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
+    const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay) : (column.title || '');
 
     // Update the column title DOM element
     const titleElement = columnElement.querySelector('.column-title-text.markdown-content');

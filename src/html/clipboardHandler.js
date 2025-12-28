@@ -28,7 +28,7 @@ window.handleClipboardMouseDown = async function(e) {
 
     // Wait a moment for focus to be established
     setTimeout(async () => {
-        await updateClipboardCardSource(true); // Force update
+        await refreshClipboardUI(true); // Force update
     }, 50);
 };
 

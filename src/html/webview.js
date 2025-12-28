@@ -15,17 +15,15 @@ window.currentBoard = currentBoard; // Expose to window for debug overlay verifi
 // Note: window.tagColors is set by backend in boardUpdate message
 // Do NOT initialize to {} here - it prevents actual config from loading!
 
-// MD5 hash generation function using Web Crypto API
-async function generateMD5Hash(arrayBuffer) {
+// Generate short content hash using SHA-256 (truncated to 16 chars for filename use)
+async function generateShortHash(arrayBuffer) {
     try {
-        // Use SHA-256 instead of MD5 as it's more widely supported and secure
         const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        return hashHex.substring(0, 16); // Take first 16 characters to simulate MD5 length
+        return hashHex.substring(0, 16);
     } catch (error) {
         console.error('❌ Failed to generate hash:', error.message);
-        // Fallback to timestamp if crypto fails
         return Date.now().toString(16);
     }
 }
@@ -256,7 +254,7 @@ async function readClipboardContent() {
                         });
 
                         const arrayBuffer = await arrayBufferPromise;
-                        const md5Hash = await generateMD5Hash(arrayBuffer);
+                        const contentHash = await generateShortHash(arrayBuffer);
 
                         return {
                             title: 'Clipboard Image',
@@ -265,7 +263,7 @@ async function readClipboardContent() {
                             isImage: true,
                             imageType: type,
                             isBase64: true,
-                            md5Hash: md5Hash
+                            md5Hash: contentHash
                         };
                     } catch (error) {
                         console.error('❌ Failed to convert blob to base64:', error.message);
@@ -455,7 +453,8 @@ async function fetchUrlTitle(url) {
     }
 }
 
-async function updateClipboardCardSource(force = false) {
+// Refresh clipboard card UI - reads clipboard and updates visual state
+async function refreshClipboardUI(force = false) {
     // Throttle clipboard reading to avoid over-requesting
     const now = Date.now();
     if (!force && (now - lastClipboardCheck) < CLIPBOARD_CHECK_THROTTLE) {
@@ -911,19 +910,19 @@ function setStickyStackMode(mode) {
 // Tag visibility functionality
 let currentTagVisibility = 'standard'; // Default to standard (exclude #span and #row)
 
-// Helper function to filter tags from text based on current visibility setting
-function filterTagsFromText(text) {
+// Remove tags from text for display based on current visibility setting
+function removeTagsForDisplay(text) {
     if (!text) {return text;}
 
     const setting = currentTagVisibility || 'standard';
 
     // Always use TagUtils - no fallback
-    if (!window.tagUtils || typeof window.tagUtils.filterTagsFromText !== 'function') {
-        console.error('[filterTagsFromText] tagUtils not available!');
+    if (!window.tagUtils || typeof window.tagUtils.removeTagsForDisplay !== 'function') {
+        console.error('[removeTagsForDisplay] tagUtils not available!');
         return text;
     }
 
-    return window.tagUtils.filterTagsFromText(text, setting);
+    return window.tagUtils.removeTagsForDisplay(text, setting);
 }
 
 function applyTagVisibility(setting) {
@@ -1125,7 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('focus', async () => {
         // Wait a moment for focus to be fully established
         setTimeout(async () => {
-            await updateClipboardCardSource(true); // Force update on focus
+            await refreshClipboardUI(true); // Force update on focus
         }, 100);
     });
     
@@ -1214,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('copy', async (e) => {
         // Wait a bit for the clipboard to be updated
         setTimeout(async () => {
-            await updateClipboardCardSource(true); // Force update after copy
+            await refreshClipboardUI(true); // Force update after copy
         }, 100);
     });
 
@@ -1224,14 +1223,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
             // Wait a bit for the clipboard to be updated
             setTimeout(async () => {
-                await updateClipboardCardSource(true); // Force update after copy
+                await refreshClipboardUI(true); // Force update after copy
             }, 200);
         }
     });
     
     // Initial clipboard check
     setTimeout(async () => {
-        await updateClipboardCardSource();
+        await refreshClipboardUI();
     }, 1000); // Delay to ensure everything is initialized
 
     // Add click handler to read clipboard (user interaction required for clipboard API)
@@ -1239,7 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (clipboardSource) {
         clipboardSource.addEventListener('click', async () => {
             // Manual update on click
-            await updateClipboardCardSource(true); // Force update on click
+            await refreshClipboardUI(true); // Force update on click
         });
     }
  
@@ -2554,7 +2553,7 @@ if (!webviewEventListenersInitialized) {
                         // Update DOM directly (minimal update, no full re-render)
                         const titleEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-title-text`);
                         if (titleEl && window.tagUtils) {
-                            titleEl.innerHTML = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                            titleEl.innerHTML = window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay);
                         }
                     }
                 }
@@ -3499,7 +3498,7 @@ window.currentRowHeight = currentRowHeight;
 window.setTagVisibility = setTagVisibility;
 window.applyTagVisibility = applyTagVisibility;
 window.currentTagVisibility = currentTagVisibility;
-window.filterTagsFromText = filterTagsFromText;
+window.removeTagsForDisplay = removeTagsForDisplay;
 window.filterTagsForExport = filterTagsForExport;
 window.updateColumnRowTag = updateColumnRowTag;
 window.getColumnRow = getColumnRow;

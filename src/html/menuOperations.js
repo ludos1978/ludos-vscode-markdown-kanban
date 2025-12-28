@@ -1235,7 +1235,7 @@ function changeColumnSpan(columnId, delta) {
         if (titleElement && window.cachedBoard) {
             const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
             if (columnData) {
-                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
+                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.removeTagsForDisplay) : (columnData.title || '');
                 titleElement.innerHTML = renderedTitle;
             }
         }
@@ -1458,7 +1458,7 @@ function toggleColumnSticky(columnId) {
         if (titleElement && window.cachedBoard) {
             const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
             if (columnData) {
-                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
+                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.removeTagsForDisplay) : (columnData.title || '');
                 titleElement.innerHTML = renderedTitle;
             }
         }
@@ -1568,7 +1568,7 @@ function toggleColumnStack(columnId) {
         if (titleElement && window.cachedBoard) {
             const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
             if (columnData) {
-                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
+                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.removeTagsForDisplay) : (columnData.title || '');
                 titleElement.innerHTML = renderedTitle;
             }
         }
@@ -2368,7 +2368,7 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
         if (columnData) {
             titleElement.innerHTML = window.tagUtils
-                ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText)
+                ? window.tagUtils.getColumnDisplayTitle(columnData, window.removeTagsForDisplay)
                 : (columnData.title || '');
         }
     }
@@ -3451,7 +3451,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                     // Update the title display using the shared utility function
                     const displayElement = element.querySelector('.column-title-text');
                     if (displayElement && window.tagUtils) {
-                        const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.removeTagsForDisplay);
                         displayElement.innerHTML = renderedTitle;
                     }
                 }

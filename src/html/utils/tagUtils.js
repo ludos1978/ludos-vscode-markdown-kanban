@@ -1189,21 +1189,21 @@ class TagUtils {
     }
 
     /**
-     * Filter tags from text based on visibility setting
-     * @param {string} text - Text to filter
+     * Remove tags from text for display based on visibility setting
+     * @param {string} text - Text to process
      * @param {string} setting - Visibility setting ('all', 'standard', 'custom', 'mentions', 'none')
-     * @returns {string} Filtered text
+     * @returns {string} Text with tags removed per setting
      */
-    filterTagsFromText(text, setting = 'standard') {
+    removeTagsForDisplay(text, setting = 'standard') {
         if (!text) return text;
 
         switch (setting) {
             case 'all':
-                // Show all tags - don't filter anything
+                // Show all tags - don't remove anything
                 return text;
             case 'standard':
             case 'allexcludinglayout':
-                // Hide layout tags only (#span, #row, #stack, #sticky) - direct replacement
+                // Remove layout tags only (#span, #row, #stack, #sticky)
                 return text
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
@@ -1213,7 +1213,7 @@ class TagUtils {
                     .trim();
             case 'custom':
             case 'customonly':
-                // Hide layout tags only (configured tag filtering happens in CSS) - direct replacement
+                // Remove layout tags only (configured tag filtering happens in CSS)
                 return text
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
@@ -1223,7 +1223,7 @@ class TagUtils {
                     .trim();
             case 'mentions':
             case 'mentionsonly':
-                // Hide all # and @ tags, keep $ person tags
+                // Remove all # and ! tags, keep @ person tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
                     removePerson: false,
@@ -1231,7 +1231,7 @@ class TagUtils {
                     keepLayout: false
                 });
             case 'none':
-                // Hide all tags
+                // Remove all tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
                     removePerson: true,
@@ -1240,7 +1240,7 @@ class TagUtils {
                 });
             default:
                 // Default to standard behavior
-                return this.filterTagsFromText(text, 'standard');
+                return this.removeTagsForDisplay(text, 'standard');
         }
     }
 
@@ -1298,7 +1298,7 @@ class TagUtils {
     /**
      * Get display title for a column, handling columninclude specially
      * @param {Object} column - Column object with title, includeMode, includeFiles, displayTitle
-     * @param {Function} filterFn - Tag filtering function (e.g., window.filterTagsFromText)
+     * @param {Function} filterFn - Tag removal function (e.g., window.removeTagsForDisplay)
      * @returns {string} HTML string for display
      */
     getColumnDisplayTitle(column, filterFn) {
@@ -1448,7 +1448,7 @@ class TagUtils {
             return generateIncludeLinkWithMenu(fileName, displayText, 'task');
         } else {
             // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
-            const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
+            const displayTitle = task.displayTitle || (task.title ? (window.removeTagsForDisplay ? window.removeTagsForDisplay(task.title) : task.title) : '');
 
             // Render markdown first (placeholder will be preserved in the output)
             const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);

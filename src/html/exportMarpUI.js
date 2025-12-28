@@ -1555,8 +1555,8 @@ function handleCopyContentResult(result) {
         if (navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(result.content).then(() => {
                 // Update clipboard card source to reflect new content
-                if (typeof updateClipboardCardSource === 'function') {
-                    setTimeout(() => updateClipboardCardSource(true), 50);
+                if (typeof refreshClipboardUI === 'function') {
+                    setTimeout(() => refreshClipboardUI(true), 50);
                 }
             }).catch(err => {
                 console.error('[kanban.exportMarpUI.handleCopyContentResult] Failed to copy:', err);
@@ -1575,8 +1575,8 @@ function handleCopyContentResult(result) {
             try {
                 document.execCommand('copy');
                 // Update clipboard card source to reflect new content
-                if (typeof updateClipboardCardSource === 'function') {
-                    setTimeout(() => updateClipboardCardSource(true), 50);
+                if (typeof refreshClipboardUI === 'function') {
+                    setTimeout(() => refreshClipboardUI(true), 50);
                 }
             } catch (err) {
                 console.error('[kanban.exportMarpUI.handleCopyContentResult] Fallback copy failed:', err);
