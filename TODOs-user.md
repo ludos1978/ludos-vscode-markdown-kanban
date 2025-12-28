@@ -1,3 +1,5 @@
+- [ ] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
+
 - [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
 
 - [ ] analyze the html structure and make a detailed hierarchy structure in a agent/HTML-STRUCTURE.md with structural documentation. i can provide a html of a typical presentation if you need. we will use it to simplify the css afterwards. so include any relevant data needed for a css analysation.

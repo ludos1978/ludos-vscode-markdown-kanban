@@ -215,21 +215,26 @@ function deleteFromMarkdown(path) {
 // ============================================================================
 
 /**
- * Toggle the image path menu visibility
- * Called from inline onclick handlers in rendered markdown
- * Creates menu dynamically and appends to body to avoid stacking context issues
+ * Unified path menu for images, videos, and includes
+ * Creates a floating menu dynamically and appends to body to avoid stacking context issues
+ *
+ * @param {HTMLElement} container - The container element with the menu button
+ * @param {string} filePath - The file path
+ * @param {'image' | 'video' | 'include'} mediaType - The type of media
  */
-function toggleImagePathMenu(container, imagePath) {
+function togglePathMenu(container, filePath, mediaType) {
     // Close any existing floating menus and other open menus
     closeAllPathMenus();
 
-    // Get button position for menu placement
-    const button = container.querySelector('.image-menu-btn');
+    // Determine button class based on media type
+    const buttonClass = mediaType === 'include' ? '.include-menu-btn' :
+                        mediaType === 'video' ? '.video-menu-btn' : '.image-menu-btn';
+    const button = container.querySelector(buttonClass);
     if (!button) return;
 
     const rect = button.getBoundingClientRect();
-    const isAbsolutePath = imagePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(imagePath);
-    const escapedPath = imagePath.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const isAbsolutePath = filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
+    const escapedPath = filePath.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
     // Find task/column context for targeted updates
     const taskElement = container.closest('.task-item');
@@ -237,49 +242,46 @@ function toggleImagePathMenu(container, imagePath) {
     const columnTitleElement = container.closest('.column-title');
     const taskId = taskElement?.dataset?.taskId || '';
     const columnId = columnElement?.dataset?.columnId || '';
-    // Detect if image is in column title (not in a task)
     const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
 
-    // Check if the image is broken (has the image-broken class)
-    const isBroken = container.classList.contains('image-broken');
+    // Determine if the item is broken based on media type
+    const isBroken = mediaType === 'include'
+        ? (container.classList.contains('include-broken') ||
+           container.closest('.include-error') !== null ||
+           container.closest('.include-container.include-error') !== null)
+        : mediaType === 'video'
+        ? container.classList.contains('video-broken')
+        : container.classList.contains('image-broken');
 
-    // Create floating menu
+    // Create floating menu - use consistent styling for all types
     const menu = document.createElement('div');
-    menu.id = 'floating-image-path-menu';
+    menu.id = `floating-${mediaType}-path-menu`;
     menu.className = 'image-path-menu visible';
     menu.style.position = 'fixed';
     menu.style.top = (rect.bottom + 2) + 'px';
     menu.style.left = rect.left + 'px';
     menu.style.zIndex = '999999';
-    menu.dataset.imagePath = imagePath;
+    menu.dataset.filePath = filePath;
 
-    if (isBroken) {
-        // Menu for broken images - Open disabled, Search/Browse enabled
-        menu.innerHTML = `
-            <button class="image-path-menu-item disabled" disabled>📄 Open</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
-            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
-        `;
-    } else {
-        // Menu for valid images - Open enabled, Search/Browse disabled
-        menu.innerHTML = `
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item disabled" disabled>🔎 Search for File</button>
-            <button class="image-path-menu-item disabled" disabled>📂 Browse for File</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
-            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
-        `;
-    }
+    // Build menu HTML based on broken state
+    // Broken: Open disabled, Search/Browse enabled
+    // Valid: Open enabled, Search/Browse disabled
+    // Exception: For includes, always enable Search/Browse since column includes
+    // don't get marked as broken in the DOM (error only shows in content area)
+    const openDisabled = isBroken;
+    const searchBrowseEnabled = isBroken || mediaType === 'include';
+
+    menu.innerHTML = `
+        <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}')"`}>📄 Open</button>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+        <button class="image-path-menu-item${searchBrowseEnabled ? '' : ' disabled'}" ${searchBrowseEnabled ? `onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"` : 'disabled'}>🔎 Search for File</button>
+        <button class="image-path-menu-item${searchBrowseEnabled ? '' : ' disabled'}" ${searchBrowseEnabled ? `onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"` : 'disabled'}>📂 Browse for File</button>
+        <div class="image-path-menu-divider"></div>
+        <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
+        <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
+        <div class="image-path-menu-divider"></div>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
+    `;
 
     document.body.appendChild(menu);
 
@@ -302,63 +304,17 @@ function toggleImagePathMenu(container, imagePath) {
     setTimeout(() => document.addEventListener('click', closeHandler), 0);
 }
 
-/**
- * Toggle the include path menu visibility
- * Called from inline onclick handlers in rendered include links
- * Creates a floating menu appended to body to escape stacking context issues
- */
+// Wrapper functions for backwards compatibility with existing onclick handlers
+function toggleImagePathMenu(container, imagePath) {
+    togglePathMenu(container, imagePath, 'image');
+}
+
+function toggleVideoPathMenu(container, videoPath) {
+    togglePathMenu(container, videoPath, 'video');
+}
+
 function toggleIncludePathMenu(container, includePath) {
-    // Close any existing floating menus and other open menus
-    closeAllPathMenus();
-
-    // Get button position for menu placement
-    const button = container.querySelector('.include-menu-btn');
-    if (!button) return;
-
-    const rect = button.getBoundingClientRect();
-    const isAbsolutePath = includePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(includePath);
-    const escapedPath = includePath.replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-    // Create floating menu
-    const menu = document.createElement('div');
-    menu.id = 'floating-include-path-menu';
-    menu.className = 'include-path-menu visible';
-    menu.style.position = 'fixed';
-    menu.style.top = (rect.bottom + 2) + 'px';
-    menu.style.left = rect.left + 'px';
-    menu.style.zIndex = '999999';
-    menu.dataset.includePath = includePath;
-
-    menu.innerHTML = `
-        <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
-        <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-        <button class="include-path-menu-item disabled" disabled>🔎 Search for File</button>
-        <div class="include-path-menu-divider"></div>
-        <button class="include-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
-        <button class="include-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
-        <div class="include-path-menu-divider"></div>
-        <button class="include-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
-    `;
-
-    document.body.appendChild(menu);
-
-    // Adjust position if menu goes off screen
-    const menuRect = menu.getBoundingClientRect();
-    if (menuRect.right > window.innerWidth) {
-        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
-    }
-    if (menuRect.bottom > window.innerHeight) {
-        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
-    }
-
-    // Close menu when clicking outside
-    const closeHandler = (e) => {
-        if (!menu.contains(e.target) && !container.contains(e.target)) {
-            menu.remove();
-            document.removeEventListener('click', closeHandler);
-        }
-    };
-    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+    togglePathMenu(container, includePath, 'include');
 }
 
 /**
@@ -684,94 +640,6 @@ function handleVideoNotFound(videoElement, originalSrc) {
 }
 
 /**
- * Toggle the video path menu visibility
- * Creates menu dynamically and appends to body to avoid stacking context issues
- * Mirrors the approach used by toggleImagePathMenu for consistency
- */
-function toggleVideoPathMenu(container, videoPath) {
-    // Close any existing floating menus and other open menus
-    closeAllPathMenus();
-
-    // Get button position for menu placement
-    const button = container.querySelector('.video-menu-btn');
-    if (!button) return;
-
-    const rect = button.getBoundingClientRect();
-    const isAbsolutePath = videoPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(videoPath);
-    const escapedPath = videoPath.replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-    // Find task/column context for targeted updates
-    const taskElement = container.closest('.task-item');
-    const columnElement = container.closest('.kanban-full-height-column') || container.closest('[data-column-id]');
-    const columnTitleElement = container.closest('.column-title');
-    const taskId = taskElement?.dataset?.taskId || '';
-    const columnId = columnElement?.dataset?.columnId || '';
-    // Detect if video is in column title (not in a task)
-    const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
-
-    // Check if the video is broken
-    const isBroken = container.classList.contains('video-broken');
-
-    // Create floating menu - use image-path-menu class for consistent styling
-    const menu = document.createElement('div');
-    menu.id = 'floating-video-path-menu';
-    menu.className = 'image-path-menu visible';
-    menu.style.position = 'fixed';
-    menu.style.top = (rect.bottom + 2) + 'px';
-    menu.style.left = rect.left + 'px';
-    menu.style.zIndex = '999999';
-    menu.dataset.videoPath = videoPath;
-
-    if (isBroken) {
-        // Menu for broken videos - Open disabled, Search/Browse enabled
-        menu.innerHTML = `
-            <button class="image-path-menu-item disabled" disabled>📄 Open</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
-            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
-        `;
-    } else {
-        // Menu for valid videos - Open enabled, Search/Browse disabled
-        menu.innerHTML = `
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item disabled" disabled>🔎 Search for File</button>
-            <button class="image-path-menu-item disabled" disabled>📂 Browse for File</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
-            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
-        `;
-    }
-
-    document.body.appendChild(menu);
-
-    // Adjust position if menu goes off screen
-    const menuRect = menu.getBoundingClientRect();
-    if (menuRect.right > window.innerWidth) {
-        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
-    }
-    if (menuRect.bottom > window.innerHeight) {
-        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
-    }
-
-    // Close menu when clicking outside
-    const closeHandler = (e) => {
-        if (!menu.contains(e.target) && !container.contains(e.target)) {
-            menu.remove();
-            document.removeEventListener('click', closeHandler);
-        }
-    };
-    setTimeout(() => document.addEventListener('click', closeHandler), 0);
-}
-
-/**
  * Toggle the video-not-found menu visibility
  */
 function toggleVideoNotFoundMenu(container) {
@@ -1014,10 +882,11 @@ window.browseForImage = browseForImage;
 window.deleteFromMarkdown = deleteFromMarkdown;
 
 // Path menus
+window.togglePathMenu = togglePathMenu;
 window.toggleImagePathMenu = toggleImagePathMenu;
 window.toggleIncludePathMenu = toggleIncludePathMenu;
-window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
 window.toggleVideoPathMenu = toggleVideoPathMenu;
+window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
 window.toggleVideoNotFoundMenu = toggleVideoNotFoundMenu;
 
 // Broken image handling

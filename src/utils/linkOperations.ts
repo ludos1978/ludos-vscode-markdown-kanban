@@ -3,7 +3,7 @@ import { escapeRegExp } from './stringUtils';
 /**
  * Types of link patterns that can be matched
  */
-type LinkMatchType = 'strikeImage' | 'strikeLink' | 'strikeWiki' | 'strikeAuto' | 'image' | 'link' | 'wiki' | 'auto';
+type LinkMatchType = 'strikeImage' | 'strikeLink' | 'strikeWiki' | 'strikeAuto' | 'strikeInclude' | 'image' | 'link' | 'wiki' | 'auto' | 'include';
 
 /**
  * Information about a matched link in the text
@@ -87,7 +87,10 @@ export class LinkOperations {
             { regex: new RegExp(`(!\\[[^\\]]*\\]\\(${escapedPath}\\))`, 'g'), type: 'image' },
             { regex: new RegExp(`(^|[^!])(\\[[^\\]]+\\]\\(${escapedPath}\\))`, 'gm'), type: 'link' },
             { regex: new RegExp(`(\\[\\[\\s*${escapedPath}(?:\\|[^\\]]*)?\\]\\])`, 'g'), type: 'wiki' },
-            { regex: new RegExp(`(<${escapedPath}>)`, 'g'), type: 'auto' }
+            { regex: new RegExp(`(<${escapedPath}>)`, 'g'), type: 'auto' },
+            // Include patterns (!!!include(path)!!!)
+            { regex: new RegExp(`~~(!!!include\\(${escapedPath}\\)!!!)~~`, 'g'), type: 'strikeInclude' },
+            { regex: new RegExp(`(!!!include\\(${escapedPath}\\)!!!)`, 'g'), type: 'include' }
         ];
 
         // Find all matches with their positions
@@ -220,6 +223,18 @@ export class LinkOperations {
                 const autoLink = match[1];
                 const newAutoLink = `<${encodedNewPath}>`;
                 replacement = `~~${autoLink}~~ ${newAutoLink}`;
+                break;
+            }
+            case 'include': {
+                const includeLink = match[1];
+                const newIncludeLink = `!!!include(${encodedNewPath})!!!`;
+                replacement = `~~${includeLink}~~ ${newIncludeLink}`;
+                break;
+            }
+            case 'strikeInclude': {
+                const includeLink = match[1];
+                const newIncludeLink = `!!!include(${encodedNewPath})!!!`;
+                replacement = `~~${includeLink}~~ ${newIncludeLink}`;
                 break;
             }
             default:

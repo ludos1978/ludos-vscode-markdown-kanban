@@ -47,6 +47,73 @@
     </span>`;
   }
 
+  // Image file extensions (lowercase, without dot)
+  const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'tif', 'avif', 'heic', 'heif'];
+  const VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv', 'mpg', 'mpeg'];
+
+  /**
+   * Get file extension from a path (lowercase, without dot)
+   */
+  function getFileExtension(filePath) {
+    if (!filePath) return '';
+    const ext = filePath.split('.').pop();
+    return ext ? ext.toLowerCase() : '';
+  }
+
+  /**
+   * Check if file path is an image file
+   */
+  function isImageFile(filePath) {
+    return IMAGE_EXTENSIONS.includes(getFileExtension(filePath));
+  }
+
+  /**
+   * Check if file path is a video file
+   */
+  function isVideoFile(filePath) {
+    return VIDEO_EXTENSIONS.includes(getFileExtension(filePath));
+  }
+
+  /**
+   * Generate HTML for an image include (with path menu overlay)
+   * @param {string} filePath - Path to the image
+   * @param {boolean} isBroken - Whether the image failed to load
+   * @returns {string} HTML string
+   */
+  function generateImageIncludeHtml(filePath, isBroken) {
+    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const isAbsolute = isAbsolutePath(filePath);
+    const brokenClass = isBroken ? ' image-broken' : '';
+
+    return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}" style="display: inline-block;">
+      <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
+           onerror="handleImageNotFound(this)"
+           style="max-width: 100%; height: auto;">
+      <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+    </span>`;
+  }
+
+  /**
+   * Generate HTML for a video include (with path menu overlay)
+   * @param {string} filePath - Path to the video
+   * @param {boolean} isBroken - Whether the video failed to load
+   * @returns {string} HTML string
+   */
+  function generateVideoIncludeHtml(filePath, isBroken) {
+    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const isAbsolute = isAbsolutePath(filePath);
+    const brokenClass = isBroken ? ' video-broken' : '';
+
+    return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}" style="display: inline-block;">
+      <video src="${escapeHtml(filePath)}" controls
+             onerror="handleVideoNotFound(this)"
+             style="max-width: 100%; height: auto;">
+        Your browser does not support the video tag.
+      </video>
+      <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+    </span>`;
+  }
+
   function markdownItInclude(md, options = {}) {
     const defaultOptions = {
       root: '',
@@ -130,6 +197,18 @@
       const content = token.content;
       const filePath = token.filePath || '';
 
+      // Check if include is an image file - render as image element
+      if (isImageFile(filePath)) {
+        // content === null means file not found (broken image)
+        return generateImageIncludeHtml(filePath, content === null);
+      }
+
+      // Check if include is a video file - render as video element
+      if (isVideoFile(filePath)) {
+        // content === null means file not found (broken video)
+        return generateVideoIncludeHtml(filePath, content === null);
+      }
+
       // If content is null (not loaded yet), show placeholder with data attribute for targeted update
       if (content === null) {
         return `<div class="include-placeholder-block" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
@@ -207,6 +286,18 @@
       const content = token.content;
       const filePath = token.attrGet('data-include-file') || '';
 
+      // Check if include is an image file - render as image element
+      if (isImageFile(filePath)) {
+        // For inline, content is available, so image exists
+        return generateImageIncludeHtml(filePath, false);
+      }
+
+      // Check if include is a video file - render as video element
+      if (isVideoFile(filePath)) {
+        // For inline, content is available, so video exists
+        return generateVideoIncludeHtml(filePath, false);
+      }
+
       // Render the content as markdown
       try {
         const rendered = md.render(content);
@@ -231,10 +322,20 @@
       }
     };
 
-    // Renderer for include placeholders (inline)
+    // Renderer for include placeholders (inline) - shown while loading
     md.renderer.rules.include_placeholder = function(tokens, idx, options, env, renderer) {
       const token = tokens[idx];
       const filePath = token.content;
+
+      // Check if include is an image file - render as image element (will show broken if fails)
+      if (isImageFile(filePath)) {
+        return generateImageIncludeHtml(filePath, false);
+      }
+
+      // Check if include is a video file - render as video element (will show broken if fails)
+      if (isVideoFile(filePath)) {
+        return generateVideoIncludeHtml(filePath, false);
+      }
 
       return `<span class="include-placeholder" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
              `📄⏳ Loading: ${escapeHtml(filePath)}` +
