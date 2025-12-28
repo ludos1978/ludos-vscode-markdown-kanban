@@ -109,9 +109,8 @@ export class PathCommands extends SwitchBasedCommand {
         // Update file content in cache (marks as unsaved, does NOT save to disk)
         file.setContent(result.content, false);
 
-        // Invalidate board cache and refresh webview to show updated paths
-        context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
+        // Refresh webview to show updated paths
+        await this.refreshBoard(context);
 
         // Notify frontend
         this.postMessage({
@@ -195,10 +194,9 @@ export class PathCommands extends SwitchBasedCommand {
             allWarnings.push(...result.warnings.map(w => `[${file.getRelativePath()}] ${w}`));
         }
 
-        // Invalidate board cache and refresh webview to show updated paths
+        // Refresh webview to show updated paths
         if (totalConverted > 0) {
-            context.boardStore.invalidateCache();
-            await context.onBoardUpdate();
+            await this.refreshBoard(context);
         }
 
         // Notify frontend
@@ -303,10 +301,8 @@ export class PathCommands extends SwitchBasedCommand {
         // Update file content in cache (marks as unsaved, does NOT save to disk)
         foundFile.setContent(newContent, false);
 
-        // Always invalidate board cache and refresh webview to show updated paths
-        // This is needed for includes to update their displayed path
-        context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
+        // Refresh webview to show updated paths (needed for includes to update their displayed path)
+        await this.refreshBoard(context);
 
         // Notify frontend
         this.postMessage({
@@ -616,8 +612,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Refresh the board
-        context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
+        await this.refreshBoard(context);
 
         // Notify frontend
         this.postMessage({
@@ -790,12 +785,10 @@ export class PathCommands extends SwitchBasedCommand {
                     }
                 } else {
                     // Column not found, fall back to full update
-                    context.boardStore.invalidateCache();
-                    await context.onBoardUpdate();
+                    await this.refreshBoard(context);
                 }
             } else {
-                context.boardStore.invalidateCache();
-                await context.onBoardUpdate();
+                await this.refreshBoard(context);
             }
         } else if (taskId && columnId) {
             // Include/image is in task - update task only
@@ -842,17 +835,14 @@ export class PathCommands extends SwitchBasedCommand {
                     }
                 } else {
                     // Task/column not found, fall back to full update
-                    context.boardStore.invalidateCache();
-                    await context.onBoardUpdate();
+                    await this.refreshBoard(context);
                 }
             } else {
-                context.boardStore.invalidateCache();
-                await context.onBoardUpdate();
+                await this.refreshBoard(context);
             }
         } else {
             // No context, do full board refresh
-            context.boardStore.invalidateCache();
-            await context.onBoardUpdate();
+            await this.refreshBoard(context);
         }
 
         // Notify frontend about the replacement
@@ -1027,8 +1017,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Refresh the board
-        context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
+        await this.refreshBoard(context);
 
         // Show result notification
         const skippedMsg = skippedPaths.length > 0

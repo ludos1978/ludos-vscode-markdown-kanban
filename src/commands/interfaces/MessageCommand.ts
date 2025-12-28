@@ -327,6 +327,35 @@ export abstract class BaseMessageCommand implements MessageCommand {
     }
 
     /**
+     * Get the main file from file registry, returning failure result if not available.
+     * Common pattern used across many command handlers.
+     *
+     * @returns Object with fileRegistry and mainFile, or CommandResult failure
+     */
+    protected getMainFileOrFail(): { fileRegistry: MarkdownFileRegistry; mainFile: ReturnType<MarkdownFileRegistry['getMainFile']> } | CommandResult {
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) {
+            return this.failure('File registry not available');
+        }
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            return this.failure('Main file not found');
+        }
+        return { fileRegistry, mainFile };
+    }
+
+    /**
+     * Invalidate board cache and trigger board update.
+     * Common pattern after path/content modifications.
+     *
+     * @param context - Command context
+     */
+    protected async refreshBoard(context: CommandContext): Promise<void> {
+        context.boardStore.invalidateCache();
+        await context.onBoardUpdate();
+    }
+
+    /**
      * Execute a board action using the action system.
      * Actions declare their targets for proper undo/redo handling and targeted updates.
      *

@@ -13,6 +13,17 @@ import {
 
 type TaskEvaluator = (taskText: string, taskDate: string | null, personNames: string[]) => boolean;
 
+/** Compare two numbers using the given operator */
+function compareNumbers(a: number, b: number, operator: string): boolean {
+    switch (operator) {
+        case '=': return a === b;
+        case '!=': return a !== b;
+        case '<': return a < b;
+        case '>': return a > b;
+        default: return false;
+    }
+}
+
 interface GatherRule {
     column: KanbanColumn;
     expression: string;
@@ -307,13 +318,7 @@ export class GatherQueryEngine {
                     const weekdayNum = weekdays.indexOf(propValue as string);
                     const numValue = parseInt(value);
                     if (!isNaN(numValue)) {
-                        switch (operator) {
-                            case '=': return weekdayNum === numValue;
-                            case '!=': return weekdayNum !== numValue;
-                            case '<': return weekdayNum < numValue;
-                            case '>': return weekdayNum > numValue;
-                            default: return false;
-                        }
+                        return compareNumbers(weekdayNum, numValue, operator);
                     }
                 }
 
@@ -322,27 +327,14 @@ export class GatherQueryEngine {
                     const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
                     if (months.includes(value.toLowerCase())) {
                         const targetMonth = months.indexOf(value.toLowerCase()) + 1;
-                        switch (operator) {
-                            case '=': return (propValue as number) === targetMonth;
-                            case '!=': return (propValue as number) !== targetMonth;
-                            case '<': return (propValue as number) < targetMonth;
-                            case '>': return (propValue as number) > targetMonth;
-                            default: return false;
-                        }
+                        return compareNumbers(propValue as number, targetMonth, operator);
                     }
                 }
 
                 // For numeric comparisons
                 const numValue = parseInt(value);
                 const numPropValue = typeof propValue === 'number' ? propValue : parseInt(propValue as string);
-
-                switch (operator) {
-                    case '=': return numPropValue === numValue;
-                    case '!=': return numPropValue !== numValue;
-                    case '<': return numPropValue < numValue;
-                    case '>': return numPropValue > numValue;
-                    default: return false;
-                }
+                return compareNumbers(numPropValue, numValue, operator);
             };
         } else {
             // Treat property as a person name check

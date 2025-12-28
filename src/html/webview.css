@@ -9,6 +9,15 @@
   --column-width: 350px;
   --collapsed-column-width: 40px;
 
+  /* Z-index layers for consistent stacking */
+  --z-base: 1;
+  --z-overlay-button: 10;
+  --z-corner-badge: 100;
+  --z-dropdown: 1000;
+  --z-modal: 10000;
+  --z-modal-overlay: 10001;
+  --z-search-modal: 100001;
+
   /* Task and section highlight colors */
   --task-focus-color: gray;
   --section-focus-color: gray;
