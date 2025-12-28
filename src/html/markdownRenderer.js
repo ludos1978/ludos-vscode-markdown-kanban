@@ -1029,13 +1029,30 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
     // Initial state: page 1
     let currentPage = 1;
 
-    // Create slideshow container
+    // Create slideshow container with overlay wrapper for burger menu
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-path-overlay-container pdf-slideshow-wrapper';
+    wrapper.dataset.imagePath = filePath;
+
     const container = document.createElement('div');
     container.className = 'pdf-slideshow';
     container.id = slideshowId;
     container.setAttribute('data-pdf-path', filePath);
     container.setAttribute('data-page-count', pageCount);
     container.setAttribute('data-current-page', currentPage);
+
+    // Burger menu button for path operations
+    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'image-menu-btn';
+    menuBtn.title = 'Path options';
+    menuBtn.textContent = '☰';
+    menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof toggleImagePathMenu === 'function') {
+            toggleImagePathMenu(wrapper, filePath);
+        }
+    };
 
     // Image container
     const imageContainer = document.createElement('div');
@@ -1066,9 +1083,13 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
     container.appendChild(imageContainer);
     container.appendChild(controls);
 
+    // Assemble the wrapper with burger menu
+    wrapper.appendChild(container);
+    wrapper.appendChild(menuBtn);
+
     // Replace placeholder with slideshow
     element.innerHTML = '';
-    element.appendChild(container);
+    element.appendChild(wrapper);
 
     // Function to load and display a specific page
     const loadPage = async (pageNumber) => {
@@ -1232,10 +1253,22 @@ async function processDiagramQueue() {
 
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
-            const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` : `${item.diagramType} diagram`;
-            element.innerHTML = `<div class="diagram-error">
-                <span class="error-icon">⚠️</span>
-                <span class="error-text">Failed to load ${errorLabel}</span>
+            const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` :
+                               item.diagramType === 'pdf-slideshow' ? 'PDF' : `${item.diagramType} diagram`;
+            // Wrap error in overlay container with burger menu for path operations
+            let decodedPath = item.filePath;
+            try {
+                decodedPath = decodeURIComponent(item.filePath);
+            } catch (e) {
+                // If decoding fails, use original path
+            }
+            const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            element.innerHTML = `<div class="image-path-overlay-container image-broken" data-image-path="${decodedPath.replace(/"/g, '&quot;')}">
+                <div class="diagram-error">
+                    <span class="error-icon">⚠️</span>
+                    <span class="error-text">Failed to load ${errorLabel}</span>
+                </div>
+                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;
         }
     }

@@ -23,6 +23,7 @@ import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showInfo, showWarning } from '../services/NotificationService';
+import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 
 /**
  * Path Commands Handler
@@ -737,21 +738,41 @@ export class PathCommands extends SwitchBasedCommand {
 
         // Send targeted update based on context
         if (isColumnTitle && columnId) {
-            // Image is in column title - update column only
+            // Include/image is in column title - update column only
             const board = context.boardStore.getBoard();
             if (board) {
                 const column = board.columns.find(c => c.id === columnId);
                 if (column) {
+                    // Extract old include paths before updating
+                    const oldIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
+                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
+
                     // Manually update the column title with the new path
                     column.title = LinkOperations.replaceSingleLink(column.title, oldPath, newPath, 0);
 
-                    // Send targeted column update
-                    this.postMessage({
-                        type: 'updateColumnContent',
-                        columnId: columnId,
-                        column: column,
-                        imageMappings: {}
-                    });
+                    // Extract new include paths after updating
+                    const newIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
+                    const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
+
+                    // Check if include paths changed - if so, trigger include switch to reload content
+                    const oldPathWasInclude = oldIncludePaths.some(p => p === oldPath);
+                    if (oldPathWasInclude && newIncludePaths.length > 0) {
+                        // Trigger include file switch to reload content from new path
+                        await context.handleIncludeSwitch({
+                            columnId: columnId,
+                            oldFiles: oldIncludePaths,
+                            newFiles: newIncludePaths,
+                            newTitle: column.title
+                        });
+                    } else {
+                        // Not an include change, just send targeted column update
+                        this.postMessage({
+                            type: 'updateColumnContent',
+                            columnId: columnId,
+                            column: column,
+                            imageMappings: {}
+                        });
+                    }
                 } else {
                     // Column not found, fall back to full update
                     context.boardStore.invalidateCache();

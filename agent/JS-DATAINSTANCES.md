@@ -2,7 +2,108 @@
 
 This document lists all data instances (global variables, module-level state, singleton instances) in the JavaScript codebase.
 
-**Last Updated:** 2025-10-26
+**Last Updated:** 2025-12-28
+
+---
+
+## Data Architecture Overview
+
+### Three-Tier Data Model
+
+The extension has three places where board data lives:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. BACKEND (TypeScript - VS Code Extension Host)                   │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Source of Truth: MainKanbanFile, IncludeFile instances             │
+│  - Parses markdown files → KanbanBoard object                       │
+│  - Writes KanbanBoard → markdown files                              │
+│  - Handles file system operations                                   │
+│  - Managed by: MarkdownFileRegistry, FileManager                    │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ postMessage({type: 'boardData', board: {...}})
+                              │ postMessage({type: 'updateTaskContent', task: {...}})
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. WEBVIEW CACHE (JavaScript - window.cachedBoard)                 │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Frontend Cache: Copy of board data in webview JavaScript           │
+│  - Set in webview.js when 'boardData' message received              │
+│  - Updated incrementally via 'updateTaskContent', 'updateColumn'    │
+│  - Used by renderBoard() to generate HTML                           │
+│  - Used by taskEditor to initialize edit field values               │
+│  - Used by drag-drop to track task/column positions                 │
+│  Location: window.cachedBoard (global in webview context)           │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ renderBoard(), renderSingleTask(), etc.
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  3. DOM (HTML - Rendered UI)                                        │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Visual Representation: What the user sees and interacts with       │
+│  - Generated from window.cachedBoard by boardRenderer.js            │
+│  - User edits happen here (input fields, drag-drop)                 │
+│  - Changes sent back to backend via postMessage                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Examples
+
+**Initial Load:**
+```
+Backend: Load file → Parse markdown → KanbanBoard
+    ↓ postMessage({type: 'boardData', board})
+Webview: window.cachedBoard = message.board
+    ↓ renderBoard()
+DOM: <div class="kanban-board">...</div>
+```
+
+**User Edits Task:**
+```
+DOM: User types in <textarea class="task-description-edit">
+    ↓ taskEditor.save()
+Webview: postMessage({type: 'boardUpdate', board: window.cachedBoard})
+    ↓
+Backend: Updates MainKanbanFile → Marks unsaved → Writes to disk
+```
+
+**Path Replacement (Search for File):**
+```
+DOM: User clicks "Search for File" → postMessage({type: 'searchForFile'})
+    ↓
+Backend: Shows file picker → Replaces path in file content
+    ↓ postMessage({type: 'updateTaskContent', task: updatedTask})
+Webview:
+    1. window.cachedBoard.task.description = updatedTask.description
+    2. If editing: editor.element.value = updatedTask.description
+    3. If not editing: renderSingleTask()
+    ↓
+DOM: Updated task rendered with new path
+```
+
+### Sync Considerations
+
+**Why window.cachedBoard Exists:**
+- Webview cannot directly access backend file system
+- Avoids round-trip for every read operation
+- Required for drag-drop (need full board structure)
+- Required for rendering (needs all task data)
+
+**Potential Sync Issues:**
+1. **Stale Cache**: If backend updates but message fails, cache is stale
+2. **Edit Field vs Cache**: When editing, edit field has own value separate from cache
+3. **Race Conditions**: Multiple updates can arrive out of order
+
+**How Sync Is Maintained:**
+1. Backend sends incremental updates via `updateTaskContent`, `updateColumnContent`
+2. Webview updates `window.cachedBoard` on every message
+3. Edit fields are updated when `updateTaskContent` received while editing (fixed 2025-12-28)
+4. Full refresh via `renderBoard()` when not in edit mode
+
+---
 
 ## Format
 Each entry follows: `path_to_filename-instancename` with a brief description
@@ -29,6 +130,36 @@ if (isEditing) {
 ---
 
 ## src/html/webview.js - Global Instances
+
+### Critical Instance: `window.cachedBoard`
+**Location**: Global window object (set in webview.js)
+**Type**: `null | KanbanBoard` (board object)
+**Purpose**: Frontend cache of the entire board data structure
+
+**Set By**:
+```javascript
+case 'boardData':
+    window.cachedBoard = message.board;
+    renderBoard();
+    break;
+```
+
+**Updated By**:
+- `boardData` message: Full board replacement
+- `updateTaskContent` message: Incremental task update
+- `updateColumnContent` message: Incremental column update
+- `boardUpdate` message: After drag-drop or edits
+
+**Used By**:
+- `renderBoard()`: Generate DOM from board data
+- `taskEditor._initializeTaskDescriptionValue()`: Initialize edit fields
+- `dragDrop.js`: Track positions during drag operations
+- `search.js`: Search through tasks
+- All UI operations that need board structure
+
+**Why Important**: This is the single source of truth in the frontend. All rendering and UI operations read from this cache. Must stay in sync with backend.
+
+---
 
 ### State Variables
 - src_html_webview-currentFileInfo - Current file information (null | object)

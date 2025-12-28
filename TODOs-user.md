@@ -1,3 +1,5 @@
+- [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
+
 - [ ] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
 
 - [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
@@ -12,7 +14,7 @@
 
 - [ ] add a table editor that allows sorting of content by each category.
 
-- [ ] in the marp presentation expost the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
+- [ ] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
 
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 

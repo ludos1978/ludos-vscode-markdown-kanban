@@ -1263,9 +1263,12 @@ body.small-card-fonts .task-title-container .markdown-content img {
   background: rgba(0, 0, 0, 0.8);
 }
 
-/* BROKEN STATE: Always show menu button on broken videos */
+/* BROKEN STATE: Always show menu button on broken videos with warning outline */
 .video-path-overlay-container.video-broken .video-menu-btn {
   opacity: 1 !important;
+  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+  outline-offset: -1px;
+  background: rgba(190, 140, 0, 0.3);
 }
 
 /* Video not found container with burger menu */
@@ -3775,9 +3778,12 @@ blockquote {
   background: rgba(0, 0, 0, 0.8);
 }
 
-/* BROKEN STATE: Always show menu button on broken images */
+/* BROKEN STATE: Always show menu button on broken images with warning outline */
 .image-path-overlay-container.image-broken .image-menu-btn {
   opacity: 1 !important;
+  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+  outline-offset: -1px;
+  background: rgba(190, 140, 0, 0.3);
 }
 
 /* ============================================================================
@@ -3890,12 +3896,33 @@ blockquote {
   background: rgba(0, 0, 0, 0.7);
 }
 
-/* BROKEN STATE: Always show menu button on broken includes */
+/* BROKEN STATE: Always show menu button on broken includes with warning outline */
 /* Handles includes inside error containers and broken include link styling */
 .include-error .include-path-overlay-container .include-menu-btn,
 .include-container.include-error .include-path-overlay-container .include-menu-btn,
 .include-path-overlay-container.include-broken .include-menu-btn {
   opacity: 1 !important;
+  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+  outline-offset: -1px;
+  background: rgba(190, 140, 0, 0.3);
+}
+
+/* COLUMN/TASK INCLUDES: Always show menu button since broken state cannot be detected at render time */
+/* These includes in column/task titles need the menu to be accessible for Search for File functionality */
+.include-path-overlay-container[data-include-type="column"] .include-menu-btn,
+.include-path-overlay-container[data-include-type="task"] .include-menu-btn {
+  opacity: 1 !important;
+}
+
+/* COLUMN/TASK INCLUDES WITH ERRORS: Show warning outline when the column/task content has include errors */
+/* Uses :has() to detect error state in content area and apply warning to the title's include menu button */
+.kanban-full-height-column:has(.include-error) .column-title .include-path-overlay-container .include-menu-btn,
+.kanban-full-height-column:has(.include-container.include-error) .column-title .include-path-overlay-container .include-menu-btn,
+.task-item:has(.include-error) .task-title .include-path-overlay-container .include-menu-btn,
+.task-item:has(.include-container.include-error) .task-title .include-path-overlay-container .include-menu-btn {
+  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+  outline-offset: -1px;
+  background: rgba(190, 140, 0, 0.3);
 }
 
 .markdown-content a[href$=".pdf"],
@@ -6612,6 +6639,19 @@ figcaption {
 }
 
 /* PDF Slideshow Styles */
+
+/* Wrapper for PDF slideshow with burger menu */
+.pdf-slideshow-wrapper {
+  position: relative;
+  display: block;
+}
+
+.pdf-slideshow-wrapper .image-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
 .pdf-slideshow {
   display: flex;
   flex-direction: column;
@@ -7246,6 +7286,20 @@ body.font-size-5x .task-description-edit {
     font-family: var(--vscode-editor-font-family, monospace);
     color: var(--vscode-descriptionForeground, #969696);
     word-break: break-all;
+    /* Max 2 lines, show end of text (filename visible) */
+    display: block;
+    max-height: calc(2 * 1.4em);
+    line-height: 1.4em;
+    overflow: hidden;
+    direction: rtl;
+    text-align: left;
+    cursor: default;
+}
+
+.file-search-subtitle:hover {
+    max-height: none;
+    overflow: visible;
+    direction: ltr;
 }
 
 .file-search-broken-info {
@@ -7408,6 +7462,19 @@ body.font-size-5x .task-description-edit {
     font-family: var(--vscode-font-family);
     color: var(--vscode-foreground, #cccccc);
     word-break: break-word;
+    /* Max 2 lines, show end of text (filename visible) */
+    display: block;
+    max-height: calc(2 * 1.4em);
+    line-height: 1.4em;
+    overflow: hidden;
+    direction: rtl;
+    text-align: left;
+}
+
+.file-search-table tr:hover .file-search-result-label {
+    max-height: none;
+    overflow: visible;
+    direction: ltr;
 }
 
 .file-search-result-path {
@@ -7440,7 +7507,7 @@ body.font-size-5x .task-description-edit {
     padding: 12px 20px;
     background: var(--vscode-sideBar-background, #252526);
     border-top: 1px solid var(--vscode-widget-border, #454545);
-    max-height: 150px;
+    max-height: 10%;
     overflow-y: auto;
 }
 
@@ -7466,11 +7533,13 @@ body.font-size-5x .task-description-edit {
 }
 
 .file-search-batch-item.can-replace {
+    color: var(--vscode-inputValidation-infoForeground, #063b49);
     background: var(--vscode-inputValidation-infoBackground, #063b49);
     border: 1px solid var(--vscode-inputValidation-infoBorder, #007acc);
 }
 
 .file-search-batch-item.cannot-replace {
+    color: var(--vscode-inputValidation-warningForeground, #352a05);
     background: var(--vscode-inputValidation-warningBackground, #352a05);
     border: 1px solid var(--vscode-inputValidation-warningBorder, #be8c00);
 }
@@ -7506,6 +7575,7 @@ body.font-size-5x .task-description-edit {
     align-items: center;
     justify-content: space-between;
     gap: 20px;
+    max-height: 10%;
 }
 
 .file-search-batch-option {
@@ -7590,6 +7660,7 @@ body.font-size-5x .task-description-edit {
     align-items: center;
     gap: 8px;
     min-height: 36px;
+    max-height: 15%;
 }
 
 .file-search-path-preview-label {
@@ -7605,6 +7676,19 @@ body.font-size-5x .task-description-edit {
     /* color: var(--vscode-textPreformat-foreground, #d7ba7d); */
     word-break: break-all;
     flex: 1;
+    /* Max 2 lines, show end of text (filename visible) */
+    max-height: calc(2 * 1.4em);
+    line-height: 1.4em;
+    overflow: hidden;
+    direction: rtl;
+    text-align: left;
+    cursor: default;
+}
+
+.file-search-path-preview:hover .file-search-path-preview-value {
+    max-height: none;
+    overflow: visible;
+    direction: ltr;
 }
 
 .file-search-path-preview:not(.has-value) .file-search-path-preview-value {

@@ -30,14 +30,15 @@
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' :
                       clickHandler === 'column' ? 'handleColumnIncludeClick' : 'handleRegularIncludeClick';
     const isAbsolute = isAbsolutePath(filePath);
+    const isColumnTitle = clickHandler === 'column' ? 'true' : 'false';
 
-    return `<span class="include-path-overlay-container">
+    return `<span class="include-path-overlay-container" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
         <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">
             <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
             <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="include-path-menu-item disabled" disabled>🔎 Search for File</button>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); searchForIncludeFile(this, '${escapedPath}', '${isColumnTitle}')">🔎 Search for File</button>
             <div class="include-path-menu-divider"></div>
             <button class="include-path-menu-item${isAbsolute ? '' : ' disabled'}" ${isAbsolute ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
             <button class="include-path-menu-item${isAbsolute ? ' disabled' : ''}" ${isAbsolute ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
@@ -87,7 +88,7 @@
 
     return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}" style="display: inline-block;">
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
-           onerror="handleImageNotFound(this)"
+           onerror="handleImageNotFound(this, '${escapedPath}')"
            style="max-width: 100%; height: auto;">
       <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
     </span>`;
@@ -106,7 +107,7 @@
 
     return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}" style="display: inline-block;">
       <video src="${escapeHtml(filePath)}" controls
-             onerror="handleVideoNotFound(this)"
+             onerror="handleVideoNotFound(this, '${escapedPath}')"
              style="max-width: 100%; height: auto;">
         Your browser does not support the video tag.
       </video>

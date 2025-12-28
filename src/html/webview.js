@@ -2354,6 +2354,22 @@ if (!webviewEventListenersInitialized) {
 
                     // Check if user is currently editing
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+                    const isEditingThisColumn = isEditing &&
+                        window.taskEditor.currentEditor.type === 'column-title' &&
+                        window.taskEditor.currentEditor.columnId === message.columnId;
+
+                    // CRITICAL FIX: Update editor field value when content changes (e.g., path replacement)
+                    // This ensures the edit field reflects the latest content after replacements
+                    if (isEditingThisColumn) {
+                        const editor = window.taskEditor.currentEditor;
+                        const colData = message.column || message;
+                        const newTitle = message.columnTitle !== undefined ? message.columnTitle : colData.title;
+
+                        if (newTitle !== undefined) {
+                            editor.element.value = newTitle || '';
+                            editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                        }
+                    }
 
                     // CRITICAL: Always render when receiving include content or tasks
                     // Even if user is editing, new include content MUST be shown
@@ -2464,14 +2480,21 @@ if (!webviewEventListenersInitialized) {
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
                     const isEditingThisTask = isEditing && window.taskEditor.currentEditor.taskId === message.taskId;
 
-                    // CRITICAL FIX: For include changes, update the editor field value even if editing
-                    // The backend has processed the include removal/addition and stopped editing
-                    // We need to update the textarea to reflect the new title
-                    if (isEditingThisTask && message.taskTitle !== undefined) {
+                    // CRITICAL FIX: Update editor field value when content changes (e.g., path replacement)
+                    // This ensures the edit field reflects the latest content after replacements
+                    if (isEditingThisTask) {
                         const editor = window.taskEditor.currentEditor;
-                        if (editor.type === 'task-title') {
-                            // Update the editor field value to match the backend's processed title
-                            editor.element.value = message.taskTitle || '';
+                        const taskData = message.task || message;
+
+                        if (editor.type === 'task-title' && (message.taskTitle !== undefined || taskData.title !== undefined)) {
+                            const newTitle = message.taskTitle !== undefined ? message.taskTitle : taskData.title;
+                            editor.element.value = newTitle || '';
+                            editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                        }
+
+                        if (editor.type === 'task-description' && taskData.description !== undefined) {
+                            editor.element.value = taskData.description || '';
+                            editor.originalValue = taskData.description || ''; // Update originalValue to prevent stale revert
                         }
                     }
 

@@ -47,4 +47,8 @@ kanban-plugin: board
 ## second #stack
 - [ ] test
 
+## Broken things
+- [ ] #pink
+  ![photo-1756244866467-f4682840070c](/Users/raspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/photo-1756244866467-f4682840070c.avif)
+
 

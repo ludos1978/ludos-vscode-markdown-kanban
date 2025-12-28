@@ -3,7 +3,7 @@ import { escapeRegExp } from './stringUtils';
 /**
  * Types of link patterns that can be matched
  */
-type LinkMatchType = 'strikeImage' | 'strikeLink' | 'strikeWiki' | 'strikeAuto' | 'strikeInclude' | 'image' | 'link' | 'wiki' | 'auto' | 'include';
+type LinkMatchType = 'image' | 'link' | 'wiki' | 'auto' | 'include';
 
 /**
  * Information about a matched link in the text
@@ -21,9 +21,10 @@ interface LinkMatchInfo {
  *
  * This class provides static methods for replacing links in markdown text,
  * handling various link formats including regular links, wiki links, images,
- * and strikethrough links.
+ * and include statements.
  *
- * State: manually verified.
+ * Replacements are done in-place (old link is replaced with new link).
+ * Undo is handled by VS Code's document undo system.
  */
 export class LinkOperations {
     /**
@@ -62,7 +63,7 @@ export class LinkOperations {
 
     /**
      * Replace only the specific occurrence (by index) of a specific link in text
-     * Handles both already strikethrough and regular links properly
+     * Simply replaces the old path with the new path (no strikethrough).
      *
      * @param text - The text containing links to replace
      * @param originalPath - The original path to search for
@@ -78,18 +79,15 @@ export class LinkOperations {
 
         // Define all patterns we need to check
         const patterns: { regex: RegExp; type: LinkMatchType }[] = [
-            // Already strikethrough patterns
-            { regex: new RegExp(`~~(!\\[[^\\]]*\\]\\(${escapedPath}\\))~~`, 'g'), type: 'strikeImage' },
-            { regex: new RegExp(`~~(\\[[^\\]]+\\]\\(${escapedPath}\\))~~`, 'g'), type: 'strikeLink' },
-            { regex: new RegExp(`~~(\\[\\[\\s*${escapedPath}(?:\\|[^\\]]*)?\\]\\])~~`, 'g'), type: 'strikeWiki' },
-            { regex: new RegExp(`~~(<${escapedPath}>)~~`, 'g'), type: 'strikeAuto' },
-            // Regular patterns
+            // Image: ![alt](path)
             { regex: new RegExp(`(!\\[[^\\]]*\\]\\(${escapedPath}\\))`, 'g'), type: 'image' },
+            // Regular link: [text](path) - but not images (negative lookbehind for !)
             { regex: new RegExp(`(^|[^!])(\\[[^\\]]+\\]\\(${escapedPath}\\))`, 'gm'), type: 'link' },
+            // Wiki link: [[path]] or [[path|alias]]
             { regex: new RegExp(`(\\[\\[\\s*${escapedPath}(?:\\|[^\\]]*)?\\]\\])`, 'g'), type: 'wiki' },
+            // Auto link: <path>
             { regex: new RegExp(`(<${escapedPath}>)`, 'g'), type: 'auto' },
-            // Include patterns (!!!include(path)!!!)
-            { regex: new RegExp(`~~(!!!include\\(${escapedPath}\\)!!!)~~`, 'g'), type: 'strikeInclude' },
+            // Include: !!!include(path)!!!
             { regex: new RegExp(`(!!!include\\(${escapedPath}\\)!!!)`, 'g'), type: 'include' }
         ];
 
@@ -100,11 +98,9 @@ export class LinkOperations {
             const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
             while ((match = regex.exec(text)) !== null) {
                 // For angle bracket links, validate that they're actual links (not HTML tags)
-                if (pattern.type === 'auto' || pattern.type === 'strikeAuto') {
-                    // Extract content between angle brackets
-                    const content = originalPath; // The path we're searching for
+                if (pattern.type === 'auto') {
+                    const content = originalPath;
                     if (!this.isActualLink(content)) {
-                        // Skip this match - it's likely an HTML tag like <hr> or <br>
                         if (match.index === regex.lastIndex) {
                             regex.lastIndex++;
                         }
@@ -129,29 +125,13 @@ export class LinkOperations {
         // Sort matches by position
         allMatches.sort((a, b) => a.start - b.start);
 
-        // Remove nested matches - if we have both ~~![image]~~ and ![image], remove the inner one
-        const filteredMatches: LinkMatchInfo[] = [];
-        for (const match of allMatches) {
-            // Check if this match is contained within any other match
-            const isNested = allMatches.some(other =>
-                other !== match &&
-                other.start < match.start &&
-                other.end > match.end &&
-                (other.type.startsWith('strike') && !match.type.startsWith('strike'))
-            );
-
-            if (!isNested) {
-                filteredMatches.push(match);
-            }
-        }
-
-        // Check if targetIndex is valid (using filtered matches)
-        if (targetIndex >= 0 && targetIndex < filteredMatches.length) {
-            const targetMatch = filteredMatches[targetIndex];
+        // Check if targetIndex is valid
+        if (targetIndex >= 0 && targetIndex < allMatches.length) {
+            const targetMatch = allMatches[targetIndex];
             return this.replaceMatchAtPosition(text, targetMatch, originalPath, encodedNewPath);
-        } else if (filteredMatches.length > 0) {
+        } else if (allMatches.length > 0) {
             // Fallback: replace first match
-            const targetMatch = filteredMatches[0];
+            const targetMatch = allMatches[0];
             return this.replaceMatchAtPosition(text, targetMatch, originalPath, encodedNewPath);
         }
 
@@ -161,7 +141,7 @@ export class LinkOperations {
 
     /**
      * Replace a specific match at its exact position with the new path
-     * Uses position-based slicing instead of pattern-based replacement to avoid replacing wrong occurrences
+     * Simply replaces the old link with the new link (no strikethrough).
      *
      * @param text - The text containing the link to replace
      * @param matchInfo - Information about the match including position and type
@@ -176,65 +156,35 @@ export class LinkOperations {
         let replacement = '';
 
         switch (type) {
-            case 'strikeImage': {
-                const imageLink = match[1];
-                const newImageLink = imageLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `~~${imageLink}~~ ${newImageLink}`;
-                break;
-            }
-            case 'strikeLink': {
-                const regularLink = match[1];
-                const newRegularLink = regularLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `~~${regularLink}~~ ${newRegularLink}`;
-                break;
-            }
-            case 'strikeWiki': {
-                const wikiLink = match[1];
-                const newWikiLink = wikiLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `~~${wikiLink}~~ ${newWikiLink}`;
-                break;
-            }
-            case 'strikeAuto': {
-                const autoLink = match[1];
-                const newAutoLink = `<${encodedNewPath}>`;
-                replacement = `~~${autoLink}~~ ${newAutoLink}`;
-                break;
-            }
             case 'image': {
+                // ![alt](oldPath) → ![alt](newPath)
                 const imageLink = match[1];
-                const newImageLink = imageLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `~~${imageLink}~~ ${newImageLink}`;
+                replacement = imageLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
                 break;
             }
             case 'link': {
+                // [text](oldPath) → [text](newPath)
+                // match[1] is the preceding character (or empty), match[2] is the link
                 const before = match[1];
                 const regularLink = match[2];
-                const newRegularLink = regularLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `${before}~~${regularLink}~~ ${newRegularLink}`;
+                const newLink = regularLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
+                replacement = `${before}${newLink}`;
                 break;
             }
             case 'wiki': {
+                // [[oldPath|alias]] → [[newPath|alias]]
                 const wikiLink = match[1];
-                const newWikiLink = wikiLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
-                replacement = `~~${wikiLink}~~ ${newWikiLink}`;
+                replacement = wikiLink.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
                 break;
             }
             case 'auto': {
-                const autoLink = match[1];
-                const newAutoLink = `<${encodedNewPath}>`;
-                replacement = `~~${autoLink}~~ ${newAutoLink}`;
+                // <oldPath> → <newPath>
+                replacement = `<${encodedNewPath}>`;
                 break;
             }
             case 'include': {
-                const includeLink = match[1];
-                const newIncludeLink = `!!!include(${encodedNewPath})!!!`;
-                replacement = `~~${includeLink}~~ ${newIncludeLink}`;
-                break;
-            }
-            case 'strikeInclude': {
-                const includeLink = match[1];
-                const newIncludeLink = `!!!include(${encodedNewPath})!!!`;
-                replacement = `~~${includeLink}~~ ${newIncludeLink}`;
+                // !!!include(oldPath)!!! → !!!include(newPath)!!!
+                replacement = `!!!include(${encodedNewPath})!!!`;
                 break;
             }
             default:

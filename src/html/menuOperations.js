@@ -1759,7 +1759,7 @@ function duplicateTask(taskId, columnId) {
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
-            const { task: originalTask, column: targetColumn, columnId: actualColumnId } = found;
+            const { task: originalTask, column: targetColumn } = found;
             const duplicatedTask = {
                 id: `temp-duplicate-${Date.now()}`,
                 title: originalTask.title,
@@ -1768,7 +1768,7 @@ function duplicateTask(taskId, columnId) {
 
             // Insert after the original task
             const originalIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
-            updateCacheForNewTask(actualColumnId, duplicatedTask, originalIndex + 1);
+            updateCacheForNewTask(targetColumn.id, duplicatedTask, originalIndex + 1);
         }
     }
 
@@ -1783,7 +1783,7 @@ function insertTaskBefore(taskId, columnId) {
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
-            const { column: targetColumn, columnId: actualColumnId } = found;
+            const { column: targetColumn } = found;
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
 
             if (targetIndex >= 0) {
@@ -1793,7 +1793,7 @@ function insertTaskBefore(taskId, columnId) {
                     description: ''
                 };
 
-                updateCacheForNewTask(actualColumnId, newTask, targetIndex);
+                updateCacheForNewTask(targetColumn.id, newTask, targetIndex);
             }
         }
     }
@@ -1809,7 +1809,7 @@ function insertTaskAfter(taskId, columnId) {
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
-            const { column: targetColumn, columnId: actualColumnId } = found;
+            const { column: targetColumn } = found;
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
             if (targetIndex >= 0) {
                 const newTask = {
@@ -1818,7 +1818,7 @@ function insertTaskAfter(taskId, columnId) {
                     description: ''
                 };
 
-                updateCacheForNewTask(actualColumnId, newTask, targetIndex + 1);
+                updateCacheForNewTask(targetColumn.id, newTask, targetIndex + 1);
             }
         }
     }
