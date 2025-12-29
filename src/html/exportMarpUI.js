@@ -1867,7 +1867,6 @@ window.closeExportModal = closeExportModal;
 window.setExportDefaultFolder = setExportDefaultFolder;
 window.selectExportFolder = selectExportFolder;
 window.setSelectedExportFolder = setSelectedExportFolder;
-window.executeExport = executeExport;
 window.initializeExportTree = initializeExportTree;
 window.updateLinkHandlingOptionsVisibility = updateLinkHandlingOptionsVisibility;
 window.executeUnifiedExport = executeUnifiedExport;

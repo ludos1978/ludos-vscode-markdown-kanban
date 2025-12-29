@@ -1897,7 +1897,7 @@ body.section-height-limited .task-section figure img {
   font-weight: 500;
   display: flex;
   gap: 4px;
-  padding: 2px 2px 2px 4px;
+  padding: 1px 1px 1px 4px;
   align-items: center;
 }
 
@@ -4220,6 +4220,7 @@ blockquote {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   background: #666; /* Default background color as fallback */
   color: #fff; /* Default text color as fallback */
+  padding: 4px;
 }
 
 /* Ensure corner badges for specific tags (like corner-badge-feature) appear above borders */

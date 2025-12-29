@@ -1802,6 +1802,17 @@ function renderMarkdown(text, includeContext) {
                 const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
                 const encodedPath = encodeURI(normalizedPath);
                 return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (originalSrc && originalSrc.startsWith('/')) {
+                // Unix absolute path (/Users/...) - convert to webview URI
+                let decodedSrc = originalSrc;
+                try {
+                    decodedSrc = decodeURIComponent(originalSrc);
+                } catch (e) {
+                    // Use original if decode fails
+                }
+                // Use encodeURIComponent on each segment to handle special chars like # ? [ ]
+                const encodedPath = decodedSrc.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
+                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
             return originalSrc;
         }
@@ -1832,7 +1843,21 @@ function renderMarkdown(text, includeContext) {
             }
 
             // Generate the base video HTML
-            const videoHtml = originalVideoRenderer ? originalVideoRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
+            // Use plugin renderer if available, otherwise use fallback that properly handles children
+            let videoHtml;
+            if (originalVideoRenderer) {
+                videoHtml = originalVideoRenderer(tokens, idx, options, env, renderer);
+            } else {
+                // Fallback: manually render video element with children (source tags)
+                const attrs = renderer.renderAttrs(token);
+                const open = `<${token.tag}${attrs}>`;
+                const close = `</${token.tag}>`;
+                let content = '';
+                if (token.children) {
+                    content = renderer.renderInline(token.children, options, env);
+                }
+                videoHtml = `${open}${content}${close}`;
+            }
 
             // Skip wrapping for data URLs and blob URLs
             if (!originalSrc || originalSrc.startsWith('data:') || originalSrc.startsWith('blob:')) {
@@ -1875,7 +1900,20 @@ function renderMarkdown(text, includeContext) {
                 });
             }
 
-            return originalAudioRenderer ? originalAudioRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
+            // Use plugin renderer if available, otherwise use fallback that properly handles children
+            if (originalAudioRenderer) {
+                return originalAudioRenderer(tokens, idx, options, env, renderer);
+            } else {
+                // Fallback: manually render audio element with children (source tags)
+                const attrs = renderer.renderAttrs(token);
+                const open = `<${token.tag}${attrs}>`;
+                const close = `</${token.tag}>`;
+                let content = '';
+                if (token.children) {
+                    content = renderer.renderInline(token.children, options, env);
+                }
+                return `${open}${content}${close}`;
+            }
         };
 
         // Rest of the function remains the same...

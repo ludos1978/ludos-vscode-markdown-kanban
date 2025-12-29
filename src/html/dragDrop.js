@@ -1905,7 +1905,12 @@ async function handleVSCodeFileDrop(e, files) {
     const file = files[0];
     const fileName = file.name;
     const fileSize = file.size;
-    const isImage = file.type.startsWith('image/');
+    // Treat images, videos, and audio as media files that use ![]() syntax
+    const isMedia = file.type.startsWith('image/') ||
+                    file.type.startsWith('video/') ||
+                    file.type.startsWith('audio/');
+    // Keep isImage for backwards compatibility with backend messages
+    const isImage = isMedia;
 
     // Generate unique ID for this drop
     const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2117,7 +2122,9 @@ function handleVSCodeUriDrop(e, uriData) {
                 : uri;
             // Extract filename (handles both / and \ separators)
             const filename = fileTypeUtils.getFileName(fullPath);
-            const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
+            // Check for media files (images, videos, audio) that use ![]() syntax
+            const isMedia = /\.(png|jpg|jpeg|gif|svg|webp|bmp|avif|heic|heif|ico|tiff|tif|mp4|webm|mov|avi|mkv|m4v|ogv|wmv|mpg|mpeg|mp3|wav|ogg|m4a|flac|aac)$/i.test(filename);
+            const isImage = isMedia;
 
             // Generate unique ID for this drop
             const dropId = `uri_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
