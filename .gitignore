@@ -29,3 +29,6 @@ tests/kanban-huge-test
 .*.md.mediacache.json
 drawio-cache/
 *.drawio.bkp
+tests/kanban-presentation-tests/Media/Proteus-Nodeland_preview-[h2OqQ6-ESp4]-480p.mp4
+tests/kanban-presentation-tests/Media/Proteus-Nodeland_preview-[h2OqQ6-ESp4]-480p.mp4
+*.mp4
