@@ -19,6 +19,7 @@ import { MarkdownPatterns, HtmlPatterns, isUrl } from '../../shared/regexPattern
 import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
+import { MarkdownKanbanParser } from '../../markdownParser';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -45,9 +46,13 @@ export interface NewExportOptions {
     // - auto: Auto-export on save (registers save handler)
     // - preview: Open in Marp preview (realtime watch)
 
-    // FORMAT: Output format
-    format: 'kanban' | 'presentation' | 'marp';
-    marpFormat?: 'markdown' | 'html' | 'pdf' | 'pptx';
+    // FORMAT: Output format (defined by export dialog)
+    // 'keep' = keep original, 'kanban' = ## Headers + tasks, 'presentation' = slides with ---
+    format: 'keep' | 'kanban' | 'presentation';
+
+    // MARP: Use Marp checkbox and output format
+    runMarp?: boolean;  // Use Marp checkbox
+    marpFormat?: 'markdown' | 'html' | 'pdf' | 'pptx';  // Marp CLI output format
 
     // TRANSFORMATIONS
     mergeIncludes?: boolean;
@@ -115,6 +120,38 @@ export interface ExportAssetInfo {
     md5?: string;
 }
 
+/**
+ * ExportService - Unified export system for Kanban boards
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * EXPORT FORMAT SYSTEM (defined by export dialog dropdown)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Three format options (ONLY these, nothing else):
+ *
+ * 1. 'keep' - Keep Original Format
+ *    - Preserves the source format as-is
+ *
+ * 2. 'kanban' - Convert to Kanban Format
+ *    - ## column headers and - [ ] task items
+ *
+ * 3. 'presentation' - Convert to Presentation Format
+ *    - Slides separated by ---
+ *    - Each column becomes a title slide, each task becomes a content slide
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * MARP PROCESSING (separate from format)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Marp CLI is triggered ONLY when `runMarp` is true (Use Marp checkbox).
+ * The `marpFormat` (html/pdf/pptx) is the Marp CLI output parameter.
+ *
+ * Flow when Marp enabled:
+ *   Kanban → Presentation Markdown → Marp CLI → HTML/PDF/PPTX
+ *            (format: 'presentation')   (marpFormat: 'html'|'pdf'|'pptx')
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 export class ExportService {
     // Use centralized extension constants from fileTypeDefinitions.ts
     // This ensures consistency across all asset detection code
@@ -249,8 +286,7 @@ export class ExportService {
      */
     private static applyContentTransformations(content: string, options: NewExportOptions): string {
         // Only apply transformations for presentation format
-        const isPresentationFormat = options.format === 'presentation' || options.format === 'marp';
-        if (!isPresentationFormat) {
+        if (options.format !== 'presentation') {
             return content;
         }
 
@@ -1024,16 +1060,15 @@ export class ExportService {
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
 
-        // Convert to presentation format if requested
-        if (convertToPresentation) {
+        // Convert based on format option ONLY
+        // Two formats: 'kanban' or 'presentation'
+        if (options.format === 'presentation') {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
-            // Parse markdown to tasks, then generate presentation
-            // This uses proper parsing instead of duplicating logic
-            const tasks = PresentationParser.parseMarkdownToTasks(filteredContent);
-            filteredContent = PresentationGenerator.fromTasks(tasks, {
-                includeMarpDirectives: true,  // Export always includes Marp directives
+            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir);
+            filteredContent = PresentationGenerator.fromBoard(board, {
+                includeMarpDirectives: true,
                 marp: {
                     theme: options.marpTheme || marpConfig.defaultTheme || 'default',
                     globalClasses: options.marpGlobalClasses || marpConfig.globalClasses || [],
@@ -1041,6 +1076,7 @@ export class ExportService {
                 }
             });
         }
+        // format === 'kanban' → keep as-is
 
         return {
             exportedContent: filteredContent,
@@ -1381,11 +1417,11 @@ export class ExportService {
         let notIncludedAssets: ExportAssetInfo[] = [];
 
         // ROUTING LOGIC:
-        // - Converting format (presentation/marp) WITH includes → Use file-based pipeline
-        // - Converting format (presentation/marp) WITHOUT includes → Use board-based (faster)
-        // - Keeping original format (kanban) → Use file (kanban-markdown) to preserve formatting
+        // - Converting format (presentation) WITH includes → Use file-based pipeline
+        // - Converting format (presentation) WITHOUT includes → Use board-based (faster)
+        // - Keeping original format (kanban/keep) → Use file to preserve formatting
         // - Asset packing → Use file to process includes correctly
-        const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
+        const convertToPresentation = options.format === 'presentation';
 
         // Determine settings
         // Default: Don't merge includes (keep them separate with rewritten paths)
@@ -1538,8 +1574,8 @@ export class ExportService {
         const markdownPath = path.join(options.targetFolder, `${sourceBasename}.md`);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
 
-        // Handle Marp conversion
-        if (options.format === 'marp') {
+        // Handle Marp conversion (only if runMarp = Use Marp checkbox checked)
+        if (options.runMarp) {
             return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel, mermaidService);
         }
 

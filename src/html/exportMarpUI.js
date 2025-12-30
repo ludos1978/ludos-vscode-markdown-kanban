@@ -381,8 +381,9 @@ function executeUnifiedExport() {
     const options = {
         columnIndexes: selectedItems,
         mode: (useMarp && marpPreview) ? 'auto' : 'save',
-        format: useMarp && format === 'presentation' ? 'marp' : format,
-        marpFormat: useMarp && format === 'presentation' ? marpOutputFormat : undefined,
+        format: format,  // 'keep', 'kanban', or 'presentation'
+        runMarp: useMarp,  // Use Marp checkbox
+        marpFormat: useMarp ? marpOutputFormat : undefined,
         tagVisibility: tagVisibility,
         mergeIncludes: mergeIncludes,
         speakerNoteMode: speakerNoteMode,
