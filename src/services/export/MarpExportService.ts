@@ -154,6 +154,7 @@ export class MarpExportService {
         try {
             // Build Marp CLI arguments using input file path
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
+            console.log(`[MarpExportService] format: ${options.format}, args:`, args.join(' '));
 
             // IMPORTANT: Use the directory of the input file as CWD
             // This ensures markdown-it-include resolves paths relative to the markdown file location
@@ -183,9 +184,13 @@ export class MarpExportService {
                     env: env
                 });
 
+                // Collect stderr for error reporting
+                let stderrOutput = '';
+
                 if (marpProcess.stderr) {
                     marpProcess.stderr.on('data', (data) => {
                         const output = data.toString();
+                        stderrOutput += output;
                         // Marp sends all output to stderr - only log errors
                         if (output.includes('[ERROR]') || output.includes('Error:')) {
                             console.error(`[kanban.MarpExportService] ${output}`);
@@ -195,11 +200,21 @@ export class MarpExportService {
 
                 marpProcess.on('error', (error) => {
                     console.error(`[kanban.MarpExportService] Process error:`, error);
+                    vscode.window.showErrorMessage(`Marp export failed: ${error.message}`);
                 });
 
-                marpProcess.on('exit', () => {
+                marpProcess.on('exit', (code) => {
                     if (options.inputFilePath) {
                         this.marpProcessPids.delete(options.inputFilePath);
+                    }
+                    // Show error to user if Marp failed
+                    if (code !== 0 && code !== null) {
+                        // Extract the actual error message from stderr
+                        const errorMatch = stderrOutput.match(/\[ ERROR \](.+?)(?=\[|$)/s);
+                        const errorMessage = errorMatch
+                            ? errorMatch[1].trim().replace(/\s+/g, ' ')
+                            : `Marp exited with code ${code}`;
+                        vscode.window.showErrorMessage(`Marp export failed: ${errorMessage}`);
                     }
                 });
 
@@ -249,7 +264,8 @@ export class MarpExportService {
                             if (stderrOutput.includes('Not found processable Markdown')) {
                                 reject(new Error('Marp could not find processable Markdown file'));
                             } else {
-                                reject(new Error(`Marp export failed with exit code ${code}`));
+                                const errorDetails = stderrOutput.trim() ? `: ${stderrOutput.trim()}` : '';
+                                reject(new Error(`Marp export failed with exit code ${code}${errorDetails}`));
                             }
                         }
                     });

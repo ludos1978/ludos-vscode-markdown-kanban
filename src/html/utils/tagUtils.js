@@ -1405,12 +1405,7 @@ class TagUtils {
      * @returns {string} HTML string for display
      */
     getTaskDisplayTitle(task) {
-        // Debug: log task include properties
-        if (task.includeFiles || task.includeMode) {
-            console.log(`[getTaskDisplayTitle] Task "${task.id}": includeMode=${task.includeMode}, includeFiles=${JSON.stringify(task.includeFiles)}, title="${task.title?.substring(0, 50)}"`);
-        }
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-            console.log(`[getTaskDisplayTitle] Task "${task.id}" meets all conditions - generating menu`);
             // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');

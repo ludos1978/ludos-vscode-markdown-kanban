@@ -1533,10 +1533,12 @@ function createColumnElement(column, columnIndex) {
     // Check for #sticky tag to determine sticky state (default: false = not sticky)
     const hasStickyTag = /#sticky\b/i.test(column.title);
 
-    // Check for include error - look for error message in task descriptions
-    const hasIncludeError = column.tasks?.some(t =>
-        t.description?.includes('Include file not found') ||
-        t.description?.includes('Column include file not found'));
+    // Check for include error - use column's includeError flag OR look for error message in task descriptions
+    const hasIncludeError = column.includeError === true ||
+        column.tasks?.some(t =>
+            t.includeError === true ||
+            t.description?.includes('Include file not found') ||
+            t.description?.includes('Column include file not found'));
 
     columnDiv.className = `kanban-full-height-column ${isCollapsed ? 'collapsed' : ''} ${headerClasses} ${footerClasses} ${spanClass} ${hasIncludeError ? 'include-error' : ''}`.trim();
     columnDiv.setAttribute('data-column-id', column.id);

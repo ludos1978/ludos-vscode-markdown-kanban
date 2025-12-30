@@ -465,7 +465,8 @@ function handleExportResult(result) {
 function getWorkspacePath() {
     if (window.currentFilePath) {
         const pathParts = window.currentFilePath.split('/');
-        const directoryPath = '/' + pathParts.slice(0, -1).join('/');
+        // Join preserves empty string at start, so no need to add leading slash
+        const directoryPath = pathParts.slice(0, -1).join('/');
         return directoryPath;
     }
     return DEFAULT_EXPORT_FOLDER;

@@ -37,5 +37,3 @@ import './templateDialog.js';
 import './exportMarpUI.js';
 import './webview.js';
 
-// Log that the bundle loaded successfully
-console.log('[Bundle] All modules loaded successfully');

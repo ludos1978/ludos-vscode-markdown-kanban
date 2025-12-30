@@ -15,7 +15,6 @@ export class FileSearchService {
      * Set the webview to use for the file search modal
      */
     setWebview(webview: vscode.Webview): void {
-        console.log('[FileSearchService] setWebview called, webview:', webview ? 'defined' : 'undefined');
         this._webview = webview;
         this._fileSearchWebview.setWebview(webview);
     }

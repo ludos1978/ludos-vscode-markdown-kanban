@@ -217,24 +217,60 @@ body {
 }
 
 /* Color variants - Overlay (semi-transparent buttons on content) */
-/* Shared base for: .diagram-menu-btn, .include-menu-btn */
+/* Shared base for ALL overlay menu buttons: image, video, diagram, include */
 .btn-overlay-icon,
+.image-path-overlay-container .image-menu-btn,
+.video-path-overlay-container .video-menu-btn,
 .diagram-overlay-container .diagram-menu-btn,
 .include-path-overlay-container .include-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.6);
   border: none;
+  border-radius: 4px;
   color: white;
+  font-size: 14px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s ease;
+  z-index: 10;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .btn-overlay-icon:hover,
+.image-path-overlay-container .image-menu-btn:hover,
+.video-path-overlay-container .video-menu-btn:hover,
 .diagram-overlay-container .diagram-menu-btn:hover,
 .include-path-overlay-container .include-menu-btn:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+
+/* Show on hover */
+.image-path-overlay-container:hover .image-menu-btn,
+.video-path-overlay-container:hover .video-menu-btn,
+.diagram-overlay-container:hover .diagram-menu-btn,
+.include-path-overlay-container:hover .include-menu-btn {
+  opacity: 1;
+}
+
+/* BROKEN STATE: Always show menu button with warning outline */
+/* Unified style for all broken overlay menus: image, video, include */
+.image-path-overlay-container.image-broken .image-menu-btn,
+.video-path-overlay-container.video-broken .video-menu-btn,
+.include-path-overlay-container.include-broken .include-menu-btn,
+.include-error .include-path-overlay-container .include-menu-btn,
+.include-container.include-error .include-path-overlay-container .include-menu-btn,
+.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
+.task-item.include-error .include-path-overlay-container .include-menu-btn {
+  opacity: 1 !important;
+  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+  outline-offset: -1px;
+  background: rgba(190, 140, 0, 0.3);
 }
 
 /* ============================================
@@ -1264,42 +1300,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: inline-block;
 }
 
-/* Video menu button - similar to image menu button */
-.video-path-overlay-container .video-menu-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 4px;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-path-overlay-container:hover .video-menu-btn {
-  opacity: 1;
-}
-
-.video-path-overlay-container .video-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
-}
-
-/* BROKEN STATE: Always show menu button on broken videos with warning outline */
-.video-path-overlay-container.video-broken .video-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
-  outline-offset: -1px;
-  background: rgba(190, 140, 0, 0.3);
-}
+/* Video menu button - styles inherited from unified overlay button styles above */
 
 /* Video not found container with burger menu */
 .video-not-found-container {
@@ -3780,41 +3781,7 @@ blockquote {
   min-height: 28px;
 }
 
-.image-path-overlay-container .image-menu-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 4px;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-path-overlay-container:hover .image-menu-btn {
-  opacity: 1;
-}
-
-.image-path-overlay-container .image-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
-}
-
-/* BROKEN STATE: Always show menu button on broken images with warning outline */
-.image-path-overlay-container.image-broken .image-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
-  outline-offset: -1px;
-  background: rgba(190, 140, 0, 0.3);
-}
+/* Image menu button - styles inherited from unified overlay button styles at top of file */
 
 /* ============================================================================
    DIAGRAM OVERLAY CONTAINER - Mermaid, PlantUML burger menus
@@ -3926,51 +3893,24 @@ blockquote {
   align-items: center;
 }
 
-/* Include menu button - size specific (shared styles in btn-overlay-icon) */
+/* Include menu button - size overrides (base styles in unified overlay button section) */
 .include-path-overlay-container .include-menu-btn {
+  position: static;
   width: 16px;
   height: 16px;
   margin-left: 2px;
-  background: rgba(0, 0, 0, 0.4);
   border-radius: 3px;
   font-size: 10px;
   vertical-align: middle;
 }
 
-.include-path-overlay-container:hover .include-menu-btn {
-  opacity: 1;
-}
-
-/* BROKEN STATE: Always show menu button on broken includes with warning outline */
-/* Handles includes inside error containers and broken include link styling */
-.include-error .include-path-overlay-container .include-menu-btn,
-.include-container.include-error .include-path-overlay-container .include-menu-btn,
-.include-path-overlay-container.include-broken .include-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
-  outline-offset: -1px;
-  background: rgba(190, 140, 0, 0.3);
-}
-
-/* COLUMN/TASK INCLUDES: Always show menu button since broken state cannot be detected at render time */
-/* These includes in column/task titles need the menu to be accessible for Search for File functionality */
+/* COLUMN/TASK INCLUDES: Always show menu button for Search for File functionality */
 .include-path-overlay-container[data-include-type="column"] .include-menu-btn,
 .include-path-overlay-container[data-include-type="task"] .include-menu-btn {
   opacity: 1 !important;
 }
 
-/* COLUMN/TASK INCLUDES WITH ERRORS: Show warning outline when the column/task has include errors */
-/* Two methods: 1) Direct .include-error class on column/task (from backend flag)
-                2) :has() to detect error state in content area (fallback for runtime errors) */
-.kanban-full-height-column.include-error .column-title .include-path-overlay-container .include-menu-btn,
-.kanban-full-height-column:has(.include-container.include-error) .column-title .include-path-overlay-container .include-menu-btn,
-.task-item.include-error .task-title .include-path-overlay-container .include-menu-btn,
-.task-item:has(.include-container.include-error) .task-title .include-path-overlay-container .include-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00);
-  outline-offset: -1px;
-  background: rgba(190, 140, 0, 0.3);
-}
+/* Broken state styles are in the unified overlay button section at top of file */
 
 .markdown-content a[href$=".pdf"],
 .markdown-content a[href$=".doc"],

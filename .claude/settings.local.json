@@ -131,7 +131,12 @@
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log --all --oneline -- \"*/deleteTask*\" \"*/addColumn*\")",
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log -p --all -S \"function deleteTask\" -- \"*.js\")",
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian show:*)",
-      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log:*)"
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log:*)",
+      "Bash(while read fn)",
+      "Bash(if ! grep -rq \"window\\\\.$fn\\\\s*=\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/)",
+      "Bash(for fn in toggleAllColumns toggleGlobalSticky undo redo selectFile closeInputModal copyFullPath copyStoredPath)",
+      "Bash(if grep:*)",
+      "Bash(for fn in setSelectedExportFolder handleExportResult handleMarpStatus handleMarpThemesAvailable handleMarpAvailableClasses handleColumnExportResult handleCopyContentResult)"
     ],
     "deny": [],
     "ask": []

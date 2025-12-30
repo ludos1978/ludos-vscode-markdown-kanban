@@ -1567,6 +1567,7 @@ export class ExportService {
         mermaidService?: MermaidExportService
     ): Promise<ExportResult> {
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
+        console.log(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
 
         // Build output path
         const dir = path.dirname(markdownPath);

@@ -414,7 +414,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
                         return;
                     }
 
-                    console.log(`[MarkdownFile] reload() updating baseline for: ${this._relativePath}`);
                     this._content = content;
                     this._baseline = content;
                     // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
@@ -424,7 +423,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
                     this._emitChange('reloaded');
                 } else {
                     // Content unchanged - verification returned baseline, this is a false alarm
-                    console.log(`[MarkdownFile] reload() skipped - content matches baseline for: ${this._relativePath}`);
                     this._hasFileSystemChanges = false;
                     this._lastModified = await this._getFileModifiedTime();
                 }
@@ -454,7 +452,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         // If BOTH mtime and size are unchanged, no change
         if (!mtimeChanged && !sizeChanged && this._baseline) {
-            console.log(`[${this.getFileType()}] Mtime & size unchanged, no change`);
             return this._baseline;
         }
 
@@ -873,8 +870,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
         this._baseline = diskContent;
         this._hasFileSystemChanges = false;
         this._lastModified = await this._getFileModifiedTime();
-
-        console.log(`[${this.getFileType()}] forceSyncBaseline updated: ${this._relativePath}`);
     }
 
     // ============= EVENT EMISSION =============

@@ -28,6 +28,7 @@ async function generateShortHash(arrayBuffer) {
     }
 }
 let canUndo = false;
+let closePromptActive = false;
 let canRedo = false;
 window.currentImageMappings = {};
 
@@ -3168,8 +3169,7 @@ window.addEventListener('beforeunload', function(e) {
 // Note: unload event removed - was empty/no-op
 
 // Add visibility change detection (tab switching, window minimizing, etc)
-// Global flag to prevent auto-save when close prompt is active
-let closePromptActive = false;
+// Note: closePromptActive is declared at the top of the file
 
 document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
@@ -3582,6 +3582,17 @@ function openIncludeFile(filePath) {
 // Make functions globally available
 window.setFontSize = setFontSize;
 window.openIncludeFile = openIncludeFile;
+window.undo = undo;
+window.redo = redo;
+window.selectFile = selectFile;
+
+// Stub functions for path context menu (TODO: implement if needed)
+window.copyFullPath = function() {
+    console.warn('[webview] copyFullPath not implemented');
+};
+window.copyStoredPath = function() {
+    console.warn('[webview] copyStoredPath not implemented');
+};
 
 /**
  * Lazy load videos using IntersectionObserver for better performance

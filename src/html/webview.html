@@ -985,15 +985,15 @@
                     handleKeydown(e);
                 }
             }, true);
-            formatAutoBtnEl.addEventListener('click', () => setPathFormat('auto'));
-            formatRelativeBtnEl.addEventListener('click', () => setPathFormat('relative'));
-            formatAbsoluteBtnEl.addEventListener('click', () => setPathFormat('absolute'));
-            previewToggleEl.addEventListener('click', toggleFilePreview);
+            if (formatAutoBtnEl) formatAutoBtnEl.addEventListener('click', () => setPathFormat('auto'));
+            if (formatRelativeBtnEl) formatRelativeBtnEl.addEventListener('click', () => setPathFormat('relative'));
+            if (formatAbsoluteBtnEl) formatAbsoluteBtnEl.addEventListener('click', () => setPathFormat('absolute'));
+            if (previewToggleEl) previewToggleEl.addEventListener('click', toggleFilePreview);
         }
 
         function toggleFilePreview() {
             filePreviewEnabled = !filePreviewEnabled;
-            previewToggleEl.classList.toggle('active', filePreviewEnabled);
+            if (previewToggleEl) previewToggleEl.classList.toggle('active', filePreviewEnabled);
             if (filePreviewEnabled) {
                 // If enabling preview and we have a selection, trigger preview immediately
                 if (selectedIndex >= 0 && results[selectedIndex]) {
@@ -1007,9 +1007,9 @@
 
         function setPathFormat(format) {
             pathFormat = format;
-            formatAutoBtnEl.classList.toggle('active', format === 'auto');
-            formatRelativeBtnEl.classList.toggle('active', format === 'relative');
-            formatAbsoluteBtnEl.classList.toggle('active', format === 'absolute');
+            if (formatAutoBtnEl) formatAutoBtnEl.classList.toggle('active', format === 'auto');
+            if (formatRelativeBtnEl) formatRelativeBtnEl.classList.toggle('active', format === 'relative');
+            if (formatAbsoluteBtnEl) formatAbsoluteBtnEl.classList.toggle('active', format === 'absolute');
             updatePathPreview();
         }
 
@@ -1023,8 +1023,8 @@
 
         function updatePathPreview() {
             if (selectedIndex < 0 || !results[selectedIndex]) {
-                pathPreviewValueEl.textContent = 'Select a file to preview';
-                pathPreviewEl.classList.remove('has-value');
+                if (pathPreviewValueEl) pathPreviewValueEl.textContent = 'Select a file to preview';
+                if (pathPreviewEl) pathPreviewEl.classList.remove('has-value');
                 return;
             }
             const selected = results[selectedIndex];
@@ -1048,8 +1048,8 @@
                     previewPath = selected.fullPath;
                 }
             }
-            pathPreviewValueEl.textContent = previewPath;
-            pathPreviewEl.classList.add('has-value');
+            if (pathPreviewValueEl) pathPreviewValueEl.textContent = previewPath;
+            if (pathPreviewEl) pathPreviewEl.classList.add('has-value');
         }
 
         function handleKeydown(e) {

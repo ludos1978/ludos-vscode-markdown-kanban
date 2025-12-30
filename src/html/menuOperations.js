@@ -3779,4 +3779,5 @@ window.updateVisualTagState = updateVisualTagState;
 window.updateAllVisualTagElements = updateAllVisualTagElements;
 window.toggleTaskIncludeMode = toggleTaskIncludeMode;
 window.editTaskIncludeFile = editTaskIncludeFile;
-
+window.toggleGlobalSticky = toggleGlobalSticky;
+window.closeInputModal = closeInputModal;
