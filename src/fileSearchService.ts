@@ -30,12 +30,19 @@ export class FileSearchService {
      * Open a custom webview dialog to search for a replacement file.
      * Provides full control over UI: 80% width, full path display, custom styling.
      * Returns selection with optional batch replace flag.
+     * @param originalPath - The original broken path
+     * @param baseDir - Base directory for relative path resolution
+     * @param options - Optional settings (showOpenMediaFolder: show media folder button)
      */
-    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<FileSearchResult | undefined> {
+    async pickReplacementForBrokenLink(
+        originalPath: string,
+        baseDir?: string,
+        options?: { showOpenMediaFolder?: boolean }
+    ): Promise<FileSearchResult | undefined> {
         if (!this._webview) {
             throw new Error('Webview not set. Call setWebview() first.');
         }
 
-        return this._fileSearchWebview.pickReplacementForBrokenLink(originalPath, baseDir);
+        return this._fileSearchWebview.pickReplacementForBrokenLink(originalPath, baseDir, options);
     }
 }

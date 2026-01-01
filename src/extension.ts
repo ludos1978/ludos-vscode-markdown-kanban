@@ -7,6 +7,7 @@ import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { showError, showWarning, showInfo } from './services/NotificationService';
+import { WorkspaceMediaIndex } from './services/WorkspaceMediaIndex';
 
 // Re-export for external access
 export { getOutputChannel } from './services/OutputChannelService';
@@ -25,6 +26,23 @@ export function activate(context: vscode.ExtensionContext) {
 	} catch (error) {
 		outputChannel.appendLine(`[Extension] Warning: Plugin system initialization failed: ${error}`);
 		console.error('[Extension] Plugin system initialization failed:', error);
+	}
+
+	// Initialize workspace media index (SQLite-based file hash index)
+	const mediaIndex = WorkspaceMediaIndex.getInstance(context.extensionPath);
+	if (mediaIndex) {
+		mediaIndex.initialize().then(() => {
+			outputChannel.appendLine('[Extension] Workspace media index initialized');
+			// Background scan workspace for media files
+			mediaIndex.scanWorkspace().then(count => {
+				outputChannel.appendLine(`[Extension] Indexed ${count} media files`);
+			}).catch(err => {
+				outputChannel.appendLine(`[Extension] Media scan failed: ${err}`);
+			});
+		}).catch(err => {
+			outputChannel.appendLine(`[Extension] Media index initialization failed: ${err}`);
+		});
+		context.subscriptions.push(mediaIndex);
 	}
 
 	// Initialize kanban sidebar

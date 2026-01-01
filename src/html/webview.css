@@ -938,7 +938,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 #kanban-container {
   /* background-color: var(--board-background); */
   position: fixed;
-  top: calc(var(--whitespace) + 1px + 24px);
+  top: calc(var(--whitespace) + 4px + 24px);
   left: 0;
   right: 0;
   bottom: 0;
@@ -1490,7 +1490,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-item:hover {
-  border: var(--button-border);
+  border: none;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 

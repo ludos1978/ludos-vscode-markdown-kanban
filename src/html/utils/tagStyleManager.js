@@ -196,36 +196,38 @@ function generateTagStyles() {
         }
 
         // Default card styles (gated)
-        if (defaultConfig.card && (defaultConfig.card.applyBackground === true || defaultConfig.card.enable === true)) {
-            const cardColors = defaultConfig.card[themeKey] || defaultConfig.card.light || {};
-            if (cardColors.text && cardColors.background) {
-                const editorBg = getEditorBackground();
-                const bgDark = cardColors.backgroundDark || cardColors.background;
+        if (defaultConfig.card) {
+            if (defaultConfig.card.applyBackground === true || defaultConfig.card.enable === true) {
+                const cardColors = defaultConfig.card[themeKey] || defaultConfig.card.light || {};
+                if (cardColors.text && cardColors.background) {
+                    const editorBg = getEditorBackground();
+                    const bgDark = cardColors.backgroundDark || cardColors.background;
 
-                const cardBg = colorUtils.interpolateColor(editorBg, bgDark, 0.25);
-                styles += `.task-item:not([data-task-tag]) {
-                    background-color: ${cardBg} !important;
-                    position: relative;
-                }\n`;
+                    const cardBg = colorUtils.interpolateColor(editorBg, bgDark, 0.25);
+                    styles += `.task-item:not([data-task-tag]) {
+                        background-color: ${cardBg} !important;
+                        position: relative;
+                    }\n`;
 
-                const cardHoverBg = colorUtils.interpolateColor(editorBg, bgDark, 0.35);
-                styles += `.task-item:not([data-task-tag]):hover {
-                    background-color: ${cardHoverBg} !important;
-                }\n`;
+                    const cardHoverBg = colorUtils.interpolateColor(editorBg, bgDark, 0.35);
+                    styles += `.task-item:not([data-task-tag]):hover {
+                        background-color: ${cardHoverBg} !important;
+                    }\n`;
+                }
             }
-        }
 
-        // Default card border (always allowed if provided)
-        if (defaultConfig.card && defaultConfig.card.border) {
-            const b = defaultConfig.card.border;
-            const bStyle = b.style;
-            const bWidth = b.width;
-            const bColor = b.color;
-            if (b.position === 'left') {
-                styles += `.task-item:not([data-task-tag]) { border-left: ${bWidth} ${bStyle} ${bColor} !important; }\n`;
-            } else {
-                styles += `.task-item:not([data-task-tag]) { border: ${bWidth} ${bStyle} ${bColor} !important; }\n`;
-            }
+            // Default card border (always allowed if provided)
+            // if (defaultConfig.card.border) {
+            //     const b = defaultConfig.card.border;
+            //     const bStyle = b.style;
+            //     const bWidth = b.width;
+            //     const bColor = b.color;
+            //     if (b.position === 'left') {
+            //         styles += `.task-item:not([data-task-tag]) { border-left: ${bWidth} ${bStyle} ${bColor} !important; }\n`;
+            //     } else {
+            //         styles += `.task-item:not([data-task-tag]) { border: ${bWidth} ${bStyle} ${bColor} !important; }\n`;
+            //     }
+            // }
         }
     }
 

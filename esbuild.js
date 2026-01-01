@@ -60,6 +60,14 @@ console.log('Marp watch script placeholder');
 				console.log('Copied excalidraw-worker.js to dist/');
 			}
 
+			// Copy sql.js WASM file for SQLite support
+			const sqlJsWasm = 'node_modules/sql.js/dist/sql-wasm.wasm';
+			const sqlJsDist = 'dist/sql-wasm.wasm';
+			if (fs.existsSync(sqlJsWasm)) {
+				fs.copyFileSync(sqlJsWasm, sqlJsDist);
+				console.log('Copied sql-wasm.wasm to dist/');
+			}
+
 			const srcHtmlDir = 'src/html';
 			const distHtmlDir = 'dist/src/html';
 

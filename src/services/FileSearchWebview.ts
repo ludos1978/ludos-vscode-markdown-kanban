@@ -86,8 +86,15 @@ export class FileSearchWebview {
 
     /**
      * Open the file search modal in the kanban webview
+     * @param originalPath - The original broken path to search for
+     * @param baseDir - Base directory for relative path resolution
+     * @param options - Optional settings (showOpenMediaFolder: show media folder button)
      */
-    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<FileSearchResult | undefined> {
+    async pickReplacementForBrokenLink(
+        originalPath: string,
+        baseDir?: string,
+        options?: { showOpenMediaFolder?: boolean }
+    ): Promise<FileSearchResult | undefined> {
         if (!this._webview) {
             console.error('[FileSearchWebview] pickReplacementForBrokenLink: webview not set');
             throw new Error('Webview not set. Call setWebview() first.');
@@ -113,7 +120,8 @@ export class FileSearchWebview {
             this._webview?.postMessage({
                 type: 'fileSearchShow',
                 originalPath: decodedPath,
-                initialSearch: nameRoot
+                initialSearch: nameRoot,
+                showOpenMediaFolder: options?.showOpenMediaFolder ?? false
             });
 
             // Start initial search after a short delay

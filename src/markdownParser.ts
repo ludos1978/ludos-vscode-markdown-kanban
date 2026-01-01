@@ -166,6 +166,7 @@ export class MarkdownKanbanParser {
 
             // Generate tasks from included files
             const includeTasks: KanbanTask[] = [];
+            let hasIncludeError = false;
             for (const filePath of includeFiles) {
               const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
               try {
@@ -175,9 +176,11 @@ export class MarkdownKanbanParser {
                   includeTasks.push(...slideTasks);
                 } else {
                   console.warn(`[Parser] Column include file not found: ${resolvedPath}`);
+                  hasIncludeError = true;
                 }
               } catch (error) {
                 console.error(`[Parser] Error processing column include ${filePath}:`, error);
+                hasIncludeError = true;
               }
             }
 
@@ -199,6 +202,7 @@ export class MarkdownKanbanParser {
               tasks: includeTasks,
               includeMode: true,
               includeFiles: includeFiles,
+              includeError: hasIncludeError, // Set error flag if file not found
               originalTitle: columnTitle,
               displayTitle: displayTitle || 'Included Column' // Store cleaned title for display
             };

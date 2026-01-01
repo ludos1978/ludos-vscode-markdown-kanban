@@ -24,6 +24,7 @@ const fileSearchModal = (function() {
     let batchCheckboxEl;
     let batchInfoEl;
     let cancelBtnEl;
+    let mediaFolderBtnEl;
     let selectBtnEl;
 
     // State
@@ -34,6 +35,7 @@ const fileSearchModal = (function() {
     let batchAnalysisData = null;
     let batchAnalysisCache = {};
     let isVisible = false;
+    let showOpenMediaFolder = false;
 
     /**
      * Initialize the modal (called once on page load)
@@ -54,6 +56,7 @@ const fileSearchModal = (function() {
         batchCheckboxEl = document.getElementById('file-search-batch-checkbox');
         batchInfoEl = document.getElementById('file-search-batch-info');
         cancelBtnEl = document.getElementById('file-search-cancel-btn');
+        mediaFolderBtnEl = document.getElementById('file-search-media-folder-btn');
         selectBtnEl = document.getElementById('file-search-select-btn');
 
         if (!overlay) {
@@ -95,6 +98,7 @@ const fileSearchModal = (function() {
 
         // Buttons
         cancelBtnEl.addEventListener('click', close);
+        mediaFolderBtnEl.addEventListener('click', openMediaFolder);
         selectBtnEl.addEventListener('click', selectCurrentItem);
 
         // Keyboard navigation
@@ -140,8 +144,11 @@ const fileSearchModal = (function() {
 
     /**
      * Show the modal with the given parameters
+     * @param {string} path - The original path to search for
+     * @param {string} initialSearch - Initial search term
+     * @param {boolean} showMediaFolderBtn - Whether to show the "Open media folder" button
      */
-    function show(path, initialSearch) {
+    function show(path, initialSearch, showMediaFolderBtn) {
         if (!overlay) {
             init();
         }
@@ -153,6 +160,7 @@ const fileSearchModal = (function() {
         brokenPathData = null;
         batchAnalysisData = null;
         batchAnalysisCache = {};
+        showOpenMediaFolder = showMediaFolderBtn || false;
 
         // Update UI
         originalPathEl.textContent = path;
@@ -163,6 +171,7 @@ const fileSearchModal = (function() {
         batchInfoEl.textContent = '';
         selectBtnEl.disabled = true;
         resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+        mediaFolderBtnEl.style.display = showOpenMediaFolder ? '' : 'none';
 
         // Show modal
         isVisible = true;
@@ -186,6 +195,13 @@ const fileSearchModal = (function() {
         isVisible = false;
         overlay.classList.remove('visible');
         vscode.postMessage({ type: 'fileSearchCancelled' });
+    }
+
+    /**
+     * Open media folder (does not close the modal)
+     */
+    function openMediaFolder() {
+        vscode.postMessage({ type: 'openMediaFolder' });
     }
 
     /**
@@ -457,7 +473,7 @@ const fileSearchModal = (function() {
     function handleMessage(message) {
         switch (message.type) {
             case 'fileSearchShow':
-                show(message.originalPath, message.initialSearch);
+                show(message.originalPath, message.initialSearch, message.showOpenMediaFolder);
                 break;
 
             case 'fileSearchSearching':

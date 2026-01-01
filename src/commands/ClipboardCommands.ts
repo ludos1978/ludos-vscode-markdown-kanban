@@ -19,6 +19,8 @@ import {
     LinkExistingFileMessage
 } from '../core/bridge/MessageTypes';
 import { ConfigurationService } from '../services/ConfigurationService';
+import { FileSearchService, TrackedFileData } from '../fileSearchService';
+import { WorkspaceMediaIndex } from '../services/WorkspaceMediaIndex';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
 import { showError, showWarning, showInfo } from '../services/NotificationService';
@@ -53,6 +55,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
             'executeFileDropLink',
             'linkExistingFile',
             'openMediaFolder',
+            'searchForDroppedFile',
             'createDiagramFile'
         ],
         priority: 100
@@ -118,6 +121,11 @@ export class ClipboardCommands extends SwitchBasedCommand {
         },
         'openMediaFolder': async (_msg, ctx) => {
             await this.handleOpenMediaFolder(ctx);
+            return this.success();
+        },
+        'searchForDroppedFile': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleSearchForDroppedFile(m.fileName, m.isImage, m.dropPosition, ctx);
             return this.success();
         },
         'createDiagramFile': async (msg, ctx) => {
@@ -286,10 +294,22 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 fileHash = this._calculatePartialHashFromData(partialBuffer, fileSize);
             }
 
+            // Search workspace-wide for matching file by hash
             let existingFile: string | null = null;
+            let existingFilePath: string | null = null;
             if (fileHash) {
-                const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-                existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
+                const mediaIndex = WorkspaceMediaIndex.getInstance();
+                if (mediaIndex && mediaIndex.isInitialized()) {
+                    const matches = mediaIndex.findByHash(fileHash);
+                    if (matches.length > 0) {
+                        // Found matching file in workspace
+                        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                        if (workspaceFolder) {
+                            existingFilePath = path.join(workspaceFolder.uri.fsPath, matches[0].path);
+                            existingFile = matches[0].path;
+                        }
+                    }
+                }
             }
 
             this.postMessage({ type: 'showFileDropDialogue',
@@ -300,6 +320,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 hasSourcePath: hasSourcePath,
                 sourcePath: sourcePath,
                 existingFile: existingFile,
+                existingFilePath: existingFilePath,
                 dropPosition: dropPosition
             });
         } catch (error) {
@@ -333,14 +354,21 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     private async handleLinkExistingFile(message: LinkExistingFileMessage, context: CommandContext): Promise<void> {
-        const { existingFile, fileName, isImage, dropPosition } = message;
+        const { existingFile, existingFilePath: providedPath, fileName, isImage, dropPosition } = message;
 
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
-            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-            const existingFilePath = path.join(mediaFolderPath, existingFile);
+            const { directory } = this._getCurrentFilePaths(context);
 
-            this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage, context);
+            // Use provided full path if available (from workspace-wide hash match),
+            // otherwise fall back to looking in media folder
+            let filePath = providedPath;
+            if (!filePath) {
+                const { baseFileName } = this._getCurrentFilePaths(context);
+                const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+                filePath = path.join(mediaFolderPath, existingFile);
+            }
+
+            this._sendLinkMessage(filePath, fileName, dropPosition, directory, isImage, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error linking existing file:', error);
             this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, true, context);
@@ -356,6 +384,57 @@ export class ClipboardCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[ClipboardCommands] Error opening media folder:', error);
             showError(`Failed to open media folder: ${getErrorMessage(error)}`);
+        }
+    }
+
+    /**
+     * Handle searching for a dropped file in the workspace
+     * Opens file search modal with filename as initial search term
+     * If file is selected, creates a link to it
+     */
+    private async handleSearchForDroppedFile(
+        fileName: string,
+        isImage: boolean,
+        dropPosition: { x: number; y: number },
+        context: CommandContext
+    ): Promise<void> {
+        try {
+            const { directory } = this._getCurrentFilePaths(context);
+
+            // Set up FileSearchService
+            const fileSearchService = new FileSearchService();
+            const webview = context.fileManager.getWebview();
+            fileSearchService.setWebview(webview);
+
+            // Get tracked files from registry for scanning
+            const fileRegistry = this.getFileRegistry();
+            if (fileRegistry) {
+                const allFiles = fileRegistry.getAll();
+                const trackedFiles: TrackedFileData[] = allFiles.map(file => ({
+                    path: file.getPath(),
+                    relativePath: file.getRelativePath(),
+                    content: file.getContent()
+                }));
+                fileSearchService.setTrackedFiles(trackedFiles);
+            }
+
+            // Open file search with filename as initial search term and show media folder button
+            const result = await fileSearchService.pickReplacementForBrokenLink(fileName, directory, {
+                showOpenMediaFolder: true
+            });
+
+            if (!result) {
+                // User cancelled - do nothing
+                return;
+            }
+
+            // File was selected - create a link to it
+            const selectedFilePath = result.uri.fsPath;
+            this._sendLinkMessage(selectedFilePath, fileName, dropPosition, directory, isImage, context);
+
+        } catch (error) {
+            console.error('[ClipboardCommands] Error searching for dropped file:', error);
+            showError(`Failed to search for file: ${getErrorMessage(error)}`);
         }
     }
 
@@ -600,108 +679,6 @@ export class ClipboardCommands extends SwitchBasedCommand {
             const combined = Buffer.concat([partialData, sizeBuffer]);
             return this._generateHash(combined);
         }
-    }
-
-    private _loadHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
-        const cachePath = path.join(mediaFolderPath, '.hash_cache');
-        const cache = new Map<string, { hash: string; mtime: number }>();
-
-        if (fs.existsSync(cachePath)) {
-            try {
-                const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-                for (const [fileName, entry] of Object.entries(data)) {
-                    cache.set(fileName, entry as { hash: string; mtime: number });
-                }
-            } catch (error) {
-                console.warn('[ClipboardCommands] Failed to load hash cache:', error);
-            }
-        }
-
-        return cache;
-    }
-
-    private _saveHashCache(mediaFolderPath: string, cache: Map<string, { hash: string; mtime: number }>): void {
-        const cachePath = path.join(mediaFolderPath, '.hash_cache');
-        const data: Record<string, { hash: string; mtime: number }> = {};
-
-        for (const [fileName, entry] of cache.entries()) {
-            data[fileName] = entry;
-        }
-
-        try {
-            fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
-        } catch (error) {
-            console.warn('[ClipboardCommands] Failed to save hash cache:', error);
-        }
-    }
-
-    private _updateHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
-        const cache = this._loadHashCache(mediaFolderPath);
-        let cacheModified = false;
-
-        if (!fs.existsSync(mediaFolderPath)) {
-            return cache;
-        }
-
-        const files = fs.readdirSync(mediaFolderPath);
-        const currentFiles = new Set<string>();
-
-        for (const fileName of files) {
-            if (fileName === '.hash_cache' || fileName.startsWith('.')) {
-                continue;
-            }
-
-            const filePath = path.join(mediaFolderPath, fileName);
-            const stats = fs.statSync(filePath);
-
-            if (!stats.isFile()) {
-                continue;
-            }
-
-            currentFiles.add(fileName);
-            const mtime = stats.mtimeMs;
-            const cached = cache.get(fileName);
-
-            if (!cached || cached.mtime !== mtime) {
-                const hash = this._calculatePartialHash(filePath);
-                cache.set(fileName, { hash, mtime });
-                cacheModified = true;
-            }
-        }
-
-        for (const fileName of cache.keys()) {
-            if (!currentFiles.has(fileName)) {
-                cache.delete(fileName);
-                cacheModified = true;
-            }
-        }
-
-        if (cacheModified) {
-            this._saveHashCache(mediaFolderPath, cache);
-        }
-
-        return cache;
-    }
-
-    private _findMatchingFileByHash(mediaFolderPath: string, targetHash: string, originalFileName: string): string | null {
-        if (!fs.existsSync(mediaFolderPath)) {
-            return null;
-        }
-
-        const cache = this._updateHashCache(mediaFolderPath);
-
-        const cachedEntry = cache.get(originalFileName);
-        if (cachedEntry && cachedEntry.hash === targetHash) {
-            return originalFileName;
-        }
-
-        for (const [fileName, entry] of cache.entries()) {
-            if (entry.hash === targetHash) {
-                return fileName;
-            }
-        }
-
-        return null;
     }
 
     private _formatImagePath(absolutePath: string, kanbanDir: string): string {

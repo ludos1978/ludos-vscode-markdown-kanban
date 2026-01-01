@@ -941,6 +941,7 @@ export interface ExecuteFileDropLinkMessage extends BaseMessage {
 export interface LinkExistingFileMessage extends BaseMessage {
     type: 'linkExistingFile';
     existingFile: string;
+    existingFilePath?: string; // Full absolute path (from workspace-wide hash match)
     fileName: string;
     isImage: boolean;
     dropPosition: DropPosition;
@@ -951,6 +952,17 @@ export interface LinkExistingFileMessage extends BaseMessage {
  */
 export interface OpenMediaFolderMessage extends BaseMessage {
     type: 'openMediaFolder';
+}
+
+/**
+ * Search for dropped file in workspace
+ * Opens file search modal with filename as initial search term
+ */
+export interface SearchForDroppedFileMessage extends BaseMessage {
+    type: 'searchForDroppedFile';
+    fileName: string;
+    isImage: boolean;
+    dropPosition: DropPosition;
 }
 
 /**

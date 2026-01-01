@@ -1,3 +1,5 @@
+- [ ] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
+
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
 - [ ] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!

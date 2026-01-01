@@ -2038,13 +2038,14 @@ function showFileDropDialogue(options) {
         fileSize,
         isImage,
         existingFile,
+        existingFilePath,
         dropPosition
     } = options;
 
     const sizeText = fileSize ? ` (${formatFileSize(fileSize)})` : '';
     const buttons = [];
 
-    // Option 1: Link existing file (if found in media folder - FIRST option)
+    // Option 1: Link existing file (if found in workspace by hash match - FIRST option)
     if (existingFile) {
         buttons.push({
             text: `Link existing file`,
@@ -2055,6 +2056,7 @@ function showFileDropDialogue(options) {
                     type: 'linkExistingFile',
                     dropId: dropId,
                     existingFile: existingFile,
+                    existingFilePath: existingFilePath,
                     fileName: fileName,
                     isImage: isImage,
                     dropPosition: dropPosition
@@ -2063,10 +2065,25 @@ function showFileDropDialogue(options) {
         });
     }
 
-    // Option 2: Open media folder (always available)
+    // Option 2: Search for file in workspace (always available)
+    buttons.push({
+        text: 'Search for file',
+        primary: !existingFile, // Primary if no existing file found
+        action: () => {
+            cancelPendingFileDrop(dropId);
+            vscode.postMessage({
+                type: 'searchForDroppedFile',
+                fileName: fileName,
+                isImage: isImage,
+                dropPosition: dropPosition
+            });
+        }
+    });
+
+    // Option 3: Open media folder (always available)
     buttons.push({
         text: 'Open media folder',
-        primary: !existingFile, // Primary if no existing file found
+        primary: false,
         action: () => {
             cancelPendingFileDrop(dropId);
             vscode.postMessage({
@@ -2090,8 +2107,8 @@ function showFileDropDialogue(options) {
 
     // Show the modal
     const message = existingFile
-        ? `File "${existingFile}" already exists in media folder. Link it or copy manually.`
-        : `File not found in media folder${sizeText}. Copy it manually to the media folder.`;
+        ? `File "${existingFile}" already exists in media folder. Link it, search for another, or copy manually.`
+        : `File not found in media folder${sizeText}. Search for it in your workspace or copy it manually.`;
 
     modalUtils.showConfirmModal(
         `Add file: ${fileName}`,
