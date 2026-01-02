@@ -279,16 +279,16 @@ function togglePathMenu(container, filePath, mediaType) {
     menu.dataset.filePath = filePath;
 
     // Build menu HTML based on broken state
-    // Broken: Open disabled, Search/Browse enabled
-    // Valid: Open enabled, Search/Browse disabled
+    // Broken: Open disabled
+    // Valid: Open enabled
+    // Search and Browse are ALWAYS enabled (user may want to change to different file)
     const openDisabled = isBroken;
-    const searchBrowseEnabled = isBroken;
 
     menu.innerHTML = `
         <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}')"`}>📄 Open</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-        <button class="image-path-menu-item${searchBrowseEnabled ? '' : ' disabled'}" ${searchBrowseEnabled ? `onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"` : 'disabled'}>🔎 Search for File</button>
-        <button class="image-path-menu-item${searchBrowseEnabled ? '' : ' disabled'}" ${searchBrowseEnabled ? `onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"` : 'disabled'}>📂 Browse for File</button>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
         <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
         <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>

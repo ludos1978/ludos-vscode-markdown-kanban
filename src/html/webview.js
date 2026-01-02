@@ -2399,6 +2399,25 @@ if (!webviewEventListenersInitialized) {
                             }
                         }
 
+                        // Unfold column if it's collapsed and we just received include content
+                        // This ensures user can see the newly loaded content immediately
+                        if (hasIncludeContent && window.collapsedColumns && window.collapsedColumns.has(message.columnId)) {
+                            const columnElement = document.querySelector(`[data-column-id="${message.columnId}"]`);
+                            if (columnElement) {
+                                columnElement.classList.remove('collapsed-vertical', 'collapsed-horizontal');
+                                const toggle = columnElement.querySelector('.collapse-toggle');
+                                if (toggle) toggle.classList.remove('rotated');
+                                window.collapsedColumns.delete(message.columnId);
+                                if (window.columnFoldModes) window.columnFoldModes.delete(message.columnId);
+                                // Update global fold button state
+                                if (typeof window.updateGlobalColumnFoldButton === 'function') {
+                                    window.updateGlobalColumnFoldButton();
+                                }
+                                // Save updated folding state
+                                if (window.saveCurrentFoldingState) window.saveCurrentFoldingState();
+                            }
+                        }
+
                         // Inject header/footer bars after rendering
                         if (typeof window.injectStackableBars === 'function') {
                             requestAnimationFrame(() => {
