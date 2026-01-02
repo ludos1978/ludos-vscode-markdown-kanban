@@ -533,6 +533,9 @@ const fileSearchModal = (function() {
                 isSearching = false;
                 if (results.length === 0) {
                     resultsEl.innerHTML = '<div class="file-search-status">No results found</div>';
+                } else {
+                    // Re-render to remove streaming indicator
+                    renderResults();
                 }
                 selectBtnEl.disabled = selectedIndex < 0;
                 if (batchCheckboxEl.checked) {
