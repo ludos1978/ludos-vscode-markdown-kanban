@@ -196,6 +196,9 @@ export class IncludeFileCoordinator {
             const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
             column.tasks = tasks;
 
+            // Clear include error flag - file loaded successfully
+            column.includeError = false;
+
             // Send update to frontend
             const columnMessage: UpdateColumnContentExtendedMessage = {
                 type: 'updateColumnContent',
@@ -204,7 +207,8 @@ export class IncludeFileCoordinator {
                 columnTitle: column.title,
                 displayTitle: column.displayTitle,
                 includeMode: true,
-                includeFiles: column.includeFiles
+                includeFiles: column.includeFiles,
+                includeError: false  // Explicitly clear error state
             };
             this._deps.webviewBridge.send(columnMessage);
         }
@@ -238,6 +242,9 @@ export class IncludeFileCoordinator {
             foundTask.displayTitle = displayTitle;
             foundTask.description = fullContent;
 
+            // Clear include error flag - file loaded successfully
+            foundTask.includeError = false;
+
             // Send update to frontend
             const taskMessage: UpdateTaskContentExtendedMessage = {
                 type: 'updateTaskContent',
@@ -248,7 +255,8 @@ export class IncludeFileCoordinator {
                 taskTitle: foundTask.title,
                 originalTitle: foundTask.originalTitle,
                 includeMode: true,
-                includeFiles: foundTask.includeFiles
+                includeFiles: foundTask.includeFiles,
+                includeError: false  // Explicitly clear error state
             };
             this._deps.webviewBridge.send(taskMessage);
         }

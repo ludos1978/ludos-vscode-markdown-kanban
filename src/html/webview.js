@@ -2351,6 +2351,10 @@ if (!webviewEventListenersInitialized) {
                     if (colData.isLoadingContent !== undefined) {
                         column.isLoadingContent = colData.isLoadingContent;
                     }
+                    // Clear include error state when include loads successfully
+                    if (colData.includeError !== undefined) {
+                        column.includeError = colData.includeError;
+                    }
 
                     // Check if user is currently editing
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
@@ -2474,7 +2478,10 @@ if (!webviewEventListenersInitialized) {
                     if (taskData.isLoadingContent !== undefined) {
                         foundTask.isLoadingContent = taskData.isLoadingContent;
                     }
-
+                    // Clear include error state when include loads successfully
+                    if (taskData.includeError !== undefined) {
+                        foundTask.includeError = taskData.includeError;
+                    }
 
                     // Check if user is currently editing - if so, handle carefully
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;

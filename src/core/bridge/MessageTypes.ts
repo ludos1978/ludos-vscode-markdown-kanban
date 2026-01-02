@@ -307,6 +307,7 @@ export interface UpdateColumnContentExtendedMessage extends BaseMessage {
     includeFiles?: string[];
     isLoadingContent?: boolean;
     loadError?: boolean;
+    includeError?: boolean;  // When false, clears error state on frontend
 }
 
 /**
@@ -326,6 +327,7 @@ export interface UpdateTaskContentExtendedMessage extends BaseMessage {
     regularIncludeFiles?: string[];
     isLoadingContent?: boolean;
     loadError?: boolean;
+    includeError?: boolean;  // When false, clears error state on frontend
 }
 
 /**

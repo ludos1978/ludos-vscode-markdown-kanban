@@ -621,6 +621,11 @@ export class ChangeStateMachine {
         context: ChangeContext | null,
         isLoadingContent: boolean = false
     ): void {
+        // Clear include error flag when content loads successfully
+        if (!isLoadingContent) {
+            column.includeError = false;
+        }
+
         panel.webview.postMessage({
             type: 'updateColumnContent',
             columnId: column.id,
@@ -629,7 +634,8 @@ export class ChangeStateMachine {
             tasks: isLoadingContent ? [] : column.tasks,
             includeMode: isLoadingContent ? false : column.includeMode,
             includeFiles: isLoadingContent ? [] : column.includeFiles,
-            isLoadingContent
+            isLoadingContent,
+            includeError: isLoadingContent ? undefined : false  // Clear error state when content is ready
         });
         if (context) {
             context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
@@ -652,6 +658,11 @@ export class ChangeStateMachine {
         context: ChangeContext | null,
         isLoadingContent: boolean = false
     ): void {
+        // Clear include error flag when content loads successfully
+        if (!isLoadingContent) {
+            task.includeError = false;
+        }
+
         panel.webview.postMessage({
             type: 'updateTaskContent',
             columnId: column.id,
@@ -662,7 +673,8 @@ export class ChangeStateMachine {
             originalTitle: task.originalTitle,
             includeMode: isLoadingContent ? false : task.includeMode,
             includeFiles: isLoadingContent ? [] : task.includeFiles,
-            isLoadingContent
+            isLoadingContent,
+            includeError: isLoadingContent ? undefined : false  // Clear error state when content is ready
         });
         if (context) {
             context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
