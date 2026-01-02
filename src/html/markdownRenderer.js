@@ -2021,7 +2021,7 @@ function renderMarkdown(text, includeContext) {
             let displaySrc = originalSrc;
 
             // Check if we have includeContext and the path is relative
-            const includeContext = window.currentTaskIncludeContext;
+            // (includeContext was already declared above for diagram/PDF handling)
             // Check for Windows absolute path (C:/, D:\, etc.)
             const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
             const isRelativePath = originalSrc &&
