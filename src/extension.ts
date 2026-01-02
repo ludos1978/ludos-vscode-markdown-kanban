@@ -28,17 +28,13 @@ export function activate(context: vscode.ExtensionContext) {
 		console.error('[Extension] Plugin system initialization failed:', error);
 	}
 
-	// Initialize workspace media index (SQLite-based file hash index)
+	// Initialize workspace media index instance (lazy - scans only on first use)
+	// The actual scan happens when ensureIndexed() is called on first file drop
 	const mediaIndex = WorkspaceMediaIndex.getInstance(context.extensionPath);
 	if (mediaIndex) {
+		// Only initialize the database, don't scan yet
 		mediaIndex.initialize().then(() => {
-			outputChannel.appendLine('[Extension] Workspace media index initialized');
-			// Background scan workspace for media files
-			mediaIndex.scanWorkspace().then(count => {
-				outputChannel.appendLine(`[Extension] Indexed ${count} media files`);
-			}).catch(err => {
-				outputChannel.appendLine(`[Extension] Media scan failed: ${err}`);
-			});
+			outputChannel.appendLine('[Extension] Workspace media index ready (lazy mode - will scan on first use)');
 		}).catch(err => {
 			outputChannel.appendLine(`[Extension] Media index initialization failed: ${err}`);
 		});

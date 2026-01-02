@@ -345,9 +345,10 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	}
 
 	/**
-	 * Scan workspace for kanban files
+	 * Scan workspace for kanban files using ripgrep for fast text search
+	 * This searches for "kanban-plugin: board" directly instead of reading all .md files
 	 */
-	async scanWorkspace(maxFiles: number = 500): Promise<void> {
+	async scanWorkspace(_maxFiles: number = 500): Promise<void> {
 		if (!vscode.workspace.workspaceFolders) {
 			showWarning('No workspace folder opened');
 			return;
@@ -359,34 +360,62 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			cancellable: true
 		}, async (progress, token) => {
 			const foundFiles: string[] = [];
+			const candidateFiles = new Set<string>();
 
-			// Find all markdown files
-			const files = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', maxFiles);
+			progress.report({ message: 'Searching for kanban markers...' });
+
+			// Search across all workspace folders using ripgrep
+			const workspaceFolders = vscode.workspace.workspaceFolders || [];
+			for (const folder of workspaceFolders) {
+				if (token.isCancellationRequested) break;
+
+				try {
+					const files = await this.searchWithRipgrep(folder.uri.fsPath, token);
+					files.forEach(f => candidateFiles.add(f));
+				} catch (error) {
+					console.error(`[Kanban Sidebar] Error searching in ${folder.name}:`, error);
+					// Fallback to traditional search for this folder
+					const fallbackFiles = await this.traditionalSearch(folder.uri.fsPath, token);
+					fallbackFiles.forEach(f => candidateFiles.add(f));
+				}
+			}
 
 			if (token.isCancellationRequested) {
 				return;
 			}
 
-			const totalFiles = files.length;
-			let processed = 0;
+			progress.report({ message: `Validating ${candidateFiles.size} candidates...` });
 
-			for (const file of files) {
-				if (token.isCancellationRequested) {
-					break;
+			// Validate candidate files (check for YAML header)
+			// This is fast because we only read files that definitely have the marker
+			let processed = 0;
+			const totalCandidates = candidateFiles.size;
+
+			for (const filePath of candidateFiles) {
+				if (token.isCancellationRequested) break;
+
+				processed++;
+				if (processed % 10 === 0) {
+					progress.report({
+						message: `Validating ${processed}/${totalCandidates}...`,
+						increment: (10 / totalCandidates) * 100
+					});
 				}
 
-				// Update progress
-				processed++;
-				progress.report({
-					message: `${processed}/${totalFiles} files`,
-					increment: (1 / totalFiles) * 100
-				});
+				// Quick validation - just check for YAML header since we know marker exists
+				if (await this.hasYamlHeader(filePath)) {
+					// Skip if already registered
+					if (!this.kanbanFiles.has(filePath)) {
+						foundFiles.push(filePath);
+						this.kanbanFiles.add(filePath);
+						this.watchFile(filePath);
+					}
 
-				// Check if it's a kanban file
-				if (await this.isKanbanFile(file.fsPath)) {
-					foundFiles.push(file.fsPath);
-					this.kanbanFiles.add(file.fsPath);
-					this.watchFile(file.fsPath);
+					// Update cache
+					this.validationCache.set(filePath, {
+						isValid: true,
+						timestamp: Date.now()
+					});
 				}
 			}
 
@@ -395,9 +424,123 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			this.refresh();
 
 			if (!token.isCancellationRequested) {
-				showInfo(`Found ${foundFiles.length} kanban board(s)`);
+				const newCount = foundFiles.length;
+				const totalCount = this.kanbanFiles.size;
+				if (newCount > 0) {
+					showInfo(`Found ${newCount} new kanban board(s). Total: ${totalCount}`);
+				} else {
+					showInfo(`No new boards found. Total: ${totalCount}`);
+				}
 			}
 		});
+	}
+
+	/**
+	 * Search for kanban files using ripgrep (fast text search)
+	 */
+	private async searchWithRipgrep(folderPath: string, token: vscode.CancellationToken): Promise<string[]> {
+		const { spawn } = await import('child_process');
+
+		return new Promise((resolve, reject) => {
+			const files: string[] = [];
+
+			// Use ripgrep to find files containing "kanban-plugin: board"
+			// -l: only print file names
+			// -g: glob pattern for .md files
+			// --no-ignore-vcs: don't use .gitignore (optional, can be removed)
+			const rg = spawn('rg', [
+				'-l',                          // Only print file names
+				'-g', '*.md',                  // Only search .md files
+				'--hidden',                    // Include hidden files (for backups etc)
+				'--no-heading',                // No file name headers
+				'kanban-plugin: board',        // Search pattern
+				folderPath                     // Search directory
+			], {
+				cwd: folderPath,
+				shell: process.platform === 'win32'
+			});
+
+			let stdout = '';
+			let stderr = '';
+
+			rg.stdout.on('data', (data: Buffer) => {
+				stdout += data.toString();
+			});
+
+			rg.stderr.on('data', (data: Buffer) => {
+				stderr += data.toString();
+			});
+
+			// Handle cancellation
+			const cancelHandler = token.onCancellationRequested(() => {
+				rg.kill();
+				resolve([]);
+			});
+
+			rg.on('close', (code: number | null) => {
+				cancelHandler.dispose();
+
+				if (code === 0 || code === 1) {
+					// code 0 = matches found, code 1 = no matches (both are OK)
+					const lines = stdout.trim().split('\n').filter(line => line.length > 0);
+					lines.forEach(line => {
+						// Ensure absolute path
+						const filePath = path.isAbsolute(line) ? line : path.join(folderPath, line);
+						if (filePath.endsWith('.md')) {
+							files.push(filePath);
+						}
+					});
+					resolve(files);
+				} else {
+					// ripgrep failed, reject to trigger fallback
+					reject(new Error(`ripgrep exited with code ${code}: ${stderr}`));
+				}
+			});
+
+			rg.on('error', (err: Error) => {
+				cancelHandler.dispose();
+				reject(err);
+			});
+		});
+	}
+
+	/**
+	 * Traditional search fallback (find all .md files and check each one)
+	 */
+	private async traditionalSearch(folderPath: string, token: vscode.CancellationToken): Promise<string[]> {
+		const files: string[] = [];
+		const pattern = new vscode.RelativePattern(folderPath, '**/*.md');
+		const mdFiles = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 1000);
+
+		for (const file of mdFiles) {
+			if (token.isCancellationRequested) break;
+
+			if (await this.isKanbanFile(file.fsPath)) {
+				files.push(file.fsPath);
+			}
+		}
+
+		return files;
+	}
+
+	/**
+	 * Quick check for YAML header (first few bytes)
+	 */
+	private async hasYamlHeader(filePath: string): Promise<boolean> {
+		try {
+			// Only read the first 100 bytes to check for YAML header start
+			const fd = await fs.promises.open(filePath, 'r');
+			try {
+				const buffer = Buffer.alloc(100);
+				await fd.read(buffer, 0, 100, 0);
+				const start = buffer.toString('utf8');
+				return start.trimStart().startsWith('---');
+			} finally {
+				await fd.close();
+			}
+		} catch {
+			return false;
+		}
 	}
 
 	/**

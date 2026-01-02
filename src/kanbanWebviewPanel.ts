@@ -150,7 +150,8 @@ export class KanbanWebviewPanel {
         const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
         let documentUri = state?.documentUri || KanbanWebviewPanel._findUnrevivedDocumentUri(context);
 
-        if (documentUri) {
+        // Validate the URI before attempting to parse it
+        if (documentUri && typeof documentUri === 'string' && documentUri.includes('://')) {
             KanbanWebviewPanel._revivedUris.add(documentUri);
             setTimeout(() => KanbanWebviewPanel._revivedUris.clear(), REVIVAL_TRACKING_CLEAR_DELAY_MS);
 
@@ -158,11 +159,15 @@ export class KanbanWebviewPanel {
                 try {
                     const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
                     await kanbanPanel.loadMarkdownFile(document);
-                } catch {
+                } catch (err) {
+                    console.error('[KanbanWebviewPanel] Failed to revive document:', err);
                     kanbanPanel.tryAutoLoadActiveMarkdown();
                 }
             })();
         } else {
+            if (documentUri) {
+                console.warn('[KanbanWebviewPanel] Invalid documentUri in saved state:', documentUri);
+            }
             kanbanPanel.tryAutoLoadActiveMarkdown();
         }
     }

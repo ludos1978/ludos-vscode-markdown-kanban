@@ -299,14 +299,19 @@ export class ClipboardCommands extends SwitchBasedCommand {
             let existingFilePath: string | null = null;
             if (fileHash) {
                 const mediaIndex = WorkspaceMediaIndex.getInstance();
-                if (mediaIndex && mediaIndex.isInitialized()) {
-                    const matches = mediaIndex.findByHash(fileHash);
-                    if (matches.length > 0) {
-                        // Found matching file in workspace
-                        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-                        if (workspaceFolder) {
-                            existingFilePath = path.join(workspaceFolder.uri.fsPath, matches[0].path);
-                            existingFile = matches[0].path;
+                if (mediaIndex) {
+                    // Lazy initialization - scan on first use (shows cancellable progress)
+                    await mediaIndex.ensureIndexed();
+
+                    if (mediaIndex.isInitialized()) {
+                        const matches = mediaIndex.findByHash(fileHash);
+                        if (matches.length > 0) {
+                            // Found matching file in workspace
+                            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                            if (workspaceFolder) {
+                                existingFilePath = path.join(workspaceFolder.uri.fsPath, matches[0].path);
+                                existingFile = matches[0].path;
+                            }
                         }
                     }
                 }

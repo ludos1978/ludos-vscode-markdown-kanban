@@ -32,6 +32,9 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
     private dbPath: string | null = null;
     private extensionPath: string;
     private initialized = false;
+    private hasScanned = false;
+    private isScanning = false;
+    private scanCancellation: vscode.CancellationTokenSource | null = null;
 
     private static readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB
 
@@ -136,6 +139,104 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
      */
     isInitialized(): boolean {
         return this.initialized && this.db !== null;
+    }
+
+    /**
+     * Check if workspace has been scanned
+     */
+    hasBeenScanned(): boolean {
+        return this.hasScanned;
+    }
+
+    /**
+     * Check if a scan is currently in progress
+     */
+    isScanInProgress(): boolean {
+        return this.isScanning;
+    }
+
+    /**
+     * Cancel any running scan
+     */
+    cancelScan(): void {
+        if (this.scanCancellation) {
+            this.scanCancellation.cancel();
+            this.scanCancellation.dispose();
+            this.scanCancellation = null;
+            this.isScanning = false;
+            console.log('[WorkspaceMediaIndex] Scan cancelled by user');
+        }
+    }
+
+    /**
+     * Ensure the index has been scanned at least once.
+     * This is called lazily on first use (e.g., when searching for duplicates).
+     * Shows a progress notification that can be cancelled.
+     */
+    async ensureIndexed(): Promise<void> {
+        if (this.hasScanned || this.isScanning) {
+            return;
+        }
+
+        if (!this.initialized) {
+            await this.initialize();
+        }
+
+        if (!this.db) {
+            return;
+        }
+
+        // Check if we have existing data in the database
+        const stats = this.getStats();
+        if (stats.totalFiles > 0) {
+            // Database already has data from a previous session
+            this.hasScanned = true;
+            console.log(`[WorkspaceMediaIndex] Using existing index with ${stats.totalFiles} files`);
+            return;
+        }
+
+        // Need to scan - show progress notification
+        await this.scanWithProgress();
+    }
+
+    /**
+     * Scan workspace with a cancellable progress notification
+     */
+    async scanWithProgress(): Promise<number> {
+        if (this.isScanning) {
+            console.log('[WorkspaceMediaIndex] Scan already in progress');
+            return 0;
+        }
+
+        this.isScanning = true;
+        this.scanCancellation = new vscode.CancellationTokenSource();
+
+        try {
+            const result = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Indexing media files...',
+                    cancellable: true
+                },
+                async (progress, token) => {
+                    // Link cancellation tokens
+                    token.onCancellationRequested(() => {
+                        this.scanCancellation?.cancel();
+                    });
+
+                    return await this.scanWorkspace(progress, this.scanCancellation!.token);
+                }
+            );
+
+            this.hasScanned = true;
+            return result;
+        } finally {
+            this.isScanning = false;
+            if (this.scanCancellation) {
+                this.scanCancellation.dispose();
+                this.scanCancellation = null;
+            }
+        }
     }
 
     /**
@@ -319,8 +420,13 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
 
     /**
      * Scan workspace for media files and update index
+     * @param progress Optional progress reporter for UI feedback
+     * @param cancellationToken Optional token to cancel the scan
      */
-    async scanWorkspace(progress?: vscode.Progress<{ message?: string; increment?: number }>): Promise<number> {
+    async scanWorkspace(
+        progress?: vscode.Progress<{ message?: string; increment?: number }>,
+        cancellationToken?: vscode.CancellationToken
+    ): Promise<number> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder || !this.db) return 0;
 
@@ -343,16 +449,28 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         let totalFiles = 0;
 
         for (const pattern of patterns) {
-            const files = await vscode.workspace.findFiles(pattern, exclude);
+            // Check for cancellation before starting each pattern
+            if (cancellationToken?.isCancellationRequested) {
+                console.log('[WorkspaceMediaIndex] Scan cancelled');
+                return totalUpdated;
+            }
+
+            const files = await vscode.workspace.findFiles(pattern, exclude, undefined, cancellationToken);
             totalFiles += files.length;
 
             for (let i = 0; i < files.length; i++) {
+                // Check for cancellation periodically
+                if (cancellationToken?.isCancellationRequested) {
+                    console.log(`[WorkspaceMediaIndex] Scan cancelled after ${totalUpdated} files`);
+                    return totalUpdated;
+                }
+
                 const updated = this.updateFile(files[i].fsPath);
                 if (updated) totalUpdated++;
 
                 if (progress && i % 50 === 0) {
                     progress.report({
-                        message: `Indexing media files... (${totalUpdated} updated)`,
+                        message: `${totalFiles} files found, ${totalUpdated} indexed...`,
                         increment: 1
                     });
                 }

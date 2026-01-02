@@ -1811,6 +1811,7 @@ function insertTaskAfter(taskId, columnId) {
         if (found) {
             const { column: targetColumn } = found;
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+
             if (targetIndex >= 0) {
                 const newTask = {
                     id: `temp-insert-after-${Date.now()}`,

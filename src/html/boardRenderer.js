@@ -2855,16 +2855,30 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
     tempDiv.innerHTML = taskHtml;
     const taskElement = tempDiv.firstElementChild;
 
+    // Get only task elements (exclude add-task-btn and other non-task children)
+    // This is critical because the add-task-btn may be hidden but still in DOM
+    const taskElements = tasksContainer.querySelectorAll(':scope > .task-item');
+
     try {
-        // Insert the task at the correct position (add-task button visibility handled by CSS)
-        if (insertIndex >= 0 && insertIndex < tasksContainer.children.length) {
-            const referenceNode = tasksContainer.children[insertIndex];
+        // Insert the task at the correct position among task elements only
+        if (insertIndex >= 0 && insertIndex < taskElements.length) {
+            // Insert BEFORE the task currently at insertIndex
+            const referenceNode = taskElements[insertIndex];
             if (referenceNode && referenceNode.parentNode === tasksContainer) {
                 tasksContainer.insertBefore(taskElement, referenceNode);
             } else {
                 tasksContainer.appendChild(taskElement);
             }
+        } else if (taskElements.length > 0) {
+            // Insert at end - insert AFTER the last task element
+            const lastTask = taskElements[taskElements.length - 1];
+            if (lastTask.nextSibling) {
+                tasksContainer.insertBefore(taskElement, lastTask.nextSibling);
+            } else {
+                tasksContainer.appendChild(taskElement);
+            }
         } else {
+            // No tasks exist - just append (will be before or after hidden button, doesn't matter)
             tasksContainer.appendChild(taskElement);
         }
     } catch (error) {
