@@ -1,3 +1,5 @@
+- [ ] check the code for any timeout calls, i dont want timeout used!
+
 - [ ] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.

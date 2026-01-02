@@ -101,7 +101,7 @@ export class FileSearchWebview {
         }
 
         const decodedPath = safeDecodeURIComponent(originalPath);
-        const nameRoot = path.parse(path.basename(decodedPath)).name;
+        const fileName = path.basename(decodedPath);  // Include extension in search
         this._baseDir = baseDir;
         this._originalPath = decodedPath;
 
@@ -117,15 +117,13 @@ export class FileSearchWebview {
             this._setupMessageListener();
 
             // Send message to show the modal
+            // Frontend will trigger initial search via fileSearchQuery message
             this._webview?.postMessage({
                 type: 'fileSearchShow',
                 originalPath: decodedPath,
-                initialSearch: nameRoot,
+                initialSearch: fileName,
                 showOpenMediaFolder: options?.showOpenMediaFolder ?? false
             });
-
-            // Start initial search after a short delay
-            setTimeout(() => this._handleSearch(nameRoot), 100);
         });
     }
 
