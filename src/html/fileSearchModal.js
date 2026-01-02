@@ -495,12 +495,15 @@ const fileSearchModal = (function() {
      * Handle messages from the extension
      */
     function handleMessage(message) {
+        console.log('[FileSearchModal] Received message:', message.type);
         switch (message.type) {
             case 'fileSearchShow':
+                console.log('[FileSearchModal] Received fileSearchShow');
                 show(message.originalPath, message.initialSearch, message.showOpenMediaFolder);
                 break;
 
             case 'fileSearchSearching':
+                console.log('[FileSearchModal] Received fileSearchSearching');
                 // New search starting - reset state
                 results = [];
                 selectedIndex = -1;
@@ -511,14 +514,17 @@ const fileSearchModal = (function() {
                 break;
 
             case 'fileSearchResultsBatch':
+                console.log('[FileSearchModal] Received fileSearchResultsBatch with', message.results?.length, 'results, term:', message.term);
                 // Streaming: append new results
                 if (message.term !== currentSearchTerm) {
+                    console.log('[FileSearchModal] New term, resetting. Old:', currentSearchTerm, 'New:', message.term);
                     // New search term - reset results
                     results = [];
                     currentSearchTerm = message.term;
                 }
                 // Append new results
                 results = results.concat(message.results);
+                console.log('[FileSearchModal] Total results now:', results.length);
                 // Auto-select first result if none selected
                 if (selectedIndex < 0 && results.length > 0) {
                     selectedIndex = 0;

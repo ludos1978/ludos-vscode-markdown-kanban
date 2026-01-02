@@ -2838,6 +2838,8 @@ if (!webviewEventListenersInitialized) {
         case 'fileSearchShow':
         case 'fileSearchSearching':
         case 'fileSearchResults':
+        case 'fileSearchResultsBatch':
+        case 'fileSearchComplete':
         case 'fileSearchOptionsUpdated':
         case 'fileSearchBrokenPathCount':
         case 'fileSearchBatchAnalysis':

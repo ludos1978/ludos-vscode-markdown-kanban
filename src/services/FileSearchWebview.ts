@@ -221,20 +221,35 @@ export class FileSearchWebview {
             }
         }
 
+        // Also search for name without extension (for more flexible matching)
+        const termParsed = path.parse(rawTerm);
+        const termNameOnly = termParsed.name;  // e.g., "test" from "test.md"
+        const normalizedNameOnly = this._caseSensitive ? termNameOnly : termNameOnly.toLowerCase();
+
         const nameMatches = (fsPath: string): boolean => {
             if (!rawTerm) { return true; }
             const base = path.basename(fsPath);
             const parsed = path.parse(base);
             const baseNoExt = parsed.name;
 
-            if (this._useRegex || this._wholeWord) {
+            // ONLY regex mode uses regex - nothing else
+            if (this._useRegex) {
                 if (!compiledRegex) { return false; }
                 return compiledRegex.test(baseNoExt) || compiledRegex.test(base);
             }
 
-            const candidateA = this._caseSensitive ? baseNoExt : baseNoExt.toLowerCase();
-            const candidateB = this._caseSensitive ? base : base.toLowerCase();
-            return candidateA.includes(normalized) || candidateB.includes(normalized);
+            // All other modes: EXACT matching only
+            const candidateNoExt = this._caseSensitive ? baseNoExt : baseNoExt.toLowerCase();
+            const candidateFull = this._caseSensitive ? base : base.toLowerCase();
+            const termHasExtension = termParsed.ext.length > 0;
+
+            if (termHasExtension) {
+                // Exact match on full filename: "root-include-2.md" matches only "root-include-2.md"
+                return candidateFull === normalized;
+            } else {
+                // Exact match on name part: "root-include-2" matches "root-include-2.md", "root-include-2.txt"
+                return candidateNoExt === normalizedNameOnly;
+            }
         };
 
         const sendBatch = (force: boolean = false): void => {
@@ -273,24 +288,46 @@ export class FileSearchWebview {
         // Workspace search with smart glob patterns
         const excludePattern = '**/node_modules/**';
 
-        // For simple searches (non-regex): use smart glob patterns that let ripgrep do the work
+        // Escape special glob characters in search term
+        const escapeGlob = (s: string): string => {
+            return s.replace(/[[\]{}*?!]/g, '[$&]');
+        };
+
+        // For non-regex searches: use EXACT glob patterns
         // For regex searches: we need **/* and filter in JS
-        const useSmartGlob = !this._useRegex && rawTerm.length > 0;
+        const useExactGlob = !this._useRegex && rawTerm.length > 0;
 
         let patterns: string[];
-        if (useSmartGlob) {
-            // Smart glob: filename contains term (case-insensitive matching done by glob)
-            // Use multiple patterns to catch different positions
-            patterns = [
-                `**/*${rawTerm}*`,           // Contains term anywhere
-                `**/*${rawTerm}*.*`          // Contains term with extension
-            ];
+        if (useExactGlob && termNameOnly.length > 0) {
+            // Exact glob: match only files with exact filename
+            const escapedNameOnly = escapeGlob(termNameOnly);
+            const escapedTerm = escapeGlob(rawTerm);
+            const termHasExtension = termParsed.ext.length > 0;
+
+            if (termHasExtension) {
+                // Search for exact filename with extension: "test.md" → find only "test.md"
+                patterns = [
+                    `**/${escapedTerm}`,       // Exact filename in any subdirectory
+                    escapedTerm                 // Exact filename at root level
+                ];
+            } else {
+                // Search for exact name with any extension: "test" → find "test.md", "test.txt", etc.
+                patterns = [
+                    `**/${escapedNameOnly}.*`, // Exact name with any extension in subdirs
+                    `**/${escapedNameOnly}`,   // Exact name without extension in subdirs
+                    `${escapedNameOnly}.*`,    // Exact name with any extension at root
+                    `${escapedNameOnly}`       // Exact name without extension at root
+                ];
+            }
+            console.log(`[FileSearchWebview] Exact glob patterns for "${rawTerm}":`, patterns);
         } else if (this._useRegex) {
             // Regex mode: must scan all files and filter in JS
-            patterns = rawTerm ? ['**/*'] : [`**/${term}`, `**/${term}.*`];
+            patterns = ['**/*'];
+            console.log('[FileSearchWebview] Using full scan pattern for regex: **/*');
         } else {
-            // Empty term or fallback
-            patterns = [`**/${term}`, `**/${term}.*`];
+            // Empty term - show recent files
+            patterns = ['**/*'];
+            console.log('[FileSearchWebview] Empty term, using: **/*');
         }
 
         try {
@@ -301,6 +338,7 @@ export class FileSearchWebview {
                 if (seq !== this._searchSeq) { return; }
 
                 const files = await vscode.workspace.findFiles(pattern, excludePattern, maxPerPattern);
+
                 for (const uri of files) {
                     if (seq !== this._searchSeq) { return; }
                     addResult(uri);
@@ -308,6 +346,7 @@ export class FileSearchWebview {
                 // Force send after each pattern completes
                 sendBatch(true);
             }
+            // No fuzzy fallback - for fuzzy matching, user should enable regex mode
         } catch (error) {
             console.warn('[FileSearchWebview] Workspace search failed:', error);
         }

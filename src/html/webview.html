@@ -936,6 +936,8 @@
         let results = [], selectedIndex = -1, originalPath = '', brokenPathData = null, batchAnalysisData = null, batchAnalysisCache = {}, isVisible = false;
         let pathFormat = 'auto'; // 'auto', 'relative', 'absolute'
         let filePreviewEnabled = false; // File preview toggle state
+        let isSearching = false; // Streaming: indicates if search is in progress
+        let currentSearchTerm = ''; // Streaming: current search term
 
         function init() {
             overlay = document.getElementById('file-search-overlay');
@@ -1174,11 +1176,17 @@
         let columnWidths = { filename: 140, path: null, filesFound: 100 }; // null = flex
 
         function renderResults() {
-            if (results.length === 0) { resultsEl.innerHTML = '<div class="file-search-status">No results found</div>'; selectBtnEl.disabled = true; return; }
+            if (results.length === 0) {
+                resultsEl.innerHTML = isSearching
+                    ? '<div class="file-search-status searching">Searching...</div>'
+                    : '<div class="file-search-status">No results found</div>';
+                selectBtnEl.disabled = true; return;
+            }
             const showBatch = batchCheckboxEl.checked;
+            const streamingIndicator = isSearching ? ' <span class="streaming-indicator">⏳</span>' : '';
             let html = '<table class="file-search-table" id="file-search-table"><thead><tr>';
-            html += '<th style="width:' + columnWidths.filename + 'px" data-col="filename">Filename<div class="col-resize-handle"></div></th>';
-            html += '<th data-col="path">Path' + (showBatch ? '<div class="col-resize-handle"></div>' : '') + '</th>';
+            html += '<th style="width:' + columnWidths.filename + 'px" data-col="filename">Filename' + streamingIndicator + '<div class="col-resize-handle"></div></th>';
+            html += '<th data-col="path">Path (' + results.length + ' found)' + (showBatch ? '<div class="col-resize-handle"></div>' : '') + '</th>';
             if (showBatch) {
                 html += '<th style="width:' + columnWidths.filesFound + 'px" data-col="filesFound">Files Found</th>';
             }
@@ -1260,8 +1268,31 @@
         function handleMessage(msg) {
             switch (msg.type) {
                 case 'fileSearchShow': console.log('[FileSearchModal] Received fileSearchShow'); show(msg.originalPath, msg.initialSearch); break;
-                case 'fileSearchSearching': console.log('[FileSearchModal] Received fileSearchSearching'); resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>'; selectBtnEl.disabled = true; break;
-                case 'fileSearchResults': console.log('[FileSearchModal] Received fileSearchResults with', msg.results?.length, 'results'); results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; renderResults(); updatePathPreview(); if (filePreviewEnabled && selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
+                case 'fileSearchSearching':
+                    console.log('[FileSearchModal] Received fileSearchSearching');
+                    results = []; selectedIndex = -1; isSearching = true; currentSearchTerm = '';
+                    resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+                    selectBtnEl.disabled = true;
+                    break;
+                case 'fileSearchResultsBatch':
+                    console.log('[FileSearchModal] Received fileSearchResultsBatch with', msg.results?.length, 'results, term:', msg.term);
+                    if (msg.term !== currentSearchTerm) { results = []; currentSearchTerm = msg.term; }
+                    results = results.concat(msg.results);
+                    if (selectedIndex < 0 && results.length > 0) {
+                        selectedIndex = 0;
+                        if (filePreviewEnabled) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath });
+                    }
+                    renderResults(); updatePathPreview(); selectBtnEl.disabled = selectedIndex < 0;
+                    break;
+                case 'fileSearchComplete':
+                    console.log('[FileSearchModal] Received fileSearchComplete, totalFound:', msg.totalFound);
+                    isSearching = false;
+                    if (results.length === 0) { resultsEl.innerHTML = '<div class="file-search-status">No results found</div>'; }
+                    else { renderResults(); }
+                    selectBtnEl.disabled = selectedIndex < 0;
+                    if (batchCheckboxEl.checked) requestAllBatchAnalysis();
+                    break;
+                case 'fileSearchResults': console.log('[FileSearchModal] Received fileSearchResults with', msg.results?.length, 'results'); results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; isSearching = false; renderResults(); updatePathPreview(); if (filePreviewEnabled && selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
                 case 'fileSearchOptionsUpdated': caseBtnEl.classList.toggle('active', msg.caseSensitive); wordBtnEl.classList.toggle('active', msg.wholeWord); regexBtnEl.classList.toggle('active', msg.regex); vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }); break;
                 case 'fileSearchBrokenPathCount': brokenPathData = msg; updateBrokenCountDisplay(); if (batchCheckboxEl.checked) updateBatchPanel(); break;
                 case 'fileSearchBatchAnalysis': batchAnalysisData = msg; if (msg.newDir && !msg.scanning) batchAnalysisCache[msg.newDir] = msg; renderBatchFilesList(); renderResults(); updateBatchInfo(); break;
