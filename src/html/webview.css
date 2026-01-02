@@ -7240,21 +7240,23 @@ body.font-size-5x .task-description-edit {
     font-size: 12px;
     font-family: var(--vscode-editor-font-family, monospace);
     color: var(--vscode-descriptionForeground, #969696);
-    word-break: break-all;
-    /* Max 2 lines, show end of text (filename visible) */
+    /* Truncate from start, showing filename at end */
     display: block;
     max-height: calc(2 * 1.4em);
     line-height: 1.4em;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     direction: rtl;
-    text-align: left;
+    unicode-bidi: plaintext;  /* Preserve LTR text order within RTL container */
     cursor: default;
 }
 
 .file-search-subtitle:hover {
     max-height: none;
     overflow: visible;
-    direction: ltr;
+    white-space: normal;
+    word-break: break-all;
 }
 
 .file-search-broken-info {
