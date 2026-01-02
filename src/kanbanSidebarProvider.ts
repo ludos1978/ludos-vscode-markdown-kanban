@@ -389,6 +389,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			// Validate candidate files (check for YAML header)
 			// This is fast because we only read files that definitely have the marker
 			let processed = 0;
+			let skippedSpecial = 0;
 			const totalCandidates = candidateFiles.size;
 
 			for (const filePath of candidateFiles) {
@@ -400,6 +401,14 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 						message: `Validating ${processed}/${totalCandidates}...`,
 						increment: (10 / totalCandidates) * 100
 					});
+				}
+
+				// Skip backup, conflict, autosave, and unsavedchanges files
+				// These are internal files that should not appear in the sidebar
+				if (isBackupFile(filePath) || isConflictFile(filePath) ||
+					isAutosaveFile(filePath) || isUnsavedChangesFile(filePath)) {
+					skippedSpecial++;
+					continue;
 				}
 
 				// Quick validation - just check for YAML header since we know marker exists
@@ -426,10 +435,11 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			if (!token.isCancellationRequested) {
 				const newCount = foundFiles.length;
 				const totalCount = this.kanbanFiles.size;
+				const skippedMsg = skippedSpecial > 0 ? ` (skipped ${skippedSpecial} backup/special files)` : '';
 				if (newCount > 0) {
-					showInfo(`Found ${newCount} new kanban board(s). Total: ${totalCount}`);
+					showInfo(`Found ${newCount} new kanban board(s). Total: ${totalCount}${skippedMsg}`);
 				} else {
-					showInfo(`No new boards found. Total: ${totalCount}`);
+					showInfo(`No new boards found. Total: ${totalCount}${skippedMsg}`);
 				}
 			}
 		});
