@@ -200,72 +200,121 @@ export class FileSearchWebview {
         // Send loading state
         this._webview?.postMessage({ type: 'fileSearchSearching' });
 
-        const results: SearchResult[] = [];
         const seen = new Set<string>();
+        let totalSent = 0;
+        const BATCH_SIZE = 20;
+        const STREAM_INTERVAL_MS = 50;
+        let pendingBatch: SearchResult[] = [];
+        let lastSendTime = 0;
 
-        const makeRegex = (pattern: string): RegExp | undefined => {
+        // Precompile regex for regex/wholeWord modes (avoids repeated compilation)
+        let compiledRegex: RegExp | undefined;
+        if (this._useRegex) {
             try {
-                return new RegExp(pattern, this._caseSensitive ? '' : 'i');
+                compiledRegex = new RegExp(rawTerm, this._caseSensitive ? '' : 'i');
             } catch {
-                return undefined;
+                compiledRegex = undefined;
             }
-        };
+        } else if (this._wholeWord) {
+            try {
+                compiledRegex = new RegExp(`\\b${escapeRegExp(rawTerm)}\\b`, this._caseSensitive ? '' : 'i');
+            } catch {
+                compiledRegex = undefined;
+            }
+        }
 
         const nameMatches = (fsPath: string): boolean => {
-            if (!rawTerm) return true;
+            if (!rawTerm) { return true; }
             const base = path.basename(fsPath);
             const parsed = path.parse(base);
             const baseNoExt = parsed.name;
+
+            if (this._useRegex || this._wholeWord) {
+                if (!compiledRegex) { return false; }
+                return compiledRegex.test(baseNoExt) || compiledRegex.test(base);
+            }
+
             const candidateA = this._caseSensitive ? baseNoExt : baseNoExt.toLowerCase();
             const candidateB = this._caseSensitive ? base : base.toLowerCase();
-
-            if (this._useRegex) {
-                const rx = makeRegex(rawTerm);
-                if (!rx) return false;
-                return rx.test(baseNoExt) || rx.test(base);
-            }
-            if (this._wholeWord) {
-                const rx = makeRegex(`\\b${escapeRegExp(rawTerm)}\\b`);
-                if (!rx) return false;
-                return rx.test(baseNoExt) || rx.test(base);
-            }
             return candidateA.includes(normalized) || candidateB.includes(normalized);
         };
 
-        const addResult = (uri: vscode.Uri): void => {
-            if (seq !== this._searchSeq) return;
-            if (!nameMatches(uri.fsPath)) return;
-            if (seen.has(uri.fsPath)) return;
+        const sendBatch = (force: boolean = false): void => {
+            if (seq !== this._searchSeq) { return; }
+            const now = Date.now();
+            if (pendingBatch.length === 0) { return; }
+            if (!force && pendingBatch.length < BATCH_SIZE && now - lastSendTime < STREAM_INTERVAL_MS) { return; }
+
+            this._webview?.postMessage({
+                type: 'fileSearchResultsBatch',
+                results: pendingBatch,
+                term: rawTerm,
+                totalFound: totalSent + pendingBatch.length
+            });
+            totalSent += pendingBatch.length;
+            pendingBatch = [];
+            lastSendTime = now;
+        };
+
+        const addResult = (uri: vscode.Uri): boolean => {
+            if (seq !== this._searchSeq) { return false; }
+            if (!nameMatches(uri.fsPath)) { return false; }
+            if (seen.has(uri.fsPath)) { return false; }
             seen.add(uri.fsPath);
-            results.push({
+
+            pendingBatch.push({
                 label: path.basename(uri.fsPath),
                 fullPath: uri.fsPath,
                 relativePath: vscode.workspace.asRelativePath(uri.fsPath)
             });
+
+            sendBatch(false);
+            return true;
         };
 
-        // Workspace search
+        // Workspace search with smart glob patterns
         const excludePattern = '**/node_modules/**';
-        const globTerm = rawTerm && !this._useRegex ? rawTerm : term;
-        const patterns = this._useRegex
-            ? (rawTerm ? ['**/*', '**/*.*'] : [`**/${term}`, `**/${term}.*`])
-            : (globTerm ? [`**/*${globTerm}*`, `**/*${globTerm}*.*`] : [`**/${term}`, `**/${term}.*`]);
+
+        // For simple searches (non-regex): use smart glob patterns that let ripgrep do the work
+        // For regex searches: we need **/* and filter in JS
+        const useSmartGlob = !this._useRegex && rawTerm.length > 0;
+
+        let patterns: string[];
+        if (useSmartGlob) {
+            // Smart glob: filename contains term (case-insensitive matching done by glob)
+            // Use multiple patterns to catch different positions
+            patterns = [
+                `**/*${rawTerm}*`,           // Contains term anywhere
+                `**/*${rawTerm}*.*`          // Contains term with extension
+            ];
+        } else if (this._useRegex) {
+            // Regex mode: must scan all files and filter in JS
+            patterns = rawTerm ? ['**/*'] : [`**/${term}`, `**/${term}.*`];
+        } else {
+            // Empty term or fallback
+            patterns = [`**/${term}`, `**/${term}.*`];
+        }
 
         try {
             const maxPerPattern = this._useRegex ? MAX_REGEX_RESULTS : MAX_RESULTS_PER_PATTERN;
-            const ops = patterns.map(p => vscode.workspace.findFiles(p, excludePattern, maxPerPattern));
-            const batches = await Promise.all(ops);
-            for (const batch of batches) {
-                for (const uri of batch) {
-                    if (seq !== this._searchSeq) return;
+
+            // Process patterns sequentially to stream results faster
+            for (const pattern of patterns) {
+                if (seq !== this._searchSeq) { return; }
+
+                const files = await vscode.workspace.findFiles(pattern, excludePattern, maxPerPattern);
+                for (const uri of files) {
+                    if (seq !== this._searchSeq) { return; }
                     addResult(uri);
                 }
+                // Force send after each pattern completes
+                sendBatch(true);
             }
         } catch (error) {
             console.warn('[FileSearchWebview] Workspace search failed:', error);
         }
 
-        // Base directory scan
+        // Base directory scan (streams results as found)
         if (this._baseDir) {
             try {
                 const visited = new Set<string>();
@@ -273,13 +322,13 @@ export class FileSearchWebview {
                 const maxResults = MAX_SEARCH_RESULTS;
 
                 const scan = async (dirFsPath: string): Promise<void> => {
-                    if (seq !== this._searchSeq) return;
-                    if (foundCount >= maxResults) return;
-                    if (visited.has(dirFsPath)) return;
+                    if (seq !== this._searchSeq) { return; }
+                    if (foundCount >= maxResults) { return; }
+                    if (visited.has(dirFsPath)) { return; }
                     visited.add(dirFsPath);
 
                     const baseName = path.basename(dirFsPath);
-                    if (['node_modules', '.git', 'dist', 'out'].includes(baseName)) return;
+                    if (['node_modules', '.git', 'dist', 'out'].includes(baseName)) { return; }
 
                     let entries: [string, vscode.FileType][];
                     try {
@@ -289,32 +338,35 @@ export class FileSearchWebview {
                     }
 
                     for (const [name, type] of entries) {
-                        if (seq !== this._searchSeq) return;
-                        if (foundCount >= maxResults) break;
+                        if (seq !== this._searchSeq) { return; }
+                        if (foundCount >= maxResults) { break; }
 
                         const childPath = path.join(dirFsPath, name);
                         if (type === vscode.FileType.Directory) {
                             await scan(childPath);
                         } else if (type === vscode.FileType.File) {
-                            addResult(vscode.Uri.file(childPath));
-                            foundCount++;
+                            if (addResult(vscode.Uri.file(childPath))) {
+                                foundCount++;
+                            }
                         }
                     }
                 };
 
                 await scan(this._baseDir);
+                sendBatch(true); // Flush remaining results
             } catch (error) {
                 console.warn('[FileSearchWebview] BaseDir scan failed:', error);
             }
         }
 
-        if (seq !== this._searchSeq) return;
+        if (seq !== this._searchSeq) { return; }
 
-        // Send results to webview
+        // Send final batch and completion signal
+        sendBatch(true);
         this._webview?.postMessage({
-            type: 'fileSearchResults',
-            results: results,
-            term: rawTerm
+            type: 'fileSearchComplete',
+            term: rawTerm,
+            totalFound: totalSent
         });
     }
 

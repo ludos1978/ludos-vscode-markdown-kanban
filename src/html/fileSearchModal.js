@@ -36,6 +36,8 @@ const fileSearchModal = (function() {
     let batchAnalysisCache = {};
     let isVisible = false;
     let showOpenMediaFolder = false;
+    let isSearching = false;
+    let currentSearchTerm = '';
 
     /**
      * Initialize the modal (called once on page load)
@@ -400,16 +402,23 @@ const fileSearchModal = (function() {
      */
     function renderResults() {
         if (results.length === 0) {
-            resultsEl.innerHTML = '<div class="file-search-status">No results found</div>';
+            if (isSearching) {
+                resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+            } else {
+                resultsEl.innerHTML = '<div class="file-search-status">No results found</div>';
+            }
             selectBtnEl.disabled = true;
             return;
         }
 
         const showBatchColumn = batchCheckboxEl.checked;
 
+        // Show streaming indicator in header if still searching
+        const streamingIndicator = isSearching ? ' <span class="streaming-indicator">⏳</span>' : '';
+
         let html = '<table class="file-search-table"><thead><tr>';
-        html += '<th>Filename</th>';
-        html += '<th>Path</th>';
+        html += '<th>Filename' + streamingIndicator + '</th>';
+        html += '<th>Path (' + results.length + ' found)</th>';
         if (showBatchColumn) {
             html += '<th style="width: 120px;">Files Found</th>';
         }
@@ -468,6 +477,21 @@ const fileSearchModal = (function() {
     }
 
     /**
+     * Update the search status display during streaming
+     */
+    function updateSearchStatus() {
+        if (isSearching) {
+            const count = results.length;
+            if (count === 0) {
+                resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+            } else {
+                // Results are shown in table, but we could show count in a header
+                // The table is already rendered, just ensure it shows
+            }
+        }
+    }
+
+    /**
      * Handle messages from the extension
      */
     function handleMessage(message) {
@@ -477,13 +501,50 @@ const fileSearchModal = (function() {
                 break;
 
             case 'fileSearchSearching':
+                // New search starting - reset state
+                results = [];
+                selectedIndex = -1;
+                isSearching = true;
+                currentSearchTerm = '';
                 resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
                 selectBtnEl.disabled = true;
                 break;
 
+            case 'fileSearchResultsBatch':
+                // Streaming: append new results
+                if (message.term !== currentSearchTerm) {
+                    // New search term - reset results
+                    results = [];
+                    currentSearchTerm = message.term;
+                }
+                // Append new results
+                results = results.concat(message.results);
+                // Auto-select first result if none selected
+                if (selectedIndex < 0 && results.length > 0) {
+                    selectedIndex = 0;
+                    vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath });
+                }
+                renderResults();
+                selectBtnEl.disabled = selectedIndex < 0;
+                break;
+
+            case 'fileSearchComplete':
+                // Search finished
+                isSearching = false;
+                if (results.length === 0) {
+                    resultsEl.innerHTML = '<div class="file-search-status">No results found</div>';
+                }
+                selectBtnEl.disabled = selectedIndex < 0;
+                if (batchCheckboxEl.checked) {
+                    requestAllBatchAnalysis();
+                }
+                break;
+
             case 'fileSearchResults':
+                // Legacy: full results in one message (backward compatibility)
                 results = message.results;
                 selectedIndex = results.length > 0 ? 0 : -1;
+                isSearching = false;
                 renderResults();
                 if (selectedIndex >= 0) {
                     vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath });
