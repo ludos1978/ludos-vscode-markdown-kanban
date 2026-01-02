@@ -684,6 +684,187 @@ function toggleFileBarMenu(event, button) {
     }
 }
 
+// ============= PROCESSES MENU FUNCTIONS =============
+
+/**
+ * Toggle the processes menu dropdown
+ * Follows toggleFileBarMenu pattern
+ */
+function toggleProcessesMenu(event, button) {
+    event.stopPropagation();
+    const menu = button.parentElement;
+    const wasActive = menu.classList.contains('active');
+
+    // Close all other menus
+    document.querySelectorAll('.file-bar-menu, .marp-global-menu, .processes-menu').forEach(m => {
+        m.classList.remove('active');
+    });
+
+    if (!wasActive) {
+        menu.classList.add('active');
+
+        // Position the dropdown
+        const dropdown = menu.querySelector('.processes-menu-dropdown');
+        if (dropdown) {
+            positionProcessesDropdown(button, dropdown);
+        }
+
+        // Request fresh status from backend
+        requestProcessesStatus();
+    }
+}
+
+/**
+ * Position the processes dropdown below button
+ * Follows positionFileBarDropdown pattern
+ */
+function positionProcessesDropdown(button, dropdown) {
+    const buttonRect = button.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = dropdown.offsetHeight || 200;
+
+    let top = buttonRect.bottom + 2;
+    let left = buttonRect.right - dropdown.offsetWidth;
+
+    // Ensure dropdown stays within viewport
+    if (top + dropdownHeight > viewportHeight - 10) {
+        top = buttonRect.top - dropdownHeight - 2;
+    }
+    if (left < 10) {
+        left = 10;
+    }
+
+    dropdown.style.top = top + 'px';
+    dropdown.style.left = left + 'px';
+}
+
+/**
+ * Request media index scan
+ */
+function requestMediaIndexScan() {
+    vscode.postMessage({ type: 'requestMediaIndexScan' });
+}
+
+/**
+ * Cancel ongoing media index scan
+ */
+function requestMediaIndexCancel() {
+    vscode.postMessage({ type: 'cancelMediaIndexScan' });
+}
+
+/**
+ * Request current processes status from backend
+ */
+function requestProcessesStatus() {
+    vscode.postMessage({ type: 'getProcessesStatus' });
+}
+
+/**
+ * Stop Marp auto-export (reuses existing message)
+ */
+function stopMarpAutoExport() {
+    vscode.postMessage({ type: 'stopAutoExport' });
+    // Close the processes menu
+    document.querySelectorAll('.processes-menu').forEach(m => {
+        m.classList.remove('active');
+    });
+}
+
+/**
+ * Update processes menu UI from backend status
+ * Called when receiving 'processesStatus' message
+ */
+function updateProcessesMenuUI(status) {
+    // Media index status
+    const mediaStatus = document.getElementById('media-index-status');
+    const mediaCount = document.getElementById('media-index-count');
+    const mediaStatsRow = document.getElementById('media-index-stats-row');
+    const scanBtn = document.getElementById('media-index-scan-btn');
+    const cancelBtn = document.getElementById('media-index-cancel-btn');
+
+    if (status.mediaIndex && mediaStatus) {
+        const mi = status.mediaIndex;
+
+        if (mi.isScanning) {
+            mediaStatus.textContent = 'Scanning...';
+            mediaStatus.className = 'processes-status-value scanning';
+            if (scanBtn) scanBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = '';
+        } else if (mi.hasScanned) {
+            mediaStatus.textContent = 'Scanned';
+            mediaStatus.className = 'processes-status-value complete';
+            if (mediaStatsRow) mediaStatsRow.style.display = '';
+            if (mediaCount) mediaCount.textContent = mi.totalFiles || 0;
+            if (scanBtn) {
+                scanBtn.textContent = 'Rescan';
+                scanBtn.style.display = '';
+            }
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        } else if (mi.isInitialized) {
+            mediaStatus.textContent = 'Idle';
+            mediaStatus.className = 'processes-status-value';
+            if (mediaStatsRow) mediaStatsRow.style.display = 'none';
+            if (scanBtn) {
+                scanBtn.textContent = 'Start Scan';
+                scanBtn.style.display = '';
+            }
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        } else {
+            mediaStatus.textContent = 'Not initialized';
+            mediaStatus.className = 'processes-status-value';
+            if (mediaStatsRow) mediaStatsRow.style.display = 'none';
+            if (scanBtn) scanBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        }
+    }
+
+    // Marp auto-export status - use existing autoExportActive from exportMarpUI.js
+    const marpStatus = document.getElementById('marp-export-status');
+    const marpActions = document.getElementById('marp-export-actions');
+
+    // Use existing autoExportActive global variable
+    const isExporting = window.autoExportActive || false;
+
+    if (marpStatus) {
+        if (isExporting) {
+            marpStatus.textContent = 'Active';
+            marpStatus.className = 'processes-status-value scanning';
+            if (marpActions) marpActions.style.display = '';
+        } else {
+            marpStatus.textContent = 'Inactive';
+            marpStatus.className = 'processes-status-value';
+            if (marpActions) marpActions.style.display = 'none';
+        }
+    }
+
+    // Update indicator
+    updateProcessesIndicator(status.mediaIndex?.isScanning || isExporting);
+}
+
+/**
+ * Update the processes indicator dot
+ */
+function updateProcessesIndicator(hasActiveProcess) {
+    const indicator = document.getElementById('processes-indicator');
+    if (indicator) {
+        if (hasActiveProcess) {
+            indicator.style.display = '';
+            indicator.classList.add('active');
+        } else {
+            indicator.style.display = 'none';
+            indicator.classList.remove('active');
+        }
+    }
+}
+
+// Export to window
+window.toggleProcessesMenu = toggleProcessesMenu;
+window.requestMediaIndexScan = requestMediaIndexScan;
+window.requestMediaIndexCancel = requestMediaIndexCancel;
+window.updateProcessesMenuUI = updateProcessesMenuUI;
+window.updateProcessesIndicator = updateProcessesIndicator;
+window.stopMarpAutoExport = stopMarpAutoExport;
+
 // Function to set column width
 /**
  * Generic helper to apply and save a setting
@@ -1264,9 +1445,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if clicking outside menus - also check if clicking inside moved dropdowns
         const inDonutMenu = e.target.closest('.donut-menu');
         const inFileBarMenu = e.target.closest('.file-bar-menu');
+        const inProcessesMenu = e.target.closest('.processes-menu');
         const inMovedDropdown = e.target.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
 
-        if (!inDonutMenu && !inFileBarMenu && !inMovedDropdown) {
+        if (!inDonutMenu && !inFileBarMenu && !inProcessesMenu && !inMovedDropdown) {
             // Close all menus and clean up moved dropdowns
             document.querySelectorAll('.donut-menu').forEach(menu => {
                 menu.classList.remove('active');
@@ -1283,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             document.querySelectorAll('.file-bar-menu').forEach(menu => {
                 menu.classList.remove('active');
-                // Clean up moved dropdowns - check both in menu and moved to body  
+                // Clean up moved dropdowns - check both in menu and moved to body
                 let dropdown = menu.querySelector('.file-bar-menu-dropdown');
                 if (!dropdown && typeof cleanupDropdown === 'function') {
                     // Look for moved dropdowns in body that belong to this menu
@@ -1293,6 +1475,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (dropdown && typeof cleanupDropdown === 'function') {
                     cleanupDropdown(dropdown);
                 }
+            });
+            // Close processes menu
+            document.querySelectorAll('.processes-menu').forEach(menu => {
+                menu.classList.remove('active');
             });
         }
     });
@@ -2823,6 +3009,37 @@ if (!webviewEventListenersInitialized) {
                     btn.classList.remove('active');
                 }
             }, 100);
+            // Update processes menu status
+            if (typeof updateProcessesIndicator === 'function') {
+                updateProcessesIndicator(false);
+            }
+            break;
+
+        // ============= PROCESSES MENU MESSAGES =============
+        case 'processesStatus':
+            if (typeof updateProcessesMenuUI === 'function') {
+                updateProcessesMenuUI(message);
+            }
+            break;
+
+        case 'mediaIndexScanStarted':
+            if (typeof updateProcessesMenuUI === 'function') {
+                updateProcessesMenuUI({ mediaIndex: { isScanning: true, isInitialized: true, hasScanned: false } });
+            }
+            break;
+
+        case 'mediaIndexScanCompleted':
+            // Refresh full status to get accurate counts
+            if (typeof requestProcessesStatus === 'function') {
+                requestProcessesStatus();
+            }
+            break;
+
+        case 'mediaIndexScanCancelled':
+            // Refresh full status
+            if (typeof requestProcessesStatus === 'function') {
+                requestProcessesStatus();
+            }
             break;
 
         case 'plantUMLConvertSuccess':

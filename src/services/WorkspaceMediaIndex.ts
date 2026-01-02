@@ -509,6 +509,31 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
     }
 
     /**
+     * Get current status for processes menu
+     */
+    getStatus(): {
+        isInitialized: boolean;
+        isScanning: boolean;
+        hasScanned: boolean;
+        totalFiles: number;
+        byType: Record<string, number>;
+    } {
+        const stats = this.getStats();
+        // Consider "scanned" if we have data in DB (even if ensureIndexed wasn't called)
+        const hasData = stats.totalFiles > 0;
+        if (hasData && !this.hasScanned) {
+            this.hasScanned = true; // Update flag for consistency
+        }
+        return {
+            isInitialized: this.initialized,
+            isScanning: this.isScanning,
+            hasScanned: this.hasScanned || hasData,
+            totalFiles: stats.totalFiles,
+            byType: stats.byType
+        };
+    }
+
+    /**
      * Clear the entire index
      */
     clear(): void {

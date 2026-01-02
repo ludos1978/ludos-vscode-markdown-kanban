@@ -415,10 +415,8 @@ function executeUnifiedExport() {
 
     autoExportBrowserMode = useMarp && marpPreview;
 
-    const shouldShowButton = autoExportOnSave || (useMarp && marpPreview);
-    const autoExportBtn = document.getElementById('auto-export-btn');
-    if (autoExportBtn && lastExportSettings && shouldShowButton) {
-        autoExportBtn.style.display = '';
+    const shouldActivateAutoExport = autoExportOnSave || (useMarp && marpPreview);
+    if (lastExportSettings && shouldActivateAutoExport) {
         autoExportActive = true;
         window.autoExportActive = true;
         updateAutoExportButton();
@@ -1355,22 +1353,14 @@ function toggleAutoExport() {
             message: 'Auto-export started. File will export automatically on save.'
         });
     } else {
-        const autoExportBtn = document.getElementById('auto-export-btn');
-        if (autoExportBtn) {
-            autoExportBtn.style.display = 'none';
-            autoExportBtn.classList.remove('active');
-        }
-
         autoExportActive = false;
         window.autoExportActive = false;
         autoExportBrowserMode = false;
         lastExportSettings = null;
         window.lastExportSettings = null;
 
-        const icon = document.getElementById('auto-export-icon');
-        if (icon) {
-            icon.textContent = '▶';
-        }
+        // Update processes menu status
+        updateAutoExportButton();
 
         vscode.postMessage({
             type: 'stopAutoExport'
@@ -1384,35 +1374,52 @@ function toggleAutoExport() {
 }
 
 /**
- * Update auto-export button appearance
+ * Update auto-export button appearance and processes menu status
  */
 function updateAutoExportButton() {
     const btn = document.getElementById('auto-export-btn');
     const icon = document.getElementById('auto-export-icon');
 
-    if (!btn || !icon) {
-        console.warn('[kanban.exportMarpUI] updateAutoExportButton: Button elements not found');
-        return;
+    // Update old auto-export button if it exists (may be removed in favor of processes menu)
+    if (btn && icon) {
+        if (!lastExportSettings) {
+            btn.style.display = 'none';
+            btn.classList.remove('active');
+            icon.textContent = '▶';
+            btn.title = 'Start auto-export with last settings';
+        } else {
+            btn.style.display = '';
+            if (autoExportActive) {
+                btn.classList.add('active');
+                icon.textContent = '■';
+                btn.title = 'Stop auto-export';
+            } else {
+                btn.classList.remove('active');
+                icon.textContent = '▶';
+                btn.title = 'Start auto-export with last settings';
+            }
+        }
     }
 
-    if (!lastExportSettings) {
-        btn.style.display = 'none';
-        btn.classList.remove('active');
-        icon.textContent = '▶';
-        btn.title = 'Start auto-export with last settings';
-        return;
+    // Update processes menu Marp status
+    const marpStatus = document.getElementById('marp-export-status');
+    const marpActions = document.getElementById('marp-export-actions');
+
+    if (marpStatus) {
+        if (autoExportActive) {
+            marpStatus.textContent = 'Active';
+            marpStatus.className = 'processes-status-value scanning';
+            if (marpActions) marpActions.style.display = '';
+        } else {
+            marpStatus.textContent = 'Inactive';
+            marpStatus.className = 'processes-status-value';
+            if (marpActions) marpActions.style.display = 'none';
+        }
     }
 
-    btn.style.display = '';
-
-    if (autoExportActive) {
-        btn.classList.add('active');
-        icon.textContent = '■';
-        btn.title = 'Stop auto-export';
-    } else {
-        btn.classList.remove('active');
-        icon.textContent = '▶';
-        btn.title = 'Start auto-export with last settings';
+    // Update processes indicator
+    if (typeof window.updateProcessesIndicator === 'function') {
+        window.updateProcessesIndicator(autoExportActive);
     }
 }
 

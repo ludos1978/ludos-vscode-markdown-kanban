@@ -728,6 +728,8 @@ export interface RequestDrawIORenderMessage extends RequestMessage {
     type: 'requestDrawIORender';
     filePath: string;
     pageIndex?: number;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
 }
 
 /**
@@ -736,6 +738,8 @@ export interface RequestDrawIORenderMessage extends RequestMessage {
 export interface RequestExcalidrawRenderMessage extends RequestMessage {
     type: 'requestExcalidrawRender';
     filePath: string;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
 }
 
 /**
@@ -745,6 +749,8 @@ export interface RequestPDFPageRenderMessage extends RequestMessage {
     type: 'requestPDFPageRender';
     filePath: string;
     pageNumber: number;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
 }
 
 /**
@@ -753,6 +759,8 @@ export interface RequestPDFPageRenderMessage extends RequestMessage {
 export interface RequestPDFInfoMessage extends RequestMessage {
     type: 'requestPDFInfo';
     filePath: string;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
 }
 
 // ============= UI MESSAGES =============
@@ -1520,6 +1528,71 @@ export interface DeleteFromMarkdownMessage extends BaseMessage {
     path: string;
 }
 
+// ============= PROCESSES MESSAGES =============
+
+/**
+ * Request processes status (Frontend -> Backend)
+ */
+export interface GetProcessesStatusMessage extends BaseMessage {
+    type: 'getProcessesStatus';
+}
+
+/**
+ * Request media index scan (Frontend -> Backend)
+ */
+export interface RequestMediaIndexScanMessage extends BaseMessage {
+    type: 'requestMediaIndexScan';
+}
+
+/**
+ * Cancel media index scan (Frontend -> Backend)
+ */
+export interface CancelMediaIndexScanMessage extends BaseMessage {
+    type: 'cancelMediaIndexScan';
+}
+
+/**
+ * Media index status info
+ */
+export interface MediaIndexStatus {
+    isInitialized: boolean;
+    isScanning: boolean;
+    hasScanned: boolean;
+    totalFiles?: number;
+    byType?: Record<string, number>;
+}
+
+/**
+ * Processes status response (Backend -> Frontend)
+ */
+export interface ProcessesStatusMessage extends BaseMessage {
+    type: 'processesStatus';
+    mediaIndex: MediaIndexStatus;
+}
+
+/**
+ * Media index scan started (Backend -> Frontend)
+ */
+export interface MediaIndexScanStartedMessage extends BaseMessage {
+    type: 'mediaIndexScanStarted';
+}
+
+/**
+ * Media index scan completed (Backend -> Frontend)
+ */
+export interface MediaIndexScanCompletedMessage extends BaseMessage {
+    type: 'mediaIndexScanCompleted';
+    filesIndexed: number;
+    totalFiles: number;
+}
+
+/**
+ * Media index scan cancelled (Backend -> Frontend)
+ */
+export interface MediaIndexScanCancelledMessage extends BaseMessage {
+    type: 'mediaIndexScanCancelled';
+}
+
 // ============= TYPE UNIONS =============
 
 /**
@@ -1549,7 +1622,12 @@ export type OutgoingMessage =
     | UpdateTaskContentExtendedMessage
     | ConfigurationUpdateMessage
     | TriggerSnippetMessage
-    | IncludesUpdatedMessage;
+    | IncludesUpdatedMessage
+    // Processes messages
+    | ProcessesStatusMessage
+    | MediaIndexScanStartedMessage
+    | MediaIndexScanCompletedMessage
+    | MediaIndexScanCancelledMessage;
 
 /**
  * All incoming message types (Frontend → Backend)
@@ -1687,7 +1765,11 @@ export type IncomingMessage =
     | SearchForFileMessage
     | RevealPathInExplorerMessage
     | BrowseForImageMessage
-    | DeleteFromMarkdownMessage;
+    | DeleteFromMarkdownMessage
+    // Processes messages
+    | GetProcessesStatusMessage
+    | RequestMediaIndexScanMessage
+    | CancelMediaIndexScanMessage;
 
 /**
  * Message type string literals for type-safe checking

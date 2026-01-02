@@ -916,9 +916,10 @@ window.processDiagramQueue = processDiagramQueue;
  * Render diagram file (draw.io or excalidraw) to SVG using backend
  * @param {string} filePath - Path to diagram file
  * @param {string} diagramType - Type of diagram ('drawio' or 'excalidraw')
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
  * @returns {Promise<{svgDataUrl: string, fileMtime: number}>} SVG data URL and file mtime
  */
-async function renderDiagram(filePath, diagramType) {
+async function renderDiagram(filePath, diagramType, includeDir) {
     return new Promise((resolve, reject) => {
         const requestId = `diagram-${++diagramRequestId}`;
 
@@ -927,11 +928,16 @@ async function renderDiagram(filePath, diagramType) {
 
         // Send request to extension backend
         const messageType = diagramType === 'drawio' ? 'requestDrawIORender' : 'requestExcalidrawRender';
-        vscode.postMessage({
+        const message = {
             type: messageType,
             requestId: requestId,
             filePath: filePath
-        });
+        };
+        // Add include context if available (for resolving relative paths in include files)
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
 
         // Timeout after 30 seconds
         setTimeout(() => {
@@ -943,17 +949,25 @@ async function renderDiagram(filePath, diagramType) {
     });
 }
 
-function queueDiagramRender(id, filePath, diagramType) {
-    pendingDiagramQueue.push({ id, filePath, diagramType, timestamp: Date.now() });
+/**
+ * Queue a diagram for async rendering
+ * @param {string} id - Unique ID for the diagram placeholder
+ * @param {string} filePath - Path to diagram file
+ * @param {string} diagramType - Type of diagram ('drawio' or 'excalidraw')
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
+ */
+function queueDiagramRender(id, filePath, diagramType, includeDir) {
+    pendingDiagramQueue.push({ id, filePath, diagramType, includeDir, timestamp: Date.now() });
 }
 
 /**
  * Render a specific PDF page to PNG using backend
  * @param {string} filePath - Path to PDF file
  * @param {number} pageNumber - Page number to render (1-indexed)
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
  * @returns {Promise<{pngDataUrl: string, fileMtime: number}>} PNG data URL and file mtime
  */
-async function renderPDFPage(filePath, pageNumber) {
+async function renderPDFPage(filePath, pageNumber, includeDir) {
     return new Promise((resolve, reject) => {
         const requestId = `pdf-${++diagramRequestId}`;
 
@@ -961,12 +975,16 @@ async function renderPDFPage(filePath, pageNumber) {
         diagramRenderRequests.set(requestId, { resolve, reject, filePath, pageNumber });
 
         // Send request to extension backend
-        vscode.postMessage({
+        const message = {
             type: 'requestPDFPageRender',
             requestId: requestId,
             filePath: filePath,
             pageNumber: pageNumber
-        });
+        };
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
 
         // Timeout after 30 seconds
         setTimeout(() => {
@@ -978,16 +996,17 @@ async function renderPDFPage(filePath, pageNumber) {
     });
 }
 
-function queuePDFPageRender(id, filePath, pageNumber) {
-    pendingDiagramQueue.push({ id, filePath, pageNumber, diagramType: 'pdf', timestamp: Date.now() });
+function queuePDFPageRender(id, filePath, pageNumber, includeDir) {
+    pendingDiagramQueue.push({ id, filePath, pageNumber, diagramType: 'pdf', includeDir, timestamp: Date.now() });
 }
 
 /**
  * Request PDF info (page count) from backend
  * @param {string} filePath - Path to PDF file
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
  * @returns {Promise<{pageCount: number, fileMtime: number}>}
  */
-async function getPDFInfo(filePath) {
+async function getPDFInfo(filePath, includeDir) {
     return new Promise((resolve, reject) => {
         const requestId = `pdfinfo-${++diagramRequestId}`;
 
@@ -995,11 +1014,15 @@ async function getPDFInfo(filePath) {
         diagramRenderRequests.set(requestId, { resolve, reject, filePath });
 
         // Send request to extension backend
-        vscode.postMessage({
+        const message = {
             type: 'requestPDFInfo',
             requestId: requestId,
             filePath: filePath
-        });
+        };
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
 
         // Timeout after 10 seconds
         setTimeout(() => {
@@ -1011,8 +1034,8 @@ async function getPDFInfo(filePath) {
     });
 }
 
-function queuePDFSlideshow(id, filePath) {
-    pendingDiagramQueue.push({ id, filePath, diagramType: 'pdf-slideshow', timestamp: Date.now() });
+function queuePDFSlideshow(id, filePath, includeDir) {
+    pendingDiagramQueue.push({ id, filePath, diagramType: 'pdf-slideshow', includeDir, timestamp: Date.now() });
 }
 
 /**
@@ -1021,8 +1044,9 @@ function queuePDFSlideshow(id, filePath) {
  * @param {string} filePath - Path to PDF file
  * @param {number} pageCount - Total number of pages
  * @param {number} fileMtime - File modification time for caching
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
  */
-async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
+async function createPDFSlideshow(element, filePath, pageCount, fileMtime, includeDir) {
     // Create unique ID for this slideshow
     const slideshowId = `pdf-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -1096,8 +1120,8 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
         try {
             imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
 
-            // Request page rendering
-            const result = await renderPDFPage(filePath, pageNumber);
+            // Request page rendering (pass includeDir for correct relative path resolution)
+            const result = await renderPDFPage(filePath, pageNumber, includeDir);
             const { pngDataUrl } = result;
 
             // Update image
@@ -1181,11 +1205,11 @@ async function processDiagramQueue() {
             // Handle PDF slideshow separately
             if (item.diagramType === 'pdf-slideshow') {
                 // Get PDF info (page count)
-                const pdfInfo = await getPDFInfo(item.filePath);
+                const pdfInfo = await getPDFInfo(item.filePath, item.includeDir);
                 const { pageCount, fileMtime } = pdfInfo;
 
                 // Create slideshow UI
-                await createPDFSlideshow(element, item.filePath, pageCount, fileMtime);
+                await createPDFSlideshow(element, item.filePath, pageCount, fileMtime, item.includeDir);
                 continue;
             }
 
@@ -1194,13 +1218,13 @@ async function processDiagramQueue() {
             // Render based on type
             if (item.diagramType === 'pdf') {
                 // Render PDF page
-                const result = await renderPDFPage(item.filePath, item.pageNumber);
+                const result = await renderPDFPage(item.filePath, item.pageNumber, item.includeDir);
                 imageDataUrl = result.pngDataUrl;
                 fileMtime = result.fileMtime;
                 displayLabel = `PDF page ${item.pageNumber}`;
             } else {
                 // Render diagram (draw.io or excalidraw)
-                const result = await renderDiagram(item.filePath, item.diagramType);
+                const result = await renderDiagram(item.filePath, item.diagramType, item.includeDir);
                 imageDataUrl = result.svgDataUrl;
                 fileMtime = result.fileMtime;
                 displayLabel = `${item.diagramType} diagram`;
@@ -1943,14 +1967,18 @@ function renderMarkdown(text, includeContext) {
                 </div>`;
             }
 
+            // Get include context for relative path resolution (needed for diagrams/PDFs in include files)
+            const includeContext = window.currentTaskIncludeContext;
+            const includeDir = includeContext?.includeDir;
+
             // Check if this is a PDF file reference without page number (slideshow mode)
             const isPdfFile = originalSrc && originalSrc.match(/\.pdf$/i) && !originalSrc.includes('#');
             if (isPdfFile) {
                 // Create unique ID for this PDF slideshow
                 const pdfId = `pdf-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                // Queue for async slideshow creation
-                queuePDFSlideshow(pdfId, originalSrc);
+                // Queue for async slideshow creation (pass includeDir for relative path resolution)
+                queuePDFSlideshow(pdfId, originalSrc, includeDir);
 
                 // Return placeholder immediately (synchronous)
                 return `<div id="${pdfId}" class="diagram-placeholder">
@@ -1980,8 +2008,8 @@ function renderMarkdown(text, includeContext) {
                 // Create unique ID for this diagram
                 const diagramId = `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                // Queue for async rendering
-                queueDiagramRender(diagramId, originalSrc, diagramType);
+                // Queue for async rendering (pass includeDir for relative path resolution)
+                queueDiagramRender(diagramId, originalSrc, diagramType, includeDir);
 
                 // Return placeholder immediately (synchronous)
                 return `<div id="${diagramId}" class="diagram-placeholder">

@@ -378,9 +378,61 @@
                     <span id="global-sticky-icon" class="global-sticky-icon">📌</span>
                 </button>
 
-                <button id="auto-export-btn" class="auto-export-btn" style="display: none;" onmousedown="event.preventDefault();" onclick="toggleAutoExport()" title="Start/stop auto-export">
-                    <span id="auto-export-icon" class="auto-export-icon">▶</span>
-                </button>
+                <!-- Processes Dropdown Menu -->
+                <div class="processes-menu" id="processes-menu">
+                    <button class="processes-menu-btn" onclick="toggleProcessesMenu(event, this)" title="Background Processes">
+                        <span class="processes-icon">⚙</span>
+                        <span class="processes-indicator" id="processes-indicator" style="display: none;"></span>
+                    </button>
+                    <div class="processes-menu-dropdown">
+                        <div class="processes-menu-header">Background Processes</div>
+
+                        <!-- Media Indexing Section -->
+                        <div class="processes-section">
+                            <div class="processes-section-title">
+                                <span class="menu-icon">🔍</span> Media Index
+                            </div>
+                            <div class="processes-section-content">
+                                <div class="processes-status-row">
+                                    <span class="processes-status-label">Status:</span>
+                                    <span class="processes-status-value" id="media-index-status">Not initialized</span>
+                                </div>
+                                <div class="processes-status-row" id="media-index-stats-row" style="display: none;">
+                                    <span class="processes-status-label">Files:</span>
+                                    <span class="processes-status-value" id="media-index-count">0</span>
+                                </div>
+                                <div class="processes-actions">
+                                    <button class="processes-action-btn" id="media-index-scan-btn" onclick="requestMediaIndexScan()">
+                                        Start Scan
+                                    </button>
+                                    <button class="processes-action-btn" id="media-index-cancel-btn" onclick="requestMediaIndexCancel()" style="display: none;">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="processes-menu-divider"></div>
+
+                        <!-- Marp Auto-Export Section -->
+                        <div class="processes-section">
+                            <div class="processes-section-title">
+                                <span class="menu-icon">📑</span> Marp Auto-Export
+                            </div>
+                            <div class="processes-section-content">
+                                <div class="processes-status-row">
+                                    <span class="processes-status-label">Status:</span>
+                                    <span class="processes-status-value" id="marp-export-status">Inactive</span>
+                                </div>
+                                <div class="processes-actions" id="marp-export-actions" style="display: none;">
+                                    <button class="processes-action-btn stop-btn" onclick="stopMarpAutoExport()">
+                                        Stop Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <button id="refresh-btn" class="refresh-btn" onmousedown="event.preventDefault();" onclick="showDebugOverlay()" title="Show File States">
                     <span class="refresh-icon">ⓘ</span>

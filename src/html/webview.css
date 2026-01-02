@@ -784,6 +784,155 @@ body {
   }
 }
 
+/* ============= PROCESSES MENU ============= */
+.processes-menu {
+  position: relative;
+  z-index: 100;
+}
+
+.processes-menu.active {
+  z-index: 1000;
+  isolation: isolate;
+}
+
+.processes-menu-btn {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.processes-menu-btn:hover {
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
+}
+
+.processes-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vscode-statusBarItem-warningBackground, #f0ad4e);
+}
+
+.processes-indicator.active {
+  background: var(--vscode-charts-green, #4caf50);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes processes-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.processes-menu-dropdown {
+  display: none;
+  position: fixed;
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 4px;
+  padding: 8px;
+  min-width: 220px;
+  z-index: 2147483647;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.processes-menu.active .processes-menu-dropdown {
+  display: block;
+}
+
+.processes-menu-header {
+  font-weight: 600;
+  padding: 4px 8px;
+  color: var(--vscode-foreground);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  margin-bottom: 8px;
+}
+
+.processes-section {
+  padding: 4px 0;
+}
+
+.processes-section-title {
+  font-weight: 500;
+  padding: 4px 8px;
+  color: var(--vscode-foreground);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.processes-section-content {
+  padding: 4px 8px;
+}
+
+.processes-status-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.processes-status-label {
+  color: var(--vscode-descriptionForeground);
+}
+
+.processes-status-value {
+  color: var(--vscode-foreground);
+}
+
+.processes-status-value.scanning {
+  color: var(--vscode-charts-yellow, #f0ad4e);
+}
+
+.processes-status-value.complete {
+  color: var(--vscode-charts-green, #4caf50);
+}
+
+.processes-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.processes-action-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.processes-action-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.processes-action-btn.stop-btn {
+  background: var(--vscode-statusBarItem-errorBackground, #d32f2f);
+  color: white;
+}
+
+.processes-action-btn.stop-btn:hover {
+  opacity: 0.9;
+}
+
+.processes-menu-divider {
+  height: 1px;
+  background: var(--vscode-panel-border);
+  margin: 8px 0;
+}
+
 /* Layout Presets Menu */
 .layout-presets-menu-container {
   position: relative;

@@ -238,7 +238,7 @@ export class DiagramCommands extends SwitchBasedCommand {
      * Implements file-based caching to avoid re-rendering unchanged diagrams
      */
     private async handleRenderDrawIO(message: RequestDrawIORenderMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath } = message;
+        const { requestId, filePath, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
@@ -247,8 +247,11 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
+            // Build include context if provided (for diagrams inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
             // Resolve file path (handles both document-relative and workspace-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath);
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
 
             if (!resolution || !resolution.exists) {
                 throw new Error(`draw.io file not found: ${filePath}`);
@@ -480,7 +483,7 @@ export class DiagramCommands extends SwitchBasedCommand {
      * Uses backend ExcalidrawService with library for conversion
      */
     private async handleRenderExcalidraw(message: RequestExcalidrawRenderMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath } = message;
+        const { requestId, filePath, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
@@ -493,8 +496,11 @@ export class DiagramCommands extends SwitchBasedCommand {
             const { ExcalidrawService } = await import('../services/export/ExcalidrawService');
             const service = new ExcalidrawService();
 
+            // Build include context if provided (for diagrams inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
             // Resolve file path (handles both document-relative and workspace-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath);
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
 
             if (!resolution || !resolution.exists) {
                 throw new Error(`Excalidraw file not found: ${filePath}`);
@@ -556,7 +562,7 @@ export class DiagramCommands extends SwitchBasedCommand {
      * Uses backend PDFService with pdftoppm CLI for conversion
      */
     private async handleRenderPDFPage(message: RequestPDFPageRenderMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath, pageNumber } = message;
+        const { requestId, filePath, pageNumber, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
@@ -569,8 +575,11 @@ export class DiagramCommands extends SwitchBasedCommand {
             const { PDFService } = await import('../services/export/PDFService');
             const service = new PDFService();
 
+            // Build include context if provided (for PDFs inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
             // Resolve file path (handles both workspace-relative and document-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath);
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
             if (!resolution || !resolution.exists) {
                 throw new Error(`PDF file not found: ${filePath}`);
             }
@@ -611,7 +620,7 @@ export class DiagramCommands extends SwitchBasedCommand {
      * Handle PDF info request (get page count)
      */
     private async handleGetPDFInfo(message: RequestPDFInfoMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath } = message;
+        const { requestId, filePath, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
@@ -624,8 +633,11 @@ export class DiagramCommands extends SwitchBasedCommand {
             const { PDFService } = await import('../services/export/PDFService');
             const service = new PDFService();
 
-            // Resolve file path
-            const resolution = await context.fileManager.resolveFilePath(filePath);
+            // Build include context if provided (for PDFs inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
+            // Resolve file path (handles both workspace-relative and document-relative paths)
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
             if (!resolution || !resolution.exists) {
                 throw new Error(`PDF file not found: ${filePath}`);
             }
