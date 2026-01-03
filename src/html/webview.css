@@ -2774,10 +2774,10 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat 0 4px / 100% 2px;
 }
 
-.task-item:not(:last-child)::after {
+.task-item:not(:first-child)::after {
     content: '';
     position: absolute;
-    bottom: 0px;
+    top: calc(0px - var(--whitespace-div4));
     left: 0;
     width: 100%;
     height: 1px;
