@@ -682,7 +682,8 @@ body {
 .file-info-right .refresh-btn,
 .file-info-right .auto-export-btn,
 .file-info-right .layout-presets-btn,
-.file-info-right .file-bar-menu-btn {
+.file-info-right .file-bar-menu-btn,
+.file-info-right .processes-menu-btn {
   border: var(--button-border);
   padding: 2px 4px;
   margin: 0;
@@ -795,7 +796,7 @@ body {
   isolation: isolate;
 }
 
-.processes-menu-btn {
+/* .processes-menu-btn {
   background: var(--button-background);
   color: var(--button-foreground);
   border: var(--button-border);
@@ -807,7 +808,7 @@ body {
   align-items: center;
   gap: 4px;
   position: relative;
-}
+} */
 
 .processes-menu-btn:hover {
   background: var(--button-background-hover);
@@ -1561,7 +1562,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 .task-item {
   /* background-color: var(--task-background); */
   border-radius: 4px;
-	gap: var(--whitespace-div2);
+	gap: var(--whitespace-div4);
   margin-bottom: var(--whitespace-div2);
   min-height: var(--task-height);
   transition: all 0.2s ease;
