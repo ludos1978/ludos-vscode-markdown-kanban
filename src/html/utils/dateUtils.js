@@ -32,19 +32,10 @@ function generateTimestamp(date = new Date()) {
  * Generate a timestamp for export folders (without seconds)
  * Format: YYYYMMDD-HHmm (e.g., 20231215-1430)
  */
-function generateTimestampExport(date = new Date()) {
-    const { year, month, day, hours, minutes } = getDateComponents(date);
-    return `${year}${month}${day}-${hours}${minutes}`;
-}
-
-/**
- * Generate a filename-safe ISO-like timestamp
- * Format: YYYY-MM-DDTHH-mm-ss (e.g., 2023-12-15T14-30-22)
- */
-function generateTimestampFilenameSafe(date = new Date()) {
-    const { year, month, day, hours, minutes, seconds } = getDateComponents(date);
-    return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}`;
-}
+// function generateTimestampExport(date = new Date()) {
+//     const { year, month, day, hours, minutes } = getDateComponents(date);
+//     return `${year}${month}${day}T${hours}${minutes}`;
+// }
 
 /**
  * Generate date-only string
@@ -52,15 +43,13 @@ function generateTimestampFilenameSafe(date = new Date()) {
  */
 function generateDateOnly(date = new Date()) {
     const { year, month, day } = getDateComponents(date);
-    return `${year}-${month}-${day}`;
+    return `${year}${month}${day}`;
 }
 
 // Export for use in other modules
 if (typeof window !== 'undefined') {
     window.DateUtils = {
         generateTimestamp,
-        generateTimestampExport,
-        generateTimestampFilenameSafe,
         generateDateOnly
     };
 }

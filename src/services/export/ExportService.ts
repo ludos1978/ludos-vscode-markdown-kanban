@@ -13,7 +13,7 @@ import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { MermaidExportService } from './MermaidExportService';
 import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
-import { generateTimestampExport } from '../../constants/FileNaming';
+import { generateTimestamp } from '../../constants/FileNaming';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { MarkdownPatterns, HtmlPatterns, isUrl } from '../../shared/regexPatterns';
 import { AssetHandler } from '../assets/AssetHandler';
@@ -985,7 +985,7 @@ export class ExportService {
         const absoluteSourcePath = path.resolve(sourceDocumentPath);
         const sourceDir = path.dirname(absoluteSourcePath);
         const sourceBasename = path.basename(absoluteSourcePath, '.md');
-        const timestamp = generateTimestampExport();
+        const timestamp = generateTimestamp();
 
         const exportFolder = path.join(sourceDir, `${sourceBasename}-${timestamp}`);
         return exportFolder;

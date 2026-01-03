@@ -143,20 +143,20 @@ export function generateTimestamp(date: Date = new Date()): string {
  * Format: YYYYMMDD-HHmm (e.g., 20231215-1430)
  * Used for: export folder names
  */
-export function generateTimestampExport(date: Date = new Date()): string {
-    const { year, month, day, hours, minutes } = getDateComponents(date);
-    return `${year}${month}${day}-${hours}${minutes}`;
-}
+// export function generateTimestampExport(date: Date = new Date()): string {
+//     const { year, month, day, hours, minutes } = getDateComponents(date);
+//     return `${year}${month}${day}T${hours}${minutes}`;
+// }
 
 /**
  * Generate a filename-safe ISO-like timestamp
  * Format: YYYY-MM-DDTHH-mm-ss (e.g., 2023-12-15T14-30-22)
  * Used for: image files, clipboard pastes
  */
-export function generateTimestampFilenameSafe(date: Date = new Date()): string {
-    const { year, month, day, hours, minutes, seconds } = getDateComponents(date);
-    return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}`;
-}
+// export function generateTimestampFilenameSafe(date: Date = new Date()): string {
+//     const { year, month, day, hours, minutes, seconds } = getDateComponents(date);
+//     return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}`;
+// }
 
 /**
  * Generate date-only string
@@ -165,7 +165,7 @@ export function generateTimestampFilenameSafe(date: Date = new Date()): string {
  */
 export function generateDateOnly(date: Date = new Date()): string {
     const { year, month, day } = getDateComponents(date);
-    return `${year}-${month}-${day}`;
+    return `${year}${month}${day}`;
 }
 
 // =============================================================================

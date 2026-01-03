@@ -1,10 +1,14 @@
+- [ ] tab should not switch between field, but alt+enter. 
+
 - [ ] check the code for any timeout calls, i dont want timeout used!
 
-- [ ] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
+- [ ] could we include pandoc and it's conversion methods into the kanban exporter? are there any other worthwile exporters or converters that use markdown as basic format?
+
+- [x] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
-- [ ] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
+- [x] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
 
 - [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
 
