@@ -15,6 +15,7 @@ import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, Mes
 import { ExportService, NewExportOptions } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
+import { PandocExportService } from '../services/export/PandocExportService';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage } from '../utils/stringUtils';
@@ -62,7 +63,8 @@ export class ExportCommands extends SwitchBasedCommand {
             'openInMarpPreview',
             'checkMarpStatus',
             'getMarpAvailableClasses',
-            'askOpenExportFolder'
+            'askOpenExportFolder',
+            'checkPandocStatus'
         ],
         priority: 100
     };
@@ -80,7 +82,8 @@ export class ExportCommands extends SwitchBasedCommand {
         'openInMarpPreview': async (msg, ctx) => { await this.handleOpenInMarpPreview((msg as any).filePath); return this.success(); },
         'checkMarpStatus': async (_msg, ctx) => { await this.handleCheckMarpStatus(ctx); return this.success(); },
         'getMarpAvailableClasses': async (_msg, ctx) => { await this.handleGetMarpAvailableClasses(ctx); return this.success(); },
-        'askOpenExportFolder': async (msg, _ctx) => { await this.handleAskOpenExportFolder((msg as any).path); return this.success(); }
+        'askOpenExportFolder': async (msg, _ctx) => { await this.handleAskOpenExportFolder((msg as any).path); return this.success(); },
+        'checkPandocStatus': async (_msg, ctx) => { await this.handleCheckPandocStatus(ctx); return this.success(); }
     };
 
     /**
@@ -437,15 +440,16 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handleAskOpenExportFolder(exportPath: string): Promise<void> {
         try {
-            const folderPath = path.dirname(exportPath);
             const result = await vscode.window.showInformationMessage(
                 'Export completed successfully!',
-                'Open Export Folder',
+                'Reveal in Finder/Explorer',
                 'Dismiss'
             );
 
-            if (result === 'Open Export Folder') {
-                await vscode.commands.executeCommand('vscode.openFolder', safeFileUri(folderPath, 'ExportCommands-openExportFolder'), true);
+            if (result === 'Reveal in Finder/Explorer') {
+                // Use revealFileInOS to open in native file manager (Finder/Explorer)
+                // This reveals the exported file directly, not opening as a VS Code workspace
+                await vscode.commands.executeCommand('revealFileInOS', safeFileUri(exportPath, 'ExportCommands-revealExport'));
             }
         } catch (error) {
             console.error('Error handling export folder open request:', error);
@@ -525,6 +529,26 @@ export class ExportCommands extends SwitchBasedCommand {
             }
         } catch (error) {
             console.error('[ExportCommands.handleCheckMarpStatus] Error:', error);
+        }
+    }
+
+    /**
+     * Check Pandoc status and send to frontend
+     */
+    private async handleCheckPandocStatus(_context: CommandContext): Promise<void> {
+        try {
+            const isAvailable = await PandocExportService.isPandocAvailable();
+            const version = isAvailable ? await PandocExportService.getPandocVersion() : null;
+
+            if (!this.postMessage({
+                type: 'pandocStatus',
+                available: isAvailable,
+                version: version
+            })) {
+                console.error('[ExportCommands.handleCheckPandocStatus] No webview panel available');
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleCheckPandocStatus] Error:', error);
         }
     }
 

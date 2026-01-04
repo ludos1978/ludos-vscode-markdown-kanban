@@ -42,6 +42,9 @@ export interface KanbanConfiguration {
         globalClasses: string[];
         localClasses: string[];
     };
+    pandoc: {
+        path: string;
+    };
     sidebar: {
         autoScan: boolean;
     };
@@ -97,6 +100,9 @@ export class ConfigurationService {
             ],
             globalClasses: [],
             localClasses: []
+        },
+        pandoc: {
+            path: ''
         },
         sidebar: {
             autoScan: true

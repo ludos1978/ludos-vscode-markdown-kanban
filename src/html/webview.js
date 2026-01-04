@@ -2859,6 +2859,9 @@ if (!webviewEventListenersInitialized) {
         case 'marpStatus':
             handleMarpStatus(message);
             break;
+        case 'pandocStatus':
+            handlePandocStatus(message);
+            break;
         case 'marpThemesAvailable':
 
             // Clear the retry timeout

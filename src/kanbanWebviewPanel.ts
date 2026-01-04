@@ -380,6 +380,8 @@ export class KanbanWebviewPanel {
 
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
+            // Always send file info when consuming a pending update (fixes revival timing issue)
+            this._fileManager.sendFileInfo();
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
             return;
         }

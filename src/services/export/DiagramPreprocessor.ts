@@ -490,12 +490,36 @@ export class DiagramPreprocessor {
         const renderedIds = new Set(rendered.map(d => d.id));
         const unconverted = allDiagrams.filter(d => !renderedIds.has(d.id));
 
-        // Replace unconverted diagrams with a note
+        // Replace unconverted diagrams with a type-specific note
         for (const diagram of unconverted) {
-            const note = `> ⚠️ ${diagram.type.toUpperCase()} diagram could not be converted for export\n> To include this diagram, please open the Kanban board view before exporting`;
+            const note = this.getUnconvertedDiagramNote(diagram);
             result = result.replace(diagram.fullMatch, note);
         }
 
         return result;
+    }
+
+    /**
+     * Get a helpful error note for an unconverted diagram based on its type
+     */
+    private getUnconvertedDiagramNote(diagram: DiagramBlock): string {
+        const header = `> ⚠️ ${diagram.type.toUpperCase()} diagram could not be converted for export`;
+
+        switch (diagram.type) {
+            case 'mermaid':
+                return `${header}\n> To include this diagram, please open the Kanban board view before exporting`;
+
+            case 'plantuml':
+                return `${header}\n> Ensure Java is installed and accessible in your PATH`;
+
+            case 'drawio':
+                return `${header}\n> Ensure draw.io desktop app is installed with CLI support, or check if the file exists: ${diagram.filePath || 'unknown'}`;
+
+            case 'excalidraw':
+                return `${header}\n> Check if the file exists and is a valid Excalidraw format: ${diagram.filePath || 'unknown'}`;
+
+            default:
+                return `${header}\n> Check the output console for error details`;
+        }
     }
 }

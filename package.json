@@ -4461,6 +4461,11 @@
             "description": "CSS class name from availableClasses"
           }
         },
+        "markdown-kanban.pandoc.path": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to Pandoc binary. Leave empty to use system PATH. Install Pandoc from https://pandoc.org/installing.html"
+        },
         "markdown-kanban.templates.path": {
           "type": "string",
           "default": "",

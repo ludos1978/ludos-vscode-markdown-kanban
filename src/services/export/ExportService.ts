@@ -9,6 +9,7 @@ import { PresentationParser } from './PresentationParser';
 import { PresentationGenerator } from './PresentationGenerator';
 import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
+import { PandocExportService, PandocOutputFormat } from './PandocExportService';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { MermaidExportService } from './MermaidExportService';
 import { ConfigurationService } from '../ConfigurationService';
@@ -47,8 +48,8 @@ export interface NewExportOptions {
     // - preview: Open in Marp preview (realtime watch)
 
     // FORMAT: Output format (defined by export dialog)
-    // 'keep' = keep original, 'kanban' = ## Headers + tasks, 'presentation' = slides with ---
-    format: 'keep' | 'kanban' | 'presentation';
+    // 'keep' = keep original, 'kanban' = ## Headers + tasks, 'presentation' = slides with ---, 'document' = for Pandoc
+    format: 'keep' | 'kanban' | 'presentation' | 'document';
 
     // MARP: Use Marp checkbox and output format
     runMarp?: boolean;  // Use Marp checkbox
@@ -92,6 +93,11 @@ export interface NewExportOptions {
     speakerNoteMode?: 'comment' | 'keep' | 'remove';  // How to handle ;; speaker notes
     htmlCommentMode?: 'remove' | 'keep';              // How to handle <!-- --> comments
     htmlContentMode?: 'keep' | 'remove';              // How to handle <tag> content
+
+    // PANDOC: Document export options
+    runPandoc?: boolean;                              // Use Pandoc for document export
+    pandocFormat?: 'docx' | 'odt' | 'epub';           // Pandoc output format
+    documentPageBreaks?: 'continuous' | 'per-task' | 'per-column';  // Page breaks in document format
 }
 
 /**
@@ -1061,7 +1067,7 @@ export class ExportService {
         filteredContent = this.applyContentTransformations(filteredContent, options);
 
         // Convert based on format option ONLY
-        // Two formats: 'kanban' or 'presentation'
+        // Formats: 'kanban', 'presentation', or 'document'
         if (options.format === 'presentation') {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
@@ -1075,8 +1081,15 @@ export class ExportService {
                     localClasses: options.marpLocalClasses || marpConfig.localClasses || []
                 }
             });
+        } else if (options.format === 'document') {
+            // Document format for Pandoc export (DOCX, ODT, EPUB)
+            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir);
+            const pageBreaks = options.documentPageBreaks || 'continuous';
+            filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {
+                tagVisibility: options.tagVisibility
+            });
         }
-        // format === 'kanban' → keep as-is
+        // format === 'kanban' or 'keep' → keep as-is
 
         return {
             exportedContent: filteredContent,
@@ -1417,11 +1430,11 @@ export class ExportService {
         let notIncludedAssets: ExportAssetInfo[] = [];
 
         // ROUTING LOGIC:
-        // - Converting format (presentation) WITH includes → Use file-based pipeline
-        // - Converting format (presentation) WITHOUT includes → Use board-based (faster)
+        // - Converting format (presentation/document) WITH includes → Use file-based pipeline
+        // - Converting format (presentation/document) WITHOUT includes → Use board-based (faster)
         // - Keeping original format (kanban/keep) → Use file to preserve formatting
         // - Asset packing → Use file to process includes correctly
-        const convertToPresentation = options.format === 'presentation';
+        const needsFormatConversion = options.format === 'presentation' || options.format === 'document';
 
         // Determine settings
         // Default: Don't merge includes (keep them separate with rewritten paths)
@@ -1471,7 +1484,14 @@ export class ExportService {
 
             // For task scope copy: use fromTasks to avoid column header slide
             // For column/board scope: use fromBoard (includes column titles)
-            if (isCopyMode && options.scope === 'task') {
+            // For document format: use toDocument (for Pandoc export)
+            if (options.format === 'document') {
+                const pageBreaks = options.documentPageBreaks || 'continuous';
+                result = PresentationGenerator.toDocument(filteredBoard, pageBreaks, {
+                    stripIncludes: true,
+                    tagVisibility: options.tagVisibility
+                });
+            } else if (isCopyMode && options.scope === 'task') {
                 const allTasks = filteredBoard.columns.flatMap(col => col.tasks);
                 result = PresentationGenerator.fromTasks(allTasks, generatorOptions);
             } else {
@@ -1506,7 +1526,7 @@ export class ExportService {
                 targetFolder,
                 options,
                 new Set<string>(),
-                convertToPresentation,
+                needsFormatConversion,
                 mergeIncludes
             );
 
@@ -1577,6 +1597,11 @@ export class ExportService {
         // Handle Marp conversion (only if runMarp = Use Marp checkbox checked)
         if (options.runMarp) {
             return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel, mermaidService);
+        }
+
+        // Handle Pandoc conversion (only if runPandoc = Use Pandoc checkbox checked)
+        if (options.runPandoc && options.pandocFormat) {
+            return await this.runPandocConversion(markdownPath, options, webviewPanel, mermaidService);
         }
 
         // Regular save succeeded
@@ -1755,6 +1780,118 @@ export class ExportService {
                     await preprocessCleanup();
                 }
             }
+        }
+    }
+
+    /**
+     * Run Pandoc conversion for document export (DOCX, ODT, EPUB)
+     * @param markdownPath - Path to the exported markdown file
+     * @param options - Export options including pandocFormat
+     * @param webviewPanel - Optional webview panel for Mermaid diagram rendering
+     * @param mermaidService - Optional MermaidExportService for panel-isolated Mermaid rendering
+     */
+    private static async runPandocConversion(
+        markdownPath: string,
+        options: NewExportOptions,
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
+        mermaidService?: MermaidExportService
+    ): Promise<ExportResult> {
+        const pandocFormat: PandocOutputFormat = options.pandocFormat || 'docx';
+        console.log(`[ExportService] runPandocConversion - pandocFormat: ${pandocFormat}`);
+
+        // Check availability
+        const isAvailable = await PandocExportService.isPandocAvailable();
+        if (!isAvailable) {
+            return {
+                success: false,
+                message: 'Pandoc is not installed. Please install from https://pandoc.org/installing.html'
+            };
+        }
+
+        // Build output path
+        const dir = path.dirname(markdownPath);
+        const baseName = path.basename(markdownPath, '.md');
+        const ext = PandocExportService.getExtensionForFormat(pandocFormat);
+        const outputPath = path.join(dir, `${baseName}${ext}`);
+
+        // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Pandoc processing
+        // This ensures Mermaid, PlantUML, Excalidraw, Draw.io diagrams work in document exports
+        let processedMarkdownPath = markdownPath;
+        let preprocessCleanup: (() => Promise<void>) | undefined;
+
+        try {
+            // Use injected webview panel for Mermaid rendering
+            const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
+            if (panel && mermaidService) {
+                mermaidService.setWebviewPanel(panel);
+            }
+
+            // Create diagram preprocessor
+            const preprocessor = new DiagramPreprocessor(mermaidService, panel);
+
+            // Preprocess diagrams
+            const preprocessResult = await preprocessor.preprocess(
+                markdownPath,
+                dir,
+                baseName
+            );
+
+            // If diagrams were processed, write to temp file
+            if (preprocessResult.diagramFiles.length > 0) {
+                const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
+                await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
+
+                processedMarkdownPath = tempFile;
+
+                // Setup cleanup function
+                preprocessCleanup = async () => {
+                    try {
+                        await fs.promises.unlink(tempFile);
+                    } catch {
+                        // Ignore cleanup errors
+                    }
+                };
+            }
+        } catch (error) {
+            console.error('[ExportService] Diagram preprocessing failed:', error);
+            // Continue with original file if preprocessing fails
+            showWarning(
+                'Diagram preprocessing failed. Exporting without diagram conversion.'
+            );
+        }
+
+        try {
+            await PandocExportService.export({
+                inputFilePath: processedMarkdownPath,
+                format: pandocFormat,
+                outputPath: outputPath
+            });
+
+            // Cleanup preprocessed file after export
+            if (preprocessCleanup) {
+                await preprocessCleanup();
+            }
+
+            // Open file after export if requested
+            if (options.openAfterExport) {
+                vscode.commands.executeCommand('vscode.open', vscode.Uri.file(outputPath));
+            }
+
+            return {
+                success: true,
+                message: `Exported to ${outputPath}`,
+                exportedPath: outputPath
+            };
+        } catch (error) {
+            // Cleanup on error too
+            if (preprocessCleanup) {
+                await preprocessCleanup();
+            }
+            console.error(`[ExportService.runPandocConversion] Conversion failed:`, error);
+            return {
+                success: false,
+                message: `Pandoc conversion failed: ${getErrorMessage(error)}`
+            };
         }
     }
 

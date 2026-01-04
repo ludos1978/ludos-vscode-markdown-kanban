@@ -137,7 +137,8 @@
       "Bash(for fn in toggleAllColumns toggleGlobalSticky undo redo selectFile closeInputModal copyFullPath copyStoredPath)",
       "Bash(if grep:*)",
       "Bash(for fn in setSelectedExportFolder handleExportResult handleMarpStatus handleMarpThemesAvailable handleMarpAvailableClasses handleColumnExportResult handleCopyContentResult)",
-      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian status)"
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian status)",
+      "Bash(pandoc --version:*)"
     ],
     "deny": [],
     "ask": []

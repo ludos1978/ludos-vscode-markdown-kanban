@@ -124,8 +124,9 @@ function showExportDialogWithSelection(scope, index, id) {
         });
     }
 
-    // Check Marp status when opening dialog
+    // Check Marp and Pandoc status when opening dialog
     checkMarpStatus();
+    checkPandocStatus();
 
     // Add event listeners to detect manual setting changes
     addExportSettingChangeListeners();
@@ -376,12 +377,22 @@ function executeUnifiedExport() {
         marpHandoutDirection = document.getElementById('marp-handout-direction')?.value || 'horizontal';
     }
 
+    // Pandoc options
+    const usePandoc = document.getElementById('use-pandoc')?.checked || false;
+    let pandocFormat = null;
+    let documentPageBreaks = 'continuous';
+
+    if (usePandoc) {
+        pandocFormat = document.getElementById('pandoc-output-format')?.value || 'docx';
+        documentPageBreaks = document.getElementById('pandoc-page-breaks')?.value || 'continuous';
+    }
+
     closeExportModal();
 
     const options = {
         columnIndexes: selectedItems,
         mode: (useMarp && marpPreview) ? 'auto' : 'save',
-        format: format,  // 'keep', 'kanban', or 'presentation'
+        format: format,  // 'keep', 'kanban', 'presentation', or 'document'
         runMarp: useMarp,  // Use Marp checkbox
         marpFormat: useMarp ? marpOutputFormat : undefined,
         tagVisibility: tagVisibility,
@@ -402,7 +413,11 @@ function executeUnifiedExport() {
         marpHandoutLayout: useMarp && marpHandout ? marpHandoutLayout : undefined,
         marpHandoutSlidesPerPage: useMarp && marpHandout ? marpHandoutSlidesPerPage : undefined,
         marpHandoutDirection: useMarp && marpHandout ? marpHandoutDirection : undefined,
-        marpHandoutPdf: useMarp && marpHandout ? true : undefined
+        marpHandoutPdf: useMarp && marpHandout ? true : undefined,
+        // Pandoc options
+        runPandoc: usePandoc,
+        pandocFormat: usePandoc ? pandocFormat : undefined,
+        documentPageBreaks: usePandoc ? documentPageBreaks : undefined
     };
 
     lastExportSettings = options;
@@ -476,7 +491,7 @@ function getWorkspacePath() {
 // =============================================================================
 
 /**
- * Handle export format change - enable/disable Marp options
+ * Handle export format change - enable/disable Marp and Pandoc options
  */
 function handleFormatChange() {
     const formatSelect = document.getElementById('export-format');
@@ -484,11 +499,16 @@ function handleFormatChange() {
     const useMarpHint = document.getElementById('use-marp-hint');
     const marpOptions = document.getElementById('marp-options');
     const contentTransformations = document.getElementById('content-transformations');
+    const usePandocCheckbox = document.getElementById('use-pandoc');
+    const usePandocHint = document.getElementById('use-pandoc-hint');
+    const pandocOptions = document.getElementById('pandoc-options');
 
     if (formatSelect && useMarpCheckbox && marpOptions) {
         const format = formatSelect.value;
         const isPresentationFormat = format === 'presentation';
+        const isDocumentFormat = format === 'document';
 
+        // Handle Marp - only enabled for presentation format
         if (isPresentationFormat) {
             useMarpCheckbox.disabled = false;
             if (useMarpHint) useMarpHint.classList.add('hidden');
@@ -513,6 +533,27 @@ function handleFormatChange() {
             }
 
             marpOptions.classList.add('disabled-section');
+        }
+
+        // Handle Pandoc - only enabled for document format
+        if (usePandocCheckbox && pandocOptions) {
+            if (isDocumentFormat) {
+                usePandocCheckbox.disabled = false;
+                if (usePandocHint) usePandocHint.classList.add('hidden');
+
+                if (usePandocCheckbox.checked) {
+                    pandocOptions.classList.remove('disabled-section');
+                    checkPandocStatus();
+                } else {
+                    pandocOptions.classList.add('disabled-section');
+                }
+            } else {
+                usePandocCheckbox.disabled = true;
+                usePandocCheckbox.checked = false;
+                if (usePandocHint) usePandocHint.classList.remove('hidden');
+
+                pandocOptions.classList.add('disabled-section');
+            }
         }
     }
 }
@@ -876,6 +917,76 @@ function handleMarpStatus(status) {
  */
 function handleMarpAvailableClasses(classes) {
     window.marpAvailableClasses = classes;
+}
+
+// =============================================================================
+// PANDOC STATUS
+// =============================================================================
+
+/**
+ * Check Pandoc availability
+ */
+function checkPandocStatus() {
+    vscode.postMessage({
+        type: 'checkPandocStatus'
+    });
+}
+
+/**
+ * Handle Pandoc status response from backend
+ */
+function handlePandocStatus(status) {
+    const statusText = document.getElementById('pandoc-status-text');
+    const usePandocCheckbox = document.getElementById('use-pandoc');
+    const pandocOptions = document.getElementById('pandoc-options');
+    const formatSelect = document.getElementById('export-format');
+
+    if (!statusText) {
+        return;
+    }
+
+    statusText.className = 'status-text';
+
+    if (status.available) {
+        statusText.textContent = status.version ? `✓ Ready (v${status.version})` : '✓ Ready';
+        statusText.classList.add('status-success');
+        // Only enable checkbox if format is 'document' (respects format selection)
+        if (usePandocCheckbox && formatSelect && formatSelect.value === 'document') {
+            usePandocCheckbox.disabled = false;
+        }
+    } else {
+        statusText.innerHTML = '⚠ Not Installed - <a href="https://pandoc.org/installing.html" target="_blank">Install</a>';
+        statusText.classList.add('status-warning');
+        if (usePandocCheckbox) {
+            usePandocCheckbox.disabled = true;
+            usePandocCheckbox.checked = false;
+        }
+        if (pandocOptions) {
+            pandocOptions.classList.add('disabled-section');
+        }
+    }
+}
+
+/**
+ * Handle Use Pandoc checkbox change
+ */
+function handleUsePandocChange() {
+    const usePandocCheckbox = document.getElementById('use-pandoc');
+    const pandocOptions = document.getElementById('pandoc-options');
+    const useMarpCheckbox = document.getElementById('use-marp');
+
+    if (usePandocCheckbox && pandocOptions) {
+        if (usePandocCheckbox.checked) {
+            pandocOptions.classList.remove('disabled-section');
+            // Uncheck Marp when Pandoc is selected (mutually exclusive)
+            if (useMarpCheckbox) {
+                useMarpCheckbox.checked = false;
+                handleUseMarpChange();
+            }
+        } else {
+            pandocOptions.classList.add('disabled-section');
+        }
+    }
 }
 
 /**
@@ -1906,6 +2017,11 @@ window.setMarpDirective = setMarpDirective;
 window.toggleMarpDirective = toggleMarpDirective;
 window.refreshMarpDirectivesSubmenu = refreshMarpDirectivesSubmenu;
 window.toggleMarpClass = toggleMarpClass;
+
+// Pandoc functions
+window.checkPandocStatus = checkPandocStatus;
+window.handlePandocStatus = handlePandocStatus;
+window.handleUsePandocChange = handleUsePandocChange;
 
 // Auto-export functions
 window.toggleAutoExport = toggleAutoExport;

@@ -655,6 +655,7 @@
 														<option value="keep" selected>Keep Original Format</option>
 														<option value="kanban">Convert to Kanban Format</option>
 														<option value="presentation">Convert to Presentation Format</option>
+														<option value="document">Convert to Document Format</option>
 												</select>
 										</div>
 										<div class="export-field-half">
@@ -797,6 +798,42 @@
 												</div>
 										</div>
 								</div>
+
+						<!-- Use Pandoc option (document exports) -->
+						<div id="use-pandoc-container" class="export-field">
+							<label class="export-checkbox">
+								<input type="checkbox" id="use-pandoc" onchange="handleUsePandocChange()" disabled>
+								<span>Use Pandoc <span id="use-pandoc-hint" style="color: #666; font-size: 0.9em;">(requires document format)</span></span>
+							</label>
+						</div>
+
+						<!-- Pandoc Options -->
+						<div id="pandoc-options" class="export-field disabled-section">
+							<div class="export-field-row">
+								<div class="export-field-third">
+									<label for="pandoc-output-format">Output Format:</label>
+									<select id="pandoc-output-format" class="form-input">
+										<option value="docx" selected>Word Document (.docx)</option>
+										<option value="odt">OpenDocument (.odt)</option>
+										<option value="epub">EPUB (.epub)</option>
+									</select>
+								</div>
+								<div class="export-field-third">
+									<label for="pandoc-page-breaks">Page Breaks:</label>
+									<select id="pandoc-page-breaks" class="form-input">
+										<option value="continuous" selected>Continuous</option>
+										<option value="per-task">Page per Task</option>
+										<option value="per-column">Page per Column</option>
+									</select>
+								</div>
+								<div class="export-field-third">
+									<div id="pandoc-status" class="marp-status">
+										<span class="status-label">Pandoc Status:</span>
+										<span id="pandoc-status-text" class="status-pending" title="">Checking...</span>
+									</div>
+								</div>
+							</div>
+						</div>
 
                 <div class="export-field">
 										<label>Select Content to Export:</label>

@@ -121,6 +121,78 @@ export class PresentationGenerator {
     }
 
     /**
+     * Generate document format from entire board
+     *
+     * Document format is designed for Pandoc export (DOCX, ODT, EPUB).
+     * - Column titles become H1 headings
+     * - Task titles and content are combined (no special formatting)
+     * - Optional page breaks between tasks or columns
+     *
+     * @param board - Kanban board
+     * @param pageBreaks - Page break mode: 'continuous', 'per-task', or 'per-column'
+     * @param options - Generation options (for tag filtering, etc.)
+     * @returns Document markdown string
+     */
+    static toDocument(
+        board: KanbanBoard,
+        pageBreaks: 'continuous' | 'per-task' | 'per-column' = 'continuous',
+        options: PresentationOptions = {}
+    ): string {
+        const lines: string[] = [];
+
+        for (const column of board.columns) {
+            // Column title as H1
+            let columnTitle = column.displayTitle ?? column.title;
+            if (options.stripIncludes) {
+                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+            }
+            lines.push(`# ${columnTitle}`, '');
+
+            // Filter tasks if requested
+            let tasks = column.tasks;
+            if (options.filterIncludes) {
+                tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+            }
+
+            for (const task of tasks) {
+                // Task title (plain text, like presentation format)
+                let title = task.displayTitle ?? task.title ?? '';
+                if (options.stripIncludes) {
+                    title = title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+                }
+
+                if (title) {
+                    lines.push(title, '');
+                }
+
+                // Task content
+                let description = task.description ?? '';
+
+                // Apply tag filtering if specified
+                if (options.tagVisibility && options.tagVisibility !== 'all') {
+                    description = TagUtils.processMarkdownContent(description, options.tagVisibility);
+                }
+
+                if (description) {
+                    lines.push(description, '');
+                }
+
+                // Page break after task
+                if (pageBreaks === 'per-task') {
+                    lines.push('\\newpage', '');
+                }
+            }
+
+            // Page break after column
+            if (pageBreaks === 'per-column') {
+                lines.push('\\newpage', '');
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
      * Convert a single task to slide content string
      */
     private static taskToSlideContent(task: KanbanTask, options: PresentationOptions): string {

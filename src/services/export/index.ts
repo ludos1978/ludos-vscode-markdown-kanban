@@ -10,6 +10,9 @@ export { ExportService, NewExportOptions, ExportResult, ExportAssetInfo } from '
 export { MarpExportService, MarpExportOptions, MarpOutputFormat } from './MarpExportService';
 export { MarpExtensionService } from './MarpExtensionService';
 
+// Pandoc export
+export { PandocExportService, PandocExportOptions, PandocOutputFormat } from './PandocExportService';
+
 // Presentation generation & parsing
 export { PresentationGenerator, PresentationOptions, MarpOptions } from './PresentationGenerator';
 export { PresentationParser, PresentationSlide } from './PresentationParser';

@@ -869,6 +869,20 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - src/services/MarpExportService-MarpExportService_getMarpVersion - Get Marp CLI version
 - src/services/MarpExportService-MarpExportService_getAvailableThemes - Get available Marp themes
 
+## src/services/export/PandocExportService.ts - PandocExportService
+
+**Document Export Service** (Added 2026-01-03)
+Exports markdown to document formats (DOCX, ODT, EPUB) using Pandoc CLI.
+
+- src/services/export/PandocExportService-PandocExportService_isPandocAvailable - Check if Pandoc is installed on system
+- src/services/export/PandocExportService-PandocExportService_getPandocVersion - Get installed Pandoc version string
+- src/services/export/PandocExportService-PandocExportService_resetCache - Reset cached availability and version
+- src/services/export/PandocExportService-PandocExportService_export - Export markdown to DOCX/ODT/EPUB via Pandoc CLI
+- src/services/export/PandocExportService-PandocExportService_buildCliArgs - Build Pandoc command line arguments
+- src/services/export/PandocExportService-PandocExportService_getPandocPath - Get configured or default Pandoc binary path
+- src/services/export/PandocExportService-PandocExportService_getExtensionForFormat - Get file extension for format
+- src/services/export/PandocExportService-PandocExportService_getFormatDisplayName - Get human-readable format name
+
 ## src/constants/IncludeConstants.ts
 
 **Centralized Constants** (Added 2025-11-04, Updated 2025-12-22)
