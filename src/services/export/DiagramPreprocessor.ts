@@ -72,11 +72,15 @@ export class DiagramPreprocessor {
             return { processedMarkdown: markdown, diagramFiles: [] };
         }
 
+        // Get source directory for resolving relative paths in diagrams
+        const sourceDir = path.dirname(sourceFilePath);
+
         // Render all diagrams
         const rendered = await this.renderAllDiagrams(
             diagrams,
             outputFolder,
-            baseFileName
+            baseFileName,
+            sourceDir
         );
 
 
@@ -165,11 +169,16 @@ export class DiagramPreprocessor {
 
     /**
      * Render all diagrams (PlantUML in parallel, Mermaid via service, draw.io/excalidraw in parallel)
+     * @param diagrams - Extracted diagram blocks
+     * @param outputFolder - Where to save rendered SVG files
+     * @param baseFileName - Base name for output files
+     * @param sourceDir - Directory of source markdown file (for resolving relative paths)
      */
     private async renderAllDiagrams(
         diagrams: DiagramBlock[],
         outputFolder: string,
-        baseFileName: string
+        baseFileName: string,
+        sourceDir: string
     ): Promise<RenderedDiagram[]> {
         const rendered: RenderedDiagram[] = [];
 
@@ -204,7 +213,8 @@ export class DiagramPreprocessor {
             const drawioResults = await this.renderDrawIOBatch(
                 drawioDiagrams,
                 outputFolder,
-                baseFileName
+                baseFileName,
+                sourceDir
             );
             rendered.push(...drawioResults);
         }
@@ -214,7 +224,8 @@ export class DiagramPreprocessor {
             const excalidrawResults = await this.renderExcalidrawBatch(
                 excalidrawDiagrams,
                 outputFolder,
-                baseFileName
+                baseFileName,
+                sourceDir
             );
             rendered.push(...excalidrawResults);
         }
@@ -334,11 +345,13 @@ export class DiagramPreprocessor {
      * Render draw.io diagrams in parallel
      * Similar to PlantUML batch rendering (CLI-based)
      * Skips diagrams whose source files haven't changed
+     * @param sourceDir - Directory of source markdown file (for resolving relative paths)
      */
     private async renderDrawIOBatch(
         diagrams: DiagramBlock[],
         outputFolder: string,
-        baseFileName: string
+        baseFileName: string,
+        sourceDir: string
     ): Promise<RenderedDiagram[]> {
 
         const renderPromises = diagrams.map(async (diagram) => {
@@ -348,10 +361,10 @@ export class DiagramPreprocessor {
                     return null;
                 }
 
-                // Resolve path relative to the markdown file's directory (outputFolder)
+                // Resolve path relative to the SOURCE markdown file's directory, not output folder
                 const absolutePath = path.isAbsolute(diagram.filePath)
                     ? diagram.filePath
-                    : path.resolve(outputFolder, diagram.filePath);
+                    : path.resolve(sourceDir, diagram.filePath);
 
                 // Check if file exists
                 if (!fs.existsSync(absolutePath)) {
@@ -400,11 +413,13 @@ export class DiagramPreprocessor {
      * Render excalidraw diagrams in parallel
      * Similar to PlantUML batch rendering (library-based)
      * Skips diagrams whose source files haven't changed
+     * @param sourceDir - Directory of source markdown file (for resolving relative paths)
      */
     private async renderExcalidrawBatch(
         diagrams: DiagramBlock[],
         outputFolder: string,
-        baseFileName: string
+        baseFileName: string,
+        sourceDir: string
     ): Promise<RenderedDiagram[]> {
 
         const renderPromises = diagrams.map(async (diagram) => {
@@ -414,10 +429,10 @@ export class DiagramPreprocessor {
                     return null;
                 }
 
-                // Resolve path relative to the markdown file's directory (outputFolder)
+                // Resolve path relative to the SOURCE markdown file's directory, not output folder
                 const absolutePath = path.isAbsolute(diagram.filePath)
                     ? diagram.filePath
-                    : path.resolve(outputFolder, diagram.filePath);
+                    : path.resolve(sourceDir, diagram.filePath);
 
                 // Check if file exists
                 if (!fs.existsSync(absolutePath)) {
