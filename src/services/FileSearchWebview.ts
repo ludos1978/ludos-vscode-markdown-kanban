@@ -71,6 +71,22 @@ export class FileSearchWebview {
     }
 
     /**
+     * Normalize a directory path for comparison
+     * Strips leading ./ and normalizes separators
+     * This ensures directories match regardless of ./ prefix differences
+     */
+    private _normalizeDirForComparison(dir: string): string {
+        let normalized = dir.replace(/\\/g, '/');
+        if (normalized.startsWith('./')) {
+            normalized = normalized.substring(2);
+        }
+        if (normalized.endsWith('/')) {
+            normalized = normalized.slice(0, -1);
+        }
+        return normalized;
+    }
+
+    /**
      * Set the tracked files to search within (from MarkdownFileRegistry)
      */
     setTrackedFiles(files: TrackedFileData[]): void {
@@ -554,7 +570,9 @@ export class FileSearchWebview {
                 }
 
                 const foundDir = path.dirname(decodedPath);
-                if (foundDir === brokenDir) {
+                const normalizedFoundDir = this._normalizeDirForComparison(foundDir);
+                const normalizedBrokenDir = this._normalizeDirForComparison(brokenDir);
+                if (normalizedFoundDir === normalizedBrokenDir) {
                     brokenCount++;
                     const filename = path.basename(decodedPath);
                     if (!foundFiles.includes(filename)) {
@@ -617,7 +635,9 @@ export class FileSearchWebview {
                 }
 
                 const foundDir = path.dirname(decodedPath);
-                if (foundDir === brokenDir) {
+                const normalizedFoundDir = this._normalizeDirForComparison(foundDir);
+                const normalizedBrokenDir = this._normalizeDirForComparison(brokenDir);
+                if (normalizedFoundDir === normalizedBrokenDir) {
                     const filename = path.basename(decodedPath);
                     if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {
                         // Check if file exists in new directory

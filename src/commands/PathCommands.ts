@@ -646,6 +646,22 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Normalize a directory path for comparison
+     * Strips leading ./ and normalizes separators
+     * This ensures directories match regardless of ./ prefix differences
+     */
+    private normalizeDirForComparison(dir: string): string {
+        let normalized = dir.replace(/\\/g, '/');
+        if (normalized.startsWith('./')) {
+            normalized = normalized.substring(2);
+        }
+        if (normalized.endsWith('/')) {
+            normalized = normalized.slice(0, -1);
+        }
+        return normalized;
+    }
+
+    /**
      * Replace a path in markdown files and refresh the board
      * Common logic used by handleSearchForFile and handleBrowseForImage
      * If taskId and columnId are provided, sends targeted update instead of full refresh
@@ -927,8 +943,10 @@ export class PathCommands extends SwitchBasedCommand {
 
                 // Check if this path is in the broken directory
                 const foundDir = path.dirname(decodedPath);
+                const normalizedFoundDir = this.normalizeDirForComparison(foundDir);
+                const normalizedBrokenDir = this.normalizeDirForComparison(brokenDir);
 
-                if (foundDir === brokenDir || decodedPath.startsWith(brokenDir + '/') || decodedPath.startsWith(brokenDir + '\\')) {
+                if (normalizedFoundDir === normalizedBrokenDir || this.normalizeDirForComparison(decodedPath).startsWith(normalizedBrokenDir + '/')) {
                     // Calculate the new absolute path
                     const filename = path.basename(decodedPath);
                     const absoluteNewPath = path.join(newDir, filename);
