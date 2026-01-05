@@ -1659,6 +1659,11 @@ if (!webviewEventListenersInitialized) {
                 window.cachedBoard = JSON.parse(JSON.stringify(message.board)); // Deep clone - SINGLE source of truth
                 window.savedBoardState = JSON.parse(JSON.stringify(message.board)); // Reference for unsaved detection
                 window.hasUnsavedChanges = false;
+
+                // Pre-populate broken includes cache from board data for initial render
+                if (typeof window.populateBrokenIncludesFromBoard === 'function') {
+                    window.populateBrokenIncludesFromBoard(message.board);
+                }
             } else {
                 // Always update the cached board when receiving updates from backend
                 window.cachedBoard = JSON.parse(JSON.stringify(message.board));
@@ -2108,7 +2113,7 @@ if (!webviewEventListenersInitialized) {
         case 'includeFileContent':
             // Handle include file content response from backend
             if (typeof window.updateIncludeFileCache === 'function') {
-                window.updateIncludeFileCache(message.filePath, message.content);
+                window.updateIncludeFileCache(message.filePath, message.content, message.error);
             } else {
                 console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }

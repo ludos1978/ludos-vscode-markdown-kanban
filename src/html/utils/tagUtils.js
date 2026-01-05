@@ -1406,6 +1406,8 @@ class TagUtils {
      */
     getTaskDisplayTitle(task) {
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
+            // DEBUG: Log includeError state
+            console.log(`[tagUtils.getTaskDisplayTitle] task=${task.id}, includeMode=${task.includeMode}, includeError=${task.includeError}, includeFiles=${JSON.stringify(task.includeFiles)}`);
             // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
@@ -1496,6 +1498,8 @@ class TagUtils {
  * @returns {string} HTML string with include link wrapped in overlay container
  */
 function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBroken = false) {
+    // DEBUG: Log isBroken state
+    console.log(`[generateIncludeLinkWithMenu] filePath=${filePath}, isBroken=${isBroken}, clickHandler=${clickHandler}`);
     const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' : 'handleColumnIncludeClick';

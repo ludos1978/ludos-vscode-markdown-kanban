@@ -226,8 +226,8 @@ body {
   position: relative;
   top: 0px;
   right: -4px;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   background: rgba(0, 0, 0, 0.6);
   border: none;
   border-radius: 4px;
@@ -258,17 +258,6 @@ body {
   opacity: 1;
 }
 
-/* BROKEN STATE: Always show menu button with warning outline */
-/* Unified style for all broken overlay menus: image, video, include */
-/* .image-path-overlay-container.image-broken .image-menu-btn,
-.video-path-overlay-container.video-broken .video-menu-btn,
-.include-path-overlay-container.include-broken .include-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00) !important;
-  outline-offset: -1px !important;
-  background: rgba(190, 140, 0, 0.3) !important;
-} */
-
 /* Include ERROR state: RED colors (like broken images should have been) */
 .include-path-overlay-container.include-broken .columninclude-link,
 .include-path-overlay-container.include-broken .include-filename-link, 
@@ -278,28 +267,13 @@ body {
 .task-item.include-error .include-path-overlay-container .include-menu-btn,
 .image-path-overlay-container.image-broken .image-menu-btn,
 .video-path-overlay-container.video-broken .video-menu-btn,
-.include-path-overlay-container.include-broken .include-menu-btn {
+.include-path-overlay-container.include-broken .include-menu-btn { /*  ,
+.include-error .column-title */
   opacity: 1 !important;
   outline: 2px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
   outline-offset: -1px !important;
   background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
-}
-
-/* BROKEN STATE: Style the include link badge itself (not just the button) */
-/* .include-path-overlay-container.include-broken .columninclude-link,
-.include-path-overlay-container.include-broken .include-filename-link {
-  background-color: rgba(190, 140, 0, 0.3) !important;
-  color: var(--vscode-inputValidation-warningForeground, #cca700) !important;
-  border: 1px solid var(--vscode-inputValidation-warningBorder, #be8c00) !important;
-} */
-
-/* Include ERROR state: RED colors for link badge */
-.include-error .include-path-overlay-container .columninclude-link,
-.include-error .include-path-overlay-container .include-filename-link,
-.kanban-full-height-column.include-error .include-path-overlay-container .columninclude-link,
-.kanban-full-height-column.include-error .include-path-overlay-container .include-filename-link,
-.task-item.include-error .include-path-overlay-container .columninclude-link,
-.task-item.include-error .include-path-overlay-container .include-filename-link {
+  border-radius: 2px;
   background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
   color: var(--vscode-errorForeground, #f88) !important;
   border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
@@ -1344,7 +1318,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: none;
 }
 
-.column-title-text:hover {
+.column-title-text:has(:not(include-broken)):hover {
   background-color: var(--vscode-list-hoverBackground);
 }
 
@@ -1823,7 +1797,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .task-title-display {
   font-size: 14px;
-  line-height: 1.4;
+  /* line-height: 1.4; */
   word-break: break-word;
   overflow-wrap: break-word;
   padding: 2px 0;
@@ -5223,33 +5197,20 @@ s {
 .include-error .column-title {
     /* display: inline-block;
     padding: 2px 6px; */
-    background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.1)) !important;
-    color: var(--vscode-errorForeground, #ff6b6b) !important;
     /* border-radius: 3px;
     font-size: 0.85em;
     font-family: var(--vscode-font-family); */
-    border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.3));
-}
-
-/* Override display for container elements with include-error - preserve their flex layout */
-.kanban-full-height-column.include-error {
-    display: flex;
-    flex-direction: column;
-    padding: 0; /* Column doesn't need padding, only the error border */
-    font-size: inherit;
-}
-
-.task-item.include-error {
-    display: flex;
-    flex-direction: column;
-    padding: inherit; /* Task item has its own padding */
-    font-size: inherit;
+    /* background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.1)) !important;
+    color: var(--vscode-errorForeground, #ff6b6b) !important;
+    border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.3)); */
 }
 
 .include-container.include-error {
     display: block;
     padding: inherit;
     font-size: inherit;
+    border-color: var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
+    background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.1)) !important;
 }
 
 .included-content-inline {

@@ -10,7 +10,7 @@
   "use strict";
 
   // Set to true to enable debug logging
-  const DEBUG = false;
+  const DEBUG = true;
   const log = DEBUG ? console.log.bind(console, '[include-browser]') : () => {};
 
   const INCLUDE_RE = /!!!include\(([^)]+)\)!!!/;
@@ -221,6 +221,25 @@
         return generateVideoIncludeHtml(filePath, content === null);
       }
 
+      // Check if this is a broken include (file not found)
+      const isBrokenInclude = brokenIncludeCache.has(filePath);
+
+      // If content is null and marked as broken, show error state
+      if (content === null && isBrokenInclude) {
+        const fileName = filePath.split('/').pop() || filePath;
+        const displayText = `include(${fileName})`;
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
+
+        return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
+          <div class="include-title-bar">
+            ${includeLink}
+          </div>
+          <div class="include-content-area">
+            <div class="broken-include-placeholder">Include file not found</div>
+          </div>
+        </div>`;
+      }
+
       // If content is null (not loaded yet), show placeholder with data attribute for targeted update
       if (content === null) {
         return `<div class="include-placeholder-block" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
@@ -334,19 +353,39 @@
       }
     };
 
-    // Renderer for include placeholders (inline) - shown while loading
+    // Renderer for include placeholders (inline) - shown while loading or broken
     md.renderer.rules.include_placeholder = function(tokens, idx, options, env, renderer) {
       const token = tokens[idx];
       const filePath = token.content;
+      log('[include_placeholder renderer] filePath:', filePath, 'brokenIncludeCache.has:', brokenIncludeCache.has(filePath));
 
       // Check if include is an image file - render as image element (will show broken if fails)
       if (isImageFile(filePath)) {
-        return generateImageIncludeHtml(filePath, false);
+        return generateImageIncludeHtml(filePath, brokenIncludeCache.has(filePath));
       }
 
       // Check if include is a video file - render as video element (will show broken if fails)
       if (isVideoFile(filePath)) {
-        return generateVideoIncludeHtml(filePath, false);
+        return generateVideoIncludeHtml(filePath, brokenIncludeCache.has(filePath));
+      }
+
+      // Check if this is a broken include (file not found)
+      // This happens when backend responds with error and we re-render
+      const isBrokenInclude = brokenIncludeCache.has(filePath);
+      log('[include_placeholder renderer] isBrokenInclude:', isBrokenInclude);
+      if (isBrokenInclude) {
+        const fileName = filePath.split('/').pop() || filePath;
+        const displayText = `include(${fileName})`;
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
+
+        return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
+          <div class="include-title-bar">
+            ${includeLink}
+          </div>
+          <div class="include-content-area">
+            <div class="broken-include-placeholder">Include file not found</div>
+          </div>
+        </div>`;
       }
 
       return `<span class="include-placeholder" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
@@ -386,12 +425,23 @@
   let includeRenderTimer = null;
   let pendingBoardUpdate = false; // Prevent infinite loop
 
+  // Track broken includes (file not found)
+  const brokenIncludeCache = new Map();
+
   // Function to update cache when file content is received
-  function updateFileCache(filePath, content) {
-    log('updateFileCache called for:', filePath, 'content length:', content?.length);
+  function updateFileCache(filePath, content, error) {
+    log('updateFileCache called for:', filePath, 'content length:', content?.length, 'error:', error);
 
     // Remove from pending requests
     pendingRequests.delete(filePath);
+
+    // Track if this is a broken include (file not found)
+    if (error || content === null) {
+      brokenIncludeCache.set(filePath, error || 'File not found');
+      log('Marked as broken include:', filePath);
+    } else {
+      brokenIncludeCache.delete(filePath);
+    }
 
     // Check if content was previously cached
     const oldContent = fileCache.get(filePath);
@@ -415,10 +465,11 @@
       }
     }
 
-    // If this is the first time we're receiving this file's content,
-    // find and update only the task descriptions that have pending placeholders for this file
-    if (wasNotCached) {
-      log('First time receiving content, calling updatePendingIncludePlaceholders');
+    // Trigger re-render if content is new OR has changed
+    // This is critical for error handling: first call may have empty content (no error),
+    // second call may have error flag - we need to re-render when error arrives
+    if (wasNotCached || contentChanged) {
+      log('Content new or changed, calling updatePendingIncludePlaceholders');
       updatePendingIncludePlaceholders(filePath);
     }
   }
@@ -597,9 +648,35 @@
     return window.escapeHtml ? window.escapeHtml(text) : text;
   }
 
+  // Function to populate brokenIncludeCache from board data on initial load
+  function populateBrokenIncludesFromBoard(board) {
+    if (!board || !board.columns) return;
+
+    for (const column of board.columns) {
+      // Check column-level includes
+      if (column.includeError && column.includeFiles) {
+        for (const filePath of column.includeFiles) {
+          brokenIncludeCache.set(filePath, 'File not found');
+          log('Pre-populated broken column include:', filePath);
+        }
+      }
+
+      // Check task-level includes
+      for (const task of column.tasks || []) {
+        if (task.includeError && task.includeFiles) {
+          for (const filePath of task.includeFiles) {
+            brokenIncludeCache.set(filePath, 'File not found');
+            log('Pre-populated broken task include:', filePath);
+          }
+        }
+      }
+    }
+  }
+
   // Expose cache update function globally
   if (typeof window !== 'undefined') {
     window.updateIncludeFileCache = updateFileCache;
+    window.populateBrokenIncludesFromBoard = populateBrokenIncludesFromBoard;
   }
 
   return markdownItInclude;
