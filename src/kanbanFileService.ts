@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
 import { MarkdownFileRegistry, FileFactory } from './files';
@@ -252,7 +253,10 @@ export class KanbanFileService {
 
             // Update the board
             this.setBoard(parseResult.board);
-            // Registry now handles include content automatically via generateBoard()
+
+            // CRITICAL: Check include file existence and set includeError flags BEFORE sending to frontend
+            // This runs during initial load when MainKanbanFile may not be initialized yet
+            this._checkIncludeFileExistence(parseResult.board, basePath);
 
             // Clean up any duplicate row tags
             const currentBoard = this.board();
@@ -560,6 +564,63 @@ export class KanbanFileService {
             }
         } catch (error) {
             console.error(`[KanbanFileService] Error opening file ${filePath}:`, error);
+        }
+    }
+
+    /**
+     * Check include file existence and set includeError flags on the board
+     *
+     * This is called during initial load when MainKanbanFile may not be initialized yet.
+     * It directly checks the filesystem and sets error flags so the frontend shows warnings.
+     */
+    private _checkIncludeFileExistence(board: KanbanBoard, basePath: string): void {
+        if (!board.columns) return;
+
+        for (const column of board.columns) {
+            // Check column includes
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    // Resolve the absolute path
+                    const absolutePath = path.isAbsolute(relativePath)
+                        ? relativePath
+                        : path.resolve(basePath, relativePath);
+
+                    const fileExists = fs.existsSync(absolutePath);
+                    console.log(`[KanbanFileService] Initial load include check: column=${column.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
+
+                    if (!fileExists) {
+                        (column as any).includeMode = true;  // REQUIRED for frontend to show error styling
+                        (column as any).includeError = true;
+                        // Create error task so user knows what's wrong
+                        column.tasks = [{
+                            id: `error-${column.id}-${Date.now()}`,
+                            title: 'Include Error',
+                            description: `**Error:** Column include file not found: \`${relativePath}\``,
+                            includeError: true
+                        }];
+                    }
+                }
+            }
+
+            // Check task includes
+            for (const task of column.tasks || []) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const absolutePath = path.isAbsolute(relativePath)
+                            ? relativePath
+                            : path.resolve(basePath, relativePath);
+
+                        const fileExists = fs.existsSync(absolutePath);
+                        console.log(`[KanbanFileService] Initial load include check: task=${task.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
+
+                        if (!fileExists) {
+                            (task as any).includeMode = true;  // REQUIRED for frontend to show error styling
+                            (task as any).includeError = true;
+                            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+                        }
+                    }
+                }
+            }
         }
     }
 

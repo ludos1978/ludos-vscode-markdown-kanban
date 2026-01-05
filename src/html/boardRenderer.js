@@ -1533,10 +1533,12 @@ function createColumnElement(column, columnIndex) {
     // Check for #sticky tag to determine sticky state (default: false = not sticky)
     const hasStickyTag = /#sticky\b/i.test(column.title);
 
-    // Check for column-level include error ONLY (don't propagate task errors to column)
-    // Task include errors are handled separately on the task element itself
-    const hasColumnIncludeError = column.includeError === true ||
-        column.title?.includes('Column include file not found');
+    // Column include error: ONLY when ALL THREE conditions are met:
+    // 1. Column has includeFiles (it's actually a column include)
+    // 2. Column has includeMode === true (parsing recognized it as include)
+    // 3. Column has includeError === true (the include file was NOT found)
+    const isColumnInclude = column.includeFiles && column.includeFiles.length > 0;
+    const hasColumnIncludeError = isColumnInclude && column.includeMode === true && column.includeError === true;
 
     columnDiv.className = `kanban-full-height-column ${isCollapsed ? 'collapsed' : ''} ${headerClasses} ${footerClasses} ${spanClass} ${hasColumnIncludeError ? 'include-error' : ''}`.trim();
     columnDiv.setAttribute('data-column-id', column.id);
@@ -1844,10 +1846,12 @@ function createTaskElement(task, columnId, taskIndex) {
     }
     const temporalAttributeString = temporalAttributes.length > 0 ? ' ' + temporalAttributes.join(' ') : '';
 
-    // Check for include error flag (broken include file)
-    // Also check description for error messages as fallback
-    const hasTaskIncludeError = task.includeError === true ||
-        (task.description && task.description.includes('**Error:** Include file not found:'));
+    // Task include error: ONLY when ALL THREE conditions are met:
+    // 1. Task has includeFiles (it's actually a task include)
+    // 2. Task has includeMode === true (parsing recognized it as include)
+    // 3. Task has includeError === true (the include file was NOT found)
+    const isTaskInclude = task.includeFiles && task.includeFiles.length > 0;
+    const hasTaskIncludeError = isTaskInclude && task.includeMode === true && task.includeError === true;
     const taskIncludeErrorClass = hasTaskIncludeError ? 'include-error' : '';
     const taskIncludeErrorAttr = hasTaskIncludeError ? ' data-include-error="true"' : '';
 

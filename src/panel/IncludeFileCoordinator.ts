@@ -190,14 +190,32 @@ export class IncludeFileCoordinator {
         );
 
         if (column) {
-            // Parse tasks from updated file
             const columnFile = file as IncludeFile;
             const mainFilePath = this._deps.getMainFile()?.getPath();
-            const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
-            column.tasks = tasks;
 
-            // Clear include error flag - file loaded successfully
-            column.includeError = false;
+            // Check if file exists before using content
+            const fileExists = file.exists();
+            let tasks: KanbanTask[];
+            let includeError: boolean;
+
+            if (fileExists) {
+                // Parse tasks from updated file
+                tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
+                includeError = false;
+            } else {
+                // File doesn't exist - show error
+                console.warn(`[IncludeFileCoordinator] Column include file does not exist: ${relativePath}`);
+                tasks = [{
+                    id: `error-${column.id}-${Date.now()}`,
+                    title: 'Include Error',
+                    description: `**Error:** Include file not found: \`${relativePath}\``,
+                    includeError: true
+                }];
+                includeError = true;
+            }
+
+            column.tasks = tasks;
+            column.includeError = includeError;
 
             // Send update to frontend
             const columnMessage: UpdateColumnContentExtendedMessage = {
@@ -208,7 +226,7 @@ export class IncludeFileCoordinator {
                 displayTitle: column.displayTitle,
                 includeMode: true,
                 includeFiles: column.includeFiles,
-                includeError: false  // Explicitly clear error state
+                includeError: includeError
             };
             this._deps.webviewBridge.send(columnMessage);
         }
@@ -234,29 +252,41 @@ export class IncludeFileCoordinator {
         }
 
         if (foundTask && foundColumn) {
-            // Get updated content from file
-            const fullContent = file.getContent();
             const displayTitle = `# include in ${relativePath}`;
+
+            // Check if file exists before using content
+            const fileExists = file.exists();
+            let description: string;
+            let includeError: boolean;
+
+            if (fileExists) {
+                // Get updated content from file
+                description = file.getContent() || '';
+                includeError = false;
+            } else {
+                // File doesn't exist - show error
+                console.warn(`[IncludeFileCoordinator] Task include file does not exist: ${relativePath}`);
+                description = `**Error:** Include file not found: \`${relativePath}\``;
+                includeError = true;
+            }
 
             // Update task
             foundTask.displayTitle = displayTitle;
-            foundTask.description = fullContent;
-
-            // Clear include error flag - file loaded successfully
-            foundTask.includeError = false;
+            foundTask.description = description;
+            foundTask.includeError = includeError;
 
             // Send update to frontend
             const taskMessage: UpdateTaskContentExtendedMessage = {
                 type: 'updateTaskContent',
                 columnId: foundColumn.id,
                 taskId: foundTask.id,
-                description: fullContent,
+                description: description,
                 displayTitle: displayTitle,
                 taskTitle: foundTask.title,
                 originalTitle: foundTask.originalTitle,
                 includeMode: true,
                 includeFiles: foundTask.includeFiles,
-                includeError: false  // Explicitly clear error state
+                includeError: includeError
             };
             this._deps.webviewBridge.send(taskMessage);
         }

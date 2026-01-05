@@ -2762,6 +2762,7 @@ if (!webviewEventListenersInitialized) {
                         column.displayTitle = colData.displayTitle;
                         column.includeMode = colData.includeMode;
                         column.includeFiles = colData.includeFiles;
+                        column.includeError = colData.includeError;
 
                         // Update DOM directly (minimal update, no full re-render)
                         const titleEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-title-text`);
@@ -2780,6 +2781,9 @@ if (!webviewEventListenersInitialized) {
                             // Update cache
                             task.displayTitle = taskData.displayTitle;
                             task.description = taskData.description;
+                            task.includeMode = taskData.includeMode;
+                            task.includeFiles = taskData.includeFiles;
+                            task.includeError = taskData.includeError;
                         }
                     }
                 }

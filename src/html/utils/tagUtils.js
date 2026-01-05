@@ -1336,7 +1336,7 @@ class TagUtils {
             // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
             const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
-            const linkHtml = generateIncludeLinkWithMenu(fileName, displayText, 'column');
+            const linkHtml = generateIncludeLinkWithMenu(fileName, displayText, 'column', column.includeError);
 
             const fileNameWithoutExt = baseFileName.replace(/\.[^/.]+$/, '');
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
@@ -1383,7 +1383,7 @@ class TagUtils {
 
                     const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
-                    return generateIncludeLinkWithMenu(filePath, displayText, 'column');
+                    return generateIncludeLinkWithMenu(filePath, displayText, 'column', column.includeError);
                 });
 
                 return result;
@@ -1440,7 +1440,7 @@ class TagUtils {
             const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
             // Just return the include link - displayTitle is not shown because it's the file content, not metadata
-            return generateIncludeLinkWithMenu(fileName, displayText, 'task');
+            return generateIncludeLinkWithMenu(fileName, displayText, 'task', task.includeError);
         } else {
             // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
             const displayTitle = task.displayTitle || (task.title ? (window.removeTagsForDisplay ? window.removeTagsForDisplay(task.title) : task.title) : '');
@@ -1479,7 +1479,7 @@ class TagUtils {
 
                 const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
-                return generateIncludeLinkWithMenu(filePath, displayText, 'task');
+                return generateIncludeLinkWithMenu(filePath, displayText, 'task', task.includeError);
             });
 
             return rendered;
@@ -1492,9 +1492,10 @@ class TagUtils {
  * @param {string} filePath - The file path for the include
  * @param {string} displayText - The text to display in the link
  * @param {string} clickHandler - 'column' or 'task' to determine which click handler to use
+ * @param {boolean} isBroken - Whether the include file is broken/not found (adds include-broken class)
  * @returns {string} HTML string with include link wrapped in overlay container
  */
-function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
+function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBroken = false) {
     const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' : 'handleColumnIncludeClick';
@@ -1506,7 +1507,10 @@ function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
     // isColumnTitle is set based on clickHandler type
     const isColumnTitle = clickHandler === 'column' ? 'true' : 'false';
 
-    return `<span class="include-path-overlay-container" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
+    // Add include-broken class when file is not found
+    const brokenClass = isBroken ? ' include-broken' : '';
+
+    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
         <span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">

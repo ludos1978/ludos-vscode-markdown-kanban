@@ -621,10 +621,13 @@ export class ChangeStateMachine {
         context: ChangeContext | null,
         isLoadingContent: boolean = false
     ): void {
-        // Clear include error flag when content loads successfully
-        if (!isLoadingContent) {
+        // Only clear include error flag when content loads successfully AND there's no error
+        // If column.includeError is true (set by IncludeLoadingProcessor), preserve it
+        if (!isLoadingContent && !column.includeError) {
             column.includeError = false;
         }
+
+        console.log(`[ChangeStateMachine] _sendColumnUpdate: columnId=${column.id}, isLoadingContent=${isLoadingContent}, includeError=${column.includeError}, includeMode=${column.includeMode}, includeFiles=${JSON.stringify(column.includeFiles)}`);
 
         panel.webview.postMessage({
             type: 'updateColumnContent',
@@ -635,7 +638,7 @@ export class ChangeStateMachine {
             includeMode: isLoadingContent ? false : column.includeMode,
             includeFiles: isLoadingContent ? [] : column.includeFiles,
             isLoadingContent,
-            includeError: isLoadingContent ? undefined : false  // Clear error state when content is ready
+            includeError: isLoadingContent ? undefined : column.includeError  // Send actual error state
         });
         if (context) {
             context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
@@ -658,8 +661,9 @@ export class ChangeStateMachine {
         context: ChangeContext | null,
         isLoadingContent: boolean = false
     ): void {
-        // Clear include error flag when content loads successfully
-        if (!isLoadingContent) {
+        // Only clear include error flag when content loads successfully AND there's no error
+        // If task.includeError is true (set by IncludeLoadingProcessor), preserve it
+        if (!isLoadingContent && !task.includeError) {
             task.includeError = false;
         }
 
@@ -674,7 +678,7 @@ export class ChangeStateMachine {
             includeMode: isLoadingContent ? false : task.includeMode,
             includeFiles: isLoadingContent ? [] : task.includeFiles,
             isLoadingContent,
-            includeError: isLoadingContent ? undefined : false  // Clear error state when content is ready
+            includeError: isLoadingContent ? undefined : task.includeError  // Send actual error state
         });
         if (context) {
             context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });

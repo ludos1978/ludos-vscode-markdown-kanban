@@ -265,6 +265,7 @@ export interface SyncDirtyColumnInfo {
     displayTitle?: string;
     includeMode?: boolean;
     includeFiles?: string[];
+    includeError?: boolean;
 }
 
 /**
@@ -275,6 +276,9 @@ export interface SyncDirtyTaskInfo {
     taskId: string;
     displayTitle?: string;
     description?: string;
+    includeMode?: boolean;
+    includeFiles?: string[];
+    includeError?: boolean;
 }
 
 /**

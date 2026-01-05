@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
@@ -395,17 +396,32 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         // Note: A file can be used in multiple contexts (column include in one place,
         // task include in another). Don't check file type - just use the file content.
         const mainFilePath = mainFile.getPath();
+        console.log(`[MarkdownFileRegistry] generateBoard() - Processing ${board.columns.length} columns`);
+
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
+                console.log(`[MarkdownFileRegistry] generateBoard() - Column ${column.id} has includeFiles:`, column.includeFiles);
 
                 for (const relativePath of column.includeFiles) {
                     const file = this.getByRelativePath(relativePath) as IncludeFile;
+
+                    // CRITICAL: Use fresh disk check, not cached _exists flag
+                    let fileExistsOnDisk = false;
+                    let absolutePath = '';
                     if (file) {
+                        absolutePath = file.getPath();
+                        fileExistsOnDisk = fs.existsSync(absolutePath);
+                    }
+
+                    console.log(`[MarkdownFileRegistry] generateBoard() - Column include check: relativePath=${relativePath}, absolutePath=${absolutePath}, fileInRegistry=${!!file}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${file?.exists()}`);
+
+                    if (file && fileExistsOnDisk) {
                         // Parse tasks from include file, preserving existing task IDs
                         const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
                         column.tasks = tasks;
+                        (column as any).includeError = false;
                     } else {
-                        console.warn(`[MarkdownFileRegistry] generateBoard() - Column include not found: ${relativePath}`);
+                        console.warn(`[MarkdownFileRegistry] generateBoard() - Column include ERROR: ${relativePath}`);
                         // Show error task so user knows what's wrong
                         column.tasks = [{
                             id: `error-${column.id}-${Date.now()}`,
@@ -425,11 +441,19 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
                     for (const relativePath of task.includeFiles) {
                         const file = this.getByRelativePath(relativePath) as IncludeFile;
+
+                        // CRITICAL: Use fresh disk check, not cached _exists flag
+                        let fileExistsOnDisk = false;
                         if (file) {
+                            fileExistsOnDisk = fs.existsSync(file.getPath());
+                        }
+
+                        if (file && fileExistsOnDisk) {
                             // Load description from task include file
                             task.description = file.getContent();
+                            (task as any).includeError = false;
                         } else {
-                            console.warn(`[MarkdownFileRegistry] generateBoard() - Task include not found: ${relativePath}`);
+                            console.warn(`[MarkdownFileRegistry] generateBoard() - Task include ERROR: ${relativePath}`);
                             // Show error in task so user knows what's wrong
                             task.description = `**Error:** Include file not found: \`${relativePath}\``;
                             // Mark task as having include error
@@ -440,6 +464,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             }
         }
 
+        console.log(`[MarkdownFileRegistry] generateBoard() - Finished, returning board`);
         return board;
     }
 

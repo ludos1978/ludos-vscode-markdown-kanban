@@ -241,7 +241,8 @@ export class WebviewUpdateService {
                     title: column.title,
                     displayTitle: column.displayTitle,
                     includeMode: column.includeMode,
-                    includeFiles: column.includeFiles
+                    includeFiles: column.includeFiles,
+                    includeError: column.includeError
                 });
             }
         }
@@ -255,7 +256,10 @@ export class WebviewUpdateService {
                     columnId: result.column.id,
                     taskId: result.task.id,
                     displayTitle: result.task.displayTitle,
-                    description: result.task.description
+                    description: result.task.description,
+                    includeMode: result.task.includeMode,
+                    includeFiles: result.task.includeFiles,
+                    includeError: result.task.includeError
                 });
             }
         }

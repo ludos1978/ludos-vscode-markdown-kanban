@@ -25,14 +25,17 @@
   }
 
   // Helper function to generate include link with burger menu (matching generateIncludeLinkWithMenu in tagUtils.js)
-  function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
+  function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBroken = false) {
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' :
                       clickHandler === 'column' ? 'handleColumnIncludeClick' : 'handleRegularIncludeClick';
     const isAbsolute = isAbsolutePath(filePath);
     const isColumnTitle = clickHandler === 'column' ? 'true' : 'false';
 
-    return `<span class="include-path-overlay-container" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
+    // Add include-broken class when file is not found
+    const brokenClass = isBroken ? ' include-broken' : '';
+
+    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
         <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">
@@ -250,7 +253,7 @@
         // Return the raw content escaped as fallback
         const fileName = filePath.split('/').pop() || filePath;
         const displayText = `include(${fileName}) - PARSE ERROR`;
-        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
 
         const errorLinesHtml = errorLocation ? errorLocation.lines.map(l =>
           `<div style="margin: 4px 0;"><strong>Line ${l.lineNumber}:</strong> <span style="font-family: monospace; background: #5a1d1d !important; color: #fff !important; padding: 2px 6px; border-radius: 3px;">${escapeHtml(l.content)}</span></div>`

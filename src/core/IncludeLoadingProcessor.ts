@@ -9,6 +9,7 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeTypes';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
@@ -179,6 +180,8 @@ export class IncludeLoadingProcessor {
         fileFactory: FileFactory,
         context: ChangeContext
     ): Promise<void> {
+        console.log(`[IncludeLoadingProcessor] _loadColumnContent called for column ${column.id}, includeFiles:`, includeFiles);
+
         // Update column properties
         column.includeFiles = includeFiles;
         column.includeMode = true;
@@ -205,6 +208,14 @@ export class IncludeLoadingProcessor {
             const file = this._fileRegistry.getByRelativePath(relativePath);
             if (!file) {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
+                // Mark column as having include error and add error task
+                column.includeError = true;
+                tasks.push({
+                    id: `error-${column.id}-${Date.now()}`,
+                    title: 'Include Error',
+                    description: `**Error:** Column include file not found: \`${relativePath}\``,
+                    includeError: true
+                });
                 continue;
             }
 
@@ -221,14 +232,44 @@ export class IncludeLoadingProcessor {
             // Parse to tasks
             const includeFile = file as IncludeFile;
             const mainFilePath = mainFile.getPath();
+
+            // CRITICAL: Fresh disk check - don't trust cached _exists flag
+            // The _exists flag can be stale if _readFromDiskWithVerification() short-circuited
+            const absolutePath = includeFile.getPath();
+            const fileExistsOnDisk = fs.existsSync(absolutePath);
+            console.log(`[IncludeLoadingProcessor] Checking file existence: relativePath=${relativePath}, absolutePath=${absolutePath}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${includeFile.exists()}`);
+            if (!fileExistsOnDisk) {
+                includeFile.setExists(false);  // Update cached state
+                console.warn(`[IncludeLoadingProcessor] File does not exist: ${relativePath}`);
+                column.includeError = true;
+                tasks.push({
+                    id: `error-${column.id}-${Date.now()}`,
+                    title: 'Include Error',
+                    description: `**Error:** Include file not found: \`${relativePath}\``,
+                    includeError: true
+                });
+                continue;
+            }
+
+            // THEN: Check for empty content (file exists but is empty)
+            const contentLength = includeFile.getContent()?.length || 0;
+            if (contentLength === 0) {
+                console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
+                column.includeError = true;
+                tasks.push({
+                    id: `error-${column.id}-${Date.now()}`,
+                    title: 'Include Error',
+                    description: `**Error:** Column include file is empty: \`${relativePath}\``,
+                    includeError: true
+                });
+                continue;
+            }
+
             const fileTasks = includeFile.parseToTasks(column.tasks, column.id, mainFilePath);
 
             // Debug logging
-            const contentLength = includeFile.getContent()?.length || 0;
-            if (contentLength > 0 && fileTasks.length === 0) {
+            if (fileTasks.length === 0) {
                 console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
-            } else if (contentLength === 0) {
-                console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
             }
 
             tasks.push(...fileTasks);
@@ -236,6 +277,7 @@ export class IncludeLoadingProcessor {
         }
 
         column.tasks = tasks;
+        console.log(`[IncludeLoadingProcessor] _loadColumnContent finished: columnId=${column.id}, includeError=${column.includeError}, taskCount=${tasks.length}, hasErrorTask=${tasks.some(t => t.includeError)}`);
     }
 
     /**
@@ -260,23 +302,61 @@ export class IncludeLoadingProcessor {
         );
 
         const file = this._fileRegistry.getByRelativePath(relativePath);
+
+        // Handle file not found - still mark as include mode but with error
         if (!file) {
             console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
+            task.includeMode = true;
+            task.includeFiles = [relativePath];
+            task.includeError = true;
+            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+            if (newTitle !== undefined) {
+                task.title = newTitle;
+                task.originalTitle = newTitle;
+            }
             return;
         }
 
         // ALWAYS reload from disk
         await file.reload();
 
-        const fullFileContent = file.getContent();
-        if (!fullFileContent || fullFileContent.length === 0) {
-            console.error(`[IncludeLoadingProcessor] Failed to load content for ${relativePath}`);
+        // CRITICAL: Fresh disk check - don't trust cached _exists flag
+        // The _exists flag can be stale if _readFromDiskWithVerification() short-circuited
+        const absolutePath = file.getPath();
+        if (!fs.existsSync(absolutePath)) {
+            file.setExists(false);  // Update cached state
+            console.warn(`[IncludeLoadingProcessor] File does not exist: ${relativePath}`);
+            task.includeMode = true;
+            task.includeFiles = [relativePath];
+            task.includeError = true;
+            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+            if (newTitle !== undefined) {
+                task.title = newTitle;
+                task.originalTitle = newTitle;
+            }
             return;
         }
 
-        // Update task properties
+        const fullFileContent = file.getContent();
+
+        // THEN: Check for empty content (file exists but is empty)
+        if (!fullFileContent || fullFileContent.length === 0) {
+            console.warn(`[IncludeLoadingProcessor] File is empty: ${relativePath}`);
+            task.includeMode = true;
+            task.includeFiles = [relativePath];
+            task.includeError = true;
+            task.description = `**Error:** Include file is empty: \`${relativePath}\``;
+            if (newTitle !== undefined) {
+                task.title = newTitle;
+                task.originalTitle = newTitle;
+            }
+            return;
+        }
+
+        // Update task properties - success case
         task.includeMode = true;
         task.includeFiles = [relativePath];
+        task.includeError = false;  // Explicitly clear error on success
         task.displayTitle = `# include in ${relativePath}`;
         task.description = fullFileContent;
 
