@@ -151,34 +151,33 @@ export class KanbanWebviewPanel {
         panel.webview.options = { enableScripts: true, localResourceRoots };
 
         const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
-        const stateDocUri = state?.documentUri;
-        const fallbackDocUri = KanbanWebviewPanel._findUnrevivedDocumentUri(context);
-        let documentUri = stateDocUri || fallbackDocUri;
+        const documentPath = state?.documentUri;
 
-        console.log('[KanbanWebviewPanel.revive] documentUri from state:', stateDocUri);
-        console.log('[KanbanWebviewPanel.revive] documentUri from fallback:', fallbackDocUri);
-        console.log('[KanbanWebviewPanel.revive] using documentUri:', documentUri);
+        console.log('[KanbanWebviewPanel.revive] documentPath from state:', documentPath);
 
-        // Validate the URI before attempting to parse it
-        if (documentUri && typeof documentUri === 'string' && documentUri.includes('://')) {
-            KanbanWebviewPanel._revivedUris.add(documentUri);
+        // Validate: must be a non-empty string that looks like a file path
+        if (documentPath && typeof documentPath === 'string' && documentPath.length > 0) {
+            // Convert file path to URI if needed
+            const documentUri = documentPath.includes('://')
+                ? vscode.Uri.parse(documentPath)
+                : vscode.Uri.file(documentPath);
+
+            KanbanWebviewPanel._revivedUris.add(documentUri.toString());
             setTimeout(() => KanbanWebviewPanel._revivedUris.clear(), REVIVAL_TRACKING_CLEAR_DELAY_MS);
 
             (async () => {
                 try {
-                    console.log('[KanbanWebviewPanel.revive] Opening document:', documentUri);
-                    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+                    console.log('[KanbanWebviewPanel.revive] Opening document:', documentUri.toString());
+                    const document = await vscode.workspace.openTextDocument(documentUri);
                     console.log('[KanbanWebviewPanel.revive] Document opened successfully:', document.fileName);
                     await kanbanPanel.loadMarkdownFile(document);
                     console.log('[KanbanWebviewPanel.revive] loadMarkdownFile completed');
                 } catch (err) {
                     console.error('[KanbanWebviewPanel.revive] Failed to revive document:', err);
-                    kanbanPanel.tryAutoLoadActiveMarkdown();
                 }
             })();
         } else {
-            console.warn('[KanbanWebviewPanel.revive] No valid documentUri - documentUri:', documentUri);
-            kanbanPanel.tryAutoLoadActiveMarkdown();
+            console.warn('[KanbanWebviewPanel.revive] No valid documentPath in state');
         }
     }
 

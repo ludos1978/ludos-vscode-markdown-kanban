@@ -223,11 +223,11 @@ body {
 .video-path-overlay-container .video-menu-btn,
 .diagram-overlay-container .diagram-menu-btn,
 .include-path-overlay-container .include-menu-btn {
-  position: relative;
-  top: 0px;
-  right: -4px;
-  width: 20px;
-  height: 20px;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
   background: rgba(0, 0, 0, 0.6);
   border: none;
   border-radius: 4px;
@@ -277,6 +277,13 @@ body {
   background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
   color: var(--vscode-errorForeground, #f88) !important;
   border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
+}
+
+.include-error .include-path-overlay-container .include-menu-btn,
+.task-item.include-error .include-path-overlay-container .include-menu-btn,
+.include-path-overlay-container.include-broken .include-menu-btn {
+  right: -22px;
+  top: 0px;
 }
 
 /* ============================================
@@ -1796,7 +1803,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-title-display {
-  font-size: 14px;
+  /* font-size: 14px; */
   /* line-height: 1.4; */
   word-break: break-word;
   overflow-wrap: break-word;
