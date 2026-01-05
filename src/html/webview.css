@@ -240,13 +240,6 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* position: static;
-  width: 16px;
-  height: 16px;
-  margin-left: 2px;
-  border-radius: 3px;
-  font-size: 10px;
-  vertical-align: middle; */
 }
 
 .btn-overlay-icon:hover,
@@ -267,14 +260,14 @@ body {
 
 /* BROKEN STATE: Always show menu button with warning outline */
 /* Unified style for all broken overlay menus: image, video, include */
-.image-path-overlay-container.image-broken .image-menu-btn,
+/* .image-path-overlay-container.image-broken .image-menu-btn,
 .video-path-overlay-container.video-broken .video-menu-btn,
 .include-path-overlay-container.include-broken .include-menu-btn {
   opacity: 1 !important;
   outline: 2px solid var(--vscode-inputValidation-warningBorder, #be8c00) !important;
   outline-offset: -1px !important;
   background: rgba(190, 140, 0, 0.3) !important;
-}
+} */
 
 /* Include ERROR state: RED colors (like broken images should have been) */
 .include-path-overlay-container.include-broken .columninclude-link,
@@ -282,7 +275,10 @@ body {
 .include-error .include-path-overlay-container .include-menu-btn,
 .include-container.include-error .include-path-overlay-container .include-menu-btn,
 .kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
-.task-item.include-error .include-path-overlay-container .include-menu-btn {
+.task-item.include-error .include-path-overlay-container .include-menu-btn,
+.image-path-overlay-container.image-broken .image-menu-btn,
+.video-path-overlay-container.video-broken .video-menu-btn,
+.include-path-overlay-container.include-broken .include-menu-btn {
   opacity: 1 !important;
   outline: 2px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
   outline-offset: -1px !important;
