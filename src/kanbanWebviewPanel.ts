@@ -144,11 +144,20 @@ export class KanbanWebviewPanel {
     private static _revivedUris: Set<string> = new Set();
 
     public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext, state?: any) {
+        console.log('[KanbanWebviewPanel.revive] START - state:', JSON.stringify(state));
+        console.log('[KanbanWebviewPanel.revive] Panel title from VS Code:', panel.title);
+
         const localResourceRoots = KanbanWebviewPanel._buildResourceRoots(extensionUri);
         panel.webview.options = { enableScripts: true, localResourceRoots };
 
         const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
-        let documentUri = state?.documentUri || KanbanWebviewPanel._findUnrevivedDocumentUri(context);
+        const stateDocUri = state?.documentUri;
+        const fallbackDocUri = KanbanWebviewPanel._findUnrevivedDocumentUri(context);
+        let documentUri = stateDocUri || fallbackDocUri;
+
+        console.log('[KanbanWebviewPanel.revive] documentUri from state:', stateDocUri);
+        console.log('[KanbanWebviewPanel.revive] documentUri from fallback:', fallbackDocUri);
+        console.log('[KanbanWebviewPanel.revive] using documentUri:', documentUri);
 
         // Validate the URI before attempting to parse it
         if (documentUri && typeof documentUri === 'string' && documentUri.includes('://')) {
@@ -157,17 +166,18 @@ export class KanbanWebviewPanel {
 
             (async () => {
                 try {
+                    console.log('[KanbanWebviewPanel.revive] Opening document:', documentUri);
                     const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+                    console.log('[KanbanWebviewPanel.revive] Document opened successfully:', document.fileName);
                     await kanbanPanel.loadMarkdownFile(document);
+                    console.log('[KanbanWebviewPanel.revive] loadMarkdownFile completed');
                 } catch (err) {
-                    console.error('[KanbanWebviewPanel] Failed to revive document:', err);
+                    console.error('[KanbanWebviewPanel.revive] Failed to revive document:', err);
                     kanbanPanel.tryAutoLoadActiveMarkdown();
                 }
             })();
         } else {
-            if (documentUri) {
-                console.warn('[KanbanWebviewPanel] Invalid documentUri in saved state:', documentUri);
-            }
+            console.warn('[KanbanWebviewPanel.revive] No valid documentUri - documentUri:', documentUri);
             kanbanPanel.tryAutoLoadActiveMarkdown();
         }
     }
@@ -377,17 +387,23 @@ export class KanbanWebviewPanel {
     private _handleWebviewReady(): void {
         const wasAlreadyReady = this._context.webviewReady;
         this._context.setWebviewReady(true);
+        console.log('[KanbanWebviewPanel._handleWebviewReady] wasAlreadyReady:', wasAlreadyReady);
 
         const pendingUpdate = this._context.consumePendingBoardUpdate();
+        console.log('[KanbanWebviewPanel._handleWebviewReady] pendingUpdate:', pendingUpdate);
         if (pendingUpdate) {
-            // Always send file info when consuming a pending update (fixes revival timing issue)
+            console.log('[KanbanWebviewPanel._handleWebviewReady] Sending pending update');
             this._fileManager.sendFileInfo();
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
             return;
         }
-        if (!wasAlreadyReady) return;
+        if (!wasAlreadyReady) {
+            console.log('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
+            return;
+        }
 
         const board = this.getBoard();
+        console.log('[KanbanWebviewPanel._handleWebviewReady] board valid:', board?.valid, 'initialBoardLoad:', this._context.initialBoardLoad);
         if (!board?.valid || this._context.initialBoardLoad) return;
 
         this._fileManager.sendFileInfo();
@@ -401,15 +417,19 @@ export class KanbanWebviewPanel {
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, forceReload: boolean = false) {
+        console.log('[KanbanWebviewPanel.loadMarkdownFile] START - document:', document.fileName);
         return this._concurrency.withLock('loadMarkdownFile', async () => {
             this._context.setInitialBoardLoad(true);
             await this._fileService.loadMarkdownFile(document, forceReload);
+            console.log('[KanbanWebviewPanel.loadMarkdownFile] fileService.loadMarkdownFile completed');
             this._restoreStateFromFileService();
             await this._initializeBoardFromDocument(document);
+            console.log('[KanbanWebviewPanel.loadMarkdownFile] DONE - board valid:', this.getBoard()?.valid);
         });
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
+        console.log('[KanbanWebviewPanel.sendBoardUpdate] webviewReady:', this._context.webviewReady, 'hasService:', !!this._webviewUpdateService);
         await this._webviewUpdateService?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }
 

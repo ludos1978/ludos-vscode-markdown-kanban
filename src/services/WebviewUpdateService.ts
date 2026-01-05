@@ -79,13 +79,16 @@ export class WebviewUpdateService {
      */
     public async sendBoardUpdate(options: BoardUpdateOptions = {}): Promise<void> {
         const { applyDefaultFolding = false, isFullRefresh = false } = options;
+        console.log('[WebviewUpdateService.sendBoardUpdate] START - webviewReady:', this._deps.panelContext.webviewReady, 'hasPanel:', this._deps.hasPanel());
 
         if (!this._deps.hasPanel()) {
+            console.log('[WebviewUpdateService.sendBoardUpdate] No panel - returning');
             return;
         }
 
         // Queue update if webview not ready yet
         if (!this._deps.panelContext.webviewReady) {
+            console.log('[WebviewUpdateService.sendBoardUpdate] Webview not ready - queueing pending update');
             this._deps.panelContext.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
             return;
         }
@@ -97,6 +100,7 @@ export class WebviewUpdateService {
             yamlHeader: null,
             kanbanFooter: null
         };
+        console.log('[WebviewUpdateService.sendBoardUpdate] Board valid:', board.valid, 'columns:', board.columns?.length);
 
         // Update webview permissions to include asset directories
         this._deps.webviewManager.updatePermissionsForAssets();
@@ -106,6 +110,7 @@ export class WebviewUpdateService {
         const version = packageJson.version || 'Unknown';
 
         // Send board update message
+        console.log('[WebviewUpdateService.sendBoardUpdate] Sending boardUpdate message');
         this._sendBoardUpdateMessage(board, {
             isFullRefresh,
             applyDefaultFolding,
