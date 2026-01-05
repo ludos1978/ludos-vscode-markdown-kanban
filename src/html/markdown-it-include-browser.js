@@ -10,7 +10,7 @@
   "use strict";
 
   // Set to true to enable debug logging
-  const DEBUG = true;
+  const DEBUG = false;
   const log = DEBUG ? console.log.bind(console, '[include-browser]') : () => {};
 
   const INCLUDE_RE = /!!!include\(([^)]+)\)!!!/;
@@ -436,8 +436,10 @@
     pendingRequests.delete(filePath);
 
     // Track if this is a broken include (file not found)
+    // CRITICAL: When error is set, force content to null so re-render creates include_placeholder token
     if (error || content === null) {
       brokenIncludeCache.set(filePath, error || 'File not found');
+      content = null;  // Force null so getFileContent returns null on re-render
       log('Marked as broken include:', filePath);
     } else {
       brokenIncludeCache.delete(filePath);
@@ -449,7 +451,7 @@
     const contentChanged = oldContent !== content;
     log('wasNotCached:', wasNotCached, 'contentChanged:', contentChanged);
 
-    // Update cache
+    // Update cache (content is null for broken includes)
     fileCache.set(filePath, content);
 
     // Register this inline include in the backend's unified system for conflict resolution

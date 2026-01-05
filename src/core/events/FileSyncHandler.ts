@@ -244,10 +244,12 @@ export class FileSyncHandler {
         }
 
         for (const file of includeFiles) {
+            const fileExists = file.exists();
             const message = {
                 type: 'updateIncludeContent' as const,
                 filePath: file.getRelativePath(),
-                content: file.getContent()
+                content: file.getContent(),
+                error: fileExists ? undefined : `File not found: ${file.getRelativePath()}`
             };
             webviewBridge.sendBatched(message);
         }

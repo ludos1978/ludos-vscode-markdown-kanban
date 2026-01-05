@@ -5205,13 +5205,13 @@ s {
     border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.3)); */
 }
 
-.include-container.include-error {
+/* .include-container.include-error {
     display: block;
     padding: inherit;
     font-size: inherit;
     border-color: var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
     background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.1)) !important;
-}
+} */
 
 .included-content-inline {
     /* Inline included content should blend seamlessly */

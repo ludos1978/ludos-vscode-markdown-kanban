@@ -254,6 +254,7 @@ export interface UpdateIncludeContentMessage extends BaseMessage {
     type: 'updateIncludeContent';
     filePath: string;
     content: string;
+    error?: string;
 }
 
 /**

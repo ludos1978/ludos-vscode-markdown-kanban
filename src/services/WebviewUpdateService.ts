@@ -115,8 +115,11 @@ export class WebviewUpdateService {
         // Refresh configuration after sending board
         await this.refreshAllConfiguration();
 
-        // Send include file contents
-        this._sendIncludeFileContents();
+        // NOTE: Don't call _sendIncludeFileContents() here.
+        // The frontend will request include files via 'requestIncludeFile' during rendering,
+        // and the backend responds via 'includeFileContent'. Sending proactively here
+        // causes duplicate messages because the board is rendered before the batch is flushed.
+        // Proactive updates are handled by FileSyncHandler and IncludeFileCoordinator for file changes.
     }
 
     /**
@@ -154,10 +157,13 @@ export class WebviewUpdateService {
         const includeFiles = this._deps.fileRegistry.getIncludeFiles();
         if (includeFiles.length > 0) {
             for (const file of includeFiles) {
+                const fileExists = file.exists();
+                const relativePath = file.getRelativePath();
                 const message: UpdateIncludeContentMessage = {
                     type: 'updateIncludeContent',
-                    filePath: file.getRelativePath(),
-                    content: file.getContent()
+                    filePath: relativePath,
+                    content: file.getContent(),
+                    error: fileExists ? undefined : `File not found: ${relativePath}`
                 };
                 this._deps.webviewBridge.sendBatched(message);
             }

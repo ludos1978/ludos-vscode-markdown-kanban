@@ -294,10 +294,12 @@ export class IncludeFileCoordinator {
     private _sendRegularIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
         // Send updated include content to frontend cache
         const content = file.getContent();
+        const fileExists = file.exists();
         const includeContentMessage: UpdateIncludeContentMessage = {
             type: 'updateIncludeContent',
             filePath: relativePath,
-            content: content
+            content: content,
+            error: fileExists ? undefined : `File not found: ${relativePath}`
         };
         this._deps.webviewBridge.sendBatched(includeContentMessage);
 

@@ -2122,7 +2122,7 @@ if (!webviewEventListenersInitialized) {
         case 'updateIncludeContent':
             // Handle processed include content from backend
             if (typeof window.updateIncludeFileCache === 'function') {
-                window.updateIncludeFileCache(message.filePath, message.content);
+                window.updateIncludeFileCache(message.filePath, message.content, message.error);
             } else {
                 console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }
