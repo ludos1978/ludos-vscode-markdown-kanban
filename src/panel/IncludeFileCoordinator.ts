@@ -203,14 +203,10 @@ export class IncludeFileCoordinator {
                 tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
                 includeError = false;
             } else {
-                // File doesn't exist - show error
+                // File doesn't exist - error details shown on hover via include badge
+                // Don't create error task - just show empty column with error badge
                 console.warn(`[IncludeFileCoordinator] Column include file does not exist: ${relativePath}`);
-                tasks = [{
-                    id: `error-${column.id}-${Date.now()}`,
-                    title: 'Include Error',
-                    description: `**Error:** Include file not found: \`${relativePath}\``,
-                    includeError: true
-                }];
+                tasks = [];
                 includeError = true;
             }
 
@@ -264,9 +260,9 @@ export class IncludeFileCoordinator {
                 description = file.getContent() || '';
                 includeError = false;
             } else {
-                // File doesn't exist - show error
+                // File doesn't exist - error details shown on hover via include badge
                 console.warn(`[IncludeFileCoordinator] Task include file does not exist: ${relativePath}`);
-                description = `**Error:** Include file not found: \`${relativePath}\``;
+                description = '';
                 includeError = true;
             }
 

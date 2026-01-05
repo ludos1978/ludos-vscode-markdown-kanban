@@ -1988,6 +1988,10 @@ function updateColumnEmptyState(columnId) {
     const tasksContainer = document.querySelector(`#tasks-${columnId}`);
     if (!tasksContainer) { return; }
 
+    // Don't add button for broken include columns
+    const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+    if (column?.includeError) { return; }
+
     // Count actual task elements (not placeholder buttons)
     const taskElements = tasksContainer.querySelectorAll('.task-item');
     const hasAddButton = tasksContainer.querySelector('.add-task-btn');
@@ -2110,6 +2114,13 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
 function addTask(columnId) {
     // Close all menus properly
     closeAllMenus();
+
+    // Don't allow adding tasks to broken include columns
+    const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+    if (column?.includeError) {
+        console.warn('[addTask] Cannot add tasks to broken include column:', columnId);
+        return;
+    }
 
     // Cache-first: Only update cached board, no automatic save
     const newTask = {

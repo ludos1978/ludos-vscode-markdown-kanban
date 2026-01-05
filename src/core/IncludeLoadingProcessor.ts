@@ -208,14 +208,9 @@ export class IncludeLoadingProcessor {
             const file = this._fileRegistry.getByRelativePath(relativePath);
             if (!file) {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
-                // Mark column as having include error and add error task
+                // Mark column as having include error (error details shown on hover via include badge)
+                // Don't create error task - just show empty column with error badge
                 column.includeError = true;
-                tasks.push({
-                    id: `error-${column.id}-${Date.now()}`,
-                    title: 'Include Error',
-                    description: `**Error:** Column include file not found: \`${relativePath}\``,
-                    includeError: true
-                });
                 continue;
             }
 
@@ -241,13 +236,8 @@ export class IncludeLoadingProcessor {
             if (!fileExistsOnDisk) {
                 includeFile.setExists(false);  // Update cached state
                 console.warn(`[IncludeLoadingProcessor] File does not exist: ${relativePath}`);
+                // Don't create error task - just show empty column with error badge
                 column.includeError = true;
-                tasks.push({
-                    id: `error-${column.id}-${Date.now()}`,
-                    title: 'Include Error',
-                    description: `**Error:** Include file not found: \`${relativePath}\``,
-                    includeError: true
-                });
                 continue;
             }
 
@@ -255,13 +245,8 @@ export class IncludeLoadingProcessor {
             const contentLength = includeFile.getContent()?.length || 0;
             if (contentLength === 0) {
                 console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
+                // Don't create error task - just show empty column with error badge
                 column.includeError = true;
-                tasks.push({
-                    id: `error-${column.id}-${Date.now()}`,
-                    title: 'Include Error',
-                    description: `**Error:** Column include file is empty: \`${relativePath}\``,
-                    includeError: true
-                });
                 continue;
             }
 
@@ -304,12 +289,13 @@ export class IncludeLoadingProcessor {
         const file = this._fileRegistry.getByRelativePath(relativePath);
 
         // Handle file not found - still mark as include mode but with error
+        // Error details shown on hover via include badge
         if (!file) {
             console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
             task.includeMode = true;
             task.includeFiles = [relativePath];
             task.includeError = true;
-            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+            task.description = '';
             if (newTitle !== undefined) {
                 task.title = newTitle;
                 task.originalTitle = newTitle;
@@ -329,7 +315,7 @@ export class IncludeLoadingProcessor {
             task.includeMode = true;
             task.includeFiles = [relativePath];
             task.includeError = true;
-            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+            task.description = '';
             if (newTitle !== undefined) {
                 task.title = newTitle;
                 task.originalTitle = newTitle;
@@ -345,7 +331,7 @@ export class IncludeLoadingProcessor {
             task.includeMode = true;
             task.includeFiles = [relativePath];
             task.includeError = true;
-            task.description = `**Error:** Include file is empty: \`${relativePath}\``;
+            task.description = '';
             if (newTitle !== undefined) {
                 task.title = newTitle;
                 task.originalTitle = newTitle;

@@ -356,14 +356,14 @@ export class MarkdownKanbanParser {
                 fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
-                // Show error in task so user knows what's wrong
-                fullFileContent = `**Error:** Include file not found: \`${filePath}\``;
+                // Error details shown on hover via include badge
+                fullFileContent = '';
                 task.includeError = true;
               }
             } catch (error) {
               console.error(`[Parser] Error processing task include ${filePath}:`, error);
-              // Show error in task so user knows what's wrong
-              fullFileContent = `**Error:** Failed to read include file: \`${filePath}\``;
+              // Error details shown on hover via include badge
+              fullFileContent = '';
               task.includeError = true;
             }
           }

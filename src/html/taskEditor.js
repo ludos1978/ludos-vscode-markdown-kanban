@@ -1758,6 +1758,14 @@ function editDescription(element, taskId, columnId) {
         return; // Already editing this description
     }
 
+    // Don't allow editing description for broken task includes
+    const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+    const task = column?.tasks?.find(t => t.id === taskId);
+    if (task?.includeError) {
+        console.warn('[editDescription] Cannot edit description for broken task include:', taskId);
+        return;
+    }
+
     // Find the actual container if needed
     const container = element.closest('.task-description-container') || element;
     taskEditor.startEdit(container, 'task-description', taskId, columnId, true); // preserveCursor=true for clicks

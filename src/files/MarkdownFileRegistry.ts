@@ -422,13 +422,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         (column as any).includeError = false;
                     } else {
                         console.warn(`[MarkdownFileRegistry] generateBoard() - Column include ERROR: ${relativePath}`);
-                        // Show error task so user knows what's wrong
-                        column.tasks = [{
-                            id: `error-${column.id}-${Date.now()}`,
-                            title: 'Include Error',
-                            description: `**Error:** Column include file not found: \`${relativePath}\``,
-                            includeError: true
-                        }];
+                        // Error details shown on hover via include badge
+                        // Don't create error task - just show empty column with error badge
+                        column.tasks = [];
                         // Mark column as having include error
                         (column as any).includeError = true;
                     }
@@ -454,8 +450,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                             (task as any).includeError = false;
                         } else {
                             console.warn(`[MarkdownFileRegistry] generateBoard() - Task include ERROR: ${relativePath}`);
-                            // Show error in task so user knows what's wrong
-                            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+                            // Error details shown on hover via include badge
+                            task.description = '';
                             // Mark task as having include error
                             (task as any).includeError = true;
                         }

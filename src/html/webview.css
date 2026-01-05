@@ -1938,6 +1938,25 @@ body.section-height-limited .task-section figure img {
   border-radius: 3px;
 }
 
+/* Broken task include - show disabled message instead of "Add description" */
+.task-item.include-error .task-description-display:empty::before,
+.task-item.include-error .task-description-display:has(> .task-section:only-child:empty)::before {
+  content: "Description unavailable for broken include";
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Broken column include - placeholder message */
+.broken-include-placeholder {
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.5;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: not-allowed;
+}
+
 /* Edit fields */
 .column-title-edit,
 .task-title-edit,

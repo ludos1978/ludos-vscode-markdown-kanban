@@ -609,13 +609,8 @@ export class KanbanFileService {
                     if (!fileExists) {
                         (column as any).includeMode = true;  // REQUIRED for frontend to show error styling
                         (column as any).includeError = true;
-                        // Create error task so user knows what's wrong
-                        column.tasks = [{
-                            id: `error-${column.id}-${Date.now()}`,
-                            title: 'Include Error',
-                            description: `**Error:** Column include file not found: \`${relativePath}\``,
-                            includeError: true
-                        }];
+                        // Don't create error task - just show empty column with error badge
+                        column.tasks = [];
                     }
                 }
             }
@@ -634,7 +629,7 @@ export class KanbanFileService {
                         if (!fileExists) {
                             (task as any).includeMode = true;  // REQUIRED for frontend to show error styling
                             (task as any).includeError = true;
-                            task.description = `**Error:** Include file not found: \`${relativePath}\``;
+                            task.description = '';  // Error details shown on hover via include badge
                         }
                     }
                 }

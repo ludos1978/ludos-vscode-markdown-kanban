@@ -1605,7 +1605,7 @@ function createColumnElement(column, columnIndex) {
 												<span class="fold-icon">${foldButtonState === 'fold-collapsed' ? '▶' : foldButtonState === 'fold-expanded' ? '▼' : '▽'}</span>
 										</button>
 								</span>
-								<button class="collapsed-add-task-btn" onclick="addTaskAndUnfold('${column.id}')" title="Add task and unfold column">+</button>
+								${!column.includeError ? `<button class="collapsed-add-task-btn" onclick="addTaskAndUnfold('${column.id}')" title="Add task and unfold column">+</button>` : ''}
 								<div class="donut-menu">
 										<button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">⋯</button>
 										<div class="donut-menu-dropdown">
@@ -1676,9 +1676,12 @@ function createColumnElement(column, columnIndex) {
                         ? '<div class="column-loading-placeholder"><div class="loading-spinner"></div><div class="loading-text">Loading tasks...</div></div>'
                         : column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')
                     }
-                    ${!column.isLoadingContent && column.tasks.length === 0 ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
+                    ${!column.isLoadingContent && column.tasks.length === 0 && !column.includeError ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
                         + Add Task
                     </button>` : ''}
+                    ${!column.isLoadingContent && column.tasks.length === 0 && column.includeError ? `<div class="broken-include-placeholder">
+                        Tasks unavailable for broken include
+                    </div>` : ''}
                 </div>
             </div>
         </div>
