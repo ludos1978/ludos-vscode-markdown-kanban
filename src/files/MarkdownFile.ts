@@ -450,12 +450,16 @@ export abstract class MarkdownFile implements vscode.Disposable {
         const baselineSize = Buffer.byteLength(this._baseline, 'utf8');
         const sizeChanged = currentSize !== null && currentSize !== baselineSize;
 
-        // If BOTH mtime and size are unchanged, no change
-        if (!mtimeChanged && !sizeChanged && this._baseline) {
+        // CRITICAL: If mtime or size is null, file might be deleted - must call readFromDisk()
+        // to properly update _exists flag. Don't short-circuit in this case.
+        const fileMightBeDeleted = currentMtime === null || currentSize === null;
+
+        // If BOTH mtime and size are unchanged AND file still exists, no change
+        if (!fileMightBeDeleted && !mtimeChanged && !sizeChanged && this._baseline) {
             return this._baseline;
         }
 
-        // Either mtime or size changed - read content
+        // Either mtime or size changed, OR file might be deleted - read content
         const content = await this.readFromDisk();
         if (content === null) {
             console.error(`[${this.getFileType()}] Read failed`);

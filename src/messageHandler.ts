@@ -329,8 +329,10 @@ export class MessageHandler {
         panel: any
     ): Promise<boolean> {
         const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
-        if (!oldFile || !oldFile.hasUnsavedChanges()) {
-            return true; // No unsaved changes, proceed
+        // Skip save prompt for broken includes (never loaded). exists() is cached, so files
+        // that were loaded successfully will still prompt even if deleted externally.
+        if (!oldFile || !oldFile.hasUnsavedChanges() || !oldFile.exists()) {
+            return true; // No unsaved changes or file was never loaded, proceed
         }
 
         const choice = await vscode.window.showWarningMessage(

@@ -197,7 +197,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const fileRegistry = this.getFileRegistry();
         const file = fileRegistry?.getByRelativePath(currentFile);
 
-        if (file && file.hasUnsavedChanges()) {
+        // Only prompt if file was ever loaded (exists() is cached). Skip for broken includes.
+        if (file && file.hasUnsavedChanges() && file.exists()) {
             const choice = await vscode.window.showWarningMessage(
                 `The current include file "${currentFile}" has unsaved changes. What would you like to do?`,
                 { modal: true },
@@ -257,7 +258,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const fileRegistry = this.getFileRegistry();
         const file = fileRegistry?.getByRelativePath(currentFile);
 
-        if (file && file.hasUnsavedChanges()) {
+        // Only prompt if file was ever loaded (exists() is cached). Skip for broken includes.
+        if (file && file.hasUnsavedChanges() && file.exists()) {
             const choice = await vscode.window.showWarningMessage(
                 `The current task include file "${currentFile}" has unsaved changes. What would you like to do?`,
                 { modal: true },

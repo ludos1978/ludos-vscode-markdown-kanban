@@ -264,10 +264,12 @@ export class ChangeStateMachine {
         }
 
         // 5. Check for unsaved changes in files being unloaded
+        // NOTE: exists() checks cached flag - if file was ever loaded successfully, we should save
+        // even if the file was deleted externally. Only skip for broken includes (never loaded).
         const unsavedFiles: MarkdownFile[] = [];
         for (const relativePath of context.switches.unloadingFiles) {
             const file = this._fileRegistry?.getByRelativePath(relativePath);
-            if (file?.hasUnsavedChanges()) {
+            if (file?.hasUnsavedChanges() && file.exists()) {
                 unsavedFiles.push(file);
             }
         }

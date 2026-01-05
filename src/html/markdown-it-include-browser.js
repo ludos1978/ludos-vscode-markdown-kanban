@@ -35,9 +35,17 @@
     // Add include-broken class when file is not found
     const brokenClass = isBroken ? ' include-broken' : '';
 
-    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
-        <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
-        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+    // Show error tooltip on hover for broken includes
+    const linkTooltip = isBroken
+        ? `Include file not found: ${escapeHtml(filePath)}`
+        : `Alt+click to open file: ${escapeHtml(filePath)}`;
+    const menuTooltip = isBroken
+        ? `Include file not found - click for options`
+        : `Path options`;
+
+    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}"${isBroken ? ` data-include-error="true"` : ''}>
+        <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="${linkTooltip}">${escapeHtml(displayText)}</span>
+        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="${menuTooltip}">☰</button>
         <div class="include-path-menu">
             <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
             <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>

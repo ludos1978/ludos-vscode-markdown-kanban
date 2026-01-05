@@ -285,6 +285,21 @@ export class KanbanFileService {
             });
         }
 
+        // DEBUG: Log include error state before sending to frontend
+        const boardBeforeSend = this.board();
+        if (boardBeforeSend?.columns) {
+            for (const col of boardBeforeSend.columns) {
+                if (col.includeFiles && col.includeFiles.length > 0) {
+                    console.log(`[KanbanFileService] BEFORE sendBoardUpdate - column ${col.id}: includeMode=${col.includeMode}, includeError=${col.includeError}, includeFiles=${JSON.stringify(col.includeFiles)}`);
+                }
+                for (const task of col.tasks || []) {
+                    if (task.includeFiles && task.includeFiles.length > 0) {
+                        console.log(`[KanbanFileService] BEFORE sendBoardUpdate - task ${task.id}: includeMode=${task.includeMode}, includeError=${task.includeError}, includeFiles=${JSON.stringify(task.includeFiles)}`);
+                    }
+                }
+            }
+        }
+
         await this.sendBoardUpdate(false, forceReload);
         this.fileManager.sendFileInfo();
     }
@@ -308,7 +323,10 @@ export class KanbanFileService {
         await this._fileSaveService.saveFile(mainFile, markdown);
 
         // Save include files that have unsaved changes
-        const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
+        // NOTE: Only save files that exist() - don't save broken includes (would create the file/folder)
+        const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges()
+            .filter(f => f.getFileType() !== 'main')
+            .filter(f => f.exists());
         if (unsavedIncludes.length > 0) {
             // Save each include file individually, handling validation errors gracefully
             const saveResults = await Promise.allSettled(
