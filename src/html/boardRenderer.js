@@ -1753,9 +1753,15 @@ function createTaskElement(task, columnId, taskIndex) {
     // Clear the rendering context AFTER description is rendered
     window.currentRenderingTimeSlot = null;
 
-    // Always wrap description in task sections for keyboard navigation
-    // Even empty tasks need at least one section to be focusable
-    renderedDescription = wrapTaskSections(renderedDescription);
+    // For broken task includes, show placeholder instead of empty description
+    const isTaskIncludeWithError = task.includeMode === true && task.includeError === true;
+    if (isTaskIncludeWithError && !renderedDescription) {
+        renderedDescription = '<div class="broken-include-placeholder">Description unavailable for broken include</div>';
+    } else {
+        // Always wrap description in task sections for keyboard navigation
+        // Even empty tasks need at least one section to be focusable
+        renderedDescription = wrapTaskSections(renderedDescription);
+    }
 
     // Use same pattern as column includes:
     // - displayTitle for display (content from file or filtered title)

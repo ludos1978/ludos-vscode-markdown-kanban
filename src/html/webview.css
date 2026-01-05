@@ -223,9 +223,9 @@ body {
 .video-path-overlay-container .video-menu-btn,
 .diagram-overlay-container .diagram-menu-btn,
 .include-path-overlay-container .include-menu-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  position: relative;
+  top: 0px;
+  right: -4px;
   width: 24px;
   height: 24px;
   background: rgba(0, 0, 0, 0.6);
@@ -240,6 +240,13 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* position: static;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  border-radius: 3px;
+  font-size: 10px;
+  vertical-align: middle; */
 }
 
 .btn-overlay-icon:hover,
@@ -270,6 +277,8 @@ body {
 }
 
 /* Include ERROR state: RED colors (like broken images should have been) */
+.include-path-overlay-container.include-broken .columninclude-link,
+.include-path-overlay-container.include-broken .include-filename-link, 
 .include-error .include-path-overlay-container .include-menu-btn,
 .include-container.include-error .include-path-overlay-container .include-menu-btn,
 .kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
@@ -281,12 +290,12 @@ body {
 }
 
 /* BROKEN STATE: Style the include link badge itself (not just the button) */
-.include-path-overlay-container.include-broken .columninclude-link,
+/* .include-path-overlay-container.include-broken .columninclude-link,
 .include-path-overlay-container.include-broken .include-filename-link {
   background-color: rgba(190, 140, 0, 0.3) !important;
   color: var(--vscode-inputValidation-warningForeground, #cca700) !important;
   border: 1px solid var(--vscode-inputValidation-warningBorder, #be8c00) !important;
-}
+} */
 
 /* Include ERROR state: RED colors for link badge */
 .include-error .include-path-overlay-container .columninclude-link,
@@ -4090,7 +4099,7 @@ blockquote {
 }
 
 /* Include menu button - size overrides (base styles in unified overlay button section) */
-.include-path-overlay-container .include-menu-btn {
+/* .include-path-overlay-container .include-menu-btn {
   position: static;
   width: 16px;
   height: 16px;
@@ -4098,7 +4107,7 @@ blockquote {
   border-radius: 3px;
   font-size: 10px;
   vertical-align: middle;
-}
+} */
 
 /* COLUMN/TASK INCLUDES: Always show menu button for Search for File functionality */
 .include-path-overlay-container[data-include-type="column"] .include-menu-btn,
