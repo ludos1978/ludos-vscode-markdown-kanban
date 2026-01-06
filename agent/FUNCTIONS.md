@@ -531,6 +531,7 @@ Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncA
 - src/messageHandler-MessageHandler_handleSaveClipboardImageWithPath - Handle clipboard image save with path
 - src/messageHandler-MessageHandler_handlePasteImageIntoField - Handle image paste into field
 - src/messageHandler-MessageHandler_handleBoardUpdate - Handle board update from webview
+- src/messageHandler-MessageHandler__checkUnsavedIncludeFiles - Scan full board include usage and prompt when removed include files have unsaved changes
 - src/messageHandler-MessageHandler_handleConfirmDisableIncludeMode - Handle include mode disable confirmation
 - src/messageHandler-MessageHandler_handleRequestIncludeFile - Handle include file request
 - src/messageHandler-MessageHandler_handleRegisterInlineInclude - Handle inline include registration

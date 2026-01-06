@@ -268,34 +268,41 @@ export class MessageHandler {
         oldBoard: KanbanBoard,
         panel: any
     ): Promise<boolean> {
-        // Check column includes
-        for (let i = 0; i < newBoard.columns.length && i < oldBoard.columns.length; i++) {
-            const newCol = newBoard.columns[i];
-            const oldCol = oldBoard.columns[i];
+        const oldIncludesByNormalized = new Map<string, string>();
+        const newIncludesNormalized = new Set<string>();
 
-            // Check column-level include files
-            const shouldProceed = await this._checkRemovedIncludes(
-                oldCol.includeFiles || [],
-                newCol.includeFiles || [],
-                panel
-            );
-            if (!shouldProceed) { return false; }
-
-            // Check task includes within this column
-            for (const newTask of newCol.tasks) {
-                const oldTask = oldCol.tasks.find((t: KanbanTask) => t.id === newTask.id);
-                if (oldTask) {
-                    const taskShouldProceed = await this._checkRemovedIncludes(
-                        oldTask.includeFiles || [],
-                        newTask.includeFiles || [],
-                        panel
-                    );
-                    if (!taskShouldProceed) { return false; }
+        for (const column of oldBoard.columns) {
+            for (const path of column.includeFiles || []) {
+                const normalized = MarkdownFile.normalizeRelativePath(path);
+                if (!oldIncludesByNormalized.has(normalized)) {
+                    oldIncludesByNormalized.set(normalized, path);
+                }
+            }
+            for (const task of column.tasks) {
+                for (const path of task.includeFiles || []) {
+                    const normalized = MarkdownFile.normalizeRelativePath(path);
+                    if (!oldIncludesByNormalized.has(normalized)) {
+                        oldIncludesByNormalized.set(normalized, path);
+                    }
                 }
             }
         }
 
-        return true;
+        for (const column of newBoard.columns) {
+            for (const path of column.includeFiles || []) {
+                newIncludesNormalized.add(MarkdownFile.normalizeRelativePath(path));
+            }
+            for (const task of column.tasks) {
+                for (const path of task.includeFiles || []) {
+                    newIncludesNormalized.add(MarkdownFile.normalizeRelativePath(path));
+                }
+            }
+        }
+
+        const oldIncludes = Array.from(oldIncludesByNormalized.values());
+        const newIncludes = Array.from(newIncludesNormalized.values());
+
+        return this._checkRemovedIncludes(oldIncludes, newIncludes, panel);
     }
 
     /**
