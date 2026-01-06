@@ -343,6 +343,7 @@ export class KanbanWebviewPanel {
     public isEditingInProgress(): boolean { return this._context.editingInProgress; }
     public setUndoRedoOperation(isOperation: boolean): void { this._context.setUndoRedoOperation(isOperation); }
     public getWebviewBridge(): WebviewBridge { return this._webviewBridge; }
+    public getMessageHandler(): MessageHandler { return this._messageHandler; }
 
     private _initialize() {
         if (!this._context.initialized) {

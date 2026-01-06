@@ -87,7 +87,7 @@ export class EditModeCommands extends SwitchBasedCommand {
         if (!panel || !hasMessageHandler(panel)) {
             return null;
         }
-        return panel._messageHandler;
+        return panel.getMessageHandler ? panel.getMessageHandler() : panel._messageHandler;
     }
 
     // ============= EDIT MODE LIFECYCLE =============

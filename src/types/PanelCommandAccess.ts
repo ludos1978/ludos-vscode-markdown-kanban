@@ -85,6 +85,7 @@ export interface PanelCommandAccess {
         createUnifiedBackup(filePath: string, reason: string, includeMetadata: boolean): Promise<string>;
     };
     _messageHandler?: MessageHandlerCommandAccess;
+    getMessageHandler?(): MessageHandlerCommandAccess;
 }
 
 /**
@@ -106,7 +107,7 @@ export function hasMessageHandler(panel: unknown): panel is PanelCommandAccess &
     const p = panel as PanelCommandAccess;
     return p !== null &&
            typeof p === 'object' &&
-           p._messageHandler !== undefined;
+           (typeof p.getMessageHandler === 'function' || p._messageHandler !== undefined);
 }
 
 /**
