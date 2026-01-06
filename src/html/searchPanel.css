@@ -1,0 +1,391 @@
+/**
+ * Search Panel Styles
+ * Styles for the Kanban Search sidebar panel
+ */
+
+/* VS Code theme variables */
+:root {
+    --container-padding: 8px;
+    --input-height: 26px;
+    --button-height: 26px;
+    --border-radius: 2px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    padding: 0;
+    margin: 0;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-sideBar-background);
+}
+
+/* Container */
+.search-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--container-padding);
+    gap: 8px;
+}
+
+/* Mode Toggle */
+.mode-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--vscode-input-background);
+    border-radius: var(--border-radius);
+    padding: 2px;
+}
+
+.mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    transition: background-color 0.1s;
+}
+
+.mode-btn:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.mode-btn.active {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.mode-btn .codicon {
+    font-size: 12px;
+}
+
+/* Search Input */
+.search-input-container {
+    display: flex;
+    gap: 4px;
+}
+
+.search-input {
+    flex: 1;
+    height: var(--input-height);
+    padding: 0 8px;
+    border: 1px solid var(--vscode-input-border, transparent);
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border-radius: var(--border-radius);
+    outline: none;
+    font-size: inherit;
+}
+
+.search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.search-btn {
+    width: var(--button-height);
+    height: var(--button-height);
+    padding: 0;
+    border: none;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+/* Find Broken Button */
+.find-broken-container {
+    display: flex;
+}
+
+.find-broken-btn {
+    flex: 1;
+    height: var(--button-height);
+    padding: 0 12px;
+    border: none;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: inherit;
+}
+
+.find-broken-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.find-broken-btn .codicon {
+    font-size: 14px;
+}
+
+/* Status Message */
+.status-message {
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    display: none;
+}
+
+.status-message.visible {
+    display: block;
+}
+
+.status-message.error {
+    color: var(--vscode-errorForeground);
+    background: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    border-radius: var(--border-radius);
+}
+
+.status-message.warning {
+    color: var(--vscode-editorWarning-foreground);
+}
+
+/* Results Container */
+.results-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+    padding: 20px;
+}
+
+.results-empty .codicon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+.results-empty p {
+    margin: 4px 0;
+}
+
+.results-empty .hint {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* Results List */
+.results-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Result Group */
+.result-group {
+    margin-bottom: 8px;
+}
+
+.result-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-sideBarSectionHeader-background);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.result-group-header .codicon {
+    font-size: 12px;
+}
+
+.result-group-count {
+    margin-left: auto;
+    font-weight: normal;
+    opacity: 0.7;
+}
+
+/* Result Item */
+.result-item {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--vscode-widget-border, transparent);
+}
+
+.result-item:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.result-item:active {
+    background: var(--vscode-list-activeSelectionBackground);
+}
+
+.result-item-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.result-item-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.result-item-icon .codicon {
+    font-size: 14px;
+}
+
+.result-item-icon.broken .codicon {
+    color: var(--vscode-errorForeground);
+}
+
+.result-item-icon.text .codicon {
+    color: var(--vscode-textLink-foreground);
+}
+
+.result-item-content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.result-item-path {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.result-item-context {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.result-item-context .highlight {
+    background: var(--vscode-editor-findMatchHighlightBackground);
+    color: var(--vscode-foreground);
+}
+
+.result-item-location {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.result-item-location .codicon {
+    font-size: 10px;
+}
+
+/* Loading State */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.loading::after {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--vscode-progressBar-background);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* No Active Panel Warning */
+.no-panel-warning {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+    padding: 20px;
+}
+
+.no-panel-warning .codicon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    color: var(--vscode-editorWarning-foreground);
+}
+
+/* Codicon font (VS Code icons) */
+@font-face {
+    font-family: 'codicon';
+    src: url('https://microsoft.github.io/vscode-codicons/dist/codicon.ttf') format('truetype');
+}
+
+.codicon {
+    font-family: 'codicon';
+    font-size: 16px;
+    line-height: 1;
+}
+
+.codicon-warning::before { content: '\ea6c'; }
+.codicon-search::before { content: '\ea6d'; }
+.codicon-refresh::before { content: '\eb37'; }
+.codicon-file-media::before { content: '\eb60'; }
+.codicon-link::before { content: '\eb15'; }
+.codicon-symbol-file::before { content: '\eb5f'; }
+.codicon-play::before { content: '\eb2c'; }
+.codicon-graph::before { content: '\eacf'; }
+.codicon-quote::before { content: '\eb41'; }
+.codicon-location::before { content: '\eb11'; }
+.codicon-info::before { content: '\ea74'; }

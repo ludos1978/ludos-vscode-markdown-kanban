@@ -3102,6 +3102,11 @@ if (!webviewEventListenersInitialized) {
                 fileSearchModal.handleMessage(message);
             }
             break;
+
+        case 'scrollToElement':
+            // Handle scroll-to-element request from search sidebar
+            scrollToAndHighlight(message.columnId, message.taskId, message.highlight);
+            break;
     }
 });
 } // End of webviewEventListenersInitialized guard
@@ -3146,6 +3151,61 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
             hasTaskEditor: !!window.taskEditor,
             hasCurrentEditor: !!(window.taskEditor && window.taskEditor.currentEditor)
         });
+    }
+}
+
+/**
+ * Scroll to and highlight an element on the board
+ * Used by the Kanban Search sidebar to navigate to search results
+ * @param {string} columnId - The column ID to scroll to
+ * @param {string} [taskId] - Optional task ID to scroll to within the column
+ * @param {boolean} [highlight] - Whether to add highlight animation
+ */
+function scrollToAndHighlight(columnId, taskId, highlight = true) {
+    let targetElement = null;
+
+    if (taskId) {
+        // Find the task card
+        targetElement = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    }
+
+    if (!targetElement && columnId) {
+        // Find the column
+        targetElement = document.querySelector(`.column[data-column-id="${columnId}"]`);
+        if (!targetElement) {
+            // Try finding by column header
+            const columnHeader = document.querySelector(`.column-header[data-column-id="${columnId}"]`);
+            if (columnHeader) {
+                targetElement = columnHeader.closest('.column');
+            }
+        }
+    }
+
+    if (!targetElement) {
+        console.warn('[Webview] scrollToAndHighlight: Could not find element', { columnId, taskId });
+        return;
+    }
+
+    // Scroll the element into view
+    targetElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+    });
+
+    // Add highlight animation if requested
+    if (highlight) {
+        // Remove any existing highlight
+        targetElement.classList.remove('search-highlight');
+        // Force reflow to restart animation
+        void targetElement.offsetWidth;
+        // Add highlight class
+        targetElement.classList.add('search-highlight');
+
+        // Remove the highlight after animation completes
+        setTimeout(() => {
+            targetElement.classList.remove('search-highlight');
+        }, 2000);
     }
 }
 

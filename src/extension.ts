@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
+import { KanbanSearchProvider } from './kanbanSearchProvider';
 import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
@@ -52,6 +53,15 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	context.subscriptions.push(treeView);
 	context.subscriptions.push(sidebarProvider);
+
+	// Initialize kanban search sidebar
+	const searchProvider = new KanbanSearchProvider(context.extensionUri);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			KanbanSearchProvider.viewType,
+			searchProvider
+		)
+	);
 
 	let fileListenerEnabled = true;
 

@@ -4497,6 +4497,11 @@
         {
           "id": "kanbanBoardsSidebar",
           "name": "Kanban Boards"
+        },
+        {
+          "type": "webview",
+          "id": "kanbanSearch",
+          "name": "Kanban Search"
         }
       ]
     },
@@ -4549,6 +4554,16 @@
         "command": "markdown-kanban.sidebar.clear",
         "title": "Clear All Kanban Boards",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "markdown-kanban.search.findBroken",
+        "title": "Find Broken Elements in Kanban",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "markdown-kanban.search.searchText",
+        "title": "Search Kanban Board Content",
+        "icon": "$(search)"
       },
       {
         "command": "markdown-kanban.sidebar.refresh",

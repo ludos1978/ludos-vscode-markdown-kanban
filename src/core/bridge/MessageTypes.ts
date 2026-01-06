@@ -1533,6 +1533,75 @@ export interface DeleteFromMarkdownMessage extends BaseMessage {
     path: string;
 }
 
+// ============= SEARCH MESSAGES =============
+
+/**
+ * Location within the board where an element was found
+ */
+export interface SearchElementLocation {
+    columnId: string;
+    columnTitle: string;
+    taskId?: string;
+    taskTitle?: string;
+    field: 'columnTitle' | 'taskTitle' | 'description';
+}
+
+/**
+ * Search result for UI display
+ */
+export interface SearchResultItem {
+    type: 'image' | 'include' | 'link' | 'media' | 'diagram' | 'text';
+    path?: string;           // File path for element
+    matchText?: string;      // Matched text for text search
+    context?: string;        // Surrounding text for context
+    location: SearchElementLocation;
+    exists: boolean;         // For broken detection
+}
+
+/**
+ * Request broken elements search (Search Sidebar -> Backend)
+ */
+export interface SearchBrokenElementsMessage extends BaseMessage {
+    type: 'searchBrokenElements';
+}
+
+/**
+ * Request text search (Search Sidebar -> Backend)
+ */
+export interface SearchTextMessage extends BaseMessage {
+    type: 'searchText';
+    query: string;
+}
+
+/**
+ * Navigate to element request (Search Sidebar -> Backend)
+ */
+export interface NavigateToElementMessage extends BaseMessage {
+    type: 'navigateToElement';
+    columnId: string;
+    taskId?: string;
+    elementPath?: string;
+}
+
+/**
+ * Search results response (Backend -> Search Sidebar)
+ */
+export interface SearchResultsMessage extends BaseMessage {
+    type: 'searchResults';
+    results: SearchResultItem[];
+    searchType: 'broken' | 'text';
+}
+
+/**
+ * Scroll to element and highlight (Backend -> Main Webview)
+ */
+export interface ScrollToElementMessage extends BaseMessage {
+    type: 'scrollToElement';
+    columnId: string;
+    taskId?: string;
+    highlight: boolean;
+}
+
 // ============= PROCESSES MESSAGES =============
 
 /**
@@ -1632,7 +1701,10 @@ export type OutgoingMessage =
     | ProcessesStatusMessage
     | MediaIndexScanStartedMessage
     | MediaIndexScanCompletedMessage
-    | MediaIndexScanCancelledMessage;
+    | MediaIndexScanCancelledMessage
+    // Search messages
+    | ScrollToElementMessage
+    | SearchResultsMessage;
 
 /**
  * All incoming message types (Frontend → Backend)
@@ -1774,7 +1846,11 @@ export type IncomingMessage =
     // Processes messages
     | GetProcessesStatusMessage
     | RequestMediaIndexScanMessage
-    | CancelMediaIndexScanMessage;
+    | CancelMediaIndexScanMessage
+    // Search messages
+    | SearchBrokenElementsMessage
+    | SearchTextMessage
+    | NavigateToElementMessage;
 
 /**
  * Message type string literals for type-safe checking

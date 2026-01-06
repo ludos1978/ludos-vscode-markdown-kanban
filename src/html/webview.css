@@ -7940,3 +7940,34 @@ body.font-size-5x .task-description-edit {
 .file-search-preview-toggle .preview-label {
     font-size: 11px;
 }
+
+/* ========================================
+   Search Highlight Styles
+   Used by Kanban Search sidebar for highlighting search results
+   ======================================== */
+
+.search-highlight {
+    animation: search-highlight-pulse 2s ease-out;
+}
+
+@keyframes search-highlight-pulse {
+    0% {
+        box-shadow: 0 0 0 4px var(--vscode-focusBorder, #007acc);
+    }
+    50% {
+        box-shadow: 0 0 0 6px var(--vscode-focusBorder, #007acc);
+    }
+    100% {
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
+/* Specific highlight for columns */
+.column.search-highlight {
+    border-radius: 8px;
+}
+
+/* Specific highlight for task cards */
+.task-card.search-highlight {
+    border-radius: 6px;
+}
