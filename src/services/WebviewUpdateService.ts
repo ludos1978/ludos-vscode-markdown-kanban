@@ -13,6 +13,7 @@
  */
 
 import { KanbanBoard } from '../markdownParser';
+import * as vscode from 'vscode';
 import { BoardStore } from '../core/stores';
 import { WebviewBridge } from '../core/bridge';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
@@ -105,9 +106,8 @@ export class WebviewUpdateService {
         // Update webview permissions to include asset directories
         this._deps.webviewManager.updatePermissionsForAssets();
 
-        // Get version from package.json
-        const packageJson = require('../../package.json');
-        const version = packageJson.version || 'Unknown';
+        const extension = vscode.extensions.getExtension('ludos.ludos-kanban');
+        const version = extension?.packageJSON?.version || 'Unknown';
 
         // Send board update message
         console.log('[WebviewUpdateService.sendBoardUpdate] Sending boardUpdate message');
