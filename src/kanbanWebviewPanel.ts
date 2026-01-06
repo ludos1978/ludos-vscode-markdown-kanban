@@ -571,6 +571,7 @@ export class KanbanWebviewPanel {
             // Cleanup auto-export subscription to prevent memory leak
             cleanupAutoExportSubscription(document.uri.fsPath);
         }
+        this._cleanupPanelStateEntry();
 
         this._backupManager.dispose();
         this._mediaTracker?.dispose();
@@ -594,6 +595,16 @@ export class KanbanWebviewPanel {
     public get backupManager(): BackupManager { return this._backupManager; }
     public get fileRegistry(): MarkdownFileRegistry { return this._fileRegistry; }
     public get fileFactory(): FileFactory { return this._fileFactory; }
+
+    private _cleanupPanelStateEntry(): void {
+        const documentUri = this._context.lastDocumentUri || this._context.trackedDocumentUri;
+        if (!documentUri) {
+            return;
+        }
+
+        const stableKey = `kanban_doc_${Buffer.from(documentUri).toString('base64').replace(/[^a-zA-Z0-9]/g, '_')}`;
+        this._extensionContext.globalState.update(stableKey, undefined);
+    }
 
     private setupDocumentChangeListener(): void {
         this._fileService.setupDocumentChangeListener(this._disposables);
