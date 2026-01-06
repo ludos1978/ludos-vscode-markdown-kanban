@@ -340,6 +340,7 @@ export class KanbanWebviewPanel {
     public isFileLocked(): boolean { return this._fileManager.isFileLocked(); }
     public toggleFileLock(): void { this._fileManager.toggleFileLock(); }
     public getCurrentDocumentUri(): vscode.Uri | undefined { return this._fileManager.getCurrentDocumentUri(); }
+    public isEditingInProgress(): boolean { return this._context.editingInProgress; }
 
     private _initialize() {
         if (!this._context.initialized) {

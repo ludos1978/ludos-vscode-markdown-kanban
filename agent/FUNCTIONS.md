@@ -314,6 +314,7 @@ Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncA
 - src/kanbanWebviewPanel-KanbanWebviewPanel_isFileLocked - Check if file is locked for editing
 - src/kanbanWebviewPanel-KanbanWebviewPanel_toggleFileLock - Toggle file lock state
 - src/kanbanWebviewPanel-KanbanWebviewPanel_getCurrentDocumentUri - Get current document URI
+- src/kanbanWebviewPanel-KanbanWebviewPanel_isEditingInProgress - Check if an edit session is active in the panel
 - src/kanbanWebviewPanel-KanbanWebviewPanel_initialize - Initialize panel state and listeners
 - src/kanbanWebviewPanel-KanbanWebviewPanel_setupEventListeners - Setup message and event listeners
 - src/kanbanWebviewPanel-KanbanWebviewPanel_ensureBoardAndSendUpdate - Ensure board exists and send update to webview
