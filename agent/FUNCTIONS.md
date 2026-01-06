@@ -13,6 +13,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - `src/panel/WebviewManager.ts` `generateHtml()` now preserves `enableCommandUris` when setting webview options.
 - `src/commands/CommandRegistry.ts` now orders handlers per message type by priority and respects `canHandle()` when dispatching.
 - `src/services/WebviewUpdateService.ts` now reads extension version from VS Code extension metadata instead of a local package.json require.
+- `src/core/stores/UndoCapture.ts` added `TaskMovePayload` + `forTaskMove()` to capture drag move positions for undo/redo.
+- `src/core/stores/BoardStore.ts` added `cloneBoard()`, `invertTaskMove()`, `applyTaskMove()` helpers for position-based task move undo/redo.
 
 ---
 

@@ -1332,6 +1332,8 @@ export interface SaveUndoStateMessage extends BaseMessage {
     columnId?: string;
     fromColumnId?: string;
     toColumnId?: string;
+    fromIndex?: number;
+    toIndex?: number;
 }
 
 /**

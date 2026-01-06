@@ -28,6 +28,18 @@ export interface ResolvedTarget {
 }
 
 /**
+ * Task move payload for position-based undo/redo
+ */
+export interface TaskMovePayload {
+    type: 'task-move';
+    taskId: string;
+    fromColumnId: string;
+    fromIndex: number;
+    toColumnId: string;
+    toIndex: number;
+}
+
+/**
  * Source information for the undo entry
  */
 export interface UndoSource {
@@ -50,6 +62,8 @@ export interface UndoEntry {
     source: UndoSource;
     /** Timestamp when captured */
     timestamp: number;
+    /** Optional payload for position-based operations (e.g. drag move) */
+    payload?: TaskMovePayload;
 }
 
 // ============= HELPER FUNCTIONS =============
@@ -148,6 +162,27 @@ export class UndoCapture {
                 operation
             },
             timestamp: Date.now()
+        };
+    }
+
+    /**
+     * Create an UndoEntry for a task move (drag/reorder) using position payload
+     */
+    static forTaskMove(board: KanbanBoard, payload: TaskMovePayload, operation: string): UndoEntry {
+        const targets: ResolvedTarget[] = [
+            { type: 'column', id: payload.fromColumnId },
+            { type: 'column', id: payload.toColumnId }
+        ];
+
+        return {
+            board: deepCloneBoard(board),
+            targets,
+            source: {
+                type: 'manual',
+                operation
+            },
+            timestamp: Date.now(),
+            payload
         };
     }
 

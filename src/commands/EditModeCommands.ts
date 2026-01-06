@@ -212,36 +212,34 @@ export class EditModeCommands extends SwitchBasedCommand {
                 return this.success();
             }
 
-            if (operation === 'moveTaskViaDrag') {
-                const targets = [];
-                if (msg.fromColumnId) {
-                    targets.push({ type: 'column', id: msg.fromColumnId });
-                }
-                if (msg.toColumnId && msg.toColumnId !== msg.fromColumnId) {
-                    targets.push({ type: 'column', id: msg.toColumnId });
-                }
-                if (targets.length > 0) {
-                    context.boardStore.saveUndoEntry(
-                        UndoCapture.forMultiple(boardToSave, targets, operation)
-                    );
-                } else {
-                    context.boardStore.saveUndoEntry(
-                        UndoCapture.forFullBoard(boardToSave, operation)
-                    );
-                }
-                return this.success();
-            }
+            if (operation === 'moveTaskViaDrag' || operation === 'reorderTaskViaDrag') {
+                const hasMovePayload = msg.taskId &&
+                    msg.fromColumnId && msg.toColumnId &&
+                    typeof msg.fromIndex === 'number' &&
+                    typeof msg.toIndex === 'number';
 
-            if (operation === 'reorderTaskViaDrag') {
-                const columnId = msg.toColumnId || msg.fromColumnId || msg.columnId;
-                if (columnId) {
+                if (hasMovePayload) {
                     context.boardStore.saveUndoEntry(
-                        UndoCapture.forColumn(boardToSave, columnId, operation)
+                        UndoCapture.forTaskMove(boardToSave, {
+                            type: 'task-move',
+                            taskId: msg.taskId,
+                            fromColumnId: msg.fromColumnId,
+                            fromIndex: msg.fromIndex,
+                            toColumnId: msg.toColumnId,
+                            toIndex: msg.toIndex
+                        }, operation)
                     );
                 } else {
-                    context.boardStore.saveUndoEntry(
-                        UndoCapture.forFullBoard(boardToSave, operation)
-                    );
+                    const columnId = msg.toColumnId || msg.fromColumnId || msg.columnId;
+                    if (columnId) {
+                        context.boardStore.saveUndoEntry(
+                            UndoCapture.forColumn(boardToSave, columnId, operation)
+                        );
+                    } else {
+                        context.boardStore.saveUndoEntry(
+                            UndoCapture.forFullBoard(boardToSave, operation)
+                        );
+                    }
                 }
                 return this.success();
             }

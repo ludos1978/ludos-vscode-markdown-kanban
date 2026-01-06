@@ -17,7 +17,7 @@
 
 import * as vscode from 'vscode';
 import { KanbanBoard } from '../../markdownParser';
-import { UndoEntry, UndoCapture, ResolvedTarget } from './UndoCapture';
+import { UndoEntry, UndoCapture, ResolvedTarget, TaskMovePayload } from './UndoCapture';
 
 // Re-export for consumers
 export { UndoEntry, UndoCapture, ResolvedTarget };
@@ -52,6 +52,67 @@ export interface BoardStoreOptions {
 
 function createInferredUndoEntry(board: KanbanBoard): UndoEntry {
     return UndoCapture.inferred(board, 'inferred');
+}
+
+function cloneBoard(board: KanbanBoard): KanbanBoard {
+    return JSON.parse(JSON.stringify(board));
+}
+
+function invertTaskMove(payload: TaskMovePayload): TaskMovePayload {
+    return {
+        type: 'task-move',
+        taskId: payload.taskId,
+        fromColumnId: payload.toColumnId,
+        fromIndex: payload.toIndex,
+        toColumnId: payload.fromColumnId,
+        toIndex: payload.fromIndex
+    };
+}
+
+function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): KanbanBoard {
+    const updatedBoard = cloneBoard(board);
+    const { taskId, fromColumnId, toColumnId, fromIndex, toIndex } = payload;
+
+    let fromColumn = updatedBoard.columns.find(col => col.id === fromColumnId);
+    let toColumn = updatedBoard.columns.find(col => col.id === toColumnId);
+    let task;
+
+    if (fromColumn && fromColumn.tasks[fromIndex]?.id === taskId) {
+        task = fromColumn.tasks.splice(fromIndex, 1)[0];
+    } else if (fromColumn) {
+        const actualIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
+        if (actualIndex >= 0) {
+            task = fromColumn.tasks.splice(actualIndex, 1)[0];
+        }
+    }
+
+    if (!task) {
+        for (const column of updatedBoard.columns) {
+            const idx = column.tasks.findIndex(t => t.id === taskId);
+            if (idx >= 0) {
+                task = column.tasks.splice(idx, 1)[0];
+                fromColumn = column;
+                break;
+            }
+        }
+    }
+
+    if (!task) {
+        return updatedBoard;
+    }
+
+    if (!toColumn) {
+        toColumn = fromColumn || updatedBoard.columns[0];
+    }
+
+    if (!toColumn) {
+        return updatedBoard;
+    }
+
+    const clampedIndex = Math.max(0, Math.min(toIndex, toColumn.tasks.length));
+    toColumn.tasks.splice(clampedIndex, 0, task);
+
+    return updatedBoard;
 }
 
 // ============= MAIN CLASS =============
@@ -229,6 +290,28 @@ export class BoardStore implements vscode.Disposable {
         }
 
         const currentBoard = this._state.board;
+        const restoredEntry = this._state.undoStack.pop()!;
+
+        if (restoredEntry.payload?.type === 'task-move' && currentBoard && currentBoard.valid) {
+            this._state.redoStack.push({
+                board: cloneBoard(currentBoard),
+                targets: restoredEntry.targets,
+                source: restoredEntry.source,
+                timestamp: Date.now(),
+                payload: restoredEntry.payload
+            });
+
+            const updatedBoard = applyTaskMove(currentBoard, invertTaskMove(restoredEntry.payload));
+            this._state.board = updatedBoard;
+            this._state.cacheValid = true;
+
+            this._sendUndoRedoStatus();
+
+            return {
+                board: updatedBoard,
+                targets: restoredEntry.targets
+            };
+        }
 
         if (currentBoard && currentBoard.valid) {
             // Create a redo entry from current state
@@ -236,7 +319,6 @@ export class BoardStore implements vscode.Disposable {
             this._state.redoStack.push(createInferredUndoEntry(currentBoard));
         }
 
-        const restoredEntry = this._state.undoStack.pop()!;
         this._state.board = restoredEntry.board;
         this._state.cacheValid = true;
 
@@ -259,12 +341,34 @@ export class BoardStore implements vscode.Disposable {
         }
 
         const currentBoard = this._state.board;
+        const restoredEntry = this._state.redoStack.pop()!;
+
+        if (restoredEntry.payload?.type === 'task-move' && currentBoard && currentBoard.valid) {
+            this._state.undoStack.push({
+                board: cloneBoard(currentBoard),
+                targets: restoredEntry.targets,
+                source: restoredEntry.source,
+                timestamp: Date.now(),
+                payload: invertTaskMove(restoredEntry.payload)
+            });
+
+            const updatedBoard = applyTaskMove(currentBoard, restoredEntry.payload);
+            this._state.board = updatedBoard;
+            this._state.cacheValid = true;
+
+            this._sendUndoRedoStatus();
+
+            return {
+                board: updatedBoard,
+                targets: restoredEntry.targets
+            };
+        }
+
         if (currentBoard && currentBoard.valid) {
             // Create an undo entry from current state
             this._state.undoStack.push(createInferredUndoEntry(currentBoard));
         }
 
-        const restoredEntry = this._state.redoStack.pop()!;
         this._state.board = restoredEntry.board;
         this._state.cacheValid = true;
 

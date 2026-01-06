@@ -776,17 +776,6 @@ function setupGlobalDragAndDrop() {
         // Update cached board
         if (window.cachedBoard) {
             const taskId = taskItem.dataset.taskId;
-            const undoSnapshot = JSON.parse(JSON.stringify(window.cachedBoard));
-
-            // Save undo state
-            vscode.postMessage({
-                type: 'saveUndoState',
-                operation: originalColumnId !== finalColumnId ? 'moveTaskViaDrag' : 'reorderTaskViaDrag',
-                taskId: taskId,
-                fromColumnId: originalColumnId,
-                toColumnId: finalColumnId,
-                currentBoard: undoSnapshot
-            });
 
             // Find and remove task from original column
             const originalColumn = window.cachedBoard.columns.find(col => col.id === originalColumnId);
@@ -795,12 +784,24 @@ function setupGlobalDragAndDrop() {
             if (originalColumn && finalColumn) {
                 const taskIndex = originalColumn.tasks.findIndex(t => t.id === taskId);
                 if (taskIndex >= 0) {
+                    const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);
+                    const undoSnapshot = JSON.parse(JSON.stringify(window.cachedBoard));
+
+                    // Save undo state with positions BEFORE mutating cached board
+                    vscode.postMessage({
+                        type: 'saveUndoState',
+                        operation: originalColumnId !== finalColumnId ? 'moveTaskViaDrag' : 'reorderTaskViaDrag',
+                        taskId: taskId,
+                        fromColumnId: originalColumnId,
+                        fromIndex: taskIndex,
+                        toColumnId: finalColumnId,
+                        toIndex: insertIndex,
+                        currentBoard: undoSnapshot
+                    });
+
                     const [task] = originalColumn.tasks.splice(taskIndex, 1);
 
-                    // Log detailed task move information BEFORE the move
-
                     // Add task to new column at correct position
-                    const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);
                     finalColumn.tasks.splice(insertIndex, 0, task);
 
                     // Update column displays after task move
