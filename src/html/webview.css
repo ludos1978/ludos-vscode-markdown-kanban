@@ -1554,7 +1554,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   -moz-user-drag: element !important;
   -o-user-drag: element !important;
   user-drag: element !important;
-  cursor: grab;
 }
 
 .task-drag-handle:active {
@@ -1632,42 +1631,15 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 /* Drag handles */
-.drag-handle {
-  background: var(--button-alternative-background);
-  color: var(--button-alternative-foreground);
-  border: var(--button-alternative-border);
-  cursor: grab;
-  transition: all 0.2s;
-  user-select: none;
-  flex-shrink: 0;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: 14px;
-}
-
-.drag-handle:hover {
-  background: var(--button-alternative-background-hover);
-  color: var(--button-alternative-foreground-hover);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
+.drag-handle,
 .task-drag-handle {
   background: var(--button-alternative-background);
   color: var(--button-alternative-foreground);
   border: var(--button-alternative-border);
   cursor: grab;
   transition: all 0.2s;
-  flex-shrink: 0;
-  line-height: 1;
-  margin-top: 2px;
   user-select: none;
+  flex-shrink: 0;
   border-radius: 3px;
   display: flex;
   align-items: center;
@@ -1677,42 +1649,24 @@ body.small-card-fonts .task-title-container .markdown-content img {
   font-size: 14px;
 }
 
+.drag-handle:hover,
 .task-drag-handle:hover {
   background: var(--button-alternative-background-hover);
   color: var(--button-alternative-foreground-hover);
 }
 
+.drag-handle:active,
 .task-drag-handle:active {
   cursor: grabbing;
 }
 
+.task-drag-handle {
+  line-height: 1;
+  margin-top: 2px;
+}
+
 /* Collapse toggles */
-.collapse-toggle {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
-  cursor: pointer;
-  font-size: 10px;
-  transition: all 0.2s;
-  user-select: none;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  transform: rotate(90deg);
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.collapse-toggle:hover {
-  background: var(--button-secondary-background-hover);
-}
-
-.collapse-toggle.rotated {
-  transform: rotate(0deg);
-}
-
+.collapse-toggle,
 .task-collapse-toggle {
   background: var(--button-background);
   color: var(--button-foreground);
@@ -1722,22 +1676,27 @@ body.small-card-fonts .task-title-container .markdown-content img {
   transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
-  margin-top: 2px;
+  width: 16px;
+  height: 16px;
   transform: rotate(90deg);
   border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
 }
 
+.collapse-toggle:hover,
 .task-collapse-toggle:hover {
   background: var(--button-secondary-background-hover);
 }
 
+.collapse-toggle.rotated,
 .task-collapse-toggle.rotated {
   transform: rotate(0deg);
+}
+
+.task-collapse-toggle {
+  margin-top: 2px;
 }
 
 /* Task title container */
