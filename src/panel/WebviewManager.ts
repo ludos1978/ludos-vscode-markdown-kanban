@@ -305,7 +305,8 @@ export class WebviewManager {
         // Apply the enhanced localResourceRoots
         panel.webview.options = {
             enableScripts: true,
-            localResourceRoots: localResourceRoots
+            localResourceRoots: localResourceRoots,
+            enableCommandUris: true
         };
 
         const webviewDir = panel.webview.asWebviewUri(

@@ -9,6 +9,11 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
+## Recent Updates (2026-01-06)
+- `src/panel/WebviewManager.ts` `generateHtml()` now preserves `enableCommandUris` when setting webview options.
+
+---
+
 ## Recent Critical Fixes & New Functions (State Consolidation)
 
 ### PanelContext: Unified Panel State Management (2025-12-14)
