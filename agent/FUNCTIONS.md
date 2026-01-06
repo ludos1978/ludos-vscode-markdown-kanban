@@ -1139,6 +1139,10 @@ Total functions documented: **495**
 ### New Functions (2026-01-06):
 - src/html/markdown-it-include-browser-formatIncludeLabel - Build standardized include label text for markdown-it include render paths
 
+### Modified Functions (2026-01-06):
+- src/html/dragDrop-setupTaskDragHandle - Store original task index based on task-item order for reliable drag restore/undo positioning
+- src/html/dragDrop-processTaskDrop - Use task-only indices for final position tracking and undo payload from-index consistency
+
 ---
 
 ## src/html/boardRenderer.js - Board Rendering and Layout System

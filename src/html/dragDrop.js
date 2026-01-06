@@ -754,7 +754,8 @@ function setupGlobalDragAndDrop() {
         const originalColumnElement = dragState.originalTaskParent?.closest('.kanban-full-height-column');
         const originalColumnId = originalColumnElement?.dataset.columnId;
 
-        const finalIndex = Array.from(finalParent.children).indexOf(taskItem);
+        const finalTaskItems = Array.from(finalParent.querySelectorAll(':scope > .task-item'));
+        const finalIndex = finalTaskItems.indexOf(taskItem);
 
         // Check if position actually changed
         const positionChanged = finalParent !== dragState.originalTaskParent ||
@@ -765,8 +766,8 @@ function setupGlobalDragAndDrop() {
         }
 
         // Calculate the proper index for the data model based on task-only order
-        const taskItems = Array.from(finalParent.querySelectorAll(':scope > .task-item'));
-        const toIndex = taskItems.indexOf(taskItem);
+        const toIndex = finalTaskItems.indexOf(taskItem);
+        const fromIndex = dragState.originalTaskIndex;
 
         // Unfold the destination column if it's collapsed (unless Alt key was pressed during drag)
         if (typeof unfoldColumnIfCollapsed === 'function') {
@@ -794,7 +795,7 @@ function setupGlobalDragAndDrop() {
                         operation: originalColumnId !== finalColumnId ? 'moveTaskViaDrag' : 'reorderTaskViaDrag',
                         taskId: taskId,
                         fromColumnId: originalColumnId,
-                        fromIndex: taskIndex,
+                        fromIndex: fromIndex,
                         toColumnId: finalColumnId,
                         toIndex: insertIndex,
                         currentBoard: undoSnapshot
@@ -2457,7 +2458,8 @@ function setupTaskDragHandle(handle) {
             dragState.draggedTask = taskItem;
             dragState.originalTaskParent = taskItem.parentNode;
             dragState.originalTaskNextSibling = taskItem.nextSibling;
-            dragState.originalTaskIndex = Array.from(dragState.originalTaskParent.children).indexOf(taskItem);
+            const originalTaskItems = Array.from(dragState.originalTaskParent.querySelectorAll(':scope > .task-item'));
+            dragState.originalTaskIndex = originalTaskItems.indexOf(taskItem);
             dragState.isDragging = true; // IMPORTANT: Set this BEFORE setting data
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
