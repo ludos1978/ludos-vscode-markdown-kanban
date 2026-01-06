@@ -205,6 +205,13 @@ export class EditModeCommands extends SwitchBasedCommand {
         if (boardToSave) {
             const operation = msg.operation || 'saveUndoState';
 
+            if (operation === 'moveColumnViaDrag' || operation === 'insertColumnAtPosition') {
+                context.boardStore.saveUndoEntry(
+                    UndoCapture.forFullBoard(boardToSave, operation)
+                );
+                return this.success();
+            }
+
             if (operation === 'moveTaskViaDrag') {
                 const targets = [];
                 if (msg.fromColumnId) {
