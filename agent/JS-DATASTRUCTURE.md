@@ -66,6 +66,7 @@ Each entry follows: `path_to_filename-structurename` with a brief description
   - draggedType: 'task' | 'column'
   - draggedId: string
   - draggedColumnId: string (for tasks)
+  - originalTaskColumnId: string | null (captured at drag start for reliable undo/restore)
   - dropTarget: DOM element
   - dropPosition: 'before' | 'after' | 'inside'
 

@@ -114,6 +114,7 @@ if (!dragState) {
 
         // Task-specific
         originalTaskIndex: -1,
+        originalTaskColumnId: null,
         originalTaskParent: null,
         originalTaskNextSibling: null,
 
@@ -145,6 +146,7 @@ if (!dragState) {
 
         // Task-specific
         originalTaskIndex: -1,
+        originalTaskColumnId: null,
         originalTaskParent: null,
         originalTaskNextSibling: null,
 
@@ -233,6 +235,7 @@ function setupGlobalDragAndDrop() {
             dragState.originalTaskParent = null;
             dragState.originalTaskNextSibling = null;
             dragState.originalTaskIndex = -1;
+            dragState.originalTaskColumnId = null;
             dragState.isDragging = false;
             dragState.altKeyPressed = false;
         }
@@ -752,7 +755,7 @@ function setupGlobalDragAndDrop() {
         }
 
         const originalColumnElement = dragState.originalTaskParent?.closest('.kanban-full-height-column');
-        const originalColumnId = originalColumnElement?.dataset.columnId;
+        const originalColumnId = dragState.originalTaskColumnId || originalColumnElement?.dataset.columnId;
 
         const finalTaskItems = Array.from(finalParent.querySelectorAll(':scope > .task-item'));
         const finalIndex = finalTaskItems.indexOf(taskItem);
@@ -1476,6 +1479,7 @@ function setupGlobalDragAndDrop() {
         dragState.originalTaskParent = null;
         dragState.originalTaskNextSibling = null;
         dragState.originalTaskIndex = -1;
+        dragState.originalTaskColumnId = null;
         dragState.draggedColumn = null;
         dragState.draggedColumnId = null;
         dragState.originalDataIndex = -1;
@@ -2460,6 +2464,7 @@ function setupTaskDragHandle(handle) {
             dragState.originalTaskNextSibling = taskItem.nextSibling;
             const originalTaskItems = Array.from(dragState.originalTaskParent.querySelectorAll(':scope > .task-item'));
             dragState.originalTaskIndex = originalTaskItems.indexOf(taskItem);
+            dragState.originalTaskColumnId = columnId || null;
             dragState.isDragging = true; // IMPORTANT: Set this BEFORE setting data
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
@@ -2631,6 +2636,7 @@ function setupDragAndDrop() {
         originalDataIndex: -1,
         draggedTask: null,
         originalTaskIndex: -1,
+        originalTaskColumnId: null,
         originalTaskParent: null,
         originalTaskNextSibling: null,
         isDragging: false,  // This is the key flag
