@@ -341,6 +341,8 @@ export class KanbanWebviewPanel {
     public toggleFileLock(): void { this._fileManager.toggleFileLock(); }
     public getCurrentDocumentUri(): vscode.Uri | undefined { return this._fileManager.getCurrentDocumentUri(); }
     public isEditingInProgress(): boolean { return this._context.editingInProgress; }
+    public setUndoRedoOperation(isOperation: boolean): void { this._context.setUndoRedoOperation(isOperation); }
+    public getWebviewBridge(): WebviewBridge { return this._webviewBridge; }
 
     private _initialize() {
         if (!this._context.initialized) {
