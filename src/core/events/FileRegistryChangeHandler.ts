@@ -94,10 +94,25 @@ export class FileRegistryChangeHandler {
             return;
         }
 
+        const existingIncludePaths = new Set(
+            this._deps.fileRegistry.getIncludeFiles().map(file => file.getNormalizedRelativePath())
+        );
+
         // Main file reloaded from disk, regenerate board and update frontend
         this._deps.invalidateBoardCache();
         const board = this._deps.getBoard();
         if (board) {
+            this._deps.includeCoordinator.registerBoardIncludeFiles(board);
+
+            const newIncludeFiles = this._deps.fileRegistry
+                .getIncludeFiles()
+                .filter(file => !existingIncludePaths.has(file.getNormalizedRelativePath()));
+
+            for (const file of newIncludeFiles) {
+                await file.reload();
+            }
+
+            this._deps.invalidateBoardCache();
             // Use sendBoardUpdate to ensure image mappings are regenerated
             await this._deps.sendBoardUpdate(false, true);
         }

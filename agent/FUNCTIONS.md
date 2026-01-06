@@ -68,6 +68,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - [src/core/events/EventTypes.ts](src/core/events/EventTypes.ts) - Event type definitions
 - [src/core/events/BoardSyncHandler.ts](src/core/events/BoardSyncHandler.ts) - Handles board:changed, board:loaded events
 - [src/core/events/FileSyncHandler.ts](src/core/events/FileSyncHandler.ts) - Handles focus:gained, unified INIT/FOCUS sync
+- [src/core/events/FileRegistryChangeHandler.ts](src/core/events/FileRegistryChangeHandler.ts) - Routes file reload events and registers new include files after main file reload
 - [src/kanbanWebviewPanel.ts](src/kanbanWebviewPanel.ts) - Emits events, creates handlers
 - [src/commands/interfaces/MessageCommand.ts](src/commands/interfaces/MessageCommand.ts) - `BoardContext.emitBoardChanged`
 - All command files in [src/commands/](src/commands/) - Use `context.emitBoardChanged()`
