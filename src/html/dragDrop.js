@@ -764,8 +764,9 @@ function setupGlobalDragAndDrop() {
             return;
         }
 
-        // Calculate the proper index for the data model
-        const dropIndex = finalIndex >= 0 ? finalIndex : 0;
+        // Calculate the proper index for the data model based on task-only order
+        const taskItems = Array.from(finalParent.querySelectorAll(':scope > .task-item'));
+        const toIndex = taskItems.indexOf(taskItem);
 
         // Unfold the destination column if it's collapsed (unless Alt key was pressed during drag)
         if (typeof unfoldColumnIfCollapsed === 'function') {
@@ -784,7 +785,7 @@ function setupGlobalDragAndDrop() {
             if (originalColumn && finalColumn) {
                 const taskIndex = originalColumn.tasks.findIndex(t => t.id === taskId);
                 if (taskIndex >= 0) {
-                    const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);
+                    const insertIndex = toIndex >= 0 ? Math.min(toIndex, finalColumn.tasks.length) : finalColumn.tasks.length;
                     const undoSnapshot = JSON.parse(JSON.stringify(window.cachedBoard));
 
                     // Save undo state with positions BEFORE mutating cached board

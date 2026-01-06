@@ -69,7 +69,7 @@ function invertTaskMove(payload: TaskMovePayload): TaskMovePayload {
     };
 }
 
-function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): { board: KanbanBoard; moved: boolean } {
+function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): KanbanBoard {
     const updatedBoard = cloneBoard(board);
     const { taskId, fromColumnId, toColumnId, fromIndex, toIndex } = payload;
 
@@ -98,7 +98,7 @@ function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): { board: K
     }
 
     if (!task) {
-        return { board: updatedBoard, moved: false };
+        return updatedBoard;
     }
 
     if (!toColumn) {
@@ -106,13 +106,13 @@ function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): { board: K
     }
 
     if (!toColumn) {
-        return { board: updatedBoard, moved: false };
+        return updatedBoard;
     }
 
     const clampedIndex = Math.max(0, Math.min(toIndex, toColumn.tasks.length));
     toColumn.tasks.splice(clampedIndex, 0, task);
 
-    return { board: updatedBoard, moved: true };
+    return updatedBoard;
 }
 
 // ============= MAIN CLASS =============
@@ -301,8 +301,7 @@ export class BoardStore implements vscode.Disposable {
                 payload: restoredEntry.payload
             });
 
-            const moveResult = applyTaskMove(currentBoard, invertTaskMove(restoredEntry.payload));
-            const updatedBoard = moveResult.moved ? moveResult.board : restoredEntry.board;
+            const updatedBoard = applyTaskMove(currentBoard, invertTaskMove(restoredEntry.payload));
             this._state.board = updatedBoard;
             this._state.cacheValid = true;
 
@@ -353,8 +352,7 @@ export class BoardStore implements vscode.Disposable {
                 payload: invertTaskMove(restoredEntry.payload)
             });
 
-            const moveResult = applyTaskMove(currentBoard, restoredEntry.payload);
-            const updatedBoard = moveResult.moved ? moveResult.board : restoredEntry.board;
+            const updatedBoard = applyTaskMove(currentBoard, restoredEntry.payload);
             this._state.board = updatedBoard;
             this._state.cacheValid = true;
 
