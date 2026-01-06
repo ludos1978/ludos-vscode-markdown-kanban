@@ -1506,12 +1506,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   flex-shrink: 0;
 }
 
-/* Align task header controls with title baseline */
-.task-header > .task-drag-handle,
-.task-header > .task-collapse-toggle,
-.task-header > .task-menu-container {
-  margin-top: 2px; /* Align with title text baseline */
-}
+/* Task header controls align to header center (single-line titles) */
 
 /* Drag handles */
 .drag-handle,
@@ -1545,7 +1540,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .task-drag-handle {
   line-height: 1;
-  margin-top: 2px;
 }
 
 /* Collapse toggles */
@@ -1579,7 +1573,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-collapse-toggle {
-  margin-top: 2px;
 }
 
 /* Task title container */
