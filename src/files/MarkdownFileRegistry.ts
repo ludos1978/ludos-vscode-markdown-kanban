@@ -172,6 +172,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         this._files.clear();
         this._filesByRelativePath.clear();
+        this._registrationCache.clear();
     }
 
     // ============= RETRIEVAL =============

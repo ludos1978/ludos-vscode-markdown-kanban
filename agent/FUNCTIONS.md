@@ -1053,7 +1053,7 @@ Total functions documented: **495**
 
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_register - Register file in registry
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_unregister - Unregister file from registry
-- src/files/MarkdownFileRegistry-MarkdownFileRegistry_clear - Clear all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_clear - Clear all files and registration cache
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_get - Get file by absolute path
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_getByRelativePath - Get file by relative path
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_getAll - Get all files
