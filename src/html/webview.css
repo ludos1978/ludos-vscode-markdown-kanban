@@ -4643,25 +4643,12 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 
 /* Sort button */
 .sort-btn {
-    background: var(--button-secondary-background);
-    color: var(--button-secondary-foreground);
-    border-color: var(--button-border);
     cursor: pointer;
-    border-radius: 3px;
     transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 8px;
-    font-size: 12px;
     line-height: 1;
-    gap: 4px;
-    flex-shrink: 0;
-    margin-left: 8px;
-}
-
-.sort-btn:hover {
-    background: var(--button-secondary-background-hover);
 }
 
 .sort-icon {
@@ -5733,15 +5720,6 @@ figcaption {
 .status-warn { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
 .status-bad { color: var(--vscode-gitDecoration-deletedResourceForeground); }
 .status-unknown { color: var(--vscode-descriptionForeground); }
-
-.file-path {
-    font-family: var(--vscode-editor-font-family);
-    font-size: 11px;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
 
 /* File States Overview Styles */
 .file-states-section {
@@ -6832,11 +6810,6 @@ figcaption {
 .template-item.dragging {
   opacity: 0.5;
   cursor: grabbing;
-}
-
-.template-icon {
-  font-size: 16px;
-  line-height: 1;
 }
 
 .template-name {
