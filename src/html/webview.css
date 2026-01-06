@@ -580,6 +580,9 @@ body {
 }
 
 /* Consistent styling for all file-info header buttons */
+.file-info-left .marp-global-menu-btn,
+.file-info-center .drag-menu-trigger,
+.file-info-center .template-source,
 .file-info-left .global-fold-btn,
 .file-info-left .sort-btn,
 .file-info-right .global-fold-btn,
@@ -591,6 +594,8 @@ body {
 .file-info-right .layout-presets-btn,
 .file-info-right .file-bar-menu-btn,
 .file-info-right .processes-menu-btn {
+  background: var(--button-background);
+  color: var(--button-foreground);
   border: var(--button-border);
   padding: 2px 4px;
   margin: 0;
@@ -604,21 +609,27 @@ body {
   border-radius: 3px;
 }
 
-.file-info-right .file-bar-menu-btn {
-  padding: 4px 4px;
-}
-
-.file-info-left .sort-btn,
-.file-info-right .sort-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
-}
-
+.file-info-left .marp-global-menu-btn:hover,
+.file-info-center .drag-menu-trigger:hover,
+.file-info-center .template-source:hover,
+.file-info-left .global-fold-btn:hover,
 .file-info-left .sort-btn:hover,
-.file-info-right .sort-btn:hover {
+.file-info-right .global-fold-btn:hover,
+.file-info-right .sort-btn:hover,
+.file-info-right .global-sticky-btn:hover,
+.file-info-right .font-size-btn:hover,
+.file-info-right .refresh-btn:hover,
+.file-info-right .auto-export-btn:hover,
+.file-info-right .layout-presets-btn:hover,
+.file-info-right .file-bar-menu-btn:hover,
+.file-info-right .processes-menu-btn:hover {
   background: var(--button-background-hover);
   color: var(--button-foreground-hover);
+}
+
+/* Keep file-bar menu button padding consistent with icon size */
+.file-info-right .file-bar-menu-btn {
+  padding: 4px 4px;
 }
 
 /* Text styling for button labels */
@@ -716,11 +727,6 @@ body {
   gap: 4px;
   position: relative;
 } */
-
-.processes-menu-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
-}
 
 .processes-indicator {
   position: absolute;
@@ -2034,20 +2040,12 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-bar-menu-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 16px;
   line-height: 1;
   transition: all 0.2s;
   border-radius: 3px;
-}
-
-.file-bar-menu-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
 }
 
 .donut-menu-dropdown,
@@ -6456,9 +6454,6 @@ figcaption {
 }
 
 .marp-global-menu-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
   cursor: pointer;
   padding: 4px 4px;
   margin: 0;
@@ -6473,11 +6468,6 @@ figcaption {
   display: flex;
   align-items: center;
   transition: all 0.2s;
-}
-
-.marp-global-menu-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
 }
 
 .marp-global-menu-dropdown {
@@ -6713,11 +6703,6 @@ figcaption {
   border-radius: 3px;
   font-size: 12px;
   white-space: nowrap;
-}
-
-.template-source:hover {
-  background: var(--button-alternative-background-hover);
-  color: var(--button-alternative-foreground-hover);
 }
 
 .template-icon {
