@@ -599,6 +599,7 @@ body {
   border: var(--button-border);
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;
   padding: 2px 4px;
   margin: 0;
   height: 22px;
