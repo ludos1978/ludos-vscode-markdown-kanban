@@ -466,6 +466,10 @@ export class KanbanWebviewPanel {
         await this._webviewUpdateService?.refreshAllConfiguration();
     }
 
+    public syncIncludeFilesWithBoard(board: KanbanBoard): void {
+        this._includeCoordinator.registerBoardIncludeFiles(board);
+    }
+
     /** Get board - returns cached or generates fresh from registry */
     public getBoard(): KanbanBoard | undefined {
         if (this._boardStore.isCacheValid()) {
