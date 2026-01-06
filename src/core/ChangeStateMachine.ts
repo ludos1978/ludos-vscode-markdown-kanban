@@ -59,7 +59,11 @@ export class ChangeStateMachine {
     private _currentState: ChangeState = ChangeState.IDLE;
     private _currentContext?: ChangeContext;
     private _isProcessing: boolean = false;
-    private _eventQueue: ChangeEvent[] = [];
+    private _eventQueue: Array<{
+        event: ChangeEvent;
+        resolve: (result: ChangeResult) => void;
+        reject: (error: Error) => void;
+    }> = [];
 
     // Dependencies (injected via constructor)
     private _fileRegistry: IFileRegistryForStateMachine;
@@ -94,15 +98,9 @@ export class ChangeStateMachine {
     public async processChange(event: ChangeEvent): Promise<ChangeResult> {
         // If already processing, queue the event
         if (this._isProcessing) {
-            this._eventQueue.push(event);
-            const currentState = this._currentState;
-            const currentEventType = this._currentContext?.event?.type || 'unknown';
-            return {
-                success: false,
-                error: new Error(`Event queued - state machine busy (currentState: ${currentState}, processing: ${currentEventType}, queued: ${event.type})`),
-                context: this._createInitialContext(event),
-                duration: 0
-            };
+            return new Promise<ChangeResult>((resolve, reject) => {
+                this._eventQueue.push({ event, resolve, reject });
+            });
         }
 
         this._isProcessing = true;
@@ -149,8 +147,12 @@ export class ChangeStateMachine {
 
             // Process next queued event if any
             if (this._eventQueue.length > 0) {
-                const nextEvent = this._eventQueue.shift()!;
-                setImmediate(() => this.processChange(nextEvent));
+                const next = this._eventQueue.shift()!;
+                setImmediate(() => {
+                    this.processChange(next.event)
+                        .then(next.resolve)
+                        .catch(next.reject);
+                });
             }
         }
     }

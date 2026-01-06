@@ -198,7 +198,7 @@ Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncA
 
 **Public Methods:**
 - `constructor(fileRegistry, webviewPanel)` - Create per-panel instance (NOT singleton)
-- `processChange(event)` - **SINGLE ENTRY POINT** - Process any file change event
+- `processChange(event)` - **SINGLE ENTRY POINT** - Process any file change event (queued events now resolve after processing instead of failing)
 
 **State Handlers (Private):**
 - `_handleValidate()` - Analyze impact, capture edit, check unsaved, prompt user, save
