@@ -737,16 +737,30 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-.processes-menu-dropdown {
+/* Shared dropdown surfaces */
+.donut-menu-dropdown,
+.file-bar-menu-dropdown,
+.processes-menu-dropdown,
+.layout-presets-dropdown,
+.marp-global-menu-dropdown {
   display: none;
   position: fixed;
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-dropdown-border);
   border-radius: 4px;
+}
+
+.donut-menu-dropdown,
+.file-bar-menu-dropdown,
+.processes-menu-dropdown,
+.marp-global-menu-dropdown {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.processes-menu-dropdown {
   padding: 8px;
   min-width: 220px;
   z-index: 2147483647;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .processes-menu.active .processes-menu-dropdown {
@@ -843,14 +857,9 @@ body {
 }
 
 .layout-presets-dropdown {
-  position: fixed;
   min-width: 200px;
-  background: var(--vscode-dropdown-background);
-  border: 1px solid var(--vscode-dropdown-border);
-  border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   z-index: 1000;
-  display: none;
   padding: 4px 0;
 }
 
@@ -2043,12 +2052,6 @@ body.vscode-high-contrast-light .task-count {
 
 .donut-menu-dropdown,
 .file-bar-menu-dropdown {
-  display: none;
-  position: fixed;
-  background: var(--vscode-dropdown-background);
-  border: 1px solid var(--vscode-dropdown-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   z-index: 1000;
   /* Add hover border for easier targeting */
   padding: 3px;
@@ -6478,12 +6481,6 @@ figcaption {
 }
 
 .marp-global-menu-dropdown {
-  display: none;
-  position: fixed;
-  background: var(--vscode-dropdown-background);
-  border: 1px solid var(--vscode-dropdown-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   z-index: 2147483640;
   padding: 0;
   min-width: 320px;
