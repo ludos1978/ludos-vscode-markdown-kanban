@@ -430,7 +430,7 @@ function toggleAllTasksInColumn(columnId) {
     }
 
     // Find the tasks container within the column structure
-    const tasksContainer = columnElement.querySelector('.tasks-container');
+    const tasksContainer = columnElement.querySelector('.column-content');
     if (!tasksContainer) {
         return;
     }

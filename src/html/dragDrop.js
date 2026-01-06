@@ -487,8 +487,8 @@ function setupGlobalDragAndDrop() {
             const dropResult = findDropPositionHierarchical(e.clientX, e.clientY, null);
 
             if (dropResult && dropResult.columnElement) {
-                const tasksContainer = dropResult.columnElement.querySelector('.tasks-container');
-                showTaskDropIndicatorWithState(tasksContainer, { clientY: e.clientY, column: dropResult.columnElement });
+                const columnContent = dropResult.columnElement.querySelector('.column-content');
+                showTaskDropIndicatorWithState(columnContent, { clientY: e.clientY, column: dropResult.columnElement });
             } else {
                 hideDropIndicatorWithState();
             }
@@ -2376,7 +2376,7 @@ function setupTaskDragAndDropForColumn(columnElement) {
     if (!columnElement) return;
 
     const columnId = columnElement.dataset.columnId;
-    const tasksContainer = columnElement.querySelector('.tasks-container');
+    const tasksContainer = columnElement.querySelector('.column-content');
 
     if (!tasksContainer) {return;}
 
@@ -2573,7 +2573,7 @@ function findDropPositionHierarchical(mouseX, mouseY, draggedTask = null) {
     if (!targetColumn) {return null;}
 
     // STEP 4: Within COLUMN, find TASK position by Y midpoint
-    const tasksContainer = targetColumn.querySelector('.tasks-container');
+    const tasksContainer = targetColumn.querySelector('.column-content');
     if (!tasksContainer) {
         return {
             columnElement: targetColumn,
@@ -2798,16 +2798,16 @@ function updateStackBottomDropZones() {
             const columnMargin = col.querySelector('.column-margin');
             const columnHeader = col.querySelector('.column-header');
             const columnTitle = col.querySelector('.column-title');
-            const columnInner = col.querySelector('.column-inner');
+            const columnContent = col.querySelector('.column-content');
             const columnFooter = col.querySelector('.column-footer');
 
             if (columnMargin) {cumulativeTop += columnMargin.offsetHeight;}
             if (columnHeader) {cumulativeTop += columnHeader.offsetHeight;}
             if (columnTitle) {cumulativeTop += columnTitle.offsetHeight;}
 
-            // Include column-inner content height (skip if column is folded)
-            if (columnInner && !isVerticallyFolded && !isHorizontallyFolded) {
-                cumulativeTop += columnInner.scrollHeight;
+            // Include column-content height (skip if column is folded)
+            if (columnContent && !isVerticallyFolded && !isHorizontallyFolded) {
+                cumulativeTop += columnContent.scrollHeight;
             }
 
             if (columnFooter) {
@@ -3197,7 +3197,7 @@ function setupColumnDragAndDrop() {
                 if (!targetColumn) {return;}
 
                 // Get tasks container
-                const tasksContainer = targetColumn.querySelector('.tasks-container');
+                const tasksContainer = targetColumn.querySelector('.column-content');
 
                 // For folded columns, always drop at end (highlight the title)
                 const isFolded = targetColumn.classList.contains('collapsed-vertical') ||

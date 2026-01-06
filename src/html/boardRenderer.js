@@ -1148,7 +1148,7 @@ function renderBoard(options = null) {
     }
     
     // Save current scroll positions - scope to board element for performance
-    boardElement.querySelectorAll('.tasks-container').forEach(container => {
+    boardElement.querySelectorAll('.column-content').forEach(container => {
         const columnId = container.id.replace('tasks-', '');
         scrollPositions.set(columnId, container.scrollTop);
     });
@@ -1579,7 +1579,7 @@ function createColumnElement(column, columnIndex) {
     const editTitle = column.title || '';
     const foldButtonState = getFoldAllButtonState(column.id);
 
-		// the column-header and column-title MUST be outside the column-inner to be able to be sticky over the full height!!!
+		// the column-header and column-title MUST be outside the column-content to be able to be sticky over the full height!!!
     columnDiv.innerHTML = `
 				<div class="column-offset"></div>
 				<div class="column-margin"></div>
@@ -1669,21 +1669,17 @@ function createColumnElement(column, columnIndex) {
 								</div>
 						</div>
 				</div>
-        <div class="column-inner${column.isLoadingContent ? ' column-loading' : ''}">
-            <div class="column-content">
-                <div class="tasks-container" id="tasks-${column.id}">
-                    ${column.isLoadingContent
-                        ? '<div class="column-loading-placeholder"><div class="loading-spinner"></div><div class="loading-text">Loading tasks...</div></div>'
-                        : column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')
-                    }
-                    ${!column.isLoadingContent && column.tasks.length === 0 && !column.includeError ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
-                        + Add Task
-                    </button>` : ''}
-                    ${!column.isLoadingContent && column.tasks.length === 0 && column.includeError ? `<div class="broken-include-placeholder">
-                        Tasks unavailable for broken include
-                    </div>` : ''}
-                </div>
-            </div>
+        <div class="column-content${column.isLoadingContent ? ' column-loading' : ''}" id="tasks-${column.id}">
+            ${column.isLoadingContent
+                ? '<div class="column-loading-placeholder"><div class="loading-spinner"></div><div class="loading-text">Loading tasks...</div></div>'
+                : column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')
+            }
+            ${!column.isLoadingContent && column.tasks.length === 0 && !column.includeError ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
+                + Add Task
+            </button>` : ''}
+            ${!column.isLoadingContent && column.tasks.length === 0 && column.includeError ? `<div class="broken-include-placeholder">
+                Tasks unavailable for broken include
+            </div>` : ''}
         </div>
         <div class="column-footer">
             ${footerBarsHtml || ''}
@@ -2086,12 +2082,12 @@ function setupColumnResizeObserver() {
         }
     });
 
-    // Observe all existing tasks-container elements
+    // Observe all existing column-content elements
     // NOTE: We only observe containers, NOT individual task-items
     // Observing 600+ task-items causes feedback loops and 100% CPU
     // Container resize is sufficient - it changes when any child content changes
-    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
-        columnResizeObserver.observe(tasksContainer);
+    document.querySelectorAll('.column-content').forEach(columnContent => {
+        columnResizeObserver.observe(columnContent);
     });
 
     // MUTATION OBSERVER: Detects DOM changes (innerHTML) that ResizeObserver doesn't catch
@@ -2136,9 +2132,9 @@ function setupColumnResizeObserver() {
         startHeightPolling();
     });
 
-    // Observe all tasks-container elements for DOM changes AND class changes
-    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
-        columnMutationObserver.observe(tasksContainer, {
+    // Observe all column-content elements for DOM changes AND class changes
+    document.querySelectorAll('.column-content').forEach(columnContent => {
+        columnMutationObserver.observe(columnContent, {
             childList: true,
             subtree: true,
             attributes: true,
@@ -2161,18 +2157,18 @@ function setupColumnResizeObserver() {
 
 // Observe a new column when it's added to the DOM
 function observeColumnForResize(columnElement) {
-    const tasksContainer = columnElement.querySelector('.tasks-container');
+    const columnContent = columnElement.querySelector('.column-content');
 
     // Add to ResizeObserver (only container, not individual tasks)
-    if (columnResizeObserver && tasksContainer) {
-        columnResizeObserver.observe(tasksContainer);
+    if (columnResizeObserver && columnContent) {
+        columnResizeObserver.observe(columnContent);
     }
 
     // Add to MutationObserver
     if (columnMutationObserver) {
-        // Observe tasks container for content changes
-        if (tasksContainer) {
-            columnMutationObserver.observe(tasksContainer, {
+        // Observe column content for content changes
+        if (columnContent) {
+            columnMutationObserver.observe(columnContent, {
                 childList: true,
                 subtree: true,
                 attributes: true,
@@ -2615,7 +2611,7 @@ function injectStackableBars(targetElement = null) {
                 if (hasHeaderLabel) {element.classList.add('has-header-label');}
             }
 
-            // Create and append footer container to column-footer (not column-inner)
+            // Create and append footer container to column-footer (not column-content)
             if (footerBars.length > 0 && columnFooter) {
                 const footerContainer = document.createElement('div');
                 footerContainer.className = 'footer-bars-container';

@@ -401,9 +401,8 @@ function updateStackLayoutCore(stackElement = null) {
                 const headerHeight = header ? header.offsetHeight : 0;
                 const footerHeight = footer ? footer.offsetHeight : 0;
 
-                // Measure the actual content height - use column-content for more accurate measurement
-                // .column-inner has flex:1 which can affect scrollHeight
-                const columnContent = col.querySelector('.column-content');
+            // Measure the actual content height on column-content for accurate measurement
+            const columnContent = col.querySelector('.column-content');
                 const contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
 
                 const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
@@ -439,7 +438,7 @@ function updateStackLayoutCore(stackElement = null) {
             const globalStickyMode = window.currentStickyStackMode || 'titleonly';
 
             // Third pass: Calculate all sticky positions based on per-column sticky state and global mode
-            // Note: HTML order is: margin, column-header, column-title, column-inner, column-footer
+            // Note: HTML order is: margin, column-header, column-title, column-content, column-footer
             let cumulativeStickyTop = 0;
             const positions = expandedColumns.map((data, expandedIdx) => {
                 // Check if this column has sticky enabled
@@ -488,7 +487,7 @@ function updateStackLayoutCore(stackElement = null) {
             });
 
             // Calculate bottom positions based on per-column mode
-            // Bottom to top order: footer, column-inner, column-title, column-header, margin
+            // Bottom to top order: footer, column-content, column-title, column-header, margin
             let cumulativeFromBottom = 0;
             for (let i = expandedColumns.length - 1; i >= 0; i--) {
                 const isColumnSticky = positions[i].isColumnSticky;

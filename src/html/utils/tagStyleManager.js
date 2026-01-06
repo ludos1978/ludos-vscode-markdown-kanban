@@ -375,7 +375,7 @@ function generateTagStyles() {
                             styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-content {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                             styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-footer {
@@ -395,7 +395,7 @@ function generateTagStyles() {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-content {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: none !important;

@@ -1072,12 +1072,16 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   flex-direction: column;
   padding: var(--whitespace-div4)  var(--whitespace-div2) var(--whitespace-div4) var(--whitespace-div2);
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   /* background-color: var(--vscode-editor-background); */
   /* border-radius: 0 0 var(--whitespace-div4) var(--whitespace-div4); */
   /* border: 0.5px solid var(--vscode-panel-border); */
   border-top: none;
   margin: 0 var(--whitespace) var(--whitespace) var(--whitespace);
+  overflow: visible;
+  overflow-x: visible;
+  max-height: min-content;
+  background-color: var(--column-background);
 }
 
 .header-bars-container,
@@ -1167,20 +1171,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .column-title::after {
   bottom: 0;
-}
-
-.column-inner {
-  /* This is the scrollable container for sticky positioning */
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	/* border-radius: 0px 0px 4px 4px; */
-  overflow-x: visible;
-  /* min-height: 100%; */
-	max-height: min-content;
-  background-color: var(--column-background);
 }
 
 .column-footer {
@@ -1397,11 +1387,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 200px;
-}
-
-/* Tasks container must allow the children to be overflow visible! */
-.tasks-container {
-  overflow: visible;
 }
 
 /* Task items */
@@ -1797,7 +1782,7 @@ body.section-height-limited .task-section figure img {
 }
 
 /* Hide add-task button when column has tasks */
-.tasks-container:has(.task-item) .add-task-btn {
+.column-content:has(.task-item) .add-task-btn {
   display: none;
 }
 
@@ -2428,7 +2413,7 @@ button.file-bar-menu-item {
 .kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-title,
 .kanban-column-stack .kanban-full-height-column .column-footer,
-.kanban-column-stack .kanban-full-height-column .column-inner {
+.kanban-column-stack .kanban-full-height-column .column-content {
   pointer-events: auto;
 }
 
@@ -2442,7 +2427,7 @@ button.file-bar-menu-item {
   z-index: 100;
 }
 
-.kanban-column-stack .kanban-full-height-column .column-inner {
+.kanban-column-stack .kanban-full-height-column .column-content {
   transform: translateZ(-0.08px);
 }
 
@@ -2508,9 +2493,9 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 	width: min-content;
 }
 
-/* Collapsed column inner content */
-.kanban-full-height-column.collapsed-vertical .column-inner,
-.kanban-full-height-column.collapsed-horizontal .column-inner {
+/* Collapsed column content */
+.kanban-full-height-column.collapsed-vertical .column-content,
+.kanban-full-height-column.collapsed-horizontal .column-content {
   overflow: visible;
   flex: none;
   display: flex;
@@ -2544,9 +2529,9 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   gap: 4px;
 }
 
-/* Hide column-inner when collapsed in stacks */
-.kanban-column-stack .kanban-full-height-column.collapsed-vertical .column-inner,
-.kanban-column-stack .kanban-full-height-column.collapsed-horizontal .column-inner {
+/* Hide column-content when collapsed in stacks */
+.kanban-column-stack .kanban-full-height-column.collapsed-vertical .column-content,
+.kanban-column-stack .kanban-full-height-column.collapsed-horizontal .column-content {
   display: none !important;
 }
 
@@ -2616,7 +2601,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 /* Visual separation - add padding to content of stacked columns
-.kanban-column-stack .kanban-full-height-column:nth-child(n+2) .column-inner {
+.kanban-column-stack .kanban-full-height-column:nth-child(n+2) .column-content {
   padding-top: var(--whitespace);
 } */
 
@@ -4188,7 +4173,7 @@ blockquote {
   [data-current-weekday="true"],
   [data-current-time="true"],
   [data-current-hour="true"]
-) :is(.column-header, .column-title, .column-inner, .column-footer),
+) :is(.column-header, .column-title, .column-content, .column-footer),
 .task-item:is(
   [data-current-week="true"],
   [data-current-day="true"],
@@ -4202,7 +4187,7 @@ blockquote {
 /* Background style - add class 'week-highlight-background' to body to enable */
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-header,
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title,
-body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-inner,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-content,
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-footer {
   background-color: var(--current-week-highlight-color) !important;
   opacity: 0.2;
@@ -4216,7 +4201,7 @@ body.week-highlight-background .task-item[data-current-week="true"] {
 /* Glow style - add class 'week-highlight-glow' to body to enable */
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-header,
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-title,
-body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-inner,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-content,
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-footer {
   box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }

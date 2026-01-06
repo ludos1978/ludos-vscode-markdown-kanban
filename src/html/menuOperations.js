@@ -3493,7 +3493,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
     // 1. CLEAN UP - Remove visual elements only from column-title and column-footer areas
     if (elementType === 'column') {
-        // For columns: clean up only within column-header and column-footer (never column-inner)
+        // For columns: clean up only within column-header and column-footer (never column-content)
 
         const columnHeader = element.querySelector('.column-header');
         if (columnHeader) {
