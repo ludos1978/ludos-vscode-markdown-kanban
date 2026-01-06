@@ -110,9 +110,11 @@ export class UICommands extends SwitchBasedCommand {
      * Handle redo command
      */
     private async handleRedo(context: CommandContext): Promise<CommandResult> {
+        console.log(`[kanban.UICommands.handleRedo.undo] canRedo=${context.boardStore.canRedo()}, stackSize=${context.boardStore.getRedoStackSize()}`);
         context.setUndoRedoOperation(true);
 
         const result = context.boardStore.redo();
+        console.log(`[kanban.UICommands.handleRedo.undo] result=${result ? 'restored' : 'none'}`);
         if (result) {
             context.setBoard(result.board);
             context.emitBoardChanged(result.board, 'redo');
