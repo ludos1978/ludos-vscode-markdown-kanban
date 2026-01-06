@@ -1594,7 +1594,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   /* line-height: 1.4; */
   word-break: break-word;
   overflow-wrap: break-word;
-  padding: 0;
+  padding: 1px 0;
   border-radius: 3px;
   cursor: pointer;
   min-height: 16px;
