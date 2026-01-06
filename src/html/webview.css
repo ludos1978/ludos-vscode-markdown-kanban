@@ -176,8 +176,6 @@ body {
 .include-error .include-path-overlay-container .include-menu-btn,
 .task-item.include-error .include-path-overlay-container .include-menu-btn,
 .include-path-overlay-container.include-broken .include-menu-btn {
-  right: -22px;
-  top: 0px;
 }
 
 /* ============================================
@@ -1579,6 +1577,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 /* Task title container */
 .task-title-container {
   flex: auto;
+  display: flex;
+  align-items: center;
   /* width: -webkit-fill-available; */
   /* max-width: var(--task-title-width); */
   cursor: pointer;
@@ -1598,6 +1598,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   border-radius: 3px;
   cursor: pointer;
   min-height: 20px;
+  line-height: 1.2;
 }
 
 .task-title-display:hover {
@@ -3862,18 +3863,21 @@ blockquote {
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  line-height: 1.2;
 }
 
 /* Include menu button - size overrides (base styles in unified overlay button section) */
-/* .include-path-overlay-container .include-menu-btn {
+.include-path-overlay-container .include-menu-btn {
   position: static;
   width: 16px;
   height: 16px;
-  margin-left: 2px;
+  margin: 0;
   border-radius: 3px;
   font-size: 10px;
-  vertical-align: middle;
-} */
+  line-height: 1;
+  flex-shrink: 0;
+}
 
 /* COLUMN/TASK INCLUDES: Always show menu button for Search for File functionality */
 .include-path-overlay-container[data-include-type="column"] .include-menu-btn,
