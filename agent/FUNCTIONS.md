@@ -11,6 +11,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ## Recent Updates (2026-01-06)
 - `src/panel/WebviewManager.ts` `generateHtml()` now preserves `enableCommandUris` when setting webview options.
+- `src/commands/CommandRegistry.ts` now orders handlers per message type by priority and respects `canHandle()` when dispatching.
 
 ---
 

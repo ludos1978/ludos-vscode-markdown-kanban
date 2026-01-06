@@ -28,7 +28,7 @@ export { ValidationResult };
  */
 export class CommandRegistry {
     private _commands: Map<string, MessageCommand> = new Map();
-    private _messageTypeToCommand: Map<string, MessageCommand> = new Map();
+    private _messageTypeToCommands: Map<string, MessageCommand[]> = new Map();
     private _context?: CommandContext;
     private _initialized: boolean = false;
 
@@ -101,11 +101,14 @@ export class CommandRegistry {
 
         // Map message types to command
         for (const messageType of command.metadata.messageTypes) {
-            if (this._messageTypeToCommand.has(messageType)) {
-                const existing = this._messageTypeToCommand.get(messageType)!;
-                console.warn(`[CommandRegistry] Message type '${messageType}' already handled by '${existing.metadata.id}', replacing with '${command.metadata.id}'`);
+            const existingHandlers = this._messageTypeToCommands.get(messageType) || [];
+            if (existingHandlers.length > 0) {
+                const existingIds = existingHandlers.map(existing => existing.metadata.id).join(', ');
+                console.warn(`[CommandRegistry] Message type '${messageType}' already handled by '${existingIds}', adding '${command.metadata.id}'`);
             }
-            this._messageTypeToCommand.set(messageType, command);
+
+            const inserted = this._insertByPriority(existingHandlers, command);
+            this._messageTypeToCommands.set(messageType, inserted);
         }
 
         // Initialize if registry is already initialized
@@ -136,9 +139,15 @@ export class CommandRegistry {
 
         // Remove message type mappings
         for (const messageType of command.metadata.messageTypes) {
-            const mapped = this._messageTypeToCommand.get(messageType);
-            if (mapped?.metadata.id === commandId) {
-                this._messageTypeToCommand.delete(messageType);
+            const handlers = this._messageTypeToCommands.get(messageType);
+            if (!handlers) {
+                continue;
+            }
+            const filtered = handlers.filter(handler => handler.metadata.id !== commandId);
+            if (filtered.length === 0) {
+                this._messageTypeToCommands.delete(messageType);
+            } else {
+                this._messageTypeToCommands.set(messageType, filtered);
             }
         }
 
@@ -167,7 +176,8 @@ export class CommandRegistry {
      * @param messageType - Message type to check
      */
     canHandle(messageType: string): boolean {
-        return this._messageTypeToCommand.has(messageType);
+        const handlers = this._messageTypeToCommands.get(messageType);
+        return !!handlers && handlers.length > 0;
     }
 
     /**
@@ -175,7 +185,8 @@ export class CommandRegistry {
      * @param messageType - Message type to find handler for
      */
     findCommand(messageType: string): MessageCommand | undefined {
-        return this._messageTypeToCommand.get(messageType);
+        const handlers = this._messageTypeToCommands.get(messageType);
+        return handlers?.[0];
     }
 
     /**
@@ -195,19 +206,25 @@ export class CommandRegistry {
             return { success: false, error: 'Message has no type property' };
         }
 
-        const command = this.findCommand(messageType);
-        if (!command) {
-            // No command registered for this message type
+        const commands = this._messageTypeToCommands.get(messageType);
+        if (!commands || commands.length === 0) {
             return null;
         }
 
-        try {
-            return await command.execute(message, this._context);
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[CommandRegistry] Command ${command.metadata.id} failed for message ${messageType}:`, error);
-            return { success: false, error: errorMessage };
+        for (const command of commands) {
+            if (!command.canHandle(messageType)) {
+                continue;
+            }
+            try {
+                return await command.execute(message, this._context);
+            } catch (error) {
+                const errorMessage = getErrorMessage(error);
+                console.error(`[CommandRegistry] Command ${command.metadata.id} failed for message ${messageType}:`, error);
+                return { success: false, error: errorMessage };
+            }
         }
+
+        return { success: false, error: `No handler accepted message type ${messageType}` };
     }
 
     // ============= VALIDATION =============
@@ -249,13 +266,26 @@ export class CommandRegistry {
         // Check for message type conflicts
         if (command.metadata.messageTypes) {
             for (const messageType of command.metadata.messageTypes) {
-                const existing = this._messageTypeToCommand.get(messageType);
-                if (existing && existing.metadata.id !== command.metadata.id) {
-                    warnings.push(`Message type '${messageType}' already handled by '${existing.metadata.id}'`);
+                const existing = this._messageTypeToCommands.get(messageType);
+                if (existing && existing.some(handler => handler.metadata.id !== command.metadata.id)) {
+                    const existingIds = existing.map(handler => handler.metadata.id).join(', ');
+                    warnings.push(`Message type '${messageType}' already handled by '${existingIds}'`);
                 }
             }
         }
 
         return { valid: errors.length === 0, errors, warnings };
+    }
+
+    private _insertByPriority(commands: MessageCommand[], command: MessageCommand): MessageCommand[] {
+        const inserted = [...commands];
+        const newPriority = command.metadata.priority;
+        const index = inserted.findIndex(existing => existing.metadata.priority < newPriority);
+        if (index === -1) {
+            inserted.push(command);
+            return inserted;
+        }
+        inserted.splice(index, 0, command);
+        return inserted;
     }
 }
