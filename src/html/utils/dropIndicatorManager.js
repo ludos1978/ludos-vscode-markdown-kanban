@@ -106,16 +106,22 @@ function _positionDropIndicator(indicator, left, width, top) {
  * @param {HTMLElement} tasksContainer - The tasks container
  * @param {HTMLElement|null} afterElement - Element to insert before, or null for end
  * @param {HTMLElement|null} skipElement - Element to skip when finding last task
+ * @param {HTMLElement|null} fallbackContainer - Fallback element for positioning when container is hidden
  */
-function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement = null) {
-    const containerRect = tasksContainer.getBoundingClientRect();
+function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement = null, fallbackContainer = null) {
+    let containerRect = tasksContainer.getBoundingClientRect();
+    const isContainerVisible = tasksContainer.offsetParent !== null && containerRect.height > 0;
+    const fallbackRect = (!isContainerVisible && fallbackContainer) ? fallbackContainer.getBoundingClientRect() : null;
+    if (!isContainerVisible && fallbackRect) {
+        containerRect = fallbackRect;
+    }
 
     // Calculate insertion Y based on afterElement
     let insertionY;
     if (!afterElement) {
         // Drop at end - position after last task or at add button
         const addButton = tasksContainer.querySelector('.add-task-btn');
-        if (addButton) {
+        if (addButton && addButton.offsetParent !== null) {
             insertionY = addButton.getBoundingClientRect().top - 2;
         } else {
             // Find last non-skipped task
@@ -126,6 +132,8 @@ function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, ski
             }
             if (lastTask) {
                 insertionY = lastTask.getBoundingClientRect().bottom + 2;
+            } else if (fallbackRect) {
+                insertionY = fallbackRect.bottom + 2;
             } else {
                 insertionY = containerRect.top + 10;
             }
@@ -182,7 +190,8 @@ function showTaskDropIndicator(tasksContainer, options = {}) {
 
     // Position the indicator
     const skipForPosition = skipElement || (dragState && dragState.draggedTask);
-    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipForPosition);
+    const fallbackContainer = column ? (column.querySelector('.column-title') || column) : null;
+    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipForPosition, fallbackContainer);
 
     // Store drop target state if dragState provided
     if (dragState) {
