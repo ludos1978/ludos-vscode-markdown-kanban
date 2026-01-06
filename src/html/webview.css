@@ -843,11 +843,6 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-@keyframes processes-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
 .processes-menu-dropdown {
   display: none;
   position: fixed;
@@ -5342,12 +5337,6 @@ s {
 .include-content-area {
     padding: 8px 12px;
     /* background-color: var(--vscode-editor-background); */
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.6; }
-    100% { opacity: 1; }
 }
 
 @keyframes highlightFlash {
