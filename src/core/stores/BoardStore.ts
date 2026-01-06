@@ -69,7 +69,7 @@ function invertTaskMove(payload: TaskMovePayload): TaskMovePayload {
     };
 }
 
-function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): KanbanBoard {
+function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): { board: KanbanBoard; moved: boolean } {
     const updatedBoard = cloneBoard(board);
     const { taskId, fromColumnId, toColumnId, fromIndex, toIndex } = payload;
 
@@ -98,7 +98,7 @@ function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): KanbanBoar
     }
 
     if (!task) {
-        return updatedBoard;
+        return { board: updatedBoard, moved: false };
     }
 
     if (!toColumn) {
@@ -106,13 +106,13 @@ function applyTaskMove(board: KanbanBoard, payload: TaskMovePayload): KanbanBoar
     }
 
     if (!toColumn) {
-        return updatedBoard;
+        return { board: updatedBoard, moved: false };
     }
 
     const clampedIndex = Math.max(0, Math.min(toIndex, toColumn.tasks.length));
     toColumn.tasks.splice(clampedIndex, 0, task);
 
-    return updatedBoard;
+    return { board: updatedBoard, moved: true };
 }
 
 // ============= MAIN CLASS =============
@@ -301,7 +301,8 @@ export class BoardStore implements vscode.Disposable {
                 payload: restoredEntry.payload
             });
 
-            const updatedBoard = applyTaskMove(currentBoard, invertTaskMove(restoredEntry.payload));
+            const moveResult = applyTaskMove(currentBoard, invertTaskMove(restoredEntry.payload));
+            const updatedBoard = moveResult.moved ? moveResult.board : restoredEntry.board;
             this._state.board = updatedBoard;
             this._state.cacheValid = true;
 
@@ -352,7 +353,8 @@ export class BoardStore implements vscode.Disposable {
                 payload: invertTaskMove(restoredEntry.payload)
             });
 
-            const updatedBoard = applyTaskMove(currentBoard, restoredEntry.payload);
+            const moveResult = applyTaskMove(currentBoard, restoredEntry.payload);
+            const updatedBoard = moveResult.moved ? moveResult.board : restoredEntry.board;
             this._state.board = updatedBoard;
             this._state.cacheValid = true;
 
