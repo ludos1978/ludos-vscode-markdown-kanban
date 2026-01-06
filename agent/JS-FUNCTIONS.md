@@ -366,6 +366,7 @@ if (!isEditing) {
 
 ### src/html/markdown-it-include-browser.js
 - src_html_markdown-it-include-browser-markdownItInclude - Markdown-it include plugin
+- src_html_markdown-it-include-browser-formatIncludeLabel - Build standardized include labels for markdown-it include render paths
 
 ### src/html/markdown-it-ins-browser.js
 - src_html_markdown-it-ins-browser-markdownItIns - Markdown-it insert plugin

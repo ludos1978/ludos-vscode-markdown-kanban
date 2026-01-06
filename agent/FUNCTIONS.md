@@ -1132,6 +1132,13 @@ Total functions documented: **495**
 
 ---
 
+## src/html/markdown-it-include-browser.js - Markdown-it Include Plugin
+
+### New Functions (2026-01-06):
+- src/html/markdown-it-include-browser-formatIncludeLabel - Build standardized include label text for markdown-it include render paths
+
+---
+
 ## src/html/boardRenderer.js - Board Rendering and Layout System
 
 ### New Functions (2025-11-22):

@@ -24,6 +24,11 @@
     return filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
   }
 
+  // Helper to keep include labels consistent across all render paths
+  function formatIncludeLabel(fileName, suffix = '') {
+    return `!(${fileName})!${suffix ? ` ${suffix}` : ''}`;
+  }
+
   // Helper function to generate include link with burger menu (matching generateIncludeLinkWithMenu in tagUtils.js)
   function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBroken = false) {
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -227,7 +232,7 @@
       // If content is null and marked as broken, show error state
       if (content === null && isBrokenInclude) {
         const fileName = filePath.split('/').pop() || filePath;
-        const displayText = `include(${fileName})`;
+        const displayText = formatIncludeLabel(fileName);
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
 
         return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
@@ -253,7 +258,7 @@
 
         // Create filename display (show just the basename) with burger menu
         const fileName = filePath.split('/').pop() || filePath;
-        const displayText = `include(${fileName})`;
+        const displayText = formatIncludeLabel(fileName);
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
@@ -279,7 +284,7 @@
 
         // Return the raw content escaped as fallback
         const fileName = filePath.split('/').pop() || filePath;
-        const displayText = `include(${fileName}) - PARSE ERROR`;
+        const displayText = formatIncludeLabel(fileName, '- PARSE ERROR');
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
 
         const errorLinesHtml = errorLocation ? errorLocation.lines.map(l =>
@@ -335,7 +340,7 @@
 
         // Create filename display (show just the basename) with burger menu
         const fileName = filePath.split('/').pop() || filePath;
-        const displayText = `include(${fileName})`;
+        const displayText = formatIncludeLabel(fileName);
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
@@ -375,7 +380,7 @@
       log('[include_placeholder renderer] isBrokenInclude:', isBrokenInclude);
       if (isBrokenInclude) {
         const fileName = filePath.split('/').pop() || filePath;
-        const displayText = `include(${fileName})`;
+        const displayText = formatIncludeLabel(fileName);
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
 
         return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
