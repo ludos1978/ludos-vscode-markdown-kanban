@@ -5684,10 +5684,6 @@ figcaption {
     background: #FF9800 !important;
     color: white !important;
 }
-.include-type-label {
-    background: #666 !important;
-    color: white !important;
-}
 
 .watcher-status.active { color: var(--vscode-gitDecoration-addedResourceForeground); }
 .watcher-status.inactive { color: var(--vscode-gitDecoration-deletedResourceForeground); }
