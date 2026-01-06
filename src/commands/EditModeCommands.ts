@@ -213,20 +213,22 @@ export class EditModeCommands extends SwitchBasedCommand {
             }
 
             if (operation === 'moveTaskViaDrag' || operation === 'reorderTaskViaDrag') {
-                const hasMovePayload = msg.taskId &&
-                    msg.fromColumnId && msg.toColumnId &&
-                    typeof msg.fromIndex === 'number' &&
-                    typeof msg.toIndex === 'number';
+                const hasMoveContext = msg.taskId && msg.fromColumnId && msg.toColumnId;
+                if (hasMoveContext) {
+                    const fromColumn = boardToSave.columns.find(col => col.id === msg.fromColumnId);
+                    const resolvedFromIndex = (typeof msg.fromIndex === 'number')
+                        ? msg.fromIndex
+                        : (fromColumn ? fromColumn.tasks.findIndex(t => t.id === msg.taskId) : -1);
+                    const resolvedToIndex = (typeof msg.toIndex === 'number') ? msg.toIndex : -1;
 
-                if (hasMovePayload) {
                     context.boardStore.saveUndoEntry(
                         UndoCapture.forTaskMove(boardToSave, {
                             type: 'task-move',
                             taskId: msg.taskId,
                             fromColumnId: msg.fromColumnId,
-                            fromIndex: msg.fromIndex,
+                            fromIndex: resolvedFromIndex,
                             toColumnId: msg.toColumnId,
-                            toIndex: msg.toIndex
+                            toIndex: resolvedToIndex
                         }, operation)
                     );
                 } else {

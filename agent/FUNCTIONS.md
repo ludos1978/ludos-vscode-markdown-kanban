@@ -15,6 +15,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - `src/services/WebviewUpdateService.ts` now reads extension version from VS Code extension metadata instead of a local package.json require.
 - `src/core/stores/UndoCapture.ts` added `TaskMovePayload` + `forTaskMove()` to capture drag move positions for undo/redo.
 - `src/core/stores/BoardStore.ts` added `cloneBoard()` helper for undo/redo state snapshots.
+- `src/commands/EditModeCommands.ts` now captures drag move undo entries whenever from/to columns are available, resolving indices from the saved board when needed.
 
 ---
 
