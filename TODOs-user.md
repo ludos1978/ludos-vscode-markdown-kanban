@@ -1,3 +1,5 @@
+- [ ] when clicking the version number in the burger menu, the code should switch to debug mode. where all debug logs are activated. also the version number should add (debug) after the number while it's active.
+
 - [ ] tab should not switch between field, but alt+enter. 
 
 - [ ] check the code for any timeout calls, i dont want timeout used!

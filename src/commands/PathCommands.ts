@@ -706,25 +706,57 @@ export class PathCommands extends SwitchBasedCommand {
         const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
 
         // Find the file containing the old path FIRST
+        // Try both URL-decoded and URL-encoded versions of the path
+        // (frontend may send decoded path like "00:00:20" but file has "00%3A00%3A20")
         let foundFile: MarkdownFile | null = null;
         let foundContent: string = '';
+        let actualOldPath = oldPath; // The path variant that was actually found
 
-        const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedOldPath, 'g');
+        // Build path variants to handle encoding mismatches between frontend and file content
+        const pathVariants: string[] = [oldPath];
 
-        for (const file of allFiles) {
-            const content = file.getContent();
-            if (regex.test(content)) {
-                foundFile = file;
-                foundContent = content;
-                break;
+        // Add encoded version (in case frontend sent decoded but file has encoded)
+        const encodedPath = encodeFilePath(oldPath);
+        if (encodedPath !== oldPath) {
+            pathVariants.push(encodedPath);
+        }
+
+        // Add decoded version (in case frontend sent encoded but file has decoded)
+        try {
+            const decodedPath = decodeURIComponent(oldPath);
+            if (decodedPath !== oldPath) {
+                pathVariants.push(decodedPath);
             }
-            regex.lastIndex = 0;
+        } catch {
+            // Invalid percent-encoding in oldPath - ignore decode variant
+        }
+
+        // Remove duplicates
+        const uniqueVariants = [...new Set(pathVariants.filter(p => p))];
+
+        for (const pathVariant of uniqueVariants) {
+            const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapedPath, 'g');
+
+            for (const file of allFiles) {
+                const content = file.getContent();
+                if (regex.test(content)) {
+                    foundFile = file;
+                    foundContent = content;
+                    actualOldPath = pathVariant;
+                    break;
+                }
+                regex.lastIndex = 0;
+            }
+            if (foundFile) break;
         }
 
         if (!foundFile) {
+            console.log('[PathCommands] Path not found in any file. Tried variants:', uniqueVariants);
             return this.failure('Old path not found in any file');
         }
+
+        console.log('[PathCommands] Found path variant:', actualOldPath, 'in file:', foundFile.getRelativePath());
 
         // Use the FOUND FILE's directory as base for relative path calculation
         // This is critical for include files in different directories
@@ -750,18 +782,28 @@ export class PathCommands extends SwitchBasedCommand {
         newPath = encodeFilePath(newPath);
 
         // Use LinkOperations to replace with strikethrough pattern
-        const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
+        // Use actualOldPath (the variant that was found in the file)
+        const newContent = LinkOperations.replaceSingleLink(foundContent, actualOldPath, newPath, 0);
 
         if (newContent === foundContent) {
             // Fallback to direct replacement
-            regex.lastIndex = 0;
-            foundFile.setContent(foundContent.replace(regex, newPath), false);
+            const escapedActualOldPath = actualOldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const fallbackRegex = new RegExp(escapedActualOldPath, 'g');
+            foundFile.setContent(foundContent.replace(fallbackRegex, newPath), false);
         } else {
             foundFile.setContent(newContent, false);
         }
 
-        // Send targeted update based on context
-        if (isColumnTitle && columnId) {
+        // If path was found in an include file, always do full refresh
+        // This ensures include content is properly re-parsed after the path change
+        // Targeted updates for include files have encoding issues
+        const isIncludeFile = foundFile !== mainFile;
+        if (isIncludeFile) {
+            console.log('[PathCommands] Path found in include file, triggering full refresh');
+            await this.refreshBoard(context);
+        }
+        // Send targeted update based on context (only for main file)
+        else if (isColumnTitle && columnId) {
             // Include/image is in column title - update column only
             const board = context.boardStore.getBoard();
             if (board) {

@@ -403,24 +403,39 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 console.log(`[MarkdownFileRegistry] generateBoard() - Column ${column.id} has includeFiles:`, column.includeFiles);
 
                 for (const relativePath of column.includeFiles) {
-                    const file = this.getByRelativePath(relativePath) as IncludeFile;
+                    const file = this.getByRelativePath(relativePath);
 
-                    // CRITICAL: Use fresh disk check, not cached _exists flag
-                    let fileExistsOnDisk = false;
-                    let absolutePath = '';
-                    if (file) {
-                        absolutePath = file.getPath();
-                        fileExistsOnDisk = fs.existsSync(absolutePath);
-                    }
+                    // CRITICAL: Check disk existence FIRST, regardless of registry status
+                    // This handles the case where user fixes an include path - the new file
+                    // exists on disk but isn't registered yet
+                    const mainFileDir = path.dirname(mainFile.getPath());
+                    const absolutePath = file
+                        ? file.getPath()
+                        : path.resolve(mainFileDir, relativePath);
+                    const fileExistsOnDisk = fs.existsSync(absolutePath);
 
                     console.log(`[MarkdownFileRegistry] generateBoard() - Column include check: relativePath=${relativePath}, absolutePath=${absolutePath}, fileInRegistry=${!!file}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${file?.exists()}`);
 
+                    if (fileExistsOnDisk) {
+                        // File exists on disk - clear error even if not registered yet
+                        // Content will be loaded when IncludeLoadingProcessor runs
+                        (column as any).includeError = false;
+                    }
+
+                    // CRITICAL FIX: Type guard to prevent treating MainKanbanFile as IncludeFile
+                    if (file && file.getFileType() === 'main') {
+                        console.error(`[MarkdownFileRegistry] generateBoard() BUG: Include path resolved to MainKanbanFile: ${relativePath}`);
+                        (column as any).includeError = true;
+                        continue;
+                    }
+
                     if (file && fileExistsOnDisk) {
                         // Parse tasks from include file, preserving existing task IDs
-                        const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
+                        const includeFile = file as IncludeFile;
+                        const tasks = includeFile.parseToTasks(column.tasks, column.id, mainFilePath);
                         column.tasks = tasks;
                         (column as any).includeError = false;
-                    } else {
+                    } else if (!fileExistsOnDisk) {
                         console.warn(`[MarkdownFileRegistry] generateBoard() - Column include ERROR: ${relativePath}`);
                         // Error details shown on hover via include badge
                         // Don't create error task - just show empty column with error badge
@@ -428,6 +443,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         // Mark column as having include error
                         (column as any).includeError = true;
                     }
+                    // else: file exists but not registered - error already cleared above, content loads later
                 }
             }
 
@@ -436,25 +452,42 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 if (task.includeFiles && task.includeFiles.length > 0) {
 
                     for (const relativePath of task.includeFiles) {
-                        const file = this.getByRelativePath(relativePath) as IncludeFile;
+                        const file = this.getByRelativePath(relativePath);
 
-                        // CRITICAL: Use fresh disk check, not cached _exists flag
-                        let fileExistsOnDisk = false;
-                        if (file) {
-                            fileExistsOnDisk = fs.existsSync(file.getPath());
+                        // CRITICAL: Check disk existence FIRST, regardless of registry status
+                        // This handles the case where user fixes an include path - the new file
+                        // exists on disk but isn't registered yet
+                        const absolutePath = file
+                            ? file.getPath()
+                            : path.resolve(path.dirname(mainFile.getPath()), relativePath);
+                        const fileExistsOnDisk = fs.existsSync(absolutePath);
+
+                        if (fileExistsOnDisk) {
+                            // File exists on disk - clear error even if not registered yet
+                            // Content will be loaded when IncludeLoadingProcessor runs
+                            (task as any).includeError = false;
+                        }
+
+                        // CRITICAL FIX: Type guard to prevent treating MainKanbanFile as IncludeFile
+                        if (file && file.getFileType() === 'main') {
+                            console.error(`[MarkdownFileRegistry] generateBoard() BUG: Task include path resolved to MainKanbanFile: ${relativePath}`);
+                            (task as any).includeError = true;
+                            continue;
                         }
 
                         if (file && fileExistsOnDisk) {
                             // Load description from task include file
-                            task.description = file.getContent();
+                            const includeFile = file as IncludeFile;
+                            task.description = includeFile.getContent();
                             (task as any).includeError = false;
-                        } else {
+                        } else if (!fileExistsOnDisk) {
                             console.warn(`[MarkdownFileRegistry] generateBoard() - Task include ERROR: ${relativePath}`);
                             // Error details shown on hover via include badge
                             task.description = '';
                             // Mark task as having include error
                             (task as any).includeError = true;
                         }
+                        // else: file exists but not registered - error already cleared above
                     }
                 }
             }
@@ -504,6 +537,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         // First, try to find by relative path (normalized)
         const existingByRelative = this.getByRelativePath(relativePath);
         if (existingByRelative) {
+            // CRITICAL FIX: Type guard to prevent returning MainKanbanFile as IncludeFile
+            // This prevents cache corruption where include content would overwrite main file content
+            if (existingByRelative.getFileType() === 'main') {
+                console.warn(`[MarkdownFileRegistry] Cannot include the main kanban file itself: ${relativePath}`);
+                return undefined;
+            }
             return existingByRelative as IncludeFile;
         }
 
@@ -514,6 +553,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         const existingByAbsolute = this.get(absolutePath);
         if (existingByAbsolute) {
+            // CRITICAL FIX: Type guard to prevent returning MainKanbanFile as IncludeFile
+            // This can happen if include path resolves to the same file as the main kanban file
+            if (existingByAbsolute.getFileType() === 'main') {
+                console.warn(`[MarkdownFileRegistry] Cannot include the main kanban file itself (resolved path): ${relativePath} -> ${absolutePath}`);
+                return undefined;
+            }
             // File already exists under a different relative path key
             // Return the existing instance to prevent duplicates
             return existingByAbsolute as IncludeFile;

@@ -195,6 +195,9 @@ export class IncludeLoadingProcessor {
         // Load all files and collect tasks
         const tasks: KanbanTask[] = [];
 
+        // Initialize error state - will be set to true if ANY file fails
+        column.includeError = false;
+
         for (const relativePath of includeFiles) {
             // Ensure file is registered
             this._fileRegistry.ensureIncludeRegistered(
@@ -210,6 +213,14 @@ export class IncludeLoadingProcessor {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
                 // Mark column as having include error (error details shown on hover via include badge)
                 // Don't create error task - just show empty column with error badge
+                column.includeError = true;
+                continue;
+            }
+
+            // CRITICAL DEFENSE: Verify this is actually an IncludeFile, not MainKanbanFile
+            // This prevents cache corruption if the registry returns the wrong file type
+            if (file.getFileType() === 'main') {
+                console.error(`[IncludeLoadingProcessor] BUG: Registry returned MainKanbanFile for include path: ${relativePath}`);
                 column.includeError = true;
                 continue;
             }
@@ -292,6 +303,21 @@ export class IncludeLoadingProcessor {
         // Error details shown on hover via include badge
         if (!file) {
             console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
+            task.includeMode = true;
+            task.includeFiles = [relativePath];
+            task.includeError = true;
+            task.description = '';
+            if (newTitle !== undefined) {
+                task.title = newTitle;
+                task.originalTitle = newTitle;
+            }
+            return;
+        }
+
+        // CRITICAL DEFENSE: Verify this is actually an IncludeFile, not MainKanbanFile
+        // This prevents cache corruption if the registry returns the wrong file type
+        if (file.getFileType() === 'main') {
+            console.error(`[IncludeLoadingProcessor] BUG: Registry returned MainKanbanFile for include path: ${relativePath}`);
             task.includeMode = true;
             task.includeFiles = [relativePath];
             task.includeError = true;

@@ -148,22 +148,30 @@ export class BoardSyncHandler {
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                    if (file) {
-                        const content = file.generateFromTasks(column.tasks);
-                        const currentContent = file.getContent();
-                        const baseline = file.getBaseline();
+                    const file = this._deps.fileRegistry.getByRelativePath(relativePath);
+                    if (!file) continue;
 
-                        // CRITICAL PROTECTION: Never replace existing content with empty
-                        if (!content.trim() && currentContent.trim()) {
-                            console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe column content to empty`);
-                            continue;
-                        }
+                    // CRITICAL FIX: Type guard to prevent writing to MainKanbanFile
+                    // This prevents cache corruption if include path matches main file
+                    if (file.getFileType() === 'main') {
+                        console.error(`[BoardSyncHandler] BUG: Refusing to write include content to MainKanbanFile: ${relativePath}`);
+                        continue;
+                    }
 
-                        // Only update if content differs from baseline
-                        if (content !== baseline) {
-                            file.setContent(content, false);
-                        }
+                    const includeFile = file as IncludeFile;
+                    const content = includeFile.generateFromTasks(column.tasks);
+                    const currentContent = includeFile.getContent();
+                    const baseline = includeFile.getBaseline();
+
+                    // CRITICAL PROTECTION: Never replace existing content with empty
+                    if (!content.trim() && currentContent.trim()) {
+                        console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe column content to empty`);
+                        continue;
+                    }
+
+                    // Only update if content differs from baseline
+                    if (content !== baseline) {
+                        includeFile.setContent(content, false);
                     }
                 }
             }
@@ -174,22 +182,30 @@ export class BoardSyncHandler {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                        if (file) {
-                            const fullContent = task.description || '';
-                            const currentContent = file.getContent();
-                            const baseline = file.getBaseline();
+                        const file = this._deps.fileRegistry.getByRelativePath(relativePath);
+                        if (!file) continue;
 
-                            // CRITICAL PROTECTION: Never replace existing content with empty
-                            if (!fullContent.trim() && currentContent.trim()) {
-                                console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe task content to empty`);
-                                continue;
-                            }
+                        // CRITICAL FIX: Type guard to prevent writing to MainKanbanFile
+                        // This prevents cache corruption if include path matches main file
+                        if (file.getFileType() === 'main') {
+                            console.error(`[BoardSyncHandler] BUG: Refusing to write task include content to MainKanbanFile: ${relativePath}`);
+                            continue;
+                        }
 
-                            // Only update if content differs from baseline
-                            if (fullContent !== baseline) {
-                                file.setTaskDescription(fullContent);
-                            }
+                        const includeFile = file as IncludeFile;
+                        const fullContent = task.description || '';
+                        const currentContent = includeFile.getContent();
+                        const baseline = includeFile.getBaseline();
+
+                        // CRITICAL PROTECTION: Never replace existing content with empty
+                        if (!fullContent.trim() && currentContent.trim()) {
+                            console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe task content to empty`);
+                            continue;
+                        }
+
+                        // Only update if content differs from baseline
+                        if (fullContent !== baseline) {
+                            includeFile.setTaskDescription(fullContent);
                         }
                     }
                 }

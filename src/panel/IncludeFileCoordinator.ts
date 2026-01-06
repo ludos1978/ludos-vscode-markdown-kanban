@@ -190,6 +190,14 @@ export class IncludeFileCoordinator {
         );
 
         if (column) {
+            // CRITICAL FIX: Type guard to prevent treating MainKanbanFile as IncludeFile
+            if (file.getFileType() === 'main') {
+                console.error(`[IncludeFileCoordinator] BUG: Column include path resolved to MainKanbanFile: ${relativePath}`);
+                column.tasks = [];
+                column.includeError = true;
+                return;
+            }
+
             const columnFile = file as IncludeFile;
             const mainFilePath = this._deps.getMainFile()?.getPath();
 
@@ -248,6 +256,14 @@ export class IncludeFileCoordinator {
         }
 
         if (foundTask && foundColumn) {
+            // CRITICAL FIX: Type guard to prevent treating MainKanbanFile as IncludeFile
+            if (file.getFileType() === 'main') {
+                console.error(`[IncludeFileCoordinator] BUG: Task include path resolved to MainKanbanFile: ${relativePath}`);
+                foundTask.description = '';
+                foundTask.includeError = true;
+                return;
+            }
+
             const displayTitle = `# include in ${relativePath}`;
 
             // Check if file exists before using content

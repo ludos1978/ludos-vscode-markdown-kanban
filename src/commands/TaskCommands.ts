@@ -194,6 +194,12 @@ export class TaskCommands extends SwitchBasedCommand {
                     const file = fileRegistry?.getByRelativePath(relativePath);
 
                     if (file) {
+                        // CRITICAL FIX: Type guard to prevent writing to MainKanbanFile
+                        if (file.getFileType() === 'main') {
+                            console.error(`[TaskCommands] BUG: Refusing to write task include content to MainKanbanFile: ${relativePath}`);
+                            continue;
+                        }
+
                         const fullFileContent = message.taskData.description || '';
                         file.setContent(fullFileContent, false);
                     }

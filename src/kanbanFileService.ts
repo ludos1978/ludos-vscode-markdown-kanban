@@ -66,6 +66,9 @@ export class KanbanFileService {
     private _documentChangeDebounceTimer: NodeJS.Timeout | null = null;
     // Note: Uses centralized DOCUMENT_CHANGE_DEBOUNCE_MS from TimeoutConstants
 
+    // Flag to skip undo detection when we are saving the document ourselves
+    private _isSavingDocument = false;
+
     constructor(
         private fileManager: FileManager,
         private fileRegistry: MarkdownFileRegistry,
@@ -316,11 +319,20 @@ export class KanbanFileService {
             return;
         }
 
+        // Set flag to skip undo detection during save (prevents false "undo" detection)
+        this._isSavingDocument = true;
+
         // Generate markdown content
         const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
 
-        // Use FileSaveService for unified save handling
-        await this._fileSaveService.saveFile(mainFile, markdown);
+        try {
+            // Use FileSaveService for unified save handling
+            await this._fileSaveService.saveFile(mainFile, markdown);
+        } finally {
+            // Reset flag after save completes
+            // The flag prevents false "undo" detection during our own save operation
+            this._isSavingDocument = false;
+        }
 
         // Save include files that have unsaved changes
         // NOTE: Only save files that exist() - don't save broken includes (would create the file/folder)
@@ -412,6 +424,8 @@ export class KanbanFileService {
             newContent
         );
 
+        // Set flag to skip undo detection during save
+        this._isSavingDocument = true;
         try {
             await vscode.workspace.applyEdit(edit);
             await document.save();
@@ -427,6 +441,8 @@ export class KanbanFileService {
             // STATE MACHINE: Error recovery
             this._saveState = SaveState.IDLE;
             showError(`Failed to initialize file: ${error}`);
+        } finally {
+            this._isSavingDocument = false;
         }
     }
 
@@ -455,6 +471,14 @@ export class KanbanFileService {
                 // UNDO SUPPORT: Check if document content differs from our cache
                 // This happens when user undoes a WorkspaceEdit operation
                 // Debounced to prevent rapid reparses during multiple undo/redo operations
+                // SKIP if we are currently saving (prevents false "undo" detection during our own save)
+                if (this._isSavingDocument) {
+                    return;
+                }
+                // SKIP if webview-initiated undo/redo is in progress (UICommands handles targeted updates)
+                if (this._context.undoRedoOperation) {
+                    return;
+                }
                 const mainFile = this.fileRegistry.getMainFile();
                 if (mainFile) {
                     const documentContent = event.document.getText();
@@ -471,7 +495,19 @@ export class KanbanFileService {
                             const currentDocContent = event.document.getText();
                             const currentCacheContent = mainFile.getContent();
                             if (currentDocContent !== currentCacheContent) {
+                                // Diagnostic: Find first difference for debugging
+                                let diffIndex = 0;
+                                const minLen = Math.min(currentDocContent.length, currentCacheContent.length);
+                                while (diffIndex < minLen && currentDocContent[diffIndex] === currentCacheContent[diffIndex]) {
+                                    diffIndex++;
+                                }
                                 console.log('[KanbanFileService] Document content changed (possibly undo), syncing cache and reparsing');
+                                console.log('[KanbanFileService] Content diff details:',
+                                    'docLen=' + currentDocContent.length,
+                                    'cacheLen=' + currentCacheContent.length,
+                                    'diffAt=' + diffIndex,
+                                    'doc@diff=' + JSON.stringify(currentDocContent.substring(diffIndex, diffIndex + 50)),
+                                    'cache@diff=' + JSON.stringify(currentCacheContent.substring(diffIndex, diffIndex + 50)));
                                 // Sync cache from document
                                 mainFile.setContent(currentDocContent, false);
                                 // Trigger full board refresh

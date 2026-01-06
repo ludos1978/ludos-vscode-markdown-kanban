@@ -565,6 +565,12 @@ export class IncludeCommands extends SwitchBasedCommand {
                     throw new Error(`File not found in registry: ${absolutePath}`);
                 }
 
+                // CRITICAL FIX: Type guard to prevent accidental reload of MainKanbanFile as include
+                if (file.getFileType() === 'main') {
+                    console.error(`[IncludeCommands] BUG: Refusing to reload MainKanbanFile as include: ${absolutePath}`);
+                    throw new Error(`Cannot reload main kanban file as include: ${absolutePath}`);
+                }
+
                 const freshContent = await fsPromises.readFile(absolutePath, 'utf-8');
                 file.setContent(freshContent, true);
 
