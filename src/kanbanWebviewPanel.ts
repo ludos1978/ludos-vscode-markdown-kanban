@@ -396,18 +396,16 @@ export class KanbanWebviewPanel {
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
             return;
         }
-        if (!wasAlreadyReady) {
-            console.log('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
+
+        // No pending update - check if this is a duplicate ready message
+        if (wasAlreadyReady) {
+            // Already handled webviewReady before - skip duplicate
+            console.log('[KanbanWebviewPanel._handleWebviewReady] Duplicate webviewReady - skipping');
             return;
         }
 
-        const board = this.getBoard();
-        console.log('[KanbanWebviewPanel._handleWebviewReady] board valid:', board?.valid, 'initialBoardLoad:', this._context.initialBoardLoad);
-        if (!board?.valid || this._context.initialBoardLoad) return;
-
-        this._fileManager.sendFileInfo();
-        this.sendBoardUpdate(false, true);
-        this._boardStore.resendUndoRedoStatus();
+        // First ready without pending update - nothing to do
+        console.log('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
     }
 
     private async _ensureBoardAndSendUpdate() {
