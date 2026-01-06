@@ -110,6 +110,7 @@ context.emitBoardChanged(board, 'edit');  // or 'undo', 'redo', 'template', 'sor
 
 *FileSyncHandler:*
 - `focus:gained` - Checks for external file changes and reloads if needed
+  - External changes now route through `handleExternalChange()` to preserve conflict handling and avoid baseline overwrites
 
 **Unified INIT/FOCUS Code Path:**
 Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncAllFiles()`:

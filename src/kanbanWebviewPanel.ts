@@ -302,7 +302,7 @@ export class KanbanWebviewPanel {
         this._fileSyncHandler = new FileSyncHandler({
             fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,
             getWebviewBridge: () => this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context,
-            sendBoardUpdate: (isFullRefresh, applyDefaultFolding) => this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
+            sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         });
         this._linkReplacementHandler = new LinkReplacementHandler({

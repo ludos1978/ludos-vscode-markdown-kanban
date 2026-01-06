@@ -45,7 +45,7 @@ export interface FileSyncDependencies {
     getWebviewBridge: () => WebviewBridge | null;
     getBoard: () => KanbanBoard | undefined;
     panelContext: PanelContext;
-    sendBoardUpdate: (isFullRefresh?: boolean, applyDefaultFolding?: boolean) => void;
+    sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => void;
     emitBoardLoaded: (board: KanbanBoard) => void;
 }
 
@@ -181,19 +181,18 @@ export class FileSyncHandler {
         // Check mode: only reload files that changed externally
         const changesMap = await this._deps.fileRegistry.checkAllForExternalChanges();
 
-        changesMap.forEach((hasChanged, path) => {
-            if (hasChanged) {
-                changedFiles.push(path);
+        for (const file of allFiles) {
+            if (!changesMap.get(file.getPath())) {
+                continue;
             }
-        });
 
-        if (changedFiles.length > 0) {
-            // Force sync baseline for changed files
-            for (const file of allFiles) {
-                if (changesMap.get(file.getPath())) {
-                    await file.forceSyncBaseline();
-                }
+            if (file.getFileType() === 'main') {
+                await file.handleExternalChange('modified');
+                continue;
             }
+
+            changedFiles.push(file.getPath());
+            await file.handleExternalChange('modified');
         }
 
         return { hasChanges: changedFiles.length > 0, changedFiles };
