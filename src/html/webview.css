@@ -1391,15 +1391,17 @@ body.small-card-fonts .task-title-container .markdown-content img {
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
-/* Image not found container with burger menu */
-.image-not-found-container {
+/* Not found containers with burger menu */
+.image-not-found-container,
+.video-not-found-container {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
 /* Burger menu button inside the image-not-found box - always visible */
-.image-not-found .image-menu-btn {
+.image-not-found .image-menu-btn,
+.video-not-found .video-menu-btn {
   position: static !important;
   width: 18px !important;
   height: 18px !important;
@@ -1417,11 +1419,13 @@ body.small-card-fonts .task-title-container .markdown-content img {
   vertical-align: middle;
 }
 
-.image-not-found .image-menu-btn:hover {
+.image-not-found .image-menu-btn:hover,
+.video-not-found .video-menu-btn:hover {
   background: rgba(0, 0, 0, 0.7) !important;
 }
 
-.image-not-found-menu {
+.image-not-found-menu,
+.video-not-found-menu {
   display: none;
   position: absolute;
   top: 100%;
@@ -1436,7 +1440,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
   pointer-events: auto;
 }
 
-.image-not-found-menu.visible {
+.image-not-found-menu.visible,
+.video-not-found-menu.visible {
   display: block;
 }
 
@@ -1460,13 +1465,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Video menu button - styles inherited from unified overlay button styles above */
 
-/* Video not found container with burger menu */
-.video-not-found-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
 /* Video not found placeholder */
 .video-not-found {
   display: inline-flex;
@@ -1486,48 +1484,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 200px;
-}
-
-/* Burger menu button inside the video-not-found box - always visible */
-.video-not-found .video-menu-btn {
-  position: static !important;
-  width: 18px !important;
-  height: 18px !important;
-  margin-left: 6px;
-  background: rgba(0, 0, 0, 0.4) !important;
-  border: none !important;
-  border-radius: 3px !important;
-  color: white !important;
-  font-size: 11px !important;
-  cursor: pointer;
-  opacity: 1 !important;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-}
-
-.video-not-found .video-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.7) !important;
-}
-
-.video-not-found-menu {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
-  min-width: 180px;
-  background: var(--vscode-menu-background, #252526);
-  border: 1px solid var(--vscode-menu-border, #454545);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  padding: 4px 0;
-  pointer-events: auto;
-}
-
-.video-not-found-menu.visible {
-  display: block;
 }
 
 .video-not-found-menu .video-path-menu-item,
