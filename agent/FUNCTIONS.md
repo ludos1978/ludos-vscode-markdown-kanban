@@ -14,7 +14,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - `src/commands/CommandRegistry.ts` now orders handlers per message type by priority and respects `canHandle()` when dispatching.
 - `src/services/WebviewUpdateService.ts` now reads extension version from VS Code extension metadata instead of a local package.json require.
 - `src/core/stores/UndoCapture.ts` added `TaskMovePayload` + `forTaskMove()` to capture drag move positions for undo/redo.
-- `src/core/stores/BoardStore.ts` added `cloneBoard()`, `invertTaskMove()`, `applyTaskMove()` helpers for position-based task move undo/redo.
+- `src/core/stores/BoardStore.ts` added `cloneBoard()` helper for undo/redo state snapshots.
 
 ---
 
@@ -1142,6 +1142,8 @@ Total functions documented: **495**
 ### Modified Functions (2026-01-06):
 - src/html/dragDrop-setupTaskDragHandle - Store original task index based on task-item order for reliable drag restore/undo positioning
 - src/html/dragDrop-processTaskDrop - Use task-only indices for final position tracking and undo payload from-index consistency
+- src/core/stores/BoardStore-undo - Restore task-move undos from stored snapshot while preserving targeted column updates
+- src/core/stores/BoardStore-redo - Restore task-move redos from stored snapshot while preserving targeted column updates
 
 ---
 
