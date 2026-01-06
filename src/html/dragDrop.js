@@ -776,6 +776,7 @@ function setupGlobalDragAndDrop() {
         // Update cached board
         if (window.cachedBoard) {
             const taskId = taskItem.dataset.taskId;
+            const undoSnapshot = JSON.parse(JSON.stringify(window.cachedBoard));
 
             // Save undo state
             vscode.postMessage({
@@ -784,7 +785,7 @@ function setupGlobalDragAndDrop() {
                 taskId: taskId,
                 fromColumnId: originalColumnId,
                 toColumnId: finalColumnId,
-                currentBoard: window.cachedBoard
+                currentBoard: undoSnapshot
             });
 
             // Find and remove task from original column
