@@ -1327,6 +1327,11 @@ export interface SaveUndoStateMessage extends BaseMessage {
     type: 'saveUndoState';
     board?: KanbanBoard;
     currentBoard?: KanbanBoard;
+    operation?: string;
+    taskId?: string;
+    columnId?: string;
+    fromColumnId?: string;
+    toColumnId?: string;
 }
 
 /**

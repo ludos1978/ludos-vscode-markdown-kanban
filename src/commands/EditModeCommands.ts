@@ -203,8 +203,58 @@ export class EditModeCommands extends SwitchBasedCommand {
         const msg = message as any;
         const boardToSave = msg.currentBoard || context.getCurrentBoard();
         if (boardToSave) {
+            const operation = msg.operation || 'saveUndoState';
+
+            if (operation === 'moveTaskViaDrag') {
+                const targets = [];
+                if (msg.fromColumnId) {
+                    targets.push({ type: 'column', id: msg.fromColumnId });
+                }
+                if (msg.toColumnId && msg.toColumnId !== msg.fromColumnId) {
+                    targets.push({ type: 'column', id: msg.toColumnId });
+                }
+                if (targets.length > 0) {
+                    context.boardStore.saveUndoEntry(
+                        UndoCapture.forMultiple(boardToSave, targets, operation)
+                    );
+                } else {
+                    context.boardStore.saveUndoEntry(
+                        UndoCapture.forFullBoard(boardToSave, operation)
+                    );
+                }
+                return this.success();
+            }
+
+            if (operation === 'reorderTaskViaDrag') {
+                const columnId = msg.toColumnId || msg.fromColumnId || msg.columnId;
+                if (columnId) {
+                    context.boardStore.saveUndoEntry(
+                        UndoCapture.forColumn(boardToSave, columnId, operation)
+                    );
+                } else {
+                    context.boardStore.saveUndoEntry(
+                        UndoCapture.forFullBoard(boardToSave, operation)
+                    );
+                }
+                return this.success();
+            }
+
+            if (msg.taskId && msg.columnId) {
+                context.boardStore.saveUndoEntry(
+                    UndoCapture.forTask(boardToSave, msg.taskId, msg.columnId, operation)
+                );
+                return this.success();
+            }
+
+            if (msg.columnId) {
+                context.boardStore.saveUndoEntry(
+                    UndoCapture.forColumn(boardToSave, msg.columnId, operation)
+                );
+                return this.success();
+            }
+
             context.boardStore.saveUndoEntry(
-                UndoCapture.forFullBoard(boardToSave, 'saveUndoState')
+                UndoCapture.forFullBoard(boardToSave, operation)
             );
         }
         return this.success();

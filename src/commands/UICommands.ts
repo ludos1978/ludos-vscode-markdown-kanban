@@ -153,19 +153,40 @@ export class UICommands extends SwitchBasedCommand {
             return false;
         }
 
-        // Only support single-element targeted updates for now
-        if (targets.length !== 1) {
+        if (targets.length === 0) {
             return false;
         }
 
-        const target = targets[0];
+        const allColumns = targets.every(target => target.type === 'column');
+        if (allColumns) {
+            const uniqueColumnIds = Array.from(new Set(targets.map(target => target.id)));
+            for (const columnId of uniqueColumnIds) {
+                const column = board.columns.find(c => c.id === columnId);
+                if (!column) {
+                    return false;
+                }
+                const message: UpdateColumnContentExtendedMessage = {
+                    type: 'updateColumnContent',
+                    columnId: column.id,
+                    tasks: column.tasks,
+                    columnTitle: column.title,
+                    displayTitle: column.displayTitle,
+                    includeMode: column.includeMode || false,
+                    includeFiles: column.includeFiles
+                };
+                this.postMessage(message);
+            }
+            return true;
+        }
 
-        if (target.type === 'task' && target.columnId) {
-            // Find the task in the restored board
-            const column = board.columns.find(c => c.id === target.columnId);
-            const task = column?.tasks.find(t => t.id === target.id);
-
-            if (task && column) {
+        const allTasks = targets.every(target => target.type === 'task' && target.columnId);
+        if (allTasks) {
+            for (const target of targets) {
+                const column = board.columns.find(c => c.id === target.columnId);
+                const task = column?.tasks.find(t => t.id === target.id);
+                if (!task || !column) {
+                    return false;
+                }
                 const message: UpdateTaskContentExtendedMessage = {
                     type: 'updateTaskContent',
                     columnId: column.id,
@@ -179,28 +200,10 @@ export class UICommands extends SwitchBasedCommand {
                     regularIncludeFiles: task.regularIncludeFiles
                 };
                 this.postMessage(message);
-                return true;
             }
-        } else if (target.type === 'column') {
-            // Find the column in the restored board
-            const column = board.columns.find(c => c.id === target.id);
-
-            if (column) {
-                const message: UpdateColumnContentExtendedMessage = {
-                    type: 'updateColumnContent',
-                    columnId: column.id,
-                    tasks: column.tasks,
-                    columnTitle: column.title,
-                    displayTitle: column.displayTitle,
-                    includeMode: column.includeMode || false,
-                    includeFiles: column.includeFiles
-                };
-                this.postMessage(message);
-                return true;
-            }
+            return true;
         }
 
-        // Couldn't find element in board, fall back to full update
         return false;
     }
 
