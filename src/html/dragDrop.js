@@ -793,6 +793,13 @@ function setupGlobalDragAndDrop() {
                     const undoSnapshot = JSON.parse(JSON.stringify(window.cachedBoard));
 
                     // Save undo state with positions BEFORE mutating cached board
+                    console.log('[kanban.dragDrop.processTaskDrop.undo-capture]', {
+                        taskId: taskId,
+                        fromColumnId: originalColumnId,
+                        toColumnId: finalColumnId,
+                        fromIndex: fromIndex,
+                        toIndex: insertIndex
+                    });
                     vscode.postMessage({
                         type: 'saveUndoState',
                         operation: originalColumnId !== finalColumnId ? 'moveTaskViaDrag' : 'reorderTaskViaDrag',

@@ -221,6 +221,14 @@ export class EditModeCommands extends SwitchBasedCommand {
                         : (fromColumn ? fromColumn.tasks.findIndex(t => t.id === msg.taskId) : -1);
                     const resolvedToIndex = (typeof msg.toIndex === 'number') ? msg.toIndex : -1;
 
+                    console.log('[kanban.EditModeCommands.saveUndoState.drag-task]', {
+                        operation,
+                        taskId: msg.taskId,
+                        fromColumnId: msg.fromColumnId,
+                        toColumnId: msg.toColumnId,
+                        fromIndex: resolvedFromIndex,
+                        toIndex: resolvedToIndex
+                    });
                     context.boardStore.saveUndoEntry(
                         UndoCapture.forTaskMove(boardToSave, {
                             type: 'task-move',

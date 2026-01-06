@@ -162,6 +162,10 @@ export class UICommands extends SwitchBasedCommand {
         const allColumns = targets.every(target => target.type === 'column');
         if (allColumns) {
             const uniqueColumnIds = Array.from(new Set(targets.map(target => target.id)));
+            console.log('[kanban.UICommands.tryTargetedUpdate.columns]', {
+                columnIds: uniqueColumnIds,
+                targetCount: targets.length
+            });
             for (const columnId of uniqueColumnIds) {
                 const column = board.columns.find(c => c.id === columnId);
                 if (!column) {

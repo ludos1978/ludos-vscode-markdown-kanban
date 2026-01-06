@@ -236,6 +236,12 @@ export class BoardStore implements vscode.Disposable {
         const restoredEntry = this._state.undoStack.pop()!;
 
         if (restoredEntry.payload?.type === 'task-move' && currentBoard && currentBoard.valid) {
+            console.log('[kanban.BoardStore.undo.task-move]', {
+                taskId: restoredEntry.payload.taskId,
+                fromColumnId: restoredEntry.payload.fromColumnId,
+                toColumnId: restoredEntry.payload.toColumnId,
+                targets: restoredEntry.targets?.map(t => t.id)
+            });
             this._state.redoStack.push({
                 board: cloneBoard(currentBoard),
                 targets: restoredEntry.targets,

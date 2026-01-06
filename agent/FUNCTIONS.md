@@ -17,6 +17,10 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - `src/core/stores/BoardStore.ts` added `cloneBoard()` helper for undo/redo state snapshots.
 - `src/commands/EditModeCommands.ts` now captures drag move undo entries whenever from/to columns are available, resolving indices from the saved board when needed.
 - `src/commands/UICommands.ts` now logs redo stack state and redo results for debugging.
+- `src/html/dragDrop.js` now logs task drag undo payloads for troubleshooting.
+- `src/core/stores/BoardStore.ts` now logs task-move undo payloads and targets.
+- `src/commands/UICommands.ts` now logs targeted column update ids for undo/redo updates.
+- `src/commands/EditModeCommands.ts` now logs resolved drag undo payload values.
 
 ---
 
