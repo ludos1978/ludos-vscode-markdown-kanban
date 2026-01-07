@@ -76,6 +76,37 @@ function normalizeWindowsAbsolutePath(pathValue, shouldDecode) {
     return '/' + resolvedPath.replace(/\\/g, '/');
 }
 
+function renderTokenWithChildren(token, renderer, options, env) {
+    const attrs = renderer.renderAttrs(token);
+    const open = `<${token.tag}${attrs}>`;
+    const close = `</${token.tag}>`;
+    const content = token.children ? renderer.renderInline(token.children, options, env) : '';
+    return `${open}${content}${close}`;
+}
+
+function updateSourceChildren(token, resolveSourcePath) {
+    let firstSource = '';
+    if (!token.children) {
+        return { firstSource };
+    }
+
+    token.children.forEach(child => {
+        if (child.type !== 'source' || !child.attrGet) {
+            return;
+        }
+        const src = child.attrGet('src');
+        if (!src) {
+            return;
+        }
+        if (!firstSource) {
+            firstSource = src;
+        }
+        child.attrSet('src', resolveSourcePath(src));
+    });
+
+    return { firstSource };
+}
+
 // Factory function to create markdown-it instance with all plugins
 // This is called once per configuration change, not per render
 function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
@@ -1884,22 +1915,7 @@ function renderMarkdown(text, includeContext) {
             const token = tokens[idx];
 
             // Get original source path before processing
-            let originalSrc = '';
-            if (token.children) {
-                token.children.forEach(child => {
-                    if (child.type === 'source' && child.attrGet) {
-                        const src = child.attrGet('src');
-                        if (src && !originalSrc) {
-                            originalSrc = src; // Keep first source as original
-                            const displaySrc = resolveMediaSourcePath(src);
-                            child.attrSet('src', displaySrc);
-                        } else if (src) {
-                            const displaySrc = resolveMediaSourcePath(src);
-                            child.attrSet('src', displaySrc);
-                        }
-                    }
-                });
-            }
+            const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
             // Generate the base video HTML
             // Use plugin renderer if available, otherwise use fallback that properly handles children
@@ -1908,14 +1924,7 @@ function renderMarkdown(text, includeContext) {
                 videoHtml = originalVideoRenderer(tokens, idx, options, env, renderer);
             } else {
                 // Fallback: manually render video element with children (source tags)
-                const attrs = renderer.renderAttrs(token);
-                const open = `<${token.tag}${attrs}>`;
-                const close = `</${token.tag}>`;
-                let content = '';
-                if (token.children) {
-                    content = renderer.renderInline(token.children, options, env);
-                }
-                videoHtml = `${open}${content}${close}`;
+                videoHtml = renderTokenWithChildren(token, renderer, options, env);
             }
 
             // Skip wrapping for data URLs and blob URLs
@@ -1947,31 +1956,14 @@ function renderMarkdown(text, includeContext) {
             const token = tokens[idx];
 
             // Process source children to dynamically resolve paths
-            if (token.children) {
-                token.children.forEach(child => {
-                    if (child.type === 'source' && child.attrGet) {
-                        const originalSrc = child.attrGet('src');
-                        if (originalSrc) {
-                            const displaySrc = resolveMediaSourcePath(originalSrc);
-                            child.attrSet('src', displaySrc);
-                        }
-                    }
-                });
-            }
+            updateSourceChildren(token, resolveMediaSourcePath);
 
             // Use plugin renderer if available, otherwise use fallback that properly handles children
             if (originalAudioRenderer) {
                 return originalAudioRenderer(tokens, idx, options, env, renderer);
             } else {
                 // Fallback: manually render audio element with children (source tags)
-                const attrs = renderer.renderAttrs(token);
-                const open = `<${token.tag}${attrs}>`;
-                const close = `</${token.tag}>`;
-                let content = '';
-                if (token.children) {
-                    content = renderer.renderInline(token.children, options, env);
-                }
-                return `${open}${content}${close}`;
+                return renderTokenWithChildren(token, renderer, options, env);
             }
         };
 
