@@ -1,1 +1,0 @@
-- For every task make 3 suggestions how to solve or approach the issue, each with an expected quality/probability that it properly solves the problem. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
