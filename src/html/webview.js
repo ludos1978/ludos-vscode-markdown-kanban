@@ -3411,7 +3411,9 @@ document.addEventListener('keydown', (e) => {
     // Ctrl+F or Cmd+F to open search
     if ((e.ctrlKey || e.metaKey) && e.key === 'f' && !isEditing) {
         e.preventDefault();
-        kanbanSearch.openSearch();
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({ type: 'openSearchPanel' });
+        }
         return;
     }
     

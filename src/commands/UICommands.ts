@@ -20,7 +20,8 @@ import {
     SetPreferenceMessage,
     SetContextMessage,
     UpdateTaskContentExtendedMessage,
-    UpdateColumnContentExtendedMessage
+    UpdateColumnContentExtendedMessage,
+    OpenSearchPanelMessage
 } from '../core/bridge/MessageTypes';
 import { ResolvedTarget } from '../core/stores/BoardStore';
 import { KanbanBoard } from '../markdownParser';
@@ -48,7 +49,8 @@ export class UICommands extends SwitchBasedCommand {
             'showInfo',
             'setPreference',
             'setContext',
-            'requestConfigurationRefresh'
+            'requestConfigurationRefresh',
+            'openSearchPanel'
         ],
         priority: 100
     };
@@ -67,7 +69,8 @@ export class UICommands extends SwitchBasedCommand {
         'showInfo': (msg, _ctx) => this.handleShowInfo(msg as ShowInfoMessage),
         'setPreference': (msg, _ctx) => this.handleSetPreference(msg as SetPreferenceMessage),
         'setContext': (msg, _ctx) => this.handleSetContext(msg as SetContextMessage),
-        'requestConfigurationRefresh': (_msg, ctx) => this.handleRequestConfigurationRefresh(ctx)
+        'requestConfigurationRefresh': (_msg, ctx) => this.handleRequestConfigurationRefresh(ctx),
+        'openSearchPanel': (msg, ctx) => this.handleOpenSearchPanel(msg as OpenSearchPanelMessage, ctx)
     };
 
     // ============= UI HANDLERS =============
@@ -324,6 +327,16 @@ export class UICommands extends SwitchBasedCommand {
      */
     private async handleRequestConfigurationRefresh(context: CommandContext): Promise<CommandResult> {
         await context.refreshConfiguration();
+        return this.success();
+    }
+
+    private async handleOpenSearchPanel(_message: OpenSearchPanelMessage, _context: CommandContext): Promise<CommandResult> {
+        try {
+            await vscode.commands.executeCommand('workbench.view.extension.kanbanBoards');
+            await vscode.commands.executeCommand('kanbanSearch.focus');
+        } catch (error) {
+            console.error('[UICommands] Failed to open kanban search panel:', error);
+        }
         return this.success();
     }
 }

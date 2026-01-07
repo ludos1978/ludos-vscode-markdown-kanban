@@ -10,6 +10,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/commands/UICommands.ts` now handles `openSearchPanel` messages to reveal the Kanban Search sidebar, and `src/html/webview.js` routes Ctrl/Cmd+F to that sidebar instead of the in-webview search overlay.
 - `src/kanbanWebviewPanel.ts` now initializes PanelContext, ConcurrencyManager, and WebviewBridge debug mode as disabled by default (debug must be toggled manually).
 - `src/html/taskEditor.js` now handles Tab/Shift+Tab to indent/unindent with spaces (no field switching) and Alt+Enter to end editing; indentation uses a two-space unit and preserves selections.
 - `src/html/webview.html` version menu item now toggles debug mode via click, and `src/html/webview.js` updates the displayed version to append "(debug)" while active.

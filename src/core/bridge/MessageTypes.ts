@@ -829,6 +829,13 @@ export interface RequestConfigurationRefreshMessage extends BaseMessage {
     type: 'requestConfigurationRefresh';
 }
 
+/**
+ * Open the Kanban Search side panel
+ */
+export interface OpenSearchPanelMessage extends BaseMessage {
+    type: 'openSearchPanel';
+}
+
 // ============= CLIPBOARD MESSAGES =============
 
 /**
@@ -1801,6 +1808,7 @@ export type IncomingMessage =
     | SetPreferenceMessage
     | SetContextMessage
     | RequestConfigurationRefreshMessage
+    | OpenSearchPanelMessage
     // Clipboard messages
     | SaveClipboardImageMessage
     | SaveClipboardImageWithPathMessage
