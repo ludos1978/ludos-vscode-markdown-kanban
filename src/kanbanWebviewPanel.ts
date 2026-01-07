@@ -214,11 +214,11 @@ export class KanbanWebviewPanel {
         this._extensionContext = context;
 
         const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
-        this._context = new PanelContext(undefined, isDevelopment);
-        this._concurrency = new ConcurrencyManager(isDevelopment);
+        this._context = new PanelContext(undefined, false);
+        this._concurrency = new ConcurrencyManager(false);
 
         this._boardStore = new BoardStore({ webview: this._panel.webview, maxUndoStackSize: MAX_UNDO_STACK_SIZE });
-        this._webviewBridge = new WebviewBridge({ maxBatchSize: MAX_BATCH_SIZE, batchFlushDelay: BATCH_FLUSH_DELAY_MS, debug: isDevelopment });
+        this._webviewBridge = new WebviewBridge({ maxBatchSize: MAX_BATCH_SIZE, batchFlushDelay: BATCH_FLUSH_DELAY_MS, debug: false });
         this._webviewBridge.setWebview(this._panel.webview);
 
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
