@@ -29,6 +29,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _extensionUri: vscode.Uri;
+    private _lastResultsPanel: KanbanWebviewPanel | null = null;
 
     constructor(extensionUri: vscode.Uri) {
         this._extensionUri = extensionUri;
@@ -101,6 +102,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             this._sendNoActivePanel();
             return;
         }
+        this._lastResultsPanel = panel;
 
         const board = panel.getBoard();
         if (!board) {
@@ -146,6 +148,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             this._sendNoActivePanel();
             return;
         }
+        this._lastResultsPanel = panel;
 
         const board = panel.getBoard();
         if (!board) {
@@ -182,7 +185,10 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
      * Handle navigation to element request
      */
     private _handleNavigateToElement(message: NavigateToElementMessage): void {
-        const panel = this._getActivePanel();
+        const preferredPanel = this._lastResultsPanel && !this._lastResultsPanel.isDisposed()
+            ? this._lastResultsPanel
+            : undefined;
+        const panel = preferredPanel || this._getActivePanel();
         if (!panel) {
             this._sendNoActivePanel();
             return;
@@ -205,12 +211,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
      * Get the currently active kanban panel
      */
     private _getActivePanel(): KanbanWebviewPanel | undefined {
-        const panels = KanbanWebviewPanel.getAllPanels();
-        if (panels.length === 0) {
-            return undefined;
-        }
-        // Return the first panel (in the future, could track which was last focused)
-        return panels[0];
+        return KanbanWebviewPanel.getActivePanel();
     }
 
     /**

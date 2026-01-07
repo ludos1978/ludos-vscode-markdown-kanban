@@ -43,6 +43,7 @@ interface PersistedPanelState {
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
     private static panelStates: Map<string, PersistedPanelState> = new Map();
+    private static lastActivePanel: KanbanWebviewPanel | null = null;
 
     public static readonly viewType = 'markdownKanbanPanel';
 
@@ -204,6 +205,14 @@ export class KanbanWebviewPanel {
         return Array.from(KanbanWebviewPanel.panels.values());
     }
 
+    public static getActivePanel(): KanbanWebviewPanel | undefined {
+        if (KanbanWebviewPanel.lastActivePanel && !KanbanWebviewPanel.lastActivePanel.isDisposed()) {
+            return KanbanWebviewPanel.lastActivePanel;
+        }
+        const panels = KanbanWebviewPanel.getAllPanels();
+        return panels.length > 0 ? panels[0] : undefined;
+    }
+
     public getPanelId(): string { return this._context.panelId; }
     public getPanel(): vscode.WebviewPanel { return this._panel; }
     public hasUnsavedChanges(): boolean { return this._fileRegistry.getMainFile()?.hasUnsavedChanges() || false; }
@@ -344,6 +353,7 @@ export class KanbanWebviewPanel {
     public setUndoRedoOperation(isOperation: boolean): void { this._context.setUndoRedoOperation(isOperation); }
     public getWebviewBridge(): WebviewBridge { return this._webviewBridge; }
     public getMessageHandler(): MessageHandler { return this._messageHandler; }
+    public isDisposed(): boolean { return this._context.disposed; }
     public setDebugMode(enabled: boolean): void {
         this._context.setDebugMode(enabled);
         this._concurrency.setDebugMode(enabled);
@@ -370,6 +380,7 @@ export class KanbanWebviewPanel {
 
         this._panel.onDidChangeViewState(async e => {
             if (e.webviewPanel.visible) {
+                KanbanWebviewPanel.lastActivePanel = this;
                 this._fileManager.sendFileInfo();
                 this.syncDirtyItems();
                 await this.refreshConfiguration();
@@ -517,6 +528,9 @@ export class KanbanWebviewPanel {
     private async _handlePanelClose() {
         // Remove from panels map immediately to prevent reuse during disposal
         this._removeFromPanelsMap();
+        if (KanbanWebviewPanel.lastActivePanel === this) {
+            KanbanWebviewPanel.lastActivePanel = null;
+        }
 
         if (!this._unsavedChangesService) return this.dispose();
 
@@ -565,6 +579,9 @@ export class KanbanWebviewPanel {
         this._context.setDisposed(true);
 
         this._removeFromPanelsMap();
+        if (KanbanWebviewPanel.lastActivePanel === this) {
+            KanbanWebviewPanel.lastActivePanel = null;
+        }
 
         this._fileRegistry.getMainFile()?.discardChanges();
         this._context.setClosingPrevented(false);

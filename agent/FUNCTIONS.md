@@ -10,6 +10,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/kanbanWebviewPanel.ts` now tracks the last active panel and exposes `getActivePanel()` so search/navigation targets the correct board; `src/kanbanSearchProvider.ts` remembers the panel used for search results and navigates within it.
 - `src/kanbanSearchProvider.ts` now reveals the main kanban webview panel before navigating to a search result, ensuring focus switches to the board.
 - `src/commands/UICommands.ts` now handles `openSearchPanel` messages to reveal the Kanban Search sidebar, and `src/html/webview.js` routes Ctrl/Cmd+F to that sidebar instead of the in-webview search overlay.
 - `src/kanbanWebviewPanel.ts` now initializes PanelContext, ConcurrencyManager, and WebviewBridge debug mode as disabled by default (debug must be toggled manually).
