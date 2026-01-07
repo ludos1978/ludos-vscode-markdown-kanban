@@ -161,7 +161,6 @@ export class BoardSyncHandler {
                     const includeFile = file as IncludeFile;
                     const content = includeFile.generateFromTasks(column.tasks);
                     const currentContent = includeFile.getContent();
-                    const baseline = includeFile.getBaseline();
 
                     // CRITICAL PROTECTION: Never replace existing content with empty
                     if (!content.trim() && currentContent.trim()) {
@@ -169,8 +168,8 @@ export class BoardSyncHandler {
                         continue;
                     }
 
-                    // Only update if content differs from baseline
-                    if (content !== baseline) {
+                    // Only update if content differs from current cached content
+                    if (content !== currentContent) {
                         includeFile.setContent(content, false);
                     }
                 }
@@ -195,7 +194,6 @@ export class BoardSyncHandler {
                         const includeFile = file as IncludeFile;
                         const fullContent = task.description || '';
                         const currentContent = includeFile.getContent();
-                        const baseline = includeFile.getBaseline();
 
                         // CRITICAL PROTECTION: Never replace existing content with empty
                         if (!fullContent.trim() && currentContent.trim()) {
@@ -203,8 +201,8 @@ export class BoardSyncHandler {
                             continue;
                         }
 
-                        // Only update if content differs from baseline
-                        if (fullContent !== baseline) {
+                        // Only update if content differs from current cached content
+                        if (fullContent !== currentContent) {
                             includeFile.setTaskDescription(fullContent);
                         }
                     }
