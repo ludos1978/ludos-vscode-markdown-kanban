@@ -196,10 +196,9 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             highlight: true
         };
 
-        panel.webview.postMessage(scrollMessage);
-
-        // Also reveal the panel if it's not visible
-        // Note: We can't directly reveal the panel, but the user will see the highlight
+        const webviewPanel = panel.getPanel();
+        webviewPanel.reveal(undefined, false);
+        webviewPanel.webview.postMessage(scrollMessage);
     }
 
     /**
