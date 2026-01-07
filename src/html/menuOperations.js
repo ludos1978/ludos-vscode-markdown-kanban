@@ -105,6 +105,46 @@ class SimpleMenuManager {
         this.hideTimeout = null;
     }
 
+    getElementForScope(scope, id, columnId) {
+        if (scope === 'column') {
+            return window.cachedBoard?.columns?.find(c => c.id === id) || null;
+        }
+        if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            return column?.tasks?.find(t => t.id === id) || null;
+        }
+        return null;
+    }
+
+    getElementTitleForScope(scope, id, columnId) {
+        return this.getElementForScope(scope, id, columnId)?.title || '';
+    }
+
+    renderDirectiveInput(scope, id, columnId, directiveName, label) {
+        return `
+            <div class="marp-menu-section">
+                <div class="marp-menu-section-title">${label}</div>
+                <div class="marp-menu-inputs">
+                    <input type="text" class="marp-menu-input marp-menu-input--local"
+                           placeholder="Local (this + following)"
+                           onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}">
+                    <input type="text" class="marp-menu-input marp-menu-input--scoped"
+                           placeholder="Scoped (this only)"
+                           onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}">
+                </div>
+            </div>
+        `;
+    }
+
+    renderPaginateButton(scope, id, columnId, scopeLabel, isActive) {
+        return `
+            <button class="marp-menu-paginate-button marp-menu-paginate-button--${scopeLabel} ${isActive ? 'is-active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', '${scopeLabel}')">
+                ${isActive ? '✓ ' : ''}${scopeLabel.charAt(0).toUpperCase() + scopeLabel.slice(1)}
+            </button>
+        `;
+    }
+
     // Safe button click handler - works for all button types without eval
     handleButtonClick(button, shouldCloseMenu = true) {
         
@@ -141,80 +181,97 @@ class SimpleMenuManager {
 
     // Safe function execution without eval
     executeSafeFunction(functionString, element) {
-
-        // Handle window.tagHandlers pattern - but check if already handled
-        const tagHandlerMatch = functionString.match(/window\.tagHandlers\['([^']+)'\]\(([^)]*)\)/);
-        if (tagHandlerMatch) {
-            const handlerKey = tagHandlerMatch[1];
-            const params = tagHandlerMatch[2];
-            
-            // Check if this is a tag handler that we've already executed
-            if (window.tagHandlers && window.tagHandlers[handlerKey]) {
-                // Skip if this was already handled by the direct tag system
-                const now = Date.now();
-                const lastExecuted = element._lastTagExecution || 0;
-                if (now - lastExecuted < 100) {
-                    return true;
-                }
-                element._lastTagExecution = now;
-                
-                // Create event object if needed
-                const event = params.includes('event') ? new Event('click') : undefined;
-                window.tagHandlers[handlerKey](event);
-                return true;
-            }
+        if (!functionString) {
+            return false;
         }
-        
-        // Handle common function patterns
+
+        if (this.tryExecuteTagHandler(functionString, element)) {
+            return true;
+        }
+
+        if (this.tryExecuteFunctionCall(functionString)) {
+            return true;
+        }
+
+        if (functionString.includes(';')) {
+            return this.executeStatementList(functionString, element);
+        }
+
+        return false; // Could not execute
+    }
+
+    tryExecuteTagHandler(functionString, element) {
+        const tagHandlerMatch = functionString.match(/window\.tagHandlers\['([^']+)'\]\(([^)]*)\)/);
+        if (!tagHandlerMatch) {
+            return false;
+        }
+
+        const handlerKey = tagHandlerMatch[1];
+        const params = tagHandlerMatch[2];
+
+        if (!window.tagHandlers || !window.tagHandlers[handlerKey]) {
+            return false;
+        }
+
+        const now = Date.now();
+        const lastExecuted = element._lastTagExecution || 0;
+        if (now - lastExecuted < 100) {
+            return true;
+        }
+        element._lastTagExecution = now;
+
+        const event = params.includes('event') ? new Event('click') : undefined;
+        window.tagHandlers[handlerKey](event);
+        return true;
+    }
+
+    tryExecuteFunctionCall(functionString) {
         const patterns = [
-            // Pattern: functionName('param1', 'param2', etc.)
             /^(\w+)\((.*)\)$/,
-            // Pattern: object.method('param1', 'param2')
             /^(\w+)\.(\w+)\((.*)\)$/
         ];
-        
+
         for (const pattern of patterns) {
             const match = functionString.match(pattern);
-            if (match) {
-                if (match.length === 3) {
-                    // Simple function call
-                    const funcName = match[1];
-                    const params = this.parseParameters(match[2]);
+            if (!match) {
+                continue;
+            }
 
-                    if (window[funcName] && typeof window[funcName] === 'function') {
-                        window[funcName].apply(window, params);
-                        return true;
-                    }
-                } else if (match.length === 4) {
-                    // Object method call
-                    const objName = match[1];
-                    const methodName = match[2]; 
-                    const params = this.parseParameters(match[3]);
-                    
-                    if (window[objName] && window[objName][methodName] && 
-                        typeof window[objName][methodName] === 'function') {
-                        window[objName][methodName].apply(window[objName], params);
-                        return true;
-                    }
+            if (match.length === 3) {
+                const funcName = match[1];
+                const params = this.parseParameters(match[2]);
+
+                if (window[funcName] && typeof window[funcName] === 'function') {
+                    window[funcName].apply(window, params);
+                    return true;
+                }
+            } else if (match.length === 4) {
+                const objName = match[1];
+                const methodName = match[2];
+                const params = this.parseParameters(match[3]);
+
+                if (window[objName] && window[objName][methodName] &&
+                    typeof window[objName][methodName] === 'function') {
+                    window[objName][methodName].apply(window[objName], params);
+                    return true;
                 }
             }
         }
-        
-        // Handle multiple statements separated by semicolons
-        if (functionString.includes(';')) {
-            const statements = functionString.split(';').filter(s => s.trim());
-            let allExecuted = true;
-            for (const statement of statements) {
-                if (statement.trim() && statement.trim() !== 'return false') {
-                    if (!this.executeSafeFunction(statement.trim(), element)) {
-                        allExecuted = false;
-                    }
+
+        return false;
+    }
+
+    executeStatementList(functionString, element) {
+        const statements = functionString.split(';').filter(s => s.trim());
+        let allExecuted = true;
+        for (const statement of statements) {
+            if (statement.trim() && statement.trim() !== 'return false') {
+                if (!this.executeSafeFunction(statement.trim(), element)) {
+                    allExecuted = false;
                 }
             }
-            return allExecuted;
         }
-        
-        return false; // Could not execute
+        return allExecuted;
     }
 
     /**
@@ -243,7 +300,7 @@ class SimpleMenuManager {
                 inQuotes = false;
                 current += char;
             } else if (!inQuotes && char === ',') {
-                params.push(this.parseValue(current.trim()));
+                params.push(this.parseParameterValue(current.trim()));
                 current = '';
             } else {
                 current += char;
@@ -251,14 +308,14 @@ class SimpleMenuManager {
         }
         
         if (current.trim()) {
-            params.push(this.parseValue(current.trim()));
+            params.push(this.parseParameterValue(current.trim()));
         }
         
         return params;
     }
     
     // Helper method to parse individual parameter values
-    parseValue(value) {
+    parseParameterValue(value) {
         const trimmed = value.trim();
         
         // String values
@@ -350,17 +407,8 @@ class SimpleMenuManager {
 
     // Create Marp Classes submenu - includes class toggles and paginate
     createMarpClassesContent(scope, id, type, columnId) {
-        let html = '<div style="padding: 8px; max-width: 450px; min-width: 300px;">';
-
-        // Get current element to check scoped state
-        let element = null;
-        if (scope === 'column') {
-            element = window.cachedBoard?.columns?.find(c => c.id === id);
-        } else if (scope === 'task' && columnId) {
-            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
-            element = column?.tasks?.find(t => t.id === id);
-        }
-        const title = element?.title || '';
+        let html = '<div class="marp-menu-panel marp-menu-panel--wide">';
+        const title = this.getElementTitleForScope(scope, id, columnId);
 
         // Get both local and scoped classes
         const localClassMatch = title.match(/<!--\s*class:\s*([^>]+?)\s*-->/);
@@ -370,21 +418,20 @@ class SimpleMenuManager {
         const scopedClasses = scopedClassMatch ? scopedClassMatch[1].trim().split(/\s+/).filter(c => c.length > 0) : [];
 
         // Classes grid - TWO sections: Local and Scoped
-        html += '<div style="margin-bottom: 12px;">';
+        html += '<div class="marp-menu-section">';
 
         const availableClasses = window.marpAvailableClasses || [];
 
         // LOCAL classes section - title and content on same line
-        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
-        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">LOCAL</div>';
+        html += '<div class="marp-menu-row marp-menu-row--stacked">';
+        html += '<div class="marp-menu-label">LOCAL</div>';
         html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
 
         availableClasses.forEach(className => {
             const isActive = localClasses.includes(className);
             html += `
-                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
-                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'local')"
-                        style="border-color: #4a90e2; background: ${isActive ? '#4a90e2' : 'var(--vscode-menu-background)'};">
+                <button class="donut-menu-tag-chip marp-tag-chip marp-tag-chip--local ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'local')">
                     <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
                     <span class="tag-chip-name">${className}</span>
                 </button>
@@ -393,16 +440,15 @@ class SimpleMenuManager {
         html += '</div></div>';
 
         // SCOPED classes section - title and content on same line
-        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
-        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">SCOPED</div>';
+        html += '<div class="marp-menu-row marp-menu-row--stacked">';
+        html += '<div class="marp-menu-label">SCOPED</div>';
         html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
 
         availableClasses.forEach(className => {
             const isActive = scopedClasses.includes(className);
             html += `
-                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
-                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'scoped')"
-                        style="border-color: #ff9500; background: ${isActive ? '#ff9500' : 'var(--vscode-menu-background)'};">
+                <button class="donut-menu-tag-chip marp-tag-chip marp-tag-chip--scoped ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'scoped')">
                     <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
                     <span class="tag-chip-name">${className}</span>
                 </button>
@@ -417,42 +463,15 @@ class SimpleMenuManager {
 
     // Create Marp Colors submenu - includes color, backgroundColor, backgroundImage, and all background properties
     createMarpColorsContent(scope, id, type, columnId) {
-        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
-
-        // Get current element to check scoped states
-        let element = null;
-        if (scope === 'column') {
-            element = window.cachedBoard?.columns?.find(c => c.id === id);
-        } else if (scope === 'task' && columnId) {
-            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
-            element = column?.tasks?.find(t => t.id === id);
-        }
-        const title = element?.title || '';
-
-        // Helper function to create TWO directive inputs (local and scoped)
-        const createDirectiveInput = (directiveName, label, placeholder) => {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                        <input type="text" placeholder="Local (this + following)"
-                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
-                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
-                        <input type="text" placeholder="Scoped (this only)"
-                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
-                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
-                    </div>
-                </div>
-            `;
-        };
+        let html = '<div class="marp-menu-panel marp-menu-panel--compact">';
 
         // Use helper to create all color directive inputs
-        html += createDirectiveInput('color', 'TEXT COLOR', 'e.g., red, #FF5733');
-        html += createDirectiveInput('backgroundColor', 'BACKGROUND COLOR', 'e.g., black, #333333');
-        html += createDirectiveInput('backgroundImage', 'BACKGROUND IMAGE', 'e.g., url(image.jpg)');
-        html += createDirectiveInput('backgroundPosition', 'BACKGROUND POSITION', 'e.g., center, top left');
-        html += createDirectiveInput('backgroundRepeat', 'BACKGROUND REPEAT', 'e.g., no-repeat, repeat-x');
-        html += createDirectiveInput('backgroundSize', 'BACKGROUND SIZE', 'e.g., cover, contain, 50%');
+        html += this.renderDirectiveInput(scope, id, columnId, 'color', 'TEXT COLOR');
+        html += this.renderDirectiveInput(scope, id, columnId, 'backgroundColor', 'BACKGROUND COLOR');
+        html += this.renderDirectiveInput(scope, id, columnId, 'backgroundImage', 'BACKGROUND IMAGE');
+        html += this.renderDirectiveInput(scope, id, columnId, 'backgroundPosition', 'BACKGROUND POSITION');
+        html += this.renderDirectiveInput(scope, id, columnId, 'backgroundRepeat', 'BACKGROUND REPEAT');
+        html += this.renderDirectiveInput(scope, id, columnId, 'backgroundSize', 'BACKGROUND SIZE');
 
         html += '</div>';
         return html;
@@ -460,63 +479,21 @@ class SimpleMenuManager {
 
     // Create Marp Header & Footer submenu
     createMarpHeaderFooterContent(scope, id, type, columnId) {
-        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
+        let html = '<div class="marp-menu-panel marp-menu-panel--compact">';
+        const title = this.getElementTitleForScope(scope, id, columnId);
 
-        // Get current element to check scoped states
-        let element = null;
-        if (scope === 'column') {
-            element = window.cachedBoard?.columns?.find(c => c.id === id);
-        } else if (scope === 'task' && columnId) {
-            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
-            element = column?.tasks?.find(t => t.id === id);
-        }
-        const title = element?.title || '';
-
-        // Helper function to create TWO directive inputs (local and scoped)
-        const createDirectiveInput = (directiveName, label, placeholder) => {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                        <input type="text" placeholder="Local (this + following)"
-                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
-                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
-                        <input type="text" placeholder="Scoped (this only)"
-                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
-                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
-                    </div>
-                </div>
-            `;
-        };
-
-        html += createDirectiveInput('header', 'HEADER TEXT', 'Header content');
-        html += createDirectiveInput('footer', 'FOOTER TEXT', 'Footer content');
+        html += this.renderDirectiveInput(scope, id, columnId, 'header', 'HEADER TEXT');
+        html += this.renderDirectiveInput(scope, id, columnId, 'footer', 'FOOTER TEXT');
 
         // Paginate - TWO buttons: local and scoped
         const isLocalPaginateActive = /<!--\s*paginate:\s*true\s*-->/.test(title);
         const isScopedPaginateActive = /<!--\s*_paginate:\s*true\s*-->/.test(title);
 
-        html += '<div style="margin-bottom: 8px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">PAGE NUMBERING</div>';
-        html += '<div style="display: flex; gap: 8px;">';
-
-        // Local paginate button
-        html += `
-            <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
-                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #4a90e2; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
-                ${isLocalPaginateActive ? '✓ ' : ''}Local
-            </button>
-        `;
-
-        // Scoped paginate button
-        html += `
-            <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
-                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #ff9500; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
-                ${isScopedPaginateActive ? '✓ ' : ''}Scoped
-            </button>
-        `;
+        html += '<div class="marp-menu-section">';
+        html += '<div class="marp-menu-section-title">PAGE NUMBERING</div>';
+        html += '<div class="marp-menu-paginate">';
+        html += this.renderPaginateButton(scope, id, columnId, 'local', isLocalPaginateActive);
+        html += this.renderPaginateButton(scope, id, columnId, 'scoped', isScopedPaginateActive);
 
         html += '</div></div>';
 

@@ -2688,6 +2688,129 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   min-width: 0;
 }
 
+/* Marp submenu layout helpers */
+.marp-menu-panel {
+  padding: 8px;
+}
+
+.marp-menu-panel--wide {
+  max-width: 450px;
+  min-width: 300px;
+}
+
+.marp-menu-panel--compact {
+  max-width: 350px;
+  min-width: 250px;
+}
+
+.marp-menu-section {
+  margin-bottom: 12px;
+}
+
+.marp-menu-section-title,
+.marp-menu-label {
+  font-weight: bold;
+  color: #ddd;
+  font-size: 10px;
+}
+
+.marp-menu-section-title {
+  margin-bottom: 6px;
+}
+
+.marp-menu-label {
+  white-space: nowrap;
+}
+
+.marp-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.marp-menu-row--stacked {
+  flex-direction: column;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.marp-menu-inputs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.marp-menu-input {
+  flex: 1;
+  padding: 6px;
+  background: var(--board-background);
+  border: 1px solid transparent;
+  color: var(--vscode-foreground);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.marp-menu-input--local {
+  border-color: #4a90e2;
+}
+
+.marp-menu-input--scoped {
+  border-color: #ff9500;
+}
+
+.marp-tag-chip {
+  background: var(--vscode-menu-background);
+}
+
+.marp-tag-chip--local {
+  border-color: #4a90e2;
+}
+
+.marp-tag-chip--scoped {
+  border-color: #ff9500;
+}
+
+.marp-tag-chip--local.active {
+  background: #4a90e2;
+}
+
+.marp-tag-chip--scoped.active {
+  background: #ff9500;
+}
+
+.marp-menu-paginate {
+  display: flex;
+  gap: 8px;
+}
+
+.marp-menu-paginate-button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--board-background);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  text-align: center;
+}
+
+.marp-menu-paginate-button--local {
+  border-color: #4a90e2;
+}
+
+.marp-menu-paginate-button--scoped {
+  border-color: #ff9500;
+}
+
+.marp-menu-paginate-button--local.is-active {
+  background: #4a90e2;
+}
+
+.marp-menu-paginate-button--scoped.is-active {
+  background: #ff9500;
+}
+
 .donut-menu-item.has-submenu:hover .donut-menu-tags-grid {
   display: flex;
 }

@@ -81,6 +81,43 @@ export class BoardContentScanner {
         this._basePath = basePath;
     }
 
+    private _getColumnTitle(column: KanbanColumn): string {
+        return column.displayTitle || column.title;
+    }
+
+    private _getTaskTitle(task: KanbanTask): string {
+        return task.displayTitle || task.title;
+    }
+
+    private _buildColumnLocation(column: KanbanColumn, field: ElementLocation['field']): ElementLocation {
+        return {
+            columnId: column.id,
+            columnTitle: this._getColumnTitle(column),
+            field
+        };
+    }
+
+    private _buildTaskLocation(column: KanbanColumn, task: KanbanTask, field: ElementLocation['field']): ElementLocation {
+        return {
+            columnId: column.id,
+            columnTitle: this._getColumnTitle(column),
+            taskId: task.id,
+            taskTitle: this._getTaskTitle(task),
+            field
+        };
+    }
+
+    private _pushIncludeElements(elements: ExtractedElement[], includePaths: string[], location: ElementLocation): void {
+        for (const includePath of includePaths) {
+            elements.push({
+                type: 'include',
+                path: includePath,
+                rawMatch: `!!!include(${includePath})!!!`,
+                location
+            });
+        }
+    }
+
     /**
      * Extract all embedded elements from a board
      */
@@ -88,84 +125,36 @@ export class BoardContentScanner {
         const elements: ExtractedElement[] = [];
 
         for (const column of board.columns) {
+            const columnLocation = this._buildColumnLocation(column, 'columnTitle');
+
             // Check column title for elements
-            this._extractFromContent(column.title, {
-                columnId: column.id,
-                columnTitle: column.displayTitle || column.title,
-                field: 'columnTitle'
-            }, elements);
+            this._extractFromContent(column.title, columnLocation, elements);
 
             // Check column-level includes
             if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const includePath of column.includeFiles) {
-                    elements.push({
-                        type: 'include',
-                        path: includePath,
-                        rawMatch: `!!!include(${includePath})!!!`,
-                        location: {
-                            columnId: column.id,
-                            columnTitle: column.displayTitle || column.title,
-                            field: 'columnTitle'
-                        }
-                    });
-                }
+                this._pushIncludeElements(elements, column.includeFiles, columnLocation);
             }
 
             // Check tasks
             for (const task of column.tasks) {
+                const taskTitleLocation = this._buildTaskLocation(column, task, 'taskTitle');
+
                 // Check task title
-                this._extractFromContent(task.title, {
-                    columnId: column.id,
-                    columnTitle: column.displayTitle || column.title,
-                    taskId: task.id,
-                    taskTitle: task.displayTitle || task.title,
-                    field: 'taskTitle'
-                }, elements);
+                this._extractFromContent(task.title, taskTitleLocation, elements);
 
                 // Check task-level includes
                 if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const includePath of task.includeFiles) {
-                        elements.push({
-                            type: 'include',
-                            path: includePath,
-                            rawMatch: `!!!include(${includePath})!!!`,
-                            location: {
-                                columnId: column.id,
-                                columnTitle: column.displayTitle || column.title,
-                                taskId: task.id,
-                                taskTitle: task.displayTitle || task.title,
-                                field: 'taskTitle'
-                            }
-                        });
-                    }
+                    this._pushIncludeElements(elements, task.includeFiles, taskTitleLocation);
                 }
 
                 // Check task description
                 if (task.description) {
-                    this._extractFromContent(task.description, {
-                        columnId: column.id,
-                        columnTitle: column.displayTitle || column.title,
-                        taskId: task.id,
-                        taskTitle: task.displayTitle || task.title,
-                        field: 'description'
-                    }, elements);
+                    const taskDescriptionLocation = this._buildTaskLocation(column, task, 'description');
+                    this._extractFromContent(task.description, taskDescriptionLocation, elements);
 
                     // Check regular includes in description
                     if (task.regularIncludeFiles && task.regularIncludeFiles.length > 0) {
-                        for (const includePath of task.regularIncludeFiles) {
-                            elements.push({
-                                type: 'include',
-                                path: includePath,
-                                rawMatch: `!!!include(${includePath})!!!`,
-                                location: {
-                                    columnId: column.id,
-                                    columnTitle: column.displayTitle || column.title,
-                                    taskId: task.id,
-                                    taskTitle: task.displayTitle || task.title,
-                                    field: 'description'
-                                }
-                            });
-                        }
+                        this._pushIncludeElements(elements, task.regularIncludeFiles, taskDescriptionLocation);
                     }
                 }
             }
@@ -230,6 +219,7 @@ export class BoardContentScanner {
                 );
 
                 if (!alreadyTracked && column.includeFiles.length > 0) {
+                    const columnLocation = this._buildColumnLocation(column, 'columnTitle');
                     for (const includePath of column.includeFiles) {
                         const resolvedPath = this._resolvePath(includePath);
                         if (!fs.existsSync(resolvedPath)) {
@@ -237,11 +227,7 @@ export class BoardContentScanner {
                                 type: 'include',
                                 path: includePath,
                                 rawMatch: `!!!include(${includePath})!!!`,
-                                location: {
-                                    columnId: column.id,
-                                    columnTitle: column.displayTitle || column.title,
-                                    field: 'columnTitle'
-                                }
+                                location: columnLocation
                             }, resolvedPath);
                         }
                     }
@@ -256,6 +242,7 @@ export class BoardContentScanner {
                     );
 
                     if (!alreadyTracked && task.includeFiles.length > 0) {
+                        const taskLocation = this._buildTaskLocation(column, task, 'taskTitle');
                         for (const includePath of task.includeFiles) {
                             const resolvedPath = this._resolvePath(includePath);
                             if (!fs.existsSync(resolvedPath)) {
@@ -263,13 +250,7 @@ export class BoardContentScanner {
                                     type: 'include',
                                     path: includePath,
                                     rawMatch: `!!!include(${includePath})!!!`,
-                                    location: {
-                                        columnId: column.id,
-                                        columnTitle: column.displayTitle || column.title,
-                                        taskId: task.id,
-                                        taskTitle: task.displayTitle || task.title,
-                                        field: 'taskTitle'
-                                    }
+                                    location: taskLocation
                                 }, resolvedPath);
                             }
                         }
@@ -301,35 +282,25 @@ export class BoardContentScanner {
 
         for (const column of board.columns) {
             // Search column title
-            const columnTitle = column.displayTitle || column.title;
+            const columnTitle = this._getColumnTitle(column);
             if (columnTitle.toLowerCase().includes(lowerQuery)) {
                 matches.push({
                     matchText: query,
-                    context: this._getContext(columnTitle, lowerQuery),
-                    location: {
-                        columnId: column.id,
-                        columnTitle: columnTitle,
-                        field: 'columnTitle'
-                    }
+                    context: this._buildSearchContext(columnTitle, lowerQuery),
+                    location: this._buildColumnLocation(column, 'columnTitle')
                 });
             }
 
             // Search tasks
             for (const task of column.tasks) {
-                const taskTitle = task.displayTitle || task.title;
+                const taskTitle = this._getTaskTitle(task);
 
                 // Search task title
                 if (taskTitle.toLowerCase().includes(lowerQuery)) {
                     matches.push({
                         matchText: query,
-                        context: this._getContext(taskTitle, lowerQuery),
-                        location: {
-                            columnId: column.id,
-                            columnTitle: columnTitle,
-                            taskId: task.id,
-                            taskTitle: taskTitle,
-                            field: 'taskTitle'
-                        }
+                        context: this._buildSearchContext(taskTitle, lowerQuery),
+                        location: this._buildTaskLocation(column, task, 'taskTitle')
                     });
                 }
 
@@ -337,14 +308,8 @@ export class BoardContentScanner {
                 if (task.description && task.description.toLowerCase().includes(lowerQuery)) {
                     matches.push({
                         matchText: query,
-                        context: this._getContext(task.description, lowerQuery),
-                        location: {
-                            columnId: column.id,
-                            columnTitle: columnTitle,
-                            taskId: task.id,
-                            taskTitle: taskTitle,
-                            field: 'description'
-                        }
+                        context: this._buildSearchContext(task.description, lowerQuery),
+                        location: this._buildTaskLocation(column, task, 'description')
                     });
                 }
 
@@ -359,17 +324,11 @@ export class BoardContentScanner {
                         }
 
                         if (includeContent && includeContent.toLowerCase().includes(lowerQuery)) {
-                            const context = this._getContext(includeContent, lowerQuery);
+                            const context = this._buildSearchContext(includeContent, lowerQuery);
                             matches.push({
                                 matchText: query,
                                 context: `include: ${includePath}\n${context}`,
-                                location: {
-                                    columnId: column.id,
-                                    columnTitle: columnTitle,
-                                    taskId: task.id,
-                                    taskTitle: taskTitle,
-                                    field: 'description'
-                                }
+                                location: this._buildTaskLocation(column, task, 'description')
                             });
                         }
                     }
@@ -490,9 +449,9 @@ export class BoardContentScanner {
     }
 
     /**
-     * Get context around a match (for display)
+     * Build context around a match (for display)
      */
-    private _getContext(content: string, lowerQuery: string): string {
+    private _buildSearchContext(content: string, lowerQuery: string): string {
         const lowerContent = content.toLowerCase();
         const index = lowerContent.indexOf(lowerQuery);
 

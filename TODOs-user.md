@@ -1,16 +1,10 @@
-- [ ] when clicking the version number in the burger menu, the code should switch to debug mode. where all debug logs are activated. also the version number should add (debug) after the number while it's active.
-
-- [ ] tab should not switch between field, but alt+enter. 
+- [ ] tab should not switch between field, instead it should indent all selected lines or at the cursors position, but alt+enter should end editing a field. shift+tab should unindent a line. we only use spaces to indent and unindent.
 
 - [ ] check the code for any timeout calls, i dont want timeout used!
 
 - [ ] could we include pandoc and it's conversion methods into the kanban exporter? are there any other worthwile exporters or converters that use markdown as basic format?
 
-- [x] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
-
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
-
-- [x] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
 
 - [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
 
@@ -75,6 +69,12 @@ A column can have multiple query tags:
 Collects all cards that didn't match any gather rule:
 
 
+
+- [x] when clicking the version number in the burger menu, the code should switch to debug mode. where all debug logs are activated. also the version number should add (debug) after the number while it's active.
+
+- [x] why is the vscode search feature so much faster then our search feature. can we use the vsocde search api?
+
+- [x] dont strike trough the columninclude, rather replace it by the new one. actually do that for all replacements, we drop the strike trough functionality and remove it completely. we only put in the new link from now on. we must make sure the undo works properly, even for multiple replacements!
 
 - [x] add a feature to convert individual or multiple images-paths or referenced document-paths in any of the documents (main or included kanban baords) that allows converting from absolute to relative paths and from relative to absolute paths. each document should get a button on the top-right (an individual breadcrumbs menu), with the option to convert the path type. detect the path type and give the option to convert it to the other tyep. also add the feature to the "File States Overview" system where each (kanban or markdown) file can be individually modified from relative to absolute paths, have both options (convert all to relative paths and convert all to absolute paths). and add one button to convert the main file and all included files.
 
