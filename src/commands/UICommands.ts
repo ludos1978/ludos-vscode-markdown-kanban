@@ -83,6 +83,10 @@ export class UICommands extends SwitchBasedCommand {
         if (result) {
             context.setBoard(result.board);
             context.emitBoardChanged(result.board, 'undo');
+            console.log('[kanban.UICommands.handleUndo.emitBoardChanged]', {
+                trigger: 'undo',
+                targetCount: result.targets?.length ?? 0
+            });
 
             // Use targeted update if single element changed, otherwise full update
             const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);
@@ -118,6 +122,10 @@ export class UICommands extends SwitchBasedCommand {
         if (result) {
             context.setBoard(result.board);
             context.emitBoardChanged(result.board, 'redo');
+            console.log('[kanban.UICommands.handleRedo.emitBoardChanged]', {
+                trigger: 'redo',
+                targetCount: result.targets?.length ?? 0
+            });
 
             // Use targeted update if single element changed, otherwise full update
             const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);

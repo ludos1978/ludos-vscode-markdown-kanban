@@ -23,6 +23,7 @@ import { IncludeFile } from '../../files/IncludeFile';
 import { MediaTracker } from '../../services/MediaTracker';
 import { BackupManager } from '../../services/BackupManager';
 import { sortColumnsByRow } from '../../utils/columnUtils';
+import { safeDecodeURIComponent } from '../../utils/stringUtils';
 import { PanelContext } from '../../panel/PanelContext';
 
 /**
@@ -102,8 +103,16 @@ export class BoardSyncHandler {
             mainFile.setCachedBoardFromWebview(normalizedBoard);
         }
 
+        if (event.data.trigger === 'undo' || event.data.trigger === 'redo') {
+            console.log('[kanban.BoardSyncHandler.undoRedo.start]', {
+                trigger: event.data.trigger,
+                columnCount: normalizedBoard.columns.length,
+                includeColumns: normalizedBoard.columns.filter(col => col.includeFiles && col.includeFiles.length > 0).map(col => col.id)
+            });
+        }
+
         // 4. Propagate board edits to include files (updates their in-memory content)
-        await this._propagateEditsToIncludeFiles(normalizedBoard);
+        await this._propagateEditsToIncludeFiles(normalizedBoard, event.data.trigger);
 
         // 5. Generate markdown and update main file content
         if (mainFile) {
@@ -143,13 +152,25 @@ export class BoardSyncHandler {
      * corresponding include files (column includes and task includes).
      * This is the reverse of loading include content into the board.
      */
-    private async _propagateEditsToIncludeFiles(board: KanbanBoard): Promise<void> {
+    private async _propagateEditsToIncludeFiles(board: KanbanBoard, trigger?: string): Promise<void> {
         // Update column include files with current task content
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                    if (!file) continue;
+                    const decodedPath = safeDecodeURIComponent(relativePath);
+                    const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
+                        || this._deps.fileRegistry.get(decodedPath);
+                    if (!file) {
+                        if (trigger === 'undo' || trigger === 'redo') {
+                            console.warn('[kanban.BoardSyncHandler.undoRedo.includeColumnMissing]', {
+                                trigger,
+                                columnId: column.id,
+                                includePath: relativePath,
+                                decodedPath: decodedPath
+                            });
+                        }
+                        continue;
+                    }
 
                     // CRITICAL FIX: Type guard to prevent writing to MainKanbanFile
                     // This prevents cache corruption if include path matches main file
@@ -170,6 +191,15 @@ export class BoardSyncHandler {
 
                     // Only update if content differs from current cached content
                     if (content !== currentContent) {
+                        if (trigger === 'undo' || trigger === 'redo') {
+                            console.log('[kanban.BoardSyncHandler.undoRedo.includeColumnUpdate]', {
+                                trigger,
+                                columnId: column.id,
+                                includePath: includeFile.getPath(),
+                                taskCount: column.tasks.length,
+                                contentLength: content.length
+                            });
+                        }
                         includeFile.setContent(content, false);
 
                         const includePath = includeFile.getPath();
@@ -198,8 +228,20 @@ export class BoardSyncHandler {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                        if (!file) continue;
+                        const decodedPath = safeDecodeURIComponent(relativePath);
+                        const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
+                            || this._deps.fileRegistry.get(decodedPath);
+                        if (!file) {
+                            if (trigger === 'undo' || trigger === 'redo') {
+                                console.warn('[kanban.BoardSyncHandler.undoRedo.includeTaskMissing]', {
+                                    trigger,
+                                    taskId: task.id,
+                                    includePath: relativePath,
+                                    decodedPath: decodedPath
+                                });
+                            }
+                            continue;
+                        }
 
                         // CRITICAL FIX: Type guard to prevent writing to MainKanbanFile
                         // This prevents cache corruption if include path matches main file
@@ -220,6 +262,14 @@ export class BoardSyncHandler {
 
                         // Only update if content differs from current cached content
                         if (fullContent !== currentContent) {
+                            if (trigger === 'undo' || trigger === 'redo') {
+                                console.log('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
+                                    trigger,
+                                    taskId: task.id,
+                                    includePath: includeFile.getPath(),
+                                    contentLength: fullContent.length
+                                });
+                            }
                             includeFile.setTaskDescription(fullContent);
 
                             const includePath = includeFile.getPath();

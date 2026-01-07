@@ -8,6 +8,7 @@ import { FileSaveService } from '../core/FileSaveService';
 import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
 import type { IMessageHandler, IFileFactory, CapturedEdit } from './FileInterfaces';
 import type { PanelContext } from '../panel/PanelContext';
+import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -404,7 +405,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 console.log(`[MarkdownFileRegistry] generateBoard() - Column ${column.id} has includeFiles:`, column.includeFiles);
 
                 for (const relativePath of column.includeFiles) {
-                    const file = this.getByRelativePath(relativePath);
+                    const decodedPath = safeDecodeURIComponent(relativePath);
+                    const file = this.getByRelativePath(decodedPath)
+                        || this.get(decodedPath);
 
                     // CRITICAL: Check disk existence FIRST, regardless of registry status
                     // This handles the case where user fixes an include path - the new file
@@ -453,7 +456,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 if (task.includeFiles && task.includeFiles.length > 0) {
 
                     for (const relativePath of task.includeFiles) {
-                        const file = this.getByRelativePath(relativePath);
+                        const decodedPath = safeDecodeURIComponent(relativePath);
+                        const file = this.getByRelativePath(decodedPath)
+                            || this.get(decodedPath);
 
                         // CRITICAL: Check disk existence FIRST, regardless of registry status
                         // This handles the case where user fixes an include path - the new file

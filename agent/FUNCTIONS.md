@@ -10,6 +10,11 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/core/events/BoardSyncHandler.ts` `_handleBoardChanged()` and `_propagateEditsToIncludeFiles()` now log undo/redo execution order and include update/missing paths, and resolve include paths via decoded lookups for undo/redo.
+- `src/files/MarkdownFileRegistry.ts` `generateBoard()` now resolves include files using decoded paths with absolute fallbacks to keep include columns/tasks in sync.
+- `src/panel/IncludeFileCoordinator.ts` `_sendColumnIncludeUpdate()` and `_sendTaskIncludeUpdate()` now match include references against both relative and absolute paths to avoid missed updates.
+- `src/commands/UICommands.ts` `handleUndo()` and `handleRedo()` now log when they emit board:changed for undo/redo sequencing.
+- `src/services/WebviewUpdateService.ts` `sendBoardUpdate()` now logs refresh options to track post-undo full refreshes.
 - `src/kanbanFileService.ts` `setupDocumentChangeListener()` now syncs cached include-file content into newly opened include documents when they have unsaved changes (absolute/relative lookup), preventing stale disk content after undo.
 - `src/commands/FileCommands.ts` `handleOpenFileLink()` and `handleOpenIncludeFile()` now apply cached include-file content to opened editors when the include file has unsaved changes, keeping include file views consistent after undo.
 - `src/core/events/BoardSyncHandler.ts` `_propagateEditsToIncludeFiles()` now compares include content against current cached content (not baseline) so undo restores include file content correctly, and updates open include documents to keep editors in sync.

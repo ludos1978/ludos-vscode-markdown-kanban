@@ -186,7 +186,9 @@ export class IncludeFileCoordinator {
     private _sendColumnIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
         // Find column that uses this include file
         const column = board.columns.find(c =>
-            c.includeFiles && c.includeFiles.some(p => MarkdownFile.isSameFile(p, relativePath))
+            c.includeFiles && c.includeFiles.some(p =>
+                MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, file.getPath())
+            )
         );
 
         if (column) {
@@ -246,7 +248,9 @@ export class IncludeFileCoordinator {
 
         for (const column of board.columns) {
             for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
+                if (task.includeFiles && task.includeFiles.some((p: string) =>
+                    MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, file.getPath())
+                )) {
                     foundTask = task;
                     foundColumn = column;
                     break;
