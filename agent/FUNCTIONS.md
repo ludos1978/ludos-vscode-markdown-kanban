@@ -10,6 +10,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/html/taskEditor.js` now handles Tab/Shift+Tab to indent/unindent with spaces (no field switching) and Alt+Enter to end editing; indentation uses a two-space unit and preserves selections.
 - `src/html/webview.html` version menu item now toggles debug mode via click, and `src/html/webview.js` updates the displayed version to append "(debug)" while active.
 - `src/html/webview.js` now maintains `window.kanbanDebug` state and sends `setDebugMode` messages to the backend on toggle; board updates apply debugMode and refresh the version label.
 - `src/core/bridge/MessageTypes.ts` adds `debugMode` to `BoardUpdateMessage` and introduces `SetDebugModeMessage` for frontend-initiated debug toggles.

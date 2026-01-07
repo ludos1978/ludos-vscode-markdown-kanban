@@ -10,6 +10,7 @@ class TaskEditor {
         this.isTransitioning = false;
         this.keystrokeTimeout = null;
         this.lastEditContext = null; // Track what was last being edited
+        this.indentUnit = '  ';
         this.setupGlobalHandlers();
     }
 
@@ -383,9 +384,16 @@ class TaskEditor {
                 return; // Let the system handle the shortcut
             }
 
-            if (e.key === 'Tab' && element.classList.contains('task-title-edit')) {
+            if (e.key === 'Tab') {
                 e.preventDefault();
-                this.transitionToDescription();
+                if (e.shiftKey) {
+                    this._unindentSelection(element);
+                } else {
+                    this._indentSelection(element);
+                }
+            } else if (e.key === 'Enter' && e.altKey) {
+                e.preventDefault();
+                this.save();
             } else if (e.key === 'Enter' && !e.shiftKey) {
                 if (element.classList.contains('task-title-edit') ||
                     element.classList.contains('column-title-edit')) {
@@ -539,6 +547,82 @@ class TaskEditor {
         const task = column?.tasks.find(t => t.id === taskId);
         if (task) {
             editElement.value = task.description || '';
+        }
+    }
+
+    // ============= INDENTATION HELPERS =============
+
+    _getLineRange(value, selectionStart, selectionEnd) {
+        const start = selectionStart ?? 0;
+        const end = selectionEnd ?? start;
+        const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+        const lineEndIndex = value.indexOf('\n', end);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+        return { lineStart, lineEnd };
+    }
+
+    _indentSelection(element) {
+        const value = element.value;
+        const start = element.selectionStart ?? 0;
+        const end = element.selectionEnd ?? start;
+
+        if (start === end) {
+            const insert = this.indentUnit;
+            element.value = value.slice(0, start) + insert + value.slice(end);
+            const cursor = start + insert.length;
+            element.selectionStart = cursor;
+            element.selectionEnd = cursor;
+            if (element.tagName === 'TEXTAREA' && this.autoResize) {
+                this.autoResize(element);
+            }
+            return;
+        }
+
+        const { lineStart, lineEnd } = this._getLineRange(value, start, end);
+        const selected = value.slice(lineStart, lineEnd);
+        const lines = selected.split('\n');
+        const indentedLines = lines.map(line => this.indentUnit + line);
+        const replacement = indentedLines.join('\n');
+
+        element.value = value.slice(0, lineStart) + replacement + value.slice(lineEnd);
+
+        const newSelectionStart = start + this.indentUnit.length;
+        const newSelectionEnd = end + (this.indentUnit.length * lines.length);
+        element.selectionStart = newSelectionStart;
+        element.selectionEnd = newSelectionEnd;
+        if (element.tagName === 'TEXTAREA' && this.autoResize) {
+            this.autoResize(element);
+        }
+    }
+
+    _unindentSelection(element) {
+        const value = element.value;
+        const start = element.selectionStart ?? 0;
+        const end = element.selectionEnd ?? start;
+
+        const { lineStart, lineEnd } = this._getLineRange(value, start, end);
+        const selected = value.slice(lineStart, lineEnd);
+        const lines = selected.split('\n');
+        const removedCounts = [];
+        const unindentedLines = lines.map(line => {
+            let removed = 0;
+            while (removed < this.indentUnit.length && line.charAt(removed) === ' ') {
+                removed += 1;
+            }
+            removedCounts.push(removed);
+            return line.slice(removed);
+        });
+
+        const replacement = unindentedLines.join('\n');
+        element.value = value.slice(0, lineStart) + replacement + value.slice(lineEnd);
+
+        const totalRemoved = removedCounts.reduce((sum, count) => sum + count, 0);
+        const newSelectionStart = Math.max(lineStart, start - removedCounts[0]);
+        const newSelectionEnd = Math.max(newSelectionStart, end - totalRemoved);
+        element.selectionStart = newSelectionStart;
+        element.selectionEnd = newSelectionEnd;
+        if (element.tagName === 'TEXTAREA' && this.autoResize) {
+            this.autoResize(element);
         }
     }
 
