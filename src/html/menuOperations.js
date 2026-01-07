@@ -105,6 +105,14 @@ class SimpleMenuManager {
         this.hideTimeout = null;
     }
 
+    buildMenuButton(label, onClick) {
+        return `<button class="donut-menu-item" onclick="${onClick}">${label}</button>`;
+    }
+
+    buildMenuButtons(items) {
+        return items.map(item => this.buildMenuButton(item.label, item.onClick)).join('');
+    }
+
     hasTagStyleProperties(tagConfig) {
         return tagConfig && typeof tagConfig === 'object' &&
             (tagConfig.light || tagConfig.dark || tagConfig.headerBar ||
@@ -406,20 +414,20 @@ class SimpleMenuManager {
             case 'marp-directives':
                 return this.createMarpDirectivesContent(menuItem.dataset.scope, id, type, columnId);
             case 'move':
-                return `
-                    <button class="donut-menu-item" onclick="moveTaskToTop('${id}', '${columnId}')">Top</button>
-                    <button class="donut-menu-item" onclick="moveTaskUp('${id}', '${columnId}')">Up</button>
-                    <button class="donut-menu-item" onclick="moveTaskDown('${id}', '${columnId}')">Down</button>
-                    <button class="donut-menu-item" onclick="moveTaskToBottom('${id}', '${columnId}')">Bottom</button>
-                `;
+                return this.buildMenuButtons([
+                    { label: 'Top', onClick: `moveTaskToTop('${id}', '${columnId}')` },
+                    { label: 'Up', onClick: `moveTaskUp('${id}', '${columnId}')` },
+                    { label: 'Down', onClick: `moveTaskDown('${id}', '${columnId}')` },
+                    { label: 'Bottom', onClick: `moveTaskToBottom('${id}', '${columnId}')` }
+                ]);
             case 'move-to-list':
-                return this.createMoveToListContent(id, columnId);
+                return this.createMoveToColumnMenu(id, columnId);
             case 'sort':
-                return `
-                    <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'unsorted')">Unsorted</button>
-                    <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>
-                    <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'numericTag')">Sort by index (#)</button>
-                `;
+                return this.buildMenuButtons([
+                    { label: 'Unsorted', onClick: `sortColumn('${columnId}', 'unsorted')` },
+                    { label: 'Sort by title', onClick: `sortColumn('${columnId}', 'title')` },
+                    { label: 'Sort by index (#)', onClick: `sortColumn('${columnId}', 'numericTag')` }
+                ]);
             case 'marp-classes':
                 return this.createMarpClassesContent(menuItem.dataset.scope, id, type, columnId);
             case 'marp-colors':
@@ -551,13 +559,16 @@ class SimpleMenuManager {
     }
 
     // Create move to list content
-    createMoveToListContent(taskId, columnId) {
+    createMoveToColumnMenu(taskId, columnId) {
         const currentBoard = window.cachedBoard;
         if (!currentBoard?.columns) {return '';}
         
         return currentBoard.columns
             .filter(col => col.id !== columnId)
-            .map(col => `<button class="donut-menu-item" onclick="moveTaskToColumn('${taskId}', '${columnId}', '${col.id}')">${window.escapeHtml ? window.escapeHtml(col.title || 'Untitled') : col.title || 'Untitled'}</button>`)
+            .map(col => {
+                const columnTitle = window.escapeHtml ? window.escapeHtml(col.title || 'Untitled') : col.title || 'Untitled';
+                return this.buildMenuButton(columnTitle, `moveTaskToColumn('${taskId}', '${columnId}', '${col.id}')`);
+            })
             .join('');
     }
 
