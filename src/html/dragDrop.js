@@ -207,6 +207,12 @@ function resetDropTargets() {
     dragState.pendingDropZone = null;
 }
 
+function clearLeftViewFlag() {
+    if (dragState.isDragging && dragState.leftView) {
+        dragState.leftView = false;
+    }
+}
+
 /**
  * Sets up global drag and drop event listeners
  * Purpose: Handle external file drops and clipboard operations
@@ -530,9 +536,7 @@ function setupGlobalDragAndDrop() {
     // Document level handlers
     document.addEventListener('dragover', function(e) {
         // If we left the view and now dragover is firing, we're back!
-        if (dragState.isDragging && dragState.leftView) {
-            dragState.leftView = false;
-        }
+        clearLeftViewFlag();
 
         if (!boardContainer.contains(e.target) && isExternalFileDrag(e)) {
             e.preventDefault();
@@ -541,23 +545,17 @@ function setupGlobalDragAndDrop() {
 
     // Use mousemove as a fallback to detect re-entry since dragenter/dragover might not fire
     document.addEventListener('mousemove', function(e) {
-        if (dragState.isDragging && dragState.leftView) {
-            dragState.leftView = false;
-        }
+        clearLeftViewFlag();
     }, false);
 
     // Try mouseenter on body as another detection method
     document.body.addEventListener('mouseenter', function(e) {
-        if (dragState.isDragging && dragState.leftView) {
-            dragState.leftView = false;
-        }
+        clearLeftViewFlag();
     }, false);
 
     // Try pointerenter which works during drag in some browsers
     document.addEventListener('pointerenter', function(e) {
-        if (dragState.isDragging && dragState.leftView) {
-            dragState.leftView = false;
-        }
+        clearLeftViewFlag();
     }, { capture: true });
 
     document.addEventListener('drop', function(e) {
