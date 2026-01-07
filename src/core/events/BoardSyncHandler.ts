@@ -81,6 +81,7 @@ export class BoardSyncHandler {
      */
     private async _handleBoardChanged(event: BoardChangedEvent): Promise<void> {
         const { board } = event.data;
+        const isDebug = this._deps.panelContext.debugMode;
 
         if (!this._deps.fileRegistry.isReady()) {
             return;
@@ -103,7 +104,7 @@ export class BoardSyncHandler {
             mainFile.setCachedBoardFromWebview(normalizedBoard);
         }
 
-        if (event.data.trigger === 'undo' || event.data.trigger === 'redo') {
+        if (isDebug && (event.data.trigger === 'undo' || event.data.trigger === 'redo')) {
             console.log('[kanban.BoardSyncHandler.undoRedo.start]', {
                 trigger: event.data.trigger,
                 columnCount: normalizedBoard.columns.length,
@@ -153,6 +154,7 @@ export class BoardSyncHandler {
      * This is the reverse of loading include content into the board.
      */
     private async _propagateEditsToIncludeFiles(board: KanbanBoard, trigger?: string): Promise<void> {
+        const isDebug = this._deps.panelContext.debugMode;
         // Update column include files with current task content
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
@@ -161,7 +163,7 @@ export class BoardSyncHandler {
                     const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
                         || this._deps.fileRegistry.get(decodedPath);
                     if (!file) {
-                        if (trigger === 'undo' || trigger === 'redo') {
+                        if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                             console.warn('[kanban.BoardSyncHandler.undoRedo.includeColumnMissing]', {
                                 trigger,
                                 columnId: column.id,
@@ -191,7 +193,7 @@ export class BoardSyncHandler {
 
                     // Only update if content differs from current cached content
                     if (content !== currentContent) {
-                        if (trigger === 'undo' || trigger === 'redo') {
+                        if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                             console.log('[kanban.BoardSyncHandler.undoRedo.includeColumnUpdate]', {
                                 trigger,
                                 columnId: column.id,
@@ -207,11 +209,13 @@ export class BoardSyncHandler {
                         if (openDoc) {
                             const openContent = openDoc.getText();
                             if (openContent !== content) {
-                                console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
-                                    includePath,
-                                    isDirty: openDoc.isDirty,
-                                    contentLength: content.length
-                                });
+                                if (isDebug) {
+                                    console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                        includePath,
+                                        isDirty: openDoc.isDirty,
+                                        contentLength: content.length
+                                    });
+                                }
                                 const edit = new vscode.WorkspaceEdit();
                                 const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
                                 edit.replace(openDoc.uri, fullRange, content);
@@ -232,7 +236,7 @@ export class BoardSyncHandler {
                         const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
                             || this._deps.fileRegistry.get(decodedPath);
                         if (!file) {
-                            if (trigger === 'undo' || trigger === 'redo') {
+                            if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                                 console.warn('[kanban.BoardSyncHandler.undoRedo.includeTaskMissing]', {
                                     trigger,
                                     taskId: task.id,
@@ -262,7 +266,7 @@ export class BoardSyncHandler {
 
                         // Only update if content differs from current cached content
                         if (fullContent !== currentContent) {
-                            if (trigger === 'undo' || trigger === 'redo') {
+                            if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                                 console.log('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
                                     trigger,
                                     taskId: task.id,
@@ -277,11 +281,13 @@ export class BoardSyncHandler {
                             if (openDoc) {
                                 const openContent = openDoc.getText();
                                 if (openContent !== fullContent) {
-                                    console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
-                                        includePath,
-                                        isDirty: openDoc.isDirty,
-                                        contentLength: fullContent.length
-                                    });
+                                    if (isDebug) {
+                                        console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                            includePath,
+                                            isDirty: openDoc.isDirty,
+                                            contentLength: fullContent.length
+                                        });
+                                    }
                                     const edit = new vscode.WorkspaceEdit();
                                     const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
                                     edit.replace(openDoc.uri, fullRange, fullContent);

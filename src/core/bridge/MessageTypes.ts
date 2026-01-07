@@ -77,6 +77,7 @@ export interface BoardUpdateMessage extends BaseMessage {
     isFullRefresh?: boolean;
     applyDefaultFolding?: boolean;
     version?: string;
+    debugMode?: boolean;
     focusTargets?: FocusTarget[];
 }
 
@@ -1246,6 +1247,14 @@ export interface ClearTrackedFilesCacheMessage extends BaseMessage {
 }
 
 /**
+ * Set debug mode
+ */
+export interface SetDebugModeMessage extends BaseMessage {
+    type: 'setDebugMode';
+    enabled: boolean;
+}
+
+/**
  * Edit mode start notification
  */
 export interface EditModeStartMessage extends BaseMessage {
@@ -1841,6 +1850,7 @@ export type IncomingMessage =
     | VerifyContentSyncMessage
     | GetTrackedFilesDebugInfoMessage
     | ClearTrackedFilesCacheMessage
+    | SetDebugModeMessage
     // Path conversion messages
     | ConvertPathsMessage
     | ConvertAllPathsMessage

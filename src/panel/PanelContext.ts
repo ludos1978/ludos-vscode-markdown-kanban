@@ -125,6 +125,7 @@ export class PanelContext {
     get trackedDocumentUri(): string | undefined { return this._trackedDocumentUri; }
     get pendingBoardUpdate(): PendingBoardUpdate | null { return this._pendingBoardUpdate; }
     get panelId(): string { return this._panelId; }
+    get debugMode(): boolean { return this._debugMode; }
 
     // ============= PANEL FLAG SETTERS =============
 
@@ -244,6 +245,15 @@ export class PanelContext {
     private _logWarning(message: string): void {
         if (this._debugMode) {
             console.warn(`[PanelContext] ${message}`);
+        }
+    }
+
+    public setDebugMode(enabled: boolean): void {
+        if (this._debugMode !== enabled) {
+            this._debugMode = enabled;
+            if (this._debugMode) {
+                console.log(`[PanelContext] debugMode: enabled`);
+            }
         }
     }
 }

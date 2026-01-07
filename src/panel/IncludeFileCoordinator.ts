@@ -185,6 +185,7 @@ export class IncludeFileCoordinator {
      */
     private _sendColumnIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
         const filePath = file.getPath();
+        const isDebug = this._deps.state.debugMode;
         // Find column that uses this include file
         const column = board.columns.find(c =>
             c.includeFiles && c.includeFiles.some(p =>
@@ -193,14 +194,16 @@ export class IncludeFileCoordinator {
         );
 
         if (!column) {
-            console.warn('[kanban.IncludeFileCoordinator.includeColumn.noMatch]', {
-                relativePath,
-                filePath,
-                boardColumns: board.columns.map(c => ({
-                    id: c.id,
-                    includeFiles: c.includeFiles || []
-                }))
-            });
+            if (isDebug) {
+                console.warn('[kanban.IncludeFileCoordinator.includeColumn.noMatch]', {
+                    relativePath,
+                    filePath,
+                    boardColumns: board.columns.map(c => ({
+                        id: c.id,
+                        includeFiles: c.includeFiles || []
+                    }))
+                });
+            }
             return;
         }
 
@@ -221,15 +224,17 @@ export class IncludeFileCoordinator {
             let tasks: KanbanTask[];
             let includeError: boolean;
 
-            console.log('[kanban.IncludeFileCoordinator.includeColumn.update]', {
-                columnId: column.id,
-                columnTitle: column.title,
-                relativePath,
-                filePath,
-                fileExists,
-                includeFiles: column.includeFiles || [],
-                previousTaskCount: column.tasks?.length ?? 0
-            });
+            if (isDebug) {
+                console.log('[kanban.IncludeFileCoordinator.includeColumn.update]', {
+                    columnId: column.id,
+                    columnTitle: column.title,
+                    relativePath,
+                    filePath,
+                    fileExists,
+                    includeFiles: column.includeFiles || [],
+                    previousTaskCount: column.tasks?.length ?? 0
+                });
+            }
 
             if (fileExists) {
                 // Parse tasks from updated file
@@ -246,13 +251,15 @@ export class IncludeFileCoordinator {
             column.tasks = tasks;
             column.includeError = includeError;
 
-            console.log('[kanban.IncludeFileCoordinator.includeColumn.parsed]', {
-                columnId: column.id,
-                relativePath,
-                taskCount: tasks.length,
-                taskIds: tasks.map(task => task.id),
-                includeError
-            });
+            if (isDebug) {
+                console.log('[kanban.IncludeFileCoordinator.includeColumn.parsed]', {
+                    columnId: column.id,
+                    relativePath,
+                    taskCount: tasks.length,
+                    taskIds: tasks.map(task => task.id),
+                    includeError
+                });
+            }
 
             // Send update to frontend
             const columnMessage: UpdateColumnContentExtendedMessage = {
@@ -274,6 +281,7 @@ export class IncludeFileCoordinator {
      */
     private _sendTaskIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
         const filePath = file.getPath();
+        const isDebug = this._deps.state.debugMode;
         // Find task that uses this include file
         let foundTask: KanbanTask | undefined;
         let foundColumn: KanbanColumn | undefined;
@@ -292,18 +300,20 @@ export class IncludeFileCoordinator {
         }
 
         if (!foundTask || !foundColumn) {
-            console.warn('[kanban.IncludeFileCoordinator.includeTask.noMatch]', {
-                relativePath,
-                filePath,
-                boardColumns: board.columns.map(column => ({
-                    id: column.id,
-                    taskIds: column.tasks.map(task => task.id),
-                    includeTasks: column.tasks
-                        .filter(task => Array.isArray(task.includeFiles) && task.includeFiles.length > 0)
-                        .map(task => ({ id: task.id, includeFiles: task.includeFiles || [] }))
-                }))
-            });
-            console.warn(`[IncludeFileCoordinator] No task found for include file: ${relativePath}`);
+            if (isDebug) {
+                console.warn('[kanban.IncludeFileCoordinator.includeTask.noMatch]', {
+                    relativePath,
+                    filePath,
+                    boardColumns: board.columns.map(column => ({
+                        id: column.id,
+                        taskIds: column.tasks.map(task => task.id),
+                        includeTasks: column.tasks
+                            .filter(task => Array.isArray(task.includeFiles) && task.includeFiles.length > 0)
+                            .map(task => ({ id: task.id, includeFiles: task.includeFiles || [] }))
+                    }))
+                });
+                console.warn(`[IncludeFileCoordinator] No task found for include file: ${relativePath}`);
+            }
             return;
         }
 
@@ -323,14 +333,16 @@ export class IncludeFileCoordinator {
             let description: string;
             let includeError: boolean;
 
-            console.log('[kanban.IncludeFileCoordinator.includeTask.update]', {
-                columnId: foundColumn.id,
-                taskId: foundTask.id,
-                taskTitle: foundTask.title,
-                relativePath,
-                filePath,
-                fileExists
-            });
+            if (isDebug) {
+                console.log('[kanban.IncludeFileCoordinator.includeTask.update]', {
+                    columnId: foundColumn.id,
+                    taskId: foundTask.id,
+                    taskTitle: foundTask.title,
+                    relativePath,
+                    filePath,
+                    fileExists
+                });
+            }
 
             if (fileExists) {
                 // Get updated content from file
@@ -348,13 +360,15 @@ export class IncludeFileCoordinator {
             foundTask.description = description;
             foundTask.includeError = includeError;
 
-            console.log('[kanban.IncludeFileCoordinator.includeTask.parsed]', {
-                columnId: foundColumn.id,
-                taskId: foundTask.id,
-                relativePath,
-                contentLength: description.length,
-                includeError
-            });
+            if (isDebug) {
+                console.log('[kanban.IncludeFileCoordinator.includeTask.parsed]', {
+                    columnId: foundColumn.id,
+                    taskId: foundTask.id,
+                    relativePath,
+                    contentLength: description.length,
+                    includeError
+                });
+            }
 
             // Send update to frontend
             const taskMessage: UpdateTaskContentExtendedMessage = {

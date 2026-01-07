@@ -78,6 +78,10 @@ export interface PanelCommandAccess {
     // File loading
     loadMarkdownFile?(document: vscode.TextDocument, forceReload?: boolean): Promise<void>;
 
+    // Debug mode
+    setDebugMode?(enabled: boolean): void;
+    getDebugMode?(): boolean;
+
     // Services access - flexible types for private method access
     _fileService?: FileServiceAccess;
     _conflictResolver?: ConflictResolver;

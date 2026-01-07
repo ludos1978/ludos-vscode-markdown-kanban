@@ -45,6 +45,14 @@ export class ConcurrencyManager {
         this._debugMode = debugMode;
     }
 
+    public setDebugMode(enabled: boolean): void {
+        this._debugMode = enabled;
+    }
+
+    public get debugMode(): boolean {
+        return this._debugMode;
+    }
+
     // ============= OPERATION LOCKING (RACE-4) =============
 
     /**

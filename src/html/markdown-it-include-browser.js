@@ -9,9 +9,11 @@
 })(this, (function() {
   "use strict";
 
-  // Set to true to enable debug logging
-  const DEBUG = false;
-  const log = DEBUG ? console.log.bind(console, '[include-browser]') : () => {};
+  const log = (...args) => {
+    if (typeof globalThis !== 'undefined' && globalThis.kanbanDebug?.enabled) {
+      console.log('[include-browser]', ...args);
+    }
+  };
 
   const INCLUDE_RE = /!!!include\(([^)]+)\)!!!/;
 

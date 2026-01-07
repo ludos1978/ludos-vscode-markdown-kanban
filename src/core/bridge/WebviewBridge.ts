@@ -43,12 +43,16 @@ export class WebviewBridge implements vscode.Disposable {
     // Options
     private readonly _maxBatchSize: number;
     private readonly _batchFlushDelay: number;
-    private readonly _debug: boolean;
+    private _debug: boolean;
 
     constructor(options: WebviewBridgeOptions = {}) {
         this._maxBatchSize = options.maxBatchSize ?? 10;
         this._batchFlushDelay = options.batchFlushDelay ?? 16;
         this._debug = options.debug ?? false;
+    }
+
+    public setDebugMode(enabled: boolean): void {
+        this._debug = enabled;
     }
 
     // ============= WEBVIEW MANAGEMENT =============

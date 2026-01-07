@@ -114,7 +114,8 @@ export class WebviewUpdateService {
         this._sendBoardUpdateMessage(board, {
             isFullRefresh,
             applyDefaultFolding,
-            version
+            version,
+            debugMode: this._deps.panelContext.debugMode
         });
 
         // Refresh configuration after sending board
@@ -134,6 +135,7 @@ export class WebviewUpdateService {
         isFullRefresh?: boolean;
         applyDefaultFolding?: boolean;
         version?: string;
+        debugMode?: boolean;
     } = {}): void {
         if (!this._deps.hasPanel()) return;
 
@@ -149,7 +151,8 @@ export class WebviewUpdateService {
             // Optional fields for full board loads
             ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
             ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
-            ...(options.version && { version: options.version })
+            ...(options.version && { version: options.version }),
+            ...(options.debugMode !== undefined && { debugMode: options.debugMode })
         } as BoardUpdateMessage;
 
         this._deps.webviewBridge.send(message);

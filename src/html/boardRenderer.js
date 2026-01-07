@@ -880,12 +880,14 @@ function renderSingleColumn(columnId, columnData) {
     const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column[data-column-id]'));
     const columnIndex = allColumns.indexOf(existingColumnElement);
     const existingTaskCount = existingColumnElement.querySelectorAll('.task-item').length;
-    console.log('[kanban.boardRenderer.renderSingleColumn.replace]', {
-        columnId: columnId,
-        columnIndex: columnIndex,
-        taskCount: columnData?.tasks?.length ?? 0,
-        existingTaskCount: existingTaskCount
-    });
+    if (window.kanbanDebug && window.kanbanDebug.enabled) {
+        window.kanbanDebug.log('[kanban.boardRenderer.renderSingleColumn.replace]', {
+            columnId: columnId,
+            columnIndex: columnIndex,
+            taskCount: columnData?.tasks?.length ?? 0,
+            existingTaskCount: existingTaskCount
+        });
+    }
 
     // Create new column element
     const newColumnElement = createColumnElement(columnData, columnIndex);
@@ -905,11 +907,13 @@ function renderSingleColumn(columnId, columnData) {
 
     const renderedTaskIds = Array.from(newColumnElement.querySelectorAll('.task-item'))
         .map(taskElement => taskElement.getAttribute('data-task-id'));
-    console.log('[kanban.boardRenderer.renderSingleColumn.dom]', {
-        columnId: columnId,
-        renderedTaskCount: renderedTaskIds.length,
-        renderedTaskIds: renderedTaskIds
-    });
+    if (window.kanbanDebug && window.kanbanDebug.enabled) {
+        window.kanbanDebug.log('[kanban.boardRenderer.renderSingleColumn.dom]', {
+            columnId: columnId,
+            renderedTaskCount: renderedTaskIds.length,
+            renderedTaskIds: renderedTaskIds
+        });
+    }
 
     // Apply current column state (collapsed/expanded)
     if (window.collapsedColumns && window.collapsedColumns.has(columnId)) {

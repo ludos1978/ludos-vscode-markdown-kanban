@@ -10,6 +10,15 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/html/webview.html` version menu item now toggles debug mode via click, and `src/html/webview.js` updates the displayed version to append "(debug)" while active.
+- `src/html/webview.js` now maintains `window.kanbanDebug` state and sends `setDebugMode` messages to the backend on toggle; board updates apply debugMode and refresh the version label.
+- `src/core/bridge/MessageTypes.ts` adds `debugMode` to `BoardUpdateMessage` and introduces `SetDebugModeMessage` for frontend-initiated debug toggles.
+- `src/commands/DebugCommands.ts` now handles `setDebugMode` messages to enable/disable backend debug logging.
+- `src/kanbanWebviewPanel.ts` adds `setDebugMode()` and `getDebugMode()` to update PanelContext, ConcurrencyManager, WebviewBridge, and EventBus debug flags.
+- `src/panel/PanelContext.ts` adds `debugMode` getter and `setDebugMode()` for runtime debug toggling.
+- `src/panel/ConcurrencyManager.ts` and `src/core/bridge/WebviewBridge.ts` now support runtime debug mode changes.
+- `src/services/WebviewUpdateService.ts` includes `debugMode` in board updates to keep webview debug state in sync after reloads.
+- `src/panel/IncludeFileCoordinator.ts`, `src/core/events/BoardSyncHandler.ts`, `src/html/webview.js`, `src/html/boardRenderer.js`, and `src/html/markdown-it-include-browser.js` now gate verbose debug logs behind the debug mode flag.
 - `src/core/events/BoardSyncHandler.ts` `_handleBoardChanged()` and `_propagateEditsToIncludeFiles()` now log undo/redo execution order and include update/missing paths, and resolve include paths via decoded lookups for undo/redo.
 - `src/files/MarkdownFileRegistry.ts` `generateBoard()` now resolves include files using decoded paths with absolute fallbacks to keep include columns/tasks in sync.
 - `src/panel/IncludeFileCoordinator.ts` `_sendColumnIncludeUpdate()` and `_sendTaskIncludeUpdate()` now match include references against both relative and absolute paths to avoid missed updates.

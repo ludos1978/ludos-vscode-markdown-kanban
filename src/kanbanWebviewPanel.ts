@@ -344,6 +344,13 @@ export class KanbanWebviewPanel {
     public setUndoRedoOperation(isOperation: boolean): void { this._context.setUndoRedoOperation(isOperation); }
     public getWebviewBridge(): WebviewBridge { return this._webviewBridge; }
     public getMessageHandler(): MessageHandler { return this._messageHandler; }
+    public setDebugMode(enabled: boolean): void {
+        this._context.setDebugMode(enabled);
+        this._concurrency.setDebugMode(enabled);
+        this._webviewBridge.setDebugMode(enabled);
+        eventBus.setDebugMode(enabled);
+    }
+    public getDebugMode(): boolean { return this._context.debugMode; }
 
     private _initialize() {
         if (!this._context.initialized) {

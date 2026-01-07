@@ -14,6 +14,57 @@ window.currentBoard = currentBoard; // Expose to window for debug overlay verifi
 
 // Note: window.tagColors is set by backend in boardUpdate message
 // Do NOT initialize to {} here - it prevents actual config from loading!
+let baseBuildVersion = '';
+window.kanbanDebug = window.kanbanDebug || {
+    enabled: false,
+    log: (...args) => {
+        if (window.kanbanDebug && window.kanbanDebug.enabled) {
+            console.log(...args);
+        }
+    },
+    warn: (...args) => {
+        if (window.kanbanDebug && window.kanbanDebug.enabled) {
+            console.warn(...args);
+        }
+    }
+};
+
+function updateVersionDisplay(nextVersion) {
+    const versionElement = document.getElementById('build-version');
+    if (!versionElement) {
+        return;
+    }
+
+    if (typeof nextVersion === 'string') {
+        baseBuildVersion = nextVersion;
+        versionElement.dataset.baseVersion = nextVersion;
+    } else if (!baseBuildVersion) {
+        baseBuildVersion = versionElement.dataset.baseVersion || versionElement.textContent || '';
+    }
+
+    const displayVersion = window.kanbanDebug.enabled
+        ? `${baseBuildVersion} (debug)`
+        : baseBuildVersion;
+    versionElement.textContent = displayVersion || '';
+}
+
+function setDebugMode(enabled, options = {}) {
+    window.kanbanDebug.enabled = !!enabled;
+    updateVersionDisplay();
+
+    if (options.notifyBackend !== false && typeof vscode !== 'undefined') {
+        vscode.postMessage({
+            type: 'setDebugMode',
+            enabled: window.kanbanDebug.enabled
+        });
+    }
+}
+
+function toggleDebugMode() {
+    setDebugMode(!window.kanbanDebug.enabled);
+}
+
+window.toggleKanbanDebugMode = toggleDebugMode;
 
 // Generate short content hash using SHA-256 (truncated to 16 chars for filename use)
 async function generateShortHash(arrayBuffer) {
@@ -1302,6 +1353,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize border styles from config
     updateBorderStyles();
 
+    const versionToggle = document.getElementById('version-toggle');
+    if (versionToggle && !versionToggle.dataset.debugToggleReady) {
+        versionToggle.dataset.debugToggleReady = 'true';
+        versionToggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            toggleDebugMode();
+        });
+    }
+
     // Update clipboard content when window gets focus
     window.addEventListener('focus', async () => {
         // Wait a moment for focus to be fully established
@@ -1699,10 +1759,13 @@ if (!webviewEventListenersInitialized) {
 
             // Update version display if provided
             if (message.version) {
-                const versionElement = document.getElementById('build-version');
-                if (versionElement) {
-                    versionElement.textContent = message.version;
-                }
+                updateVersionDisplay(message.version);
+            } else {
+                updateVersionDisplay();
+            }
+
+            if (typeof message.debugMode === 'boolean') {
+                setDebugMode(message.debugMode, { notifyBackend: false });
             }
 
             // Prevent renderBoard() calls during initial config application
@@ -2538,7 +2601,7 @@ if (!webviewEventListenersInitialized) {
                     const colData = message.column || message;
                     const incomingTaskCount = Array.isArray(colData.tasks) ? colData.tasks.length : null;
 
-                    console.log('[kanban.webview.updateColumnContent.received]', {
+                    window.kanbanDebug.log('[kanban.webview.updateColumnContent.received]', {
                         columnId: message.columnId,
                         incomingTaskCount: incomingTaskCount,
                         incomingTitle: colData.title ?? message.columnTitle,
@@ -2546,7 +2609,7 @@ if (!webviewEventListenersInitialized) {
                         includeFiles: colData.includeFiles ? colData.includeFiles.length : 0
                     });
 
-                    console.log('[kanban.webview.updateColumnContent.before]', {
+                    window.kanbanDebug.log('[kanban.webview.updateColumnContent.before]', {
                         columnId: message.columnId,
                         existingTaskCount: column.tasks?.length ?? 0,
                         isLoadingContent: !!column.isLoadingContent,
@@ -2590,7 +2653,7 @@ if (!webviewEventListenersInitialized) {
                     }
 
                     if (Array.isArray(column.tasks)) {
-                        console.log('[kanban.webview.updateColumnContent.tasks]', {
+                        window.kanbanDebug.log('[kanban.webview.updateColumnContent.tasks]', {
                             columnId: message.columnId,
                             taskCount: column.tasks.length,
                             taskIds: column.tasks.map(task => task.id)
@@ -2622,7 +2685,7 @@ if (!webviewEventListenersInitialized) {
                     const hasNewTasks = message.tasks && message.tasks.length > 0;
                     const forceRender = hasIncludeContent || hasNewTasks;
 
-                    console.log('[kanban.webview.updateColumnContent.render]', {
+                    window.kanbanDebug.log('[kanban.webview.updateColumnContent.render]', {
                         columnId: message.columnId,
                         isEditing: !!isEditing,
                         forceRender: !!forceRender,

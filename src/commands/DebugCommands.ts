@@ -19,6 +19,7 @@ import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAcc
 import { MarkdownKanbanParser } from '../markdownParser';
 import { KanbanBoard } from '../board/KanbanTypes';
 import * as fs from 'fs';
+import { SetDebugModeMessage } from '../core/bridge/MessageTypes';
 
 /**
  * File verification result for content sync check
@@ -115,7 +116,8 @@ export class DebugCommands extends SwitchBasedCommand {
             'forceWriteAllContent',
             'verifyContentSync',
             'getTrackedFilesDebugInfo',
-            'clearTrackedFilesCache'
+            'clearTrackedFilesCache',
+            'setDebugMode'
         ],
         priority: 50
     };
@@ -124,8 +126,19 @@ export class DebugCommands extends SwitchBasedCommand {
         'forceWriteAllContent': (_msg, ctx) => this.handleForceWriteAllContent(ctx),
         'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, ctx),
         'getTrackedFilesDebugInfo': (_msg, ctx) => this.handleGetTrackedFilesDebugInfo(ctx),
-        'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx)
+        'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx),
+        'setDebugMode': (msg, ctx) => this.handleSetDebugMode(msg as SetDebugModeMessage, ctx)
     };
+
+    private async handleSetDebugMode(message: SetDebugModeMessage, context: CommandContext): Promise<CommandResult> {
+        const panel = context.getWebviewPanel() as PanelCommandAccess | undefined;
+        if (!panel || typeof panel.setDebugMode !== 'function') {
+            return this.success();
+        }
+
+        panel.setDebugMode(message.enabled);
+        return this.success();
+    }
 
     // ============= FORCE WRITE / VERIFICATION HANDLERS =============
 
