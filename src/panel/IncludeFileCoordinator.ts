@@ -184,12 +184,25 @@ export class IncludeFileCoordinator {
      * Send column include file update to frontend
      */
     private _sendColumnIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
+        const filePath = file.getPath();
         // Find column that uses this include file
         const column = board.columns.find(c =>
             c.includeFiles && c.includeFiles.some(p =>
-                MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, file.getPath())
+                MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, filePath)
             )
         );
+
+        if (!column) {
+            console.warn('[kanban.IncludeFileCoordinator.includeColumn.noMatch]', {
+                relativePath,
+                filePath,
+                boardColumns: board.columns.map(c => ({
+                    id: c.id,
+                    includeFiles: c.includeFiles || []
+                }))
+            });
+            return;
+        }
 
         if (column) {
             // CRITICAL FIX: Type guard to prevent treating MainKanbanFile as IncludeFile
@@ -208,6 +221,16 @@ export class IncludeFileCoordinator {
             let tasks: KanbanTask[];
             let includeError: boolean;
 
+            console.log('[kanban.IncludeFileCoordinator.includeColumn.update]', {
+                columnId: column.id,
+                columnTitle: column.title,
+                relativePath,
+                filePath,
+                fileExists,
+                includeFiles: column.includeFiles || [],
+                previousTaskCount: column.tasks?.length ?? 0
+            });
+
             if (fileExists) {
                 // Parse tasks from updated file
                 tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
@@ -222,6 +245,14 @@ export class IncludeFileCoordinator {
 
             column.tasks = tasks;
             column.includeError = includeError;
+
+            console.log('[kanban.IncludeFileCoordinator.includeColumn.parsed]', {
+                columnId: column.id,
+                relativePath,
+                taskCount: tasks.length,
+                taskIds: tasks.map(task => task.id),
+                includeError
+            });
 
             // Send update to frontend
             const columnMessage: UpdateColumnContentExtendedMessage = {
@@ -242,6 +273,7 @@ export class IncludeFileCoordinator {
      * Send task include file update to frontend
      */
     private _sendTaskIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
+        const filePath = file.getPath();
         // Find task that uses this include file
         let foundTask: KanbanTask | undefined;
         let foundColumn: KanbanColumn | undefined;
@@ -249,7 +281,7 @@ export class IncludeFileCoordinator {
         for (const column of board.columns) {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.some((p: string) =>
-                    MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, file.getPath())
+                    MarkdownFile.isSameFile(p, relativePath) || MarkdownFile.isSameFile(p, filePath)
                 )) {
                     foundTask = task;
                     foundColumn = column;
@@ -257,6 +289,22 @@ export class IncludeFileCoordinator {
                 }
             }
             if (foundTask) break;
+        }
+
+        if (!foundTask || !foundColumn) {
+            console.warn('[kanban.IncludeFileCoordinator.includeTask.noMatch]', {
+                relativePath,
+                filePath,
+                boardColumns: board.columns.map(column => ({
+                    id: column.id,
+                    taskIds: column.tasks.map(task => task.id),
+                    includeTasks: column.tasks
+                        .filter(task => Array.isArray(task.includeFiles) && task.includeFiles.length > 0)
+                        .map(task => ({ id: task.id, includeFiles: task.includeFiles || [] }))
+                }))
+            });
+            console.warn(`[IncludeFileCoordinator] No task found for include file: ${relativePath}`);
+            return;
         }
 
         if (foundTask && foundColumn) {
@@ -275,6 +323,15 @@ export class IncludeFileCoordinator {
             let description: string;
             let includeError: boolean;
 
+            console.log('[kanban.IncludeFileCoordinator.includeTask.update]', {
+                columnId: foundColumn.id,
+                taskId: foundTask.id,
+                taskTitle: foundTask.title,
+                relativePath,
+                filePath,
+                fileExists
+            });
+
             if (fileExists) {
                 // Get updated content from file
                 description = file.getContent() || '';
@@ -290,6 +347,14 @@ export class IncludeFileCoordinator {
             foundTask.displayTitle = displayTitle;
             foundTask.description = description;
             foundTask.includeError = includeError;
+
+            console.log('[kanban.IncludeFileCoordinator.includeTask.parsed]', {
+                columnId: foundColumn.id,
+                taskId: foundTask.id,
+                relativePath,
+                contentLength: description.length,
+                includeError
+            });
 
             // Send update to frontend
             const taskMessage: UpdateTaskContentExtendedMessage = {
