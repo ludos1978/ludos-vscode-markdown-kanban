@@ -213,6 +213,13 @@ function clearLeftViewFlag() {
     }
 }
 
+function finalizeExternalDragState() {
+    dragState.draggedClipboardCard = null;
+    dragState.draggedEmptyCard = null;
+    dragState.draggedDiagramCard = null;
+    dragState.isDragging = false;
+}
+
 /**
  * Sets up global drag and drop event listeners
  * Purpose: Handle external file drops and clipboard operations
@@ -372,10 +379,7 @@ function setupGlobalDragAndDrop() {
         if (textData && textData.startsWith('CLIPBOARD_IMAGE:')) {
             const imageData = textData.substring('CLIPBOARD_IMAGE:'.length);
             handleClipboardImageDrop(e, imageData);
-            if (dragState.draggedClipboardCard) {
-                dragState.draggedClipboardCard = null;
-                dragState.isDragging = false;
-            }
+            finalizeExternalDragState();
             return;
         }
 
@@ -387,8 +391,7 @@ function setupGlobalDragAndDrop() {
                 task: dragState.draggedClipboardCard
             });
             handleClipboardCardDrop(e, clipboardData);
-            dragState.draggedClipboardCard = null;
-            dragState.isDragging = false;
+            finalizeExternalDragState();
             return;
         }
         
@@ -398,8 +401,7 @@ function setupGlobalDragAndDrop() {
                 task: dragState.draggedEmptyCard
             });
             handleEmptyCardDrop(e, emptyCardData);
-            dragState.draggedEmptyCard = null;
-            dragState.isDragging = false;
+            finalizeExternalDragState();
             return;
         }
 
@@ -412,8 +414,7 @@ function setupGlobalDragAndDrop() {
             if (typeof handleDiagramCardDrop === 'function') {
                 handleDiagramCardDrop(e, diagramData);
             }
-            dragState.draggedDiagramCard = null;
-            dragState.isDragging = false;
+            finalizeExternalDragState();
             return;
         }
 
