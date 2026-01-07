@@ -892,6 +892,14 @@ function renderSingleColumn(columnId, columnData) {
         newTasksContainer.scrollTop = scrollTop;
     }
 
+    const renderedTaskIds = Array.from(newColumnElement.querySelectorAll('.task-item'))
+        .map(taskElement => taskElement.getAttribute('data-task-id'));
+    console.log('[kanban.boardRenderer.renderSingleColumn.dom]', {
+        columnId: columnId,
+        renderedTaskCount: renderedTaskIds.length,
+        renderedTaskIds: renderedTaskIds
+    });
+
     // Apply current column state (collapsed/expanded)
     if (window.collapsedColumns && window.collapsedColumns.has(columnId)) {
         const foldMode = window.columnFoldModes?.get(columnId) || getDefaultFoldMode(columnId);

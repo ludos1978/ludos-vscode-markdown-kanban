@@ -2546,6 +2546,13 @@ if (!webviewEventListenersInitialized) {
                         includeFiles: colData.includeFiles ? colData.includeFiles.length : 0
                     });
 
+                    console.log('[kanban.webview.updateColumnContent.before]', {
+                        columnId: message.columnId,
+                        existingTaskCount: column.tasks?.length ?? 0,
+                        isLoadingContent: !!column.isLoadingContent,
+                        includeError: !!column.includeError
+                    });
+
                     // Update tasks and column metadata
                     if (colData.tasks !== undefined) column.tasks = colData.tasks;
 
@@ -2572,10 +2579,22 @@ if (!webviewEventListenersInitialized) {
                     // Update loading state for includes
                     if (colData.isLoadingContent !== undefined) {
                         column.isLoadingContent = colData.isLoadingContent;
+                    } else if (Array.isArray(colData.tasks)) {
+                        column.isLoadingContent = false;
                     }
                     // Clear include error state when include loads successfully
                     if (colData.includeError !== undefined) {
                         column.includeError = colData.includeError;
+                    } else if (Array.isArray(colData.tasks) && colData.tasks.length > 0) {
+                        column.includeError = false;
+                    }
+
+                    if (Array.isArray(column.tasks)) {
+                        console.log('[kanban.webview.updateColumnContent.tasks]', {
+                            columnId: message.columnId,
+                            taskCount: column.tasks.length,
+                            taskIds: column.tasks.map(task => task.id)
+                        });
                     }
 
                     // Check if user is currently editing
