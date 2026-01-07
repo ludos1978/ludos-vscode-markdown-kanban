@@ -182,6 +182,31 @@ function cleanupDropZoneHighlightsLocal() {
     window.dropIndicatorManager.cleanupDropZoneHighlights();
 }
 
+function resetTaskDragState() {
+    dragState.draggedTask = null;
+    dragState.originalTaskParent = null;
+    dragState.originalTaskNextSibling = null;
+    dragState.originalTaskIndex = -1;
+    dragState.originalTaskColumnId = null;
+}
+
+function resetColumnDragState() {
+    dragState.draggedColumn = null;
+    dragState.draggedColumnId = null;
+    dragState.originalDataIndex = -1;
+    dragState.originalColumnParent = null;
+    dragState.originalColumnNextSibling = null;
+    dragState.originalColumnIndex = -1;
+}
+
+function resetDropTargets() {
+    dragState.dropTargetContainer = null;
+    dragState.dropTargetAfterElement = null;
+    dragState.dropTargetStack = null;
+    dragState.dropTargetBeforeColumn = null;
+    dragState.pendingDropZone = null;
+}
+
 /**
  * Sets up global drag and drop event listeners
  * Purpose: Handle external file drops and clipboard operations
@@ -206,11 +231,7 @@ function setupGlobalDragAndDrop() {
             dragState.draggedTask.classList.remove('dragging', 'drag-preview');
 
             // Reset drag state
-            dragState.draggedTask = null;
-            dragState.originalTaskParent = null;
-            dragState.originalTaskNextSibling = null;
-            dragState.originalTaskIndex = -1;
-            dragState.originalTaskColumnId = null;
+            resetTaskDragState();
             dragState.isDragging = false;
             dragState.altKeyPressed = false;
         }
@@ -1457,28 +1478,15 @@ function setupGlobalDragAndDrop() {
         // Reset all drag state properties
         dragState.draggedClipboardCard = null;
         dragState.draggedEmptyCard = null;
-        dragState.draggedTask = null;
-        dragState.originalTaskParent = null;
-        dragState.originalTaskNextSibling = null;
-        dragState.originalTaskIndex = -1;
-        dragState.originalTaskColumnId = null;
-        dragState.draggedColumn = null;
-        dragState.draggedColumnId = null;
-        dragState.originalDataIndex = -1;
-        dragState.originalColumnParent = null;
-        dragState.originalColumnNextSibling = null;
-        dragState.originalColumnIndex = -1;
+        resetTaskDragState();
+        resetColumnDragState();
         dragState.isDragging = false;
         dragState.lastDropTarget = null;
         dragState.leftView = false;
         dragState.leftViewTimestamp = null;
 
         // Reset drop target tracking
-        dragState.dropTargetContainer = null;
-        dragState.dropTargetAfterElement = null;
-        dragState.dropTargetStack = null;
-        dragState.dropTargetBeforeColumn = null;
-        dragState.pendingDropZone = null;
+        resetDropTargets();
 
         // Reset RAF throttle flags
         dragState.columnDragoverPending = false;
