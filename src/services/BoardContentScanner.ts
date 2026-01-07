@@ -180,6 +180,31 @@ export class BoardContentScanner {
     findBrokenElements(board: KanbanBoard): BrokenElement[] {
         const elements = this.extractElements(board);
         const broken: BrokenElement[] = [];
+        const brokenKeys = new Set<string>();
+
+        const buildKey = (element: ExtractedElement): string => {
+            const location = element.location;
+            return [
+                element.type,
+                element.path,
+                location.columnId,
+                location.taskId || '',
+                location.field
+            ].join('|');
+        };
+
+        const pushBroken = (element: ExtractedElement, resolvedPath?: string): void => {
+            const key = buildKey(element);
+            if (brokenKeys.has(key)) {
+                return;
+            }
+            brokenKeys.add(key);
+            broken.push({
+                ...element,
+                exists: false,
+                resolvedPath
+            });
+        };
 
         for (const element of elements) {
             // Skip URLs
@@ -191,11 +216,7 @@ export class BoardContentScanner {
             const exists = fs.existsSync(resolvedPath);
 
             if (!exists) {
-                broken.push({
-                    ...element,
-                    exists: false,
-                    resolvedPath
-                });
+                pushBroken(element, resolvedPath);
             }
         }
 
@@ -212,7 +233,7 @@ export class BoardContentScanner {
                     for (const includePath of column.includeFiles) {
                         const resolvedPath = this._resolvePath(includePath);
                         if (!fs.existsSync(resolvedPath)) {
-                            broken.push({
+                            pushBroken({
                                 type: 'include',
                                 path: includePath,
                                 rawMatch: `!!!include(${includePath})!!!`,
@@ -220,10 +241,8 @@ export class BoardContentScanner {
                                     columnId: column.id,
                                     columnTitle: column.displayTitle || column.title,
                                     field: 'columnTitle'
-                                },
-                                exists: false,
-                                resolvedPath
-                            });
+                                }
+                            }, resolvedPath);
                         }
                     }
                 }
@@ -240,7 +259,7 @@ export class BoardContentScanner {
                         for (const includePath of task.includeFiles) {
                             const resolvedPath = this._resolvePath(includePath);
                             if (!fs.existsSync(resolvedPath)) {
-                                broken.push({
+                                pushBroken({
                                     type: 'include',
                                     path: includePath,
                                     rawMatch: `!!!include(${includePath})!!!`,
@@ -250,10 +269,8 @@ export class BoardContentScanner {
                                         taskId: task.id,
                                         taskTitle: task.displayTitle || task.title,
                                         field: 'taskTitle'
-                                    },
-                                    exists: false,
-                                    resolvedPath
-                                });
+                                    }
+                                }, resolvedPath);
                             }
                         }
                     }

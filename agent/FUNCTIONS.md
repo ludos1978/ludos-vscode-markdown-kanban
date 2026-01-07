@@ -10,6 +10,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/services/BoardContentScanner.ts` now de-duplicates broken include results by type/path/location to avoid duplicate entries in the broken embedded search.
+- `src/html/webview.html` file search modal now guards option updates when controls are missing, preventing classList null errors.
 - `src/html/webview.js` `scrollToAndHighlight()` now targets `.task-item` and `.kanban-full-height-column` selectors to match the actual DOM and find search results reliably.
 - `src/kanbanWebviewPanel.ts` now tracks the last active panel and exposes `getActivePanel()` so search/navigation targets the correct board; `src/kanbanSearchProvider.ts` remembers the panel used for search results and navigates within it.
 - `src/kanbanSearchProvider.ts` now reveals the main kanban webview panel before navigating to a search result, ensuring focus switches to the board.

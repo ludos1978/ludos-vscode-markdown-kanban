@@ -1382,7 +1382,16 @@
                     if (batchCheckboxEl.checked) requestAllBatchAnalysis();
                     break;
                 case 'fileSearchResults': console.log('[FileSearchModal] Received fileSearchResults with', msg.results?.length, 'results'); results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; isSearching = false; renderResults(); updatePathPreview(); if (filePreviewEnabled && selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
-                case 'fileSearchOptionsUpdated': caseBtnEl.classList.toggle('active', msg.caseSensitive); wordBtnEl.classList.toggle('active', msg.wholeWord); regexBtnEl.classList.toggle('active', msg.regex); vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }); break;
+                case 'fileSearchOptionsUpdated':
+                    if (!caseBtnEl || !wordBtnEl || !regexBtnEl || !searchInputEl) {
+                        console.warn('[FileSearchModal] Missing controls for options update');
+                        break;
+                    }
+                    caseBtnEl.classList.toggle('active', msg.caseSensitive);
+                    wordBtnEl.classList.toggle('active', msg.wholeWord);
+                    regexBtnEl.classList.toggle('active', msg.regex);
+                    vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value });
+                    break;
                 case 'fileSearchBrokenPathCount': brokenPathData = msg; updateBrokenCountDisplay(); if (batchCheckboxEl.checked) updateBatchPanel(); break;
                 case 'fileSearchBatchAnalysis': batchAnalysisData = msg; if (msg.newDir && !msg.scanning) batchAnalysisCache[msg.newDir] = msg; renderBatchFilesList(); renderResults(); updateBatchInfo(); break;
             }
