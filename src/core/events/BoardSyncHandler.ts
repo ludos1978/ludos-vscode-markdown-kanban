@@ -171,6 +171,23 @@ export class BoardSyncHandler {
                     // Only update if content differs from current cached content
                     if (content !== currentContent) {
                         includeFile.setContent(content, false);
+
+                        const includePath = includeFile.getPath();
+                        const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
+                        if (openDoc) {
+                            const openContent = openDoc.getText();
+                            if (openContent !== content) {
+                                console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                    includePath,
+                                    isDirty: openDoc.isDirty,
+                                    contentLength: content.length
+                                });
+                                const edit = new vscode.WorkspaceEdit();
+                                const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
+                                edit.replace(openDoc.uri, fullRange, content);
+                                await vscode.workspace.applyEdit(edit);
+                            }
+                        }
                     }
                 }
             }
@@ -204,6 +221,23 @@ export class BoardSyncHandler {
                         // Only update if content differs from current cached content
                         if (fullContent !== currentContent) {
                             includeFile.setTaskDescription(fullContent);
+
+                            const includePath = includeFile.getPath();
+                            const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
+                            if (openDoc) {
+                                const openContent = openDoc.getText();
+                                if (openContent !== fullContent) {
+                                    console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                        includePath,
+                                        isDirty: openDoc.isDirty,
+                                        contentLength: fullContent.length
+                                    });
+                                    const edit = new vscode.WorkspaceEdit();
+                                    const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
+                                    edit.replace(openDoc.uri, fullRange, fullContent);
+                                    await vscode.workspace.applyEdit(edit);
+                                }
+                            }
                         }
                     }
                 }
