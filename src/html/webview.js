@@ -2680,7 +2680,6 @@ if (!webviewEventListenersInitialized) {
                         });
                     }
                 }
-            }
             break;
         case 'updateTaskContent':
             // Handle targeted task content update for include file changes
@@ -4256,4 +4255,3 @@ function updateLayoutPresetsActiveState() {
         textSpan.textContent = layoutPresets[currentPreset].label;
     }
 }
-
