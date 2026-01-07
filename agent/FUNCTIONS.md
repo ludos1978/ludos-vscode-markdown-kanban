@@ -2,7 +2,7 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-12-18
+**Last Updated:** 2026-01-07
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
@@ -10,8 +10,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
-- `src/kanbanFileService.ts` `setupDocumentChangeListener()` now syncs cached include-file content into newly opened include documents when they have unsaved changes, preventing stale disk content after undo.
-- `src/commands/FileCommands.ts` `handleOpenFileLink()` now applies cached include-file content to opened editors when the include file has unsaved changes, keeping include file views consistent after undo.
+- `src/kanbanFileService.ts` `setupDocumentChangeListener()` now syncs cached include-file content into newly opened include documents when they have unsaved changes (absolute/relative lookup), preventing stale disk content after undo.
+- `src/commands/FileCommands.ts` `handleOpenFileLink()` and `handleOpenIncludeFile()` now apply cached include-file content to opened editors when the include file has unsaved changes, keeping include file views consistent after undo.
 - `src/core/events/BoardSyncHandler.ts` `_propagateEditsToIncludeFiles()` now compares include content against current cached content (not baseline) so undo restores include file content correctly, and updates open include documents to keep editors in sync.
 - `src/html/webview.js` updateColumnContent handler now logs cache/column state, task IDs, and clears stale loading/error flags when task payloads arrive (fixed switch scoping to avoid syntax errors).
 - `src/html/boardRenderer.js` `renderSingleColumn()` now logs rendered task IDs after replacement to compare DOM vs data.

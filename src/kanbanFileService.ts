@@ -539,7 +539,8 @@ export class KanbanFileService {
                 return;
             }
 
-            const includeFile = this.fileRegistry.getByRelativePath(document.uri.fsPath);
+            const includeFile = this.fileRegistry.get(document.uri.fsPath)
+                || this.fileRegistry.getByRelativePath(document.uri.fsPath);
             if (!includeFile || includeFile.getFileType() === 'main') {
                 return;
             }
