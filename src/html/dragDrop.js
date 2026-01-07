@@ -92,86 +92,61 @@ function readPartialFileForHash(file) {
 // The dragStateManager is already available globally as window.dragState
 // for backward compatibility
 
+const DRAG_STATE_DEFAULTS = {
+    isDragging: false,
+    draggedTask: null,
+    draggedColumn: null,
+    draggedClipboardCard: null,
+    draggedEmptyCard: null,
+    // Column-specific
+    draggedColumnId: null,
+    originalColumnIndex: -1,
+    originalColumnNextSibling: null,
+    originalColumnParent: null,
+    originalDataIndex: -1,
+
+    // Task-specific
+    originalTaskIndex: -1,
+    originalTaskColumnId: null,
+    originalTaskParent: null,
+    originalTaskNextSibling: null,
+
+    // Drop tracking
+    lastValidDropTarget: null,
+    lastDropTarget: null,
+    lastRowDropTarget: null,
+    lastRow: null,
+    targetRowNumber: null,
+    targetPosition: null,
+    finalRowNumber: null,
+
+    // Modifier keys
+    altKeyPressed: false,
+
+    // View tracking
+    leftView: false,
+    leftViewTimestamp: null,
+
+    // Template dragging
+    draggedTemplate: null,
+    draggedTemplatePath: null,
+    draggedTemplateName: null
+};
+
+function ensureDragStateDefaults(state) {
+    const resolvedState = state || {};
+    for (const [key, value] of Object.entries(DRAG_STATE_DEFAULTS)) {
+        if (resolvedState[key] === undefined) {
+            resolvedState[key] = value;
+        }
+    }
+    return resolvedState;
+}
+
 // Create local references for frequently accessed properties
 // Wait for dragStateManager to be available via window.dragState
-let dragState = window.dragState;
-
-// Add custom properties that aren't in base DragStateManager
-// Initialize dragState if not available yet
-if (!dragState) {
-    dragState = {
-        isDragging: false,
-        draggedTask: null,
-        draggedColumn: null,
-        draggedClipboardCard: null,
-        draggedEmptyCard: null,
-        // Column-specific
-        draggedColumnId: null,
-        originalColumnIndex: -1,
-        originalColumnNextSibling: null,
-        originalColumnParent: null,
-        originalDataIndex: -1,
-
-        // Task-specific
-        originalTaskIndex: -1,
-        originalTaskColumnId: null,
-        originalTaskParent: null,
-        originalTaskNextSibling: null,
-
-        // Drop tracking
-        lastValidDropTarget: null,
-        lastDropTarget: null,
-        lastRowDropTarget: null,
-        lastRow: null,
-        targetRowNumber: null,
-        targetPosition: null,
-        finalRowNumber: null,
-
-        // Modifier keys
-        altKeyPressed: false,
-
-        // View tracking
-        leftView: false,
-        leftViewTimestamp: null
-    };
-    window.dragState = dragState;
-} else if (!dragState.originalColumnIndex) {
-    Object.assign(dragState, {
-        // Column-specific
-        draggedColumnId: null,
-        originalColumnIndex: -1,
-        originalColumnNextSibling: null,
-        originalColumnParent: null,
-        originalDataIndex: -1,
-
-        // Task-specific
-        originalTaskIndex: -1,
-        originalTaskColumnId: null,
-        originalTaskParent: null,
-        originalTaskNextSibling: null,
-
-        // Drop tracking
-        lastValidDropTarget: null,
-        lastDropTarget: null,
-        lastRowDropTarget: null,
-        lastRow: null,
-        targetRowNumber: null,
-        targetPosition: null,
-        finalRowNumber: null,
-
-        // Modifier keys
-        altKeyPressed: false,
-
-        // View tracking
-        leftView: false,
-        leftViewTimestamp: null,
-
-        // Template dragging
-        draggedTemplate: null,
-        draggedTemplatePath: null,
-        draggedTemplateName: null
-    });
-}
+let dragState = ensureDragStateDefaults(window.dragState);
+window.dragState = dragState;
 
 // Template drag state (separate from main drag state for clarity)
 let templateDragState = {
