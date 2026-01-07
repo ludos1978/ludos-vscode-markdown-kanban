@@ -3284,17 +3284,17 @@ function scrollToAndHighlight(columnId, taskId, highlight = true) {
 
     if (taskId) {
         // Find the task card
-        targetElement = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+        targetElement = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
     }
 
     if (!targetElement && columnId) {
         // Find the column
-        targetElement = document.querySelector(`.column[data-column-id="${columnId}"]`);
+        targetElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
         if (!targetElement) {
             // Try finding by column header
-            const columnHeader = document.querySelector(`.column-header[data-column-id="${columnId}"]`);
+            const columnHeader = document.querySelector(`[data-column-id="${columnId}"]`);
             if (columnHeader) {
-                targetElement = columnHeader.closest('.column');
+                targetElement = columnHeader.closest('.kanban-full-height-column');
             }
         }
     }
