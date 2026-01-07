@@ -105,6 +105,32 @@ class SimpleMenuManager {
         this.hideTimeout = null;
     }
 
+    hasTagStyleProperties(tagConfig) {
+        return tagConfig && typeof tagConfig === 'object' &&
+            (tagConfig.light || tagConfig.dark || tagConfig.headerBar ||
+             tagConfig.border || tagConfig.footerBar || tagConfig.cornerBadge);
+    }
+
+    resolveTagGroupKeys(groupName, groupValue, activeTags) {
+        if (!groupValue || typeof groupValue !== 'object') {
+            return [];
+        }
+        if (this.hasTagStyleProperties(groupValue)) {
+            return [groupName];
+        }
+        return Object.keys(groupValue).filter(key => {
+            const val = groupValue[key];
+            const hasTagProperties = this.hasTagStyleProperties(val);
+            const isActive = activeTags.includes(key.toLowerCase());
+            return hasTagProperties || isActive;
+        });
+    }
+
+    getActiveTagsForElement(type, id, columnId) {
+        const title = this.getElementTitleForScope(type, id, columnId);
+        return window.getActiveTagsInTitle ? window.getActiveTagsInTitle(title) : [];
+    }
+
     getElementForScope(scope, id, columnId) {
         if (scope === 'column') {
             return window.cachedBoard?.columns?.find(c => c.id === id) || null;
@@ -509,43 +535,14 @@ class SimpleMenuManager {
             let tags = [];
 
             // Get current element's active tags to ensure they're always shown
-            const currentBoard = window.cachedBoard;
-            let currentTitle = '';
-            if (type === 'column') {
-                const column = currentBoard?.columns?.find(c => c.id === id);
-                currentTitle = column?.title || '';
-            } else if (type === 'task' && columnId) {
-                const column = currentBoard?.columns?.find(c => c.id === columnId);
-                const task = column?.tasks?.find(t => t.id === id);
-                currentTitle = task?.title || '';
-            }
-            const activeTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(currentTitle) : [];
+            const activeTags = this.getActiveTagsForElement(type, id, columnId);
 
             if (group === 'custom') {
                 tags = window.getUserAddedTags ? window.getUserAddedTags() : [];
             } else {
                 const groupValue = tagConfig[group];
 
-                if (groupValue && typeof groupValue === 'object') {
-                    // Check if this is a direct tag (has any styling properties)
-                    const isDirectTag = groupValue.light || groupValue.dark || groupValue.headerBar ||
-                                       groupValue.border || groupValue.footerBar || groupValue.cornerBadge;
-
-                    if (isDirectTag) {
-                        tags = [group];
-                    } else {
-                        // It's a group, collect its tags that have styling OR are currently active
-                        tags = Object.keys(groupValue).filter(key => {
-                            const val = groupValue[key];
-                            // Include if has styling properties OR if currently active on this element
-                            const hasTagProperties = val && typeof val === 'object' &&
-                                                    (val.light || val.dark || val.headerBar ||
-                                                     val.border || val.footerBar || val.cornerBadge);
-                            const isActive = activeTags.includes(key.toLowerCase());
-                            return hasTagProperties || isActive;
-                        });
-                    }
-                }
+                tags = this.resolveTagGroupKeys(group, groupValue, activeTags);
             }
 
             return window.generateGroupTagItems(tags, id, type, columnId, group !== 'custom');
