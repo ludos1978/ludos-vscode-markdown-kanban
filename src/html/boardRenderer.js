@@ -822,13 +822,15 @@ function generateFlatTagItems(tags, id, type, columnId = null) {
  */
 function renderSingleColumn(columnId, columnData) {
 
-    // Find the existing column element
-    const existingColumnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    // Find the existing column element (must target the column root, not nested elements)
+    const matchingColumns = Array.from(document.querySelectorAll(`.kanban-full-height-column[data-column-id="${columnId}"]`));
+    const existingColumnElement = matchingColumns[0];
     if (!existingColumnElement) {
         console.warn('[kanban.boardRenderer.renderSingleColumn.missing-element]', {
             columnId: columnId,
             hasCachedBoard: !!window.cachedBoard,
-            cachedColumnIds: window.cachedBoard?.columns?.map(c => c.id) || []
+            cachedColumnIds: window.cachedBoard?.columns?.map(c => c.id) || [],
+            matchCount: matchingColumns.length
         });
         if (typeof window.renderBoard === 'function') {
             console.warn('[kanban.boardRenderer.renderSingleColumn.full-render]', {
@@ -868,7 +870,14 @@ function renderSingleColumn(columnId, columnData) {
     }
 
     // Get the column index to maintain positioning
-    const allColumns = Array.from(document.querySelectorAll('[data-column-id]'));
+    if (matchingColumns.length > 1) {
+        console.warn('[kanban.boardRenderer.renderSingleColumn.multiple-matches]', {
+            columnId: columnId,
+            matchCount: matchingColumns.length
+        });
+    }
+
+    const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column[data-column-id]'));
     const columnIndex = allColumns.indexOf(existingColumnElement);
     const existingTaskCount = existingColumnElement.querySelectorAll('.task-item').length;
     console.log('[kanban.boardRenderer.renderSingleColumn.replace]', {
