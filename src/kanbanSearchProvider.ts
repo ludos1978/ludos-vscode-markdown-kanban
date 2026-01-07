@@ -311,13 +311,13 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         <div class="search-container">
         <!-- Mode Toggle -->
         <div class="mode-toggle">
-            <button class="mode-btn" data-mode="broken" title="Find Broken Elements">
-                <span class="codicon codicon-warning"></span>
-                Broken
-            </button>
             <button class="mode-btn active" data-mode="text" title="Search Text">
                 <span class="codicon codicon-search"></span>
                 Search
+            </button>
+            <button class="mode-btn" data-mode="broken" title="Find Broken Elements">
+                <span class="codicon codicon-warning"></span>
+                Broken
             </button>
         </div>
 

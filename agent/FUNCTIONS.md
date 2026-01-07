@@ -10,6 +10,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-07)
+- `src/kanbanSearchProvider.ts` now renders the search mode buttons with Search on the left and Broken on the right.
+- `src/html/searchPanel.js` now keeps the current search on Ctrl/Cmd+F (selects text), and supports Ctrl+G / Ctrl+Shift+G to navigate results with an active highlight; `src/html/searchPanel.css` styles the active result.
 - `src/kanbanSearchProvider.ts` now searches regular include file contents (include-regular) and uses `src/html` assets in development when available; `src/services/BoardContentScanner.ts` accepts include content maps to search within regular include files.
 - `src/kanbanSearchProvider.ts` and `src/html/searchPanel.js` now default the sidebar search panel to text search mode on load.
 - `src/services/BoardContentScanner.ts` now de-duplicates broken include results by type/path/location to avoid duplicate entries in the broken embedded search.
