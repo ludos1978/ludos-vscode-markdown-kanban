@@ -168,6 +168,11 @@ export class UICommands extends SwitchBasedCommand {
             });
             for (const columnId of uniqueColumnIds) {
                 const column = board.columns.find(c => c.id === columnId);
+                console.log('[kanban.UICommands.tryTargetedUpdate.column]', {
+                    columnId: columnId,
+                    columnFound: !!column,
+                    taskCount: column?.tasks?.length ?? 0
+                });
                 if (!column) {
                     return false;
                 }

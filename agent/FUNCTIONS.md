@@ -10,6 +10,9 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-06)
+- `src/html/webview.js` updateColumnContent handler now logs cache/column state, render decisions, and requests board refresh if cached board is missing or out of sync.
+- `src/html/boardRenderer.js` `renderSingleColumn()` now logs missing DOM elements and triggers a full re-render from cached board when the column element is missing.
+- `src/commands/UICommands.ts` `tryTargetedUpdate()` now logs per-column target resolution for undo/redo column updates.
 - `src/panel/WebviewManager.ts` `generateHtml()` now prefers `src/html` assets in development when available, falling back to `dist/src/html` for generated files.
 - `src/extension.ts` now refreshes all webview panels on `src/html` file changes in development mode to keep assets current.
 - `src/panel/WebviewManager.ts` `generateHtml()` now preserves `enableCommandUris` when setting webview options.

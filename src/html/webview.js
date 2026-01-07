@@ -2509,11 +2509,42 @@ if (!webviewEventListenersInitialized) {
             break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
-            if (window.cachedBoard && window.cachedBoard.columns) {
-                const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
-                if (column) {
+            if (!window.cachedBoard || !window.cachedBoard.columns) {
+                console.warn('[kanban.webview.updateColumnContent.missing-cache]', {
+                    columnId: message.columnId,
+                    hasCachedBoard: !!window.cachedBoard,
+                    hasColumns: !!window.cachedBoard?.columns
+                });
+                if (typeof vscode !== 'undefined') {
+                    vscode.postMessage({ type: 'requestBoardUpdate' });
+                }
+                break;
+            }
+
+            const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
+            if (!column) {
+                console.warn('[kanban.webview.updateColumnContent.column-missing]', {
+                    columnId: message.columnId,
+                    cachedColumnIds: window.cachedBoard.columns.map(c => c.id)
+                });
+                if (typeof vscode !== 'undefined') {
+                    vscode.postMessage({ type: 'requestBoardUpdate' });
+                }
+                break;
+            }
+
+            if (column) {
                     // Support both formats: individual properties OR column object
                     const colData = message.column || message;
+                    const incomingTaskCount = Array.isArray(colData.tasks) ? colData.tasks.length : null;
+
+                    console.log('[kanban.webview.updateColumnContent.received]', {
+                        columnId: message.columnId,
+                        incomingTaskCount: incomingTaskCount,
+                        incomingTitle: colData.title ?? message.columnTitle,
+                        includeMode: colData.includeMode,
+                        includeFiles: colData.includeFiles ? colData.includeFiles.length : 0
+                    });
 
                     // Update tasks and column metadata
                     if (colData.tasks !== undefined) column.tasks = colData.tasks;
@@ -2571,6 +2602,14 @@ if (!webviewEventListenersInitialized) {
                     const hasIncludeContent = message.includeMode || message.includeFiles;
                     const hasNewTasks = message.tasks && message.tasks.length > 0;
                     const forceRender = hasIncludeContent || hasNewTasks;
+
+                    console.log('[kanban.webview.updateColumnContent.render]', {
+                        columnId: message.columnId,
+                        isEditing: !!isEditing,
+                        forceRender: !!forceRender,
+                        hasIncludeContent: !!hasIncludeContent,
+                        hasNewTasks: !!hasNewTasks
+                    });
 
                     if (!isEditing || forceRender) {
                         // If forcing render while editing, save current editor state
@@ -2641,8 +2680,6 @@ if (!webviewEventListenersInitialized) {
                         });
                     }
                 }
-            } else {
-                console.warn('[Frontend] No cached board available for updateColumnContent');
             }
             break;
         case 'updateTaskContent':
@@ -4219,5 +4256,4 @@ function updateLayoutPresetsActiveState() {
         textSpan.textContent = layoutPresets[currentPreset].label;
     }
 }
-
 

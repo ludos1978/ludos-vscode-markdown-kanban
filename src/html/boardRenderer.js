@@ -825,6 +825,17 @@ function renderSingleColumn(columnId, columnData) {
     // Find the existing column element
     const existingColumnElement = document.querySelector(`[data-column-id="${columnId}"]`);
     if (!existingColumnElement) {
+        console.warn('[kanban.boardRenderer.renderSingleColumn.missing-element]', {
+            columnId: columnId,
+            hasCachedBoard: !!window.cachedBoard,
+            cachedColumnIds: window.cachedBoard?.columns?.map(c => c.id) || []
+        });
+        if (typeof window.renderBoard === 'function') {
+            console.warn('[kanban.boardRenderer.renderSingleColumn.full-render]', {
+                columnId: columnId
+            });
+            window.renderBoard();
+        }
         return;
     }
 
@@ -859,6 +870,11 @@ function renderSingleColumn(columnId, columnData) {
     // Get the column index to maintain positioning
     const allColumns = Array.from(document.querySelectorAll('[data-column-id]'));
     const columnIndex = allColumns.indexOf(existingColumnElement);
+    console.log('[kanban.boardRenderer.renderSingleColumn.replace]', {
+        columnId: columnId,
+        columnIndex: columnIndex,
+        taskCount: columnData?.tasks?.length ?? 0
+    });
 
     // Create new column element
     const newColumnElement = createColumnElement(columnData, columnIndex);
