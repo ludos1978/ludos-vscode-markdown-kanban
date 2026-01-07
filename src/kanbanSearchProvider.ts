@@ -10,6 +10,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { BoardContentScanner, BrokenElement, TextMatch } from './services/BoardContentScanner';
 import {
@@ -163,8 +164,23 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         }
 
         try {
+            const includeContentByPath = new Map<string, string>();
+            const fileRegistry = panel.getFileRegistry?.();
+            if (fileRegistry) {
+                for (const includeFile of fileRegistry.getIncludeFiles()) {
+                    if (includeFile.getFileType?.() === 'include-regular') {
+                        const content = includeFile.getContent() || '';
+                        includeContentByPath.set(includeFile.getPath(), content);
+                    }
+                }
+            }
+
             const scanner = new BoardContentScanner(basePath);
-            const matches = scanner.searchText(board, query.trim());
+            const matches = scanner.searchText(
+                board,
+                query.trim(),
+                includeContentByPath.size > 0 ? includeContentByPath : undefined
+            );
 
             const results: SearchResultItem[] = matches.map(match => ({
                 type: 'text',
@@ -268,12 +284,16 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
      * Generate HTML for the sidebar webview
      */
     private _getHtmlForWebview(webview: vscode.Webview): string {
-        // Get URIs for resources (use dist/src/html for packaged extension)
+        const srcRoot = vscode.Uri.joinPath(this._extensionUri, 'src', 'html');
+        const distRoot = vscode.Uri.joinPath(this._extensionUri, 'dist', 'src', 'html');
+        const useSrc = fs.existsSync(vscode.Uri.joinPath(srcRoot, 'searchPanel.js').fsPath);
+        const assetRoot = useSrc ? srcRoot : distRoot;
+
         const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'dist', 'src', 'html', 'searchPanel.css')
+            vscode.Uri.joinPath(assetRoot, 'searchPanel.css')
         );
         const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'dist', 'src', 'html', 'searchPanel.js')
+            vscode.Uri.joinPath(assetRoot, 'searchPanel.js')
         );
 
         const nonce = this._getNonce();
@@ -288,21 +308,21 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
     <title>Kanban Search</title>
 </head>
 <body>
-    <div class="search-container">
+        <div class="search-container">
         <!-- Mode Toggle -->
         <div class="mode-toggle">
-            <button class="mode-btn active" data-mode="broken" title="Find Broken Elements">
+            <button class="mode-btn" data-mode="broken" title="Find Broken Elements">
                 <span class="codicon codicon-warning"></span>
                 Broken
             </button>
-            <button class="mode-btn" data-mode="text" title="Search Text">
+            <button class="mode-btn active" data-mode="text" title="Search Text">
                 <span class="codicon codicon-search"></span>
                 Search
             </button>
         </div>
 
         <!-- Search Input (for text mode) -->
-        <div class="search-input-container" style="display: none;">
+        <div class="search-input-container">
             <input type="text" class="search-input" placeholder="Search board content..." />
             <button class="search-btn" title="Search">
                 <span class="codicon codicon-search"></span>
@@ -310,7 +330,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         </div>
 
         <!-- Find Broken Button (for broken mode) -->
-        <div class="find-broken-container">
+        <div class="find-broken-container" style="display: none;">
             <button class="find-broken-btn">
                 <span class="codicon codicon-refresh"></span>
                 Find Broken Elements

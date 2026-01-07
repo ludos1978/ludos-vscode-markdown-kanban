@@ -19,7 +19,7 @@
     const resultsList = document.querySelector('.results-list');
 
     // State
-    let currentMode = 'broken';
+    let currentMode = 'text';
     let hasActivePanel = false;
     let searchDebounceTimer = null;
 
@@ -51,6 +51,9 @@
         modeButtons.forEach(btn => {
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
         });
+
+        // Default to text search mode
+        setMode('text');
 
         // Find broken button
         findBrokenBtn.addEventListener('click', () => {

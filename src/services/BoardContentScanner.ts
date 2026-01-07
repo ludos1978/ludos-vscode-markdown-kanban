@@ -284,13 +284,20 @@ export class BoardContentScanner {
     /**
      * Search for text in board content
      */
-    searchText(board: KanbanBoard, query: string): TextMatch[] {
+    searchText(board: KanbanBoard, query: string, includeContentByPath?: Map<string, string>): TextMatch[] {
         if (!query || query.length === 0) {
             return [];
         }
 
         const matches: TextMatch[] = [];
         const lowerQuery = query.toLowerCase();
+        const decodePath = (value: string): string => {
+            try {
+                return decodeURIComponent(value);
+            } catch {
+                return value;
+            }
+        };
 
         for (const column of board.columns) {
             // Search column title
@@ -339,6 +346,33 @@ export class BoardContentScanner {
                             field: 'description'
                         }
                     });
+                }
+
+                if (includeContentByPath && task.regularIncludeFiles && task.regularIncludeFiles.length > 0) {
+                    for (const includePath of task.regularIncludeFiles) {
+                        const resolvedPath = this._resolvePath(includePath);
+                        let includeContent = includeContentByPath.get(resolvedPath);
+                        if (!includeContent && includePath.includes('%')) {
+                            const decodedPath = decodePath(includePath);
+                            const resolvedDecoded = this._resolvePath(decodedPath);
+                            includeContent = includeContentByPath.get(resolvedDecoded);
+                        }
+
+                        if (includeContent && includeContent.toLowerCase().includes(lowerQuery)) {
+                            const context = this._getContext(includeContent, lowerQuery);
+                            matches.push({
+                                matchText: query,
+                                context: `include: ${includePath}\n${context}`,
+                                location: {
+                                    columnId: column.id,
+                                    columnTitle: columnTitle,
+                                    taskId: task.id,
+                                    taskTitle: taskTitle,
+                                    field: 'description'
+                                }
+                            });
+                        }
+                    }
                 }
             }
         }
