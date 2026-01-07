@@ -357,7 +357,7 @@
                 </div>
 
                 <!-- Hidden template source -->
-                <div id="template-source" class="template-source" style="display: none;">
+                <div id="template-source" class="template-source hidden">
                     <select id="template-select" class="template-select">
                         <option value="">Template...</option>
                     </select>
@@ -382,7 +382,7 @@
                 <div class="processes-menu" id="processes-menu">
                     <button class="processes-menu-btn" onclick="toggleProcessesMenu(event, this)" title="Background Processes">
                         <span class="processes-icon">⚙</span>
-                        <span class="processes-indicator" id="processes-indicator" style="display: none;"></span>
+                        <span class="processes-indicator hidden" id="processes-indicator"></span>
                     </button>
                     <div class="processes-menu-dropdown">
                         <div class="processes-menu-header">Background Processes</div>
@@ -397,7 +397,7 @@
                                     <span class="processes-status-label">Status:</span>
                                     <span class="processes-status-value" id="media-index-status">Not initialized</span>
                                 </div>
-                                <div class="processes-status-row" id="media-index-stats-row" style="display: none;">
+                                <div class="processes-status-row hidden" id="media-index-stats-row">
                                     <span class="processes-status-label">Files:</span>
                                     <span class="processes-status-value" id="media-index-count">0</span>
                                 </div>
@@ -405,7 +405,7 @@
                                     <button class="processes-action-btn" id="media-index-scan-btn" onclick="requestMediaIndexScan()">
                                         Start Scan
                                     </button>
-                                    <button class="processes-action-btn" id="media-index-cancel-btn" onclick="requestMediaIndexCancel()" style="display: none;">
+                                    <button class="processes-action-btn hidden" id="media-index-cancel-btn" onclick="requestMediaIndexCancel()">
                                         Cancel
                                     </button>
                                 </div>
@@ -424,7 +424,7 @@
                                     <span class="processes-status-label">Status:</span>
                                     <span class="processes-status-value" id="marp-export-status">Inactive</span>
                                 </div>
-                                <div class="processes-actions" id="marp-export-actions" style="display: none;">
+                                <div class="processes-actions hidden" id="marp-export-actions">
                                     <button class="processes-action-btn stop-btn" onclick="stopMarpAutoExport()">
                                         Stop Export
                                     </button>
@@ -557,7 +557,7 @@
     </div>
 
     <!-- Search Panel -->
-    <div id="search-panel" class="search-panel" style="display: none;">
+    <div id="search-panel" class="search-panel hidden">
         <div class="search-panel-content">
             <input type="text" 
                    id="search-input" 
@@ -688,7 +688,7 @@
 								</div>
 
 								<!-- Content Transformations (only shown for presentation format) -->
-								<div id="content-transformations" class="export-field" style="display: none;">
+								<div id="content-transformations" class="export-field hidden">
 									<label>Content Transformations:</label>
 									<div class="export-field-row">
 										<div class="export-field-third">
@@ -781,7 +781,7 @@
 																<span>Handout PDF (slides + notes)</span>
 														</label>
 												</div>
-												<div class="export-field-third" id="handout-layout-container" style="display: none;">
+												<div class="export-field-third hidden" id="handout-layout-container">
 														<label for="marp-handout-preset">Layout:</label>
 														<select id="marp-handout-preset" class="form-input" onchange="handleMarpHandoutPresetChange()">
 																<option value="portrait-1" selected>1 slide (portrait)</option>
@@ -789,7 +789,7 @@
 																<option value="portrait-4">4 slides (portrait)</option>
 														</select>
 												</div>
-												<div class="export-field-third" id="handout-direction-container" style="display: none;">
+												<div class="export-field-third hidden" id="handout-direction-container">
 														<label for="marp-handout-direction">Direction:</label>
 														<select id="marp-handout-direction" class="form-input">
 																<option value="horizontal" selected>Left-Right</option>
@@ -860,9 +860,9 @@
                     </select>
                 </div>
 
-                <div id="link-handling-options" class="link-handling-options" style="display: none;">
+                <div id="link-handling-options" class="link-handling-options hidden">
                     <!-- File type checkboxes - shown only for pack-all mode -->
-                    <div id="file-type-options" class="export-checkboxes" style="display: none;">
+                    <div id="file-type-options" class="export-checkboxes hidden">
                         <div class="export-field-label">Select file types to pack:</div>
                         <label class="export-checkbox">
                             <input type="checkbox" id="include-files" checked>
@@ -887,7 +887,7 @@
                     </div>
 
                     <!-- File size limit - shown for pack-linked and pack-all modes -->
-                    <div id="file-size-option" class="export-field-compact" style="display: none;">
+                    <div id="file-size-option" class="export-field-compact hidden">
                         <label for="file-size-limit">File Size Limit (MB):</label>
                         <input type="number" id="file-size-limit" class="form-input" value="100" min="1" max="1000" />
                     </div>
@@ -922,7 +922,7 @@
                 <div class="file-search-status searching">Searching...</div>
             </div>
 
-            <div class="file-search-batch-panel" id="file-search-batch-panel" style="display: none;">
+            <div class="file-search-batch-panel hidden" id="file-search-batch-panel">
                 <div class="file-search-batch-title">Files in broken path: <span id="file-search-batch-count"></span></div>
                 <div class="file-search-batch-list" id="file-search-batch-list"></div>
             </div>
@@ -961,7 +961,7 @@
                     <span class="preview-label">Preview</span>
                 </button>
                 <button class="file-search-btn file-search-btn-secondary" id="file-search-cancel-btn">Cancel</button>
-                <button class="file-search-btn file-search-btn-secondary" id="file-search-media-folder-btn" style="display: none;">Open media folder</button>
+                <button class="file-search-btn file-search-btn-secondary hidden" id="file-search-media-folder-btn">Open media folder</button>
                 <button class="file-search-btn file-search-btn-primary" id="file-search-select-btn" disabled>Select</button>
             </div>
         </div>
@@ -1405,7 +1405,7 @@
 
     <!-- Main webview entry point (must be last) -->
     <script src="webview.js"></script>
-    <div id="path-context-menu" class="context-menu" style="display: none;">
+    <div id="path-context-menu" class="context-menu hidden">
         <div class="context-menu-item" onclick="copyFullPath()">Copy Full OS Path</div>
         <div class="context-menu-item" onclick="copyStoredPath()">Copy Stored Path</div>
     </div>
