@@ -1,0 +1,6 @@
+# ToTest
+
+- [ ] Verify tag menus still list active tags correctly for columns and tasks, including custom groups and active-tag overrides.
+- [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
+- [ ] Verify image/PDF/diagram placeholders still render and resolve paths in includes and main files.
+- [ ] Open the search panel and export options to confirm hidden sections toggle visible as expected.

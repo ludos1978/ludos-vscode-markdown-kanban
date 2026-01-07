@@ -2,5 +2,5 @@
 - Test your changes after each major step by building.
 - increase the revision version number after each change.
 - after each major (introducing multiple new features or changing the interface more then just a layout or smaller change) then change change the minor version number and create a build by using the ./build.sh script!
-
+- after each change give testing descriptions how to test for anything that might have been broken. Document it in ToTest.md as tasks which the user might check. Cleanup this file if the tasks are checked or enhance test requirements if similar tasks already exist.
 
