@@ -349,6 +349,13 @@ export class BoardStore implements vscode.Disposable {
     }
 
     /**
+     * Get redo stack size (for debugging)
+     */
+    getRedoStackSize(): number {
+        return this._state.redoStack.length;
+    }
+
+    /**
      * Clear undo/redo history
      */
     clearHistory(): void {

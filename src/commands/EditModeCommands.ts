@@ -21,6 +21,7 @@ import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, Mes
 import { getErrorMessage } from '../utils/stringUtils';
 import { hasMessageHandler } from '../types/PanelCommandAccess';
 import { UndoCapture } from '../core/stores/UndoCapture';
+import { KanbanColumn, KanbanTask } from '../board/KanbanTypes';
 
 /**
  * Edit Mode Commands Handler
@@ -215,10 +216,10 @@ export class EditModeCommands extends SwitchBasedCommand {
             if (operation === 'moveTaskViaDrag' || operation === 'reorderTaskViaDrag') {
                 const hasMoveContext = msg.taskId && msg.fromColumnId && msg.toColumnId;
                 if (hasMoveContext) {
-                    const fromColumn = boardToSave.columns.find(col => col.id === msg.fromColumnId);
+                    const fromColumn = boardToSave.columns.find((col: KanbanColumn) => col.id === msg.fromColumnId);
                     const resolvedFromIndex = (typeof msg.fromIndex === 'number')
                         ? msg.fromIndex
-                        : (fromColumn ? fromColumn.tasks.findIndex(t => t.id === msg.taskId) : -1);
+                        : (fromColumn ? fromColumn.tasks.findIndex((t: KanbanTask) => t.id === msg.taskId) : -1);
                     const resolvedToIndex = (typeof msg.toIndex === 'number') ? msg.toIndex : -1;
 
                     console.log('[kanban.EditModeCommands.saveUndoState.drag-task]', {

@@ -9,6 +9,17 @@ let cachedMarkdownIt = null;
 let cachedHtmlCommentMode = null;
 let cachedHtmlContentMode = null;
 
+function createUniqueId(prefix) {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createLoadingPlaceholder(id, className, message) {
+    return `<div id="${id}" class="${className}">
+        <div class="placeholder-spinner"></div>
+        <div class="placeholder-text">${message}</div>
+    </div>`;
+}
+
 // Factory function to create markdown-it instance with all plugins
 // This is called once per configuration change, not per render
 function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
@@ -1686,9 +1697,9 @@ async function processMermaidQueue() {
 }
 
 /**
- * Add PlantUML and Mermaid fence renderer to markdown-it instance
+ * Add diagram (PlantUML/Mermaid) fence renderer to markdown-it instance
  */
-function addPlantUMLRenderer(md) {
+function addDiagramFenceRenderer(md) {
     // Store original fence renderer
     const originalFence = md.renderer.rules.fence || function(tokens, idx, options, env, self) {
         return self.renderToken(tokens, idx, options);
@@ -1703,31 +1714,25 @@ function addPlantUMLRenderer(md) {
         // Check if this is a PlantUML block
         if (langName.toLowerCase() === 'plantuml') {
             const code = token.content;
-            const diagramId = `plantuml-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const diagramId = createUniqueId('plantuml');
 
             // Queue for async processing
             queuePlantUMLRender(diagramId, code);
 
             // Return placeholder immediately (synchronous)
-            return `<div id="${diagramId}" class="plantuml-placeholder">
-                <div class="placeholder-spinner"></div>
-                <div class="placeholder-text">Rendering PlantUML diagram...</div>
-            </div>`;
+            return createLoadingPlaceholder(diagramId, 'plantuml-placeholder', 'Rendering PlantUML diagram...');
         }
 
         // Check if this is a Mermaid block
         if (langName.toLowerCase() === 'mermaid') {
             const code = token.content;
-            const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const diagramId = createUniqueId('mermaid');
 
             // Queue for async processing
             queueMermaidRender(diagramId, code);
 
             // Return placeholder immediately (synchronous)
-            return `<div id="${diagramId}" class="mermaid-placeholder">
-                <div class="placeholder-spinner"></div>
-                <div class="placeholder-text">Rendering Mermaid diagram...</div>
-            </div>`;
+            return createLoadingPlaceholder(diagramId, 'mermaid-placeholder', 'Rendering Mermaid diagram...');
         }
 
         // Use original renderer for other languages
@@ -1985,16 +1990,13 @@ function renderMarkdown(text, includeContext) {
                 const pageNumber = parseInt(pdfPageMatch[2], 10);
 
                 // Create unique ID for this PDF page
-                const pdfId = `pdf-page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const pdfId = createUniqueId('pdf-page');
 
                 // Queue for async rendering
                 queuePDFPageRender(pdfId, pdfPath, pageNumber);
 
                 // Return placeholder immediately (synchronous)
-                return `<div id="${pdfId}" class="diagram-placeholder">
-                    <div class="placeholder-spinner"></div>
-                    <div class="placeholder-text">Loading PDF page ${pageNumber}...</div>
-                </div>`;
+                return createLoadingPlaceholder(pdfId, 'diagram-placeholder', `Loading PDF page ${pageNumber}...`);
             }
 
             // Get include context for relative path resolution (needed for diagrams/PDFs in include files)
@@ -2005,16 +2007,13 @@ function renderMarkdown(text, includeContext) {
             const isPdfFile = originalSrc && originalSrc.match(/\.pdf$/i) && !originalSrc.includes('#');
             if (isPdfFile) {
                 // Create unique ID for this PDF slideshow
-                const pdfId = `pdf-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const pdfId = createUniqueId('pdf-slideshow');
 
                 // Queue for async slideshow creation (pass includeDir for relative path resolution)
                 queuePDFSlideshow(pdfId, originalSrc, includeDir);
 
                 // Return placeholder immediately (synchronous)
-                return `<div id="${pdfId}" class="diagram-placeholder">
-                    <div class="placeholder-spinner"></div>
-                    <div class="placeholder-text">Loading PDF slideshow...</div>
-                </div>`;
+                return createLoadingPlaceholder(pdfId, 'diagram-placeholder', 'Loading PDF slideshow...');
             }
 
             // Check if this is a diagram file that needs special rendering
@@ -2036,16 +2035,13 @@ function renderMarkdown(text, includeContext) {
                 }
 
                 // Create unique ID for this diagram
-                const diagramId = `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const diagramId = createUniqueId('diagram');
 
                 // Queue for async rendering (pass includeDir for relative path resolution)
                 queueDiagramRender(diagramId, originalSrc, diagramType, includeDir);
 
                 // Return placeholder immediately (synchronous)
-                return `<div id="${diagramId}" class="diagram-placeholder">
-                    <div class="placeholder-spinner"></div>
-                    <div class="placeholder-text">Loading ${diagramType} diagram...</div>
-                </div>`;
+                return createLoadingPlaceholder(diagramId, 'diagram-placeholder', `Loading ${diagramType} diagram...`);
             }
 
             let displaySrc = originalSrc;
@@ -2236,7 +2232,7 @@ function renderMarkdown(text, includeContext) {
         };
 
         // Add PlantUML renderer
-        addPlantUMLRenderer(md);
+        addDiagramFenceRenderer(md);
 
         // Mark that custom renderers have been registered
         md._customRenderersRegistered = true;
