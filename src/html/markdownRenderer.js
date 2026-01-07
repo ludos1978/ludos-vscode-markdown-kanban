@@ -20,6 +20,62 @@ function createLoadingPlaceholder(id, className, message) {
     </div>`;
 }
 
+function safeDecodePath(value) {
+    if (!value) {
+        return value;
+    }
+    try {
+        return decodeURIComponent(value);
+    } catch (error) {
+        return value;
+    }
+}
+
+function isWindowsAbsolutePath(value) {
+    return Boolean(value && /^[A-Za-z]:[\/\\]/.test(value));
+}
+
+function isRelativeResourcePath(value) {
+    if (!value) {
+        return false;
+    }
+    return !value.startsWith('/') &&
+        !isWindowsAbsolutePath(value) &&
+        !value.startsWith('http://') &&
+        !value.startsWith('https://') &&
+        !value.startsWith('vscode-webview://');
+}
+
+function resolveRelativePath(baseDir, relativePath) {
+    const dirSegments = baseDir.split('/').filter(s => s);
+    const relSegments = relativePath.split('/').filter(s => s);
+
+    for (const segment of relSegments) {
+        if (segment === '..') {
+            dirSegments.pop();
+        } else if (segment !== '.') {
+            dirSegments.push(segment);
+        }
+    }
+
+    return '/' + dirSegments.join('/');
+}
+
+function encodePathSegments(pathValue) {
+    return pathValue.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
+}
+
+function buildWebviewResourceUrl(pathValue, encodeSegments = true) {
+    const normalizedPath = pathValue.startsWith('/') ? pathValue : `/${pathValue}`;
+    const encodedPath = encodeSegments ? encodePathSegments(normalizedPath) : encodeURI(normalizedPath);
+    return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+}
+
+function normalizeWindowsAbsolutePath(pathValue, shouldDecode) {
+    const resolvedPath = shouldDecode ? safeDecodePath(pathValue) : pathValue;
+    return '/' + resolvedPath.replace(/\\/g, '/');
+}
+
 // Factory function to create markdown-it instance with all plugins
 // This is called once per configuration change, not per render
 function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
@@ -1790,88 +1846,32 @@ function renderMarkdown(text, includeContext) {
         }
 
         // Helper function to resolve media paths dynamically
-        function resolveMediaPath(originalSrc) {
+        function resolveMediaSourcePath(originalSrc) {
             const includeContext = window.currentTaskIncludeContext;
-            // Check for Windows absolute path (C:/, D:\, etc.)
-            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
-            const isRelativePath = originalSrc &&
-                                   !originalSrc.startsWith('/') &&
-                                   !isWindowsAbsolute &&
-                                   !originalSrc.startsWith('http://') &&
-                                   !originalSrc.startsWith('https://') &&
-                                   !originalSrc.startsWith('vscode-webview://');
+            const isWindowsAbsolute = isWindowsAbsolutePath(originalSrc);
+            const isRelativePath = isRelativeResourcePath(originalSrc);
 
             if (includeContext && isRelativePath) {
-                // Decode first to handle already-encoded paths
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-
-                const dirSegments = includeContext.includeDir.split('/').filter(s => s);
-                const relSegments = decodedSrc.split('/').filter(s => s);
-
-                for (const segment of relSegments) {
-                    if (segment === '..') {
-                        dirSegments.pop();
-                    } else if (segment === '.') {
-                        // Stay in current directory
-                    } else {
-                        dirSegments.push(segment);
-                    }
-                }
-
-                const resolvedPath = '/' + dirSegments.join('/');
-                const encodedPath = encodeURI(resolvedPath);
-                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const resolvedPath = resolveRelativePath(includeContext.includeDir, safeDecodePath(originalSrc));
+                return buildWebviewResourceUrl(resolvedPath, false);
             } else if (isRelativePath && window.currentFilePath) {
                 // Relative path in main file - resolve against document directory
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
+                const decodedSrc = safeDecodePath(originalSrc);
 
                 // Get document directory from currentFilePath
                 const docPath = window.currentFilePath.replace(/\\/g, '/');
                 const lastSlash = docPath.lastIndexOf('/');
                 const docDir = lastSlash > 0 ? docPath.substring(0, lastSlash) : '';
 
-                const dirSegments = docDir.split('/').filter(s => s);
-                const relSegments = decodedSrc.split('/').filter(s => s);
-
-                for (const segment of relSegments) {
-                    if (segment === '..') {
-                        dirSegments.pop();
-                    } else if (segment === '.') {
-                        // Stay in current directory
-                    } else {
-                        dirSegments.push(segment);
-                    }
-                }
-
-                const resolvedPath = '/' + dirSegments.join('/');
-                const encodedPath = resolvedPath.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const resolvedPath = resolveRelativePath(docDir, decodedSrc);
+                return buildWebviewResourceUrl(resolvedPath, true);
             } else if (isWindowsAbsolute) {
                 // Windows absolute path (C:/Users/...) - convert to webview URI
-                const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
-                const encodedPath = encodeURI(normalizedPath);
-                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const normalizedPath = normalizeWindowsAbsolutePath(originalSrc, false);
+                return buildWebviewResourceUrl(normalizedPath, false);
             } else if (originalSrc && originalSrc.startsWith('/')) {
                 // Unix absolute path (/Users/...) - convert to webview URI
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-                // Use encodeURIComponent on each segment to handle special chars like # ? [ ]
-                const encodedPath = decodedSrc.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                return buildWebviewResourceUrl(safeDecodePath(originalSrc), true);
             }
             return originalSrc;
         }
@@ -1891,10 +1891,10 @@ function renderMarkdown(text, includeContext) {
                         const src = child.attrGet('src');
                         if (src && !originalSrc) {
                             originalSrc = src; // Keep first source as original
-                            const displaySrc = resolveMediaPath(src);
+                            const displaySrc = resolveMediaSourcePath(src);
                             child.attrSet('src', displaySrc);
                         } else if (src) {
-                            const displaySrc = resolveMediaPath(src);
+                            const displaySrc = resolveMediaSourcePath(src);
                             child.attrSet('src', displaySrc);
                         }
                     }
@@ -1952,7 +1952,7 @@ function renderMarkdown(text, includeContext) {
                     if (child.type === 'source' && child.attrGet) {
                         const originalSrc = child.attrGet('src');
                         if (originalSrc) {
-                            const displaySrc = resolveMediaPath(originalSrc);
+                            const displaySrc = resolveMediaSourcePath(originalSrc);
                             child.attrSet('src', displaySrc);
                         }
                     }
@@ -2048,118 +2048,34 @@ function renderMarkdown(text, includeContext) {
 
             // Check if we have includeContext and the path is relative
             // (includeContext was already declared above for diagram/PDF handling)
-            // Check for Windows absolute path (C:/, D:\, etc.)
-            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
-            const isRelativePath = originalSrc &&
-                                   !originalSrc.startsWith('/') &&
-                                   !isWindowsAbsolute &&
-                                   !originalSrc.startsWith('http://') &&
-                                   !originalSrc.startsWith('https://') &&
-                                   !originalSrc.startsWith('vscode-webview://');
+            const isWindowsAbsolute = isWindowsAbsolutePath(originalSrc);
+            const isRelativePath = isRelativeResourcePath(originalSrc);
 
             if (includeContext && isRelativePath) {
-                // Decode first to handle already-encoded paths
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-
-                // Decode includeDir as well to handle URL-encoded folder names
-                let decodedIncludeDir = includeContext.includeDir;
-                try {
-                    decodedIncludeDir = decodeURIComponent(includeContext.includeDir);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-
-                // Dynamically resolve the relative path from the include file's directory
-                // Properly handle ../ and ./ in paths
-
-                // Split the include directory path into segments
-                const dirSegments = decodedIncludeDir.split('/').filter(s => s);
-
-                // Split the relative path into segments
-                const relSegments = decodedSrc.split('/').filter(s => s);
-
-                // Process each segment
-                for (const segment of relSegments) {
-                    if (segment === '..') {
-                        // Go up one directory
-                        dirSegments.pop();
-                    } else if (segment === '.') {
-                        // Stay in current directory (do nothing)
-                    } else {
-                        // Add the segment
-                        dirSegments.push(segment);
-                    }
-                }
-
-                // Reconstruct the absolute path
-                let resolvedPath = '/' + dirSegments.join('/');
-
-                // Convert to webview URL format
-                // Format: https://file%2B.vscode-resource.vscode-cdn.net/absolute/path
-                // Use encodeURIComponent on each segment to handle special chars like # ? [ ]
-                const encodedPath = resolvedPath.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const decodedSrc = safeDecodePath(originalSrc);
+                const decodedIncludeDir = safeDecodePath(includeContext.includeDir);
+                const resolvedPath = resolveRelativePath(decodedIncludeDir, decodedSrc);
+                displaySrc = buildWebviewResourceUrl(resolvedPath, true);
             } else if (isRelativePath && window.currentFilePath) {
                 // Relative path in main file - resolve against document directory
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
+                const decodedSrc = safeDecodePath(originalSrc);
 
                 // Get document directory from currentFilePath
                 const docPath = window.currentFilePath.replace(/\\/g, '/');
                 const lastSlash = docPath.lastIndexOf('/');
                 const docDir = lastSlash > 0 ? docPath.substring(0, lastSlash) : '';
 
-                const dirSegments = docDir.split('/').filter(s => s);
-                const relSegments = decodedSrc.split('/').filter(s => s);
-
-                for (const segment of relSegments) {
-                    if (segment === '..') {
-                        dirSegments.pop();
-                    } else if (segment === '.') {
-                        // Stay in current directory
-                    } else {
-                        dirSegments.push(segment);
-                    }
-                }
-
-                const resolvedPath = '/' + dirSegments.join('/');
-                const encodedPath = resolvedPath.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const resolvedPath = resolveRelativePath(docDir, decodedSrc);
+                displaySrc = buildWebviewResourceUrl(resolvedPath, true);
             } else if (isWindowsAbsolute) {
                 // Windows absolute path (C:/Users/...) - convert to webview URI
                 // Decode first to handle already-encoded paths, then re-encode for URL
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-                // Normalize backslashes to forward slashes and prepend /
-                const normalizedPath = '/' + decodedSrc.replace(/\\/g, '/');
-                // Use encodeURIComponent on each segment to handle special chars like # ? [ ]
-                const encodedPath = normalizedPath.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                const normalizedPath = normalizeWindowsAbsolutePath(originalSrc, true);
+                displaySrc = buildWebviewResourceUrl(normalizedPath, true);
             } else if (originalSrc && originalSrc.startsWith('/')) {
                 // Unix absolute path (/Users/...) - convert to webview URI
                 // Decode first to handle already-encoded paths, then re-encode for URL
-                let decodedSrc = originalSrc;
-                try {
-                    decodedSrc = decodeURIComponent(originalSrc);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-                // Use encodeURIComponent on each segment to handle special chars like # ? [ ]
-                const encodedPath = decodedSrc.split('/').map(s => s ? encodeURIComponent(s) : '').join('/');
-                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+                displaySrc = buildWebviewResourceUrl(safeDecodePath(originalSrc), true);
             }
 
             // Store original src for click handling
