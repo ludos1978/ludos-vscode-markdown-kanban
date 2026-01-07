@@ -1604,6 +1604,8 @@ export interface NavigateToElementMessage extends BaseMessage {
     columnId: string;
     taskId?: string;
     elementPath?: string;
+    elementType?: string;
+    field?: 'columnTitle' | 'taskTitle' | 'description';
 }
 
 /**
@@ -1623,6 +1625,9 @@ export interface ScrollToElementMessage extends BaseMessage {
     columnId: string;
     taskId?: string;
     highlight: boolean;
+    elementPath?: string;
+    elementType?: string;
+    field?: 'columnTitle' | 'taskTitle' | 'description';
 }
 
 // ============= PROCESSES MESSAGES =============

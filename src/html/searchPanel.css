@@ -255,6 +255,11 @@ body {
     background: var(--vscode-list-activeSelectionBackground);
 }
 
+.result-item.active {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
 .result-item-main {
     display: flex;
     align-items: flex-start;

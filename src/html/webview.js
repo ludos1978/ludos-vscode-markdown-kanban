@@ -3223,7 +3223,14 @@ if (!webviewEventListenersInitialized) {
 
         case 'scrollToElement':
             // Handle scroll-to-element request from search sidebar
-            scrollToAndHighlight(message.columnId, message.taskId, message.highlight);
+            scrollToAndHighlight(
+                message.columnId,
+                message.taskId,
+                message.highlight,
+                message.elementPath,
+                message.elementType,
+                message.field
+            );
             break;
     }
 });
@@ -3279,28 +3286,123 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
  * @param {string} [taskId] - Optional task ID to scroll to within the column
  * @param {boolean} [highlight] - Whether to add highlight animation
  */
-function scrollToAndHighlight(columnId, taskId, highlight = true) {
+function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, elementType, field) {
     let targetElement = null;
+    const columnElement = columnId
+        ? document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`)
+        : null;
+    const taskElement = columnElement && taskId
+        ? columnElement.querySelector(`.task-item[data-task-id="${taskId}"]`)
+        : null;
 
-    if (taskId) {
-        // Find the task card
+    const escapeSelector = (value) => {
+        if (typeof value !== 'string') return '';
+        if (typeof CSS !== 'undefined' && CSS.escape) {
+            return CSS.escape(value);
+        }
+        return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    };
+
+    const getSearchRoot = () => {
+        if (field === 'columnTitle' && columnElement) {
+            return columnElement.querySelector('.column-title') || columnElement;
+        }
+        if (field === 'taskTitle' && taskElement) {
+            return taskElement.querySelector('.task-title-display') || taskElement;
+        }
+        if (field === 'description' && taskElement) {
+            return taskElement.querySelector('.task-description-display') || taskElement;
+        }
+        return taskElement || columnElement || null;
+    };
+
+    const getSelectorsForPath = (safePath, type) => {
+        const selectors = [];
+        switch (type) {
+            case 'include':
+                selectors.push(
+                    `.include-container[data-include-file="${safePath}"]`,
+                    `.include-path-overlay-container[data-include-path="${safePath}"]`,
+                    `[data-include-file="${safePath}"]`,
+                    `[data-include-path="${safePath}"]`
+                );
+                break;
+            case 'link':
+                selectors.push(`a[data-original-href="${safePath}"]`);
+                break;
+            case 'image':
+            case 'diagram':
+            case 'media':
+                selectors.push(`[data-original-src="${safePath}"]`);
+                break;
+            default:
+                selectors.push(
+                    `.include-container[data-include-file="${safePath}"]`,
+                    `.include-path-overlay-container[data-include-path="${safePath}"]`,
+                    `a[data-original-href="${safePath}"]`,
+                    `[data-original-src="${safePath}"]`,
+                    `[data-include-file="${safePath}"]`,
+                    `[data-include-path="${safePath}"]`
+                );
+                break;
+        }
+        return selectors;
+    };
+
+    const findElementByPath = (root, path, type) => {
+        if (!root || !path) return null;
+        const pathCandidates = [path];
+        if (path.includes('%')) {
+            try {
+                const decoded = decodeURIComponent(path);
+                if (decoded !== path) pathCandidates.push(decoded);
+            } catch (e) {
+                // Ignore decode errors - use original path
+            }
+        }
+        for (const candidate of pathCandidates) {
+            const safePath = escapeSelector(candidate);
+            const selectors = getSelectorsForPath(safePath, type);
+            for (const selector of selectors) {
+                const found = root.querySelector(selector);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    const searchRoot = getSearchRoot();
+
+    if (elementPath) {
+        targetElement = findElementByPath(searchRoot || document, elementPath, elementType);
+        if (!targetElement && searchRoot !== document) {
+            targetElement = findElementByPath(document, elementPath, elementType);
+        }
+    }
+
+    if (!targetElement && searchRoot) {
+        targetElement = searchRoot;
+    }
+
+    if (!targetElement && taskElement) {
+        targetElement = taskElement;
+    }
+
+    if (!targetElement && columnElement) {
+        targetElement = columnElement;
+    }
+
+    if (!targetElement && taskId) {
+        // Fallback: Find the task card anywhere
         targetElement = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
     }
 
     if (!targetElement && columnId) {
-        // Find the column
         targetElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
-        if (!targetElement) {
-            // Try finding by column header
-            const columnHeader = document.querySelector(`[data-column-id="${columnId}"]`);
-            if (columnHeader) {
-                targetElement = columnHeader.closest('.kanban-full-height-column');
-            }
-        }
     }
 
     if (!targetElement) {
-        console.warn('[Webview] scrollToAndHighlight: Could not find element', { columnId, taskId });
+        console.warn('[Webview] scrollToAndHighlight: Could not find element', { columnId, taskId, elementPath, elementType, field });
         return;
     }
 

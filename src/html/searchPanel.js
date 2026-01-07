@@ -22,6 +22,9 @@
     let currentMode = 'text';
     let hasActivePanel = false;
     let searchDebounceTimer = null;
+    let currentResults = [];
+    let resultElements = [];
+    let currentResultIndex = -1;
 
     // Icon mappings for element types
     const typeIcons = {
@@ -84,6 +87,35 @@
         // Handle messages from extension
         window.addEventListener('message', handleMessage);
 
+        document.addEventListener('keydown', (e) => {
+            const isModifier = e.ctrlKey || e.metaKey;
+            if (!isModifier) {
+                return;
+            }
+
+            if (e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                if (currentMode !== 'text') {
+                    setMode('text', { clearResults: false });
+                }
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+
+            if (e.key.toLowerCase() === 'g') {
+                if (currentResults.length === 0) {
+                    return;
+                }
+                e.preventDefault();
+                const direction = e.shiftKey ? -1 : 1;
+                const nextIndex = (currentResultIndex + direction + currentResults.length) % currentResults.length;
+                navigateToIndex(nextIndex);
+            }
+        });
+
         // Notify extension that we're ready
         vscode.postMessage({ type: 'ready' });
     }
@@ -91,7 +123,7 @@
     /**
      * Set search mode
      */
-    function setMode(mode) {
+    function setMode(mode, options = {}) {
         currentMode = mode;
 
         // Update button states
@@ -111,8 +143,9 @@
             searchInput.focus();
         }
 
-        // Clear results when switching modes
-        clearResults();
+        if (options.clearResults !== false) {
+            clearResults();
+        }
     }
 
     /**
@@ -168,6 +201,9 @@
     function displayResults(results, searchType) {
         hideStatus();
         resultsList.innerHTML = '';
+        currentResults = results || [];
+        resultElements = [];
+        currentResultIndex = -1;
 
         if (results.length === 0) {
             resultsEmpty.style.display = 'flex';
@@ -192,11 +228,17 @@
         });
 
         // Render grouped results
+        let indexCounter = 0;
         Object.keys(grouped).forEach(type => {
             const group = grouped[type];
-            const groupEl = createResultGroup(type, group, searchType);
+            const groupEl = createResultGroup(type, group, searchType, indexCounter);
+            indexCounter += group.length;
             resultsList.appendChild(groupEl);
         });
+
+        if (currentResults.length > 0) {
+            navigateToIndex(0, { scroll: false, focus: false });
+        }
 
         // Show summary
         const totalCount = results.length;
@@ -211,7 +253,7 @@
     /**
      * Create a result group element
      */
-    function createResultGroup(type, items, searchType) {
+    function createResultGroup(type, items, searchType, startIndex = 0) {
         const group = document.createElement('div');
         group.className = 'result-group';
 
@@ -226,8 +268,8 @@
         group.appendChild(header);
 
         // Items
-        items.forEach(item => {
-            const itemEl = createResultItem(item, searchType);
+        items.forEach((item, offset) => {
+            const itemEl = createResultItem(item, searchType, startIndex + offset);
             group.appendChild(itemEl);
         });
 
@@ -237,10 +279,13 @@
     /**
      * Create a result item element
      */
-    function createResultItem(item, searchType) {
+    function createResultItem(item, searchType, resultIndex) {
         const el = document.createElement('div');
         el.className = 'result-item';
-        el.addEventListener('click', () => navigateToElement(item));
+        el.dataset.resultIndex = String(resultIndex);
+        el.addEventListener('click', () => {
+            navigateToIndex(resultIndex, { focus: true, scroll: true });
+        });
 
         const isBroken = searchType === 'broken';
         const iconClass = isBroken ? 'broken' : 'text';
@@ -276,6 +321,7 @@
             </div>
         `;
 
+        resultElements[resultIndex] = el;
         return el;
     }
 
@@ -287,8 +333,36 @@
             type: 'navigateToElement',
             columnId: item.location.columnId,
             taskId: item.location.taskId,
-            elementPath: item.path
+            elementPath: item.path,
+            elementType: item.type,
+            field: item.location.field
         });
+    }
+
+    function updateActiveResult() {
+        resultElements.forEach((el, index) => {
+            if (!el) return;
+            el.classList.toggle('active', index === currentResultIndex);
+        });
+    }
+
+    function navigateToIndex(index, options = {}) {
+        const { scroll = true, focus = true } = options;
+        if (index < 0 || index >= currentResults.length) {
+            return;
+        }
+        currentResultIndex = index;
+        updateActiveResult();
+        const item = currentResults[index];
+        if (focus) {
+            navigateToElement(item);
+        }
+        if (scroll) {
+            const el = resultElements[index];
+            if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        }
     }
 
     /**
@@ -345,6 +419,9 @@
         resultsEmpty.style.display = 'flex';
         resultsList.style.display = 'none';
         hideStatus();
+        currentResults = [];
+        resultElements = [];
+        currentResultIndex = -1;
     }
 
     /**

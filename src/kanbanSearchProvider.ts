@@ -215,7 +215,10 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             type: 'scrollToElement',
             columnId: message.columnId,
             taskId: message.taskId,
-            highlight: true
+            highlight: true,
+            elementPath: message.elementPath,
+            elementType: message.elementType,
+            field: message.field
         };
 
         const webviewPanel = panel.getPanel();
