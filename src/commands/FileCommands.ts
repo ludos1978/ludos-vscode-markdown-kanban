@@ -82,6 +82,25 @@ export class FileCommands extends SwitchBasedCommand {
             message.linkIndex,
             message.includeContext
         );
+
+        const fileRegistry = context.getFileRegistry();
+        if (fileRegistry && message.href) {
+            const includeFile = fileRegistry.getByRelativePath(message.href);
+            if (includeFile && includeFile.getFileType() !== 'main') {
+                const includePath = includeFile.getPath();
+                const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
+                if (openDoc && !openDoc.isDirty) {
+                    const cachedContent = includeFile.getContent();
+                    if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
+                        const edit = new vscode.WorkspaceEdit();
+                        const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
+                        edit.replace(openDoc.uri, fullRange, cachedContent);
+                        await vscode.workspace.applyEdit(edit);
+                    }
+                }
+            }
+        }
+
         return this.success();
     }
 

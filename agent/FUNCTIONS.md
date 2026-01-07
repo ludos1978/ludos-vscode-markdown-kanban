@@ -9,7 +9,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
-## Recent Updates (2026-01-06)
+## Recent Updates (2026-01-07)
+- `src/commands/FileCommands.ts` `handleOpenFileLink()` now applies cached include-file content to opened editors when the include file has unsaved changes, keeping include file views consistent after undo.
 - `src/core/events/BoardSyncHandler.ts` `_propagateEditsToIncludeFiles()` now compares include content against current cached content (not baseline) so undo restores include file content correctly, and updates open include documents to keep editors in sync.
 - `src/html/webview.js` updateColumnContent handler now logs cache/column state, task IDs, and clears stale loading/error flags when task payloads arrive (fixed switch scoping to avoid syntax errors).
 - `src/html/boardRenderer.js` `renderSingleColumn()` now logs rendered task IDs after replacement to compare DOM vs data.
