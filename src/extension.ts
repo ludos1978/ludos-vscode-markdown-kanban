@@ -78,10 +78,40 @@ export function activate(context: vscode.ExtensionContext) {
 	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
 	const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
 	if (isDevelopment) {
-		const allPanels = KanbanWebviewPanel.getAllPanels();
-		Promise.all(allPanels.map(async (panel) => {
-			await panel.refreshWebviewContent();
-		})).catch(err => console.error('[Kanban Extension] Error refreshing panels:', err));
+		let refreshInProgress = false;
+
+		const refreshPanels = async () => {
+			if (refreshInProgress) {
+				return;
+			}
+
+			const allPanels = KanbanWebviewPanel.getAllPanels();
+			if (allPanels.length === 0) {
+				return;
+			}
+
+			refreshInProgress = true;
+			try {
+				await Promise.all(allPanels.map(panel => panel.refreshWebviewContent()));
+			} catch (err) {
+				console.error('[kanban.extension.dev-refresh]', err);
+			} finally {
+				refreshInProgress = false;
+			}
+		};
+
+		void refreshPanels();
+
+		const htmlPattern = new vscode.RelativePattern(context.extensionPath, 'src/html/**/*');
+		const htmlWatcher = vscode.workspace.createFileSystemWatcher(htmlPattern);
+		const handleHtmlChange = () => {
+			void refreshPanels();
+		};
+
+		htmlWatcher.onDidChange(handleHtmlChange);
+		htmlWatcher.onDidCreate(handleHtmlChange);
+		htmlWatcher.onDidDelete(handleHtmlChange);
+		context.subscriptions.push(htmlWatcher);
 	}
 
 	// Register command to open kanban panel

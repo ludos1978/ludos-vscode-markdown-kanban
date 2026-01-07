@@ -10,6 +10,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 ---
 
 ## Recent Updates (2026-01-06)
+- `src/panel/WebviewManager.ts` `generateHtml()` now prefers `src/html` assets in development when available, falling back to `dist/src/html` for generated files.
+- `src/extension.ts` now refreshes all webview panels on `src/html` file changes in development mode to keep assets current.
 - `src/panel/WebviewManager.ts` `generateHtml()` now preserves `enableCommandUris` when setting webview options.
 - `src/commands/CommandRegistry.ts` now orders handlers per message type by priority and respects `canHandle()` when dispatching.
 - `src/services/WebviewUpdateService.ts` now reads extension version from VS Code extension metadata instead of a local package.json require.

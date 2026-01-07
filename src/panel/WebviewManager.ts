@@ -309,17 +309,29 @@ export class WebviewManager {
             enableCommandUris: true
         };
 
-        const webviewDir = panel.webview.asWebviewUri(
-            vscode.Uri.file(path.join(extensionPath, 'dist', 'src', 'html'))
-        );
-
         // Add cache-busting timestamp for development
         const timestamp = Date.now();
         const extensionMode = this._deps.extensionContext.extensionMode;
         const isDevelopment = !extensionMode || extensionMode === vscode.ExtensionMode.Development;
         const cacheBuster = isDevelopment ? `?v=${timestamp}` : '';
 
-        html = html.replace(/href="webview\.css"/, `href="${webviewDir}/webview.css${cacheBuster}"`);
+        const devHtmlDir = path.join(extensionPath, 'src', 'html');
+        const distHtmlDir = path.join(extensionPath, 'dist', 'src', 'html');
+        const devWebviewDir = panel.webview.asWebviewUri(vscode.Uri.file(devHtmlDir));
+        const distWebviewDir = panel.webview.asWebviewUri(vscode.Uri.file(distHtmlDir));
+        const preferDevAssets = isDevelopment && fs.existsSync(devHtmlDir);
+
+        const resolveAssetUri = (relativePath: string): string => {
+            if (preferDevAssets) {
+                const devPath = path.join(devHtmlDir, relativePath);
+                if (fs.existsSync(devPath)) {
+                    return `${devWebviewDir}/${relativePath}${cacheBuster}`;
+                }
+            }
+            return `${distWebviewDir}/${relativePath}${cacheBuster}`;
+        };
+
+        html = html.replace(/href="webview\.css"/, `href="${resolveAssetUri('webview.css')}"`);
 
         // Replace all JavaScript file references
         const jsFiles = [
@@ -377,7 +389,7 @@ export class WebviewManager {
         jsFiles.forEach(jsFile => {
             html = html.replace(
                 new RegExp(`src="${jsFile}"`, 'g'),
-                `src="${webviewDir}/${jsFile}${cacheBuster}"`
+                `src="${resolveAssetUri(jsFile)}"`
             );
         });
 
