@@ -92,13 +92,10 @@ function initializeTaskElement(taskElement) {
             }
         }
 
-        // Verify description click handler - check container
-        const descContainer = taskElement.querySelector('.task-description-container');
-        if (descContainer && !descContainer.onclick && !descContainer.hasAttribute('onclick')) {
-            const descEl = taskElement.querySelector('.task-description-display');
-            if (descEl) {
-                descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
-            }
+        // Verify description click handler - check the actual display element (not container)
+        const descEl = taskElement.querySelector('.task-description-display');
+        if (descEl && !descEl.onclick && !descEl.hasAttribute('onclick')) {
+            descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
         }
 
         // Verify collapse toggle click handler
@@ -2458,6 +2455,37 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
 }
 
 function handleDescriptionClick(event, element, taskId, columnId) {
+    // DEBUG: Log scroll position at the VERY START of click handling
+    if (window.kanbanDebug?.enabled) {
+        const container = document.getElementById('kanban-container');
+        const board = document.getElementById('kanban-board');
+        const body = document.body;
+        const webviewBody = document.documentElement;
+        // Find the nearest scrollable parent
+        let scrollParent = element?.parentElement;
+        let scrollParentInfo = null;
+        while (scrollParent) {
+            const style = window.getComputedStyle(scrollParent);
+            if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                scrollParentInfo = {
+                    id: scrollParent.id || scrollParent.className.split(' ')[0],
+                    scrollTop: scrollParent.scrollTop
+                };
+                break;
+            }
+            scrollParent = scrollParent.parentElement;
+        }
+        console.log('[CLICK-DEBUG] handleDescriptionClick entry', {
+            containerScrollTop: container?.scrollTop,
+            boardScrollTop: board?.scrollTop,
+            boardHasMultiRow: board?.classList?.contains('multi-row'),
+            bodyScrollTop: body?.scrollTop,
+            documentScrollTop: webviewBody?.scrollTop,
+            scrollParent: scrollParentInfo,
+            clickedElementRect: element?.getBoundingClientRect()?.top,
+            taskId
+        });
+    }
 
     if (event.altKey) {
         // Alt+click: open link/image

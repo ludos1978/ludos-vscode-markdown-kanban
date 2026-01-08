@@ -635,6 +635,16 @@ class TaskEditor {
     _setupEditVisibility(displayElement, editElement) {
         if (displayElement) { displayElement.style.display = 'none'; }
         editElement.style.display = 'block';
+
+        // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
+        // The kanban-board is the actual scroll container when multi-row is active
+        const kanbanBoard = document.querySelector('.kanban-board');
+        if (kanbanBoard && !kanbanBoard._editingMinHeight) {
+            const currentHeight = kanbanBoard.scrollHeight;
+            kanbanBoard.style.minHeight = currentHeight + 'px';
+            kanbanBoard._editingMinHeight = currentHeight; // Store for later cleanup
+        }
+
         this.autoResize(editElement);
     }
 
@@ -714,37 +724,82 @@ class TaskEditor {
      * @private
      */
     _setupInputHandler(editElement, containerElement) {
+        // GUARD: Prevent duplicate event handler attachment
+        if (editElement._inputHandlerAttached) {
+            if (window.kanbanDebug?.enabled) {
+                console.log('[SETUP-DEBUG] Input handler already attached, skipping');
+            }
+            return;
+        }
+        editElement._inputHandlerAttached = true;
+
         let recalcTimeout = null;
         let lastRecalcTime = 0;
         const MIN_DELAY_BETWEEN_RECALC = 300;
         let autoResizePending = false;
 
-        // DEBUG: Track ALL events on the edit element
-        editElement.addEventListener('keydown', (e) => {
-            console.log('[KEYDOWN-DEBUG]', {
-                key: e.key,
-                code: e.code,
-                target: e.target.className,
-                activeElement: document.activeElement?.className
+        // DEBUG: Log how many edit elements exist
+        if (window.kanbanDebug?.enabled) {
+            const allEditElements = document.querySelectorAll('.task-description-edit');
+            console.log('[SETUP-DEBUG] Setting up input handler', {
+                editElementCount: allEditElements.length,
+                elementId: editElement.closest('[data-task-id]')?.dataset?.taskId
             });
+        }
+
+        // DEBUG: Track ALL events on the edit element (only when debug mode active)
+        editElement.addEventListener('keydown', (e) => {
+            if (window.kanbanDebug?.enabled) {
+                const container = document.getElementById('kanban-container');
+                console.log('[KEYDOWN-DEBUG]', {
+                    key: e.key,
+                    code: e.code,
+                    target: e.target.className,
+                    activeElement: document.activeElement?.className,
+                    scrollTop: container?.scrollTop,
+                    isEditing: !!this.currentEditor
+                });
+            }
+        });
+
+        // DEBUG: Track keyup to see scroll state after key processing
+        editElement.addEventListener('keyup', (e) => {
+            if (window.kanbanDebug?.enabled) {
+                const container = document.getElementById('kanban-container');
+                console.log('[KEYUP-DEBUG]', {
+                    key: e.key,
+                    scrollTop: container?.scrollTop,
+                    isEditing: !!this.currentEditor
+                });
+            }
         });
 
         editElement.addEventListener('focus', () => {
-            console.log('[FOCUS-DEBUG] Edit element gained focus');
+            if (window.kanbanDebug?.enabled) {
+                console.log('[FOCUS-DEBUG] Edit element gained focus');
+            }
         });
 
         editElement.addEventListener('blur', (e) => {
-            console.warn('[BLUR-DEBUG] Edit element LOST focus!', {
-                relatedTarget: e.relatedTarget?.className || 'null',
-                newActiveElement: document.activeElement?.className
-            });
+            if (window.kanbanDebug?.enabled) {
+                console.log('[BLUR-DEBUG] Edit element LOST focus!', {
+                    relatedTarget: e.relatedTarget?.className || 'null',
+                    newActiveElement: document.activeElement?.className
+                });
+            }
         });
 
         editElement.oninput = () => {
-            console.log('[ONINPUT-DEBUG] Input event fired!', {
-                valueLength: editElement.value.length,
-                scrollTop: document.getElementById('kanban-container')?.scrollTop
-            });
+            if (window.kanbanDebug?.enabled) {
+                const container = document.getElementById('kanban-container');
+                console.log('[ONINPUT-DEBUG] Input event fired!', {
+                    valueLength: editElement.value.length,
+                    containerScrollTop: container?.scrollTop,
+                    textareaScrollTop: editElement.scrollTop,
+                    cursorPosition: editElement.selectionStart,
+                    textareaHeight: editElement.offsetHeight
+                });
+            }
             const container = document.getElementById('kanban-container');
 
             // Throttle autoResize to max 60fps
@@ -755,8 +810,8 @@ class TaskEditor {
                     this.autoResize(editElement);
                     const scrollAfterResize = container?.scrollTop || 0;
 
-                    if (scrollBeforeResize !== scrollAfterResize) {
-                        console.warn('[INPUT-DEBUG] autoResize changed scroll:', {
+                    if (scrollBeforeResize !== scrollAfterResize && window.kanbanDebug?.enabled) {
+                        console.log('[INPUT-DEBUG] autoResize changed scroll:', {
                             before: scrollBeforeResize,
                             after: scrollAfterResize,
                             delta: scrollAfterResize - scrollBeforeResize
@@ -912,6 +967,14 @@ class TaskEditor {
         // If transitioning, don't interfere
         if (this.isTransitioning) { return; }
 
+        const container = document.getElementById('kanban-container');
+        const scrollAtStart = container?.scrollTop || 0;
+
+        // DEBUG: Track scroll position through edit initialization
+        if (window.kanbanDebug?.enabled) {
+            console.log('[START-EDIT] Begin', { type, taskId, scrollTop: scrollAtStart });
+        }
+
         // Get the appropriate elements based on type
         const { displayElement, editElement, containerElement } = this._getEditElements(element, type);
         if (!editElement) { return; }
@@ -934,14 +997,30 @@ class TaskEditor {
             this._initializeTaskDescriptionValue(editElement, taskId, columnId);
         }
 
+        if (window.kanbanDebug?.enabled) {
+            console.log('[START-EDIT] After init value', { scrollTop: container?.scrollTop });
+        }
+
         // Show edit element and setup visibility
         this._setupEditVisibility(displayElement, editElement);
+
+        if (window.kanbanDebug?.enabled) {
+            console.log('[START-EDIT] After visibility', { scrollTop: container?.scrollTop });
+        }
 
         // Recalculate stack layout if needed
         this._recalculateStackLayout(containerElement);
 
+        if (window.kanbanDebug?.enabled) {
+            console.log('[START-EDIT] After stack recalc', { scrollTop: container?.scrollTop });
+        }
+
         // Position cursor
         this._positionCursor(editElement, type, preserveCursor);
+
+        if (window.kanbanDebug?.enabled) {
+            console.log('[START-EDIT] After cursor position', { scrollTop: container?.scrollTop });
+        }
 
         // Store editor state
         this._storeEditorState(editElement, displayElement, type, taskId, columnId);
@@ -1578,19 +1657,26 @@ class TaskEditor {
         if (!this.currentEditor) {return;}
 
         const { element, displayElement, type } = this.currentEditor;
-        
+
         // Clean up event listeners
         element.onblur = null;
         element.oninput = null;
         element.removeEventListener('mousedown', this._handleMouseDown);
         element.removeEventListener('dblclick', this._handleDblClick);
-        
+
         // Hide edit element
         element.style.display = 'none';
 
         // Show display element
         if (displayElement) {
             displayElement.style.removeProperty('display');
+        }
+
+        // Release the fixed view height that was set during editing
+        const kanbanBoard = document.querySelector('.kanban-board');
+        if (kanbanBoard && kanbanBoard._editingMinHeight) {
+            kanbanBoard.style.removeProperty('min-height');
+            delete kanbanBoard._editingMinHeight;
         }
 
         const col = element.closest('.kanban-full-height-column');
@@ -1720,26 +1806,14 @@ class TaskEditor {
      * @param {HTMLTextAreaElement} textarea - Textarea to resize
      */
     autoResize(textarea) {
-        const container = document.getElementById('kanban-container');
-        const scrollBefore = container?.scrollTop || 0;
+        // Get current dimensions
+        const currentHeight = textarea.offsetHeight;
+        const scrollHeight = textarea.scrollHeight;
 
-        textarea.style.height = 'auto';  // COLLAPSE
-
-        const scrollAfterCollapse = container?.scrollTop || 0;
-
-        textarea.style.height = textarea.scrollHeight + 'px';  // EXPAND
-
-        const scrollAfterExpand = container?.scrollTop || 0;
-
-        if (scrollBefore !== scrollAfterCollapse || scrollBefore !== scrollAfterExpand) {
-            console.warn('[AUTORESIZE-DEBUG] Scroll changed during autoResize:', {
-                before: scrollBefore,
-                afterCollapse: scrollAfterCollapse,
-                afterExpand: scrollAfterExpand,
-                deltaCollapse: scrollAfterCollapse - scrollBefore,
-                deltaExpand: scrollAfterExpand - scrollBefore,
-                textareaHeight: textarea.scrollHeight
-            });
+        // ONLY GROW - never collapse during editing (collapsing causes scroll jump)
+        // Shrinking will happen naturally when editing ends and element is recreated
+        if (scrollHeight > currentHeight) {
+            textarea.style.height = scrollHeight + 'px';
         }
     }
 
@@ -1921,6 +1995,14 @@ function editTitle(element, taskId, columnId) {
  * @param {string} columnId - Parent column ID
  */
 function editDescription(element, taskId, columnId) {
+    // DEBUG: Log scroll position at editDescription entry
+    if (window.kanbanDebug?.enabled) {
+        const container = document.getElementById('kanban-container');
+        console.log('[CLICK-DEBUG] editDescription entry', {
+            scrollTop: container?.scrollTop,
+            taskId
+        });
+    }
 
     // Don't start editing if we're already editing this field
     if (taskEditor.currentEditor &&

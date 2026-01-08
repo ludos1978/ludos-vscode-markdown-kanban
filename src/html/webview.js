@@ -1460,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     webviewEventListenersInitialized = true;
 
-    // DEBUG: Global scroll listener to catch all scroll events
+    // DEBUG: Global scroll listener to catch all scroll events (respects debug mode)
     (function setupScrollDebug() {
         const container = document.getElementById('kanban-container');
         if (!container) return;
@@ -1468,9 +1468,13 @@ document.addEventListener('DOMContentLoaded', () => {
         let lastScrollTop = container.scrollTop;
 
         container.addEventListener('scroll', () => {
+            if (!window.kanbanDebug?.enabled) {
+                lastScrollTop = container.scrollTop;
+                return;
+            }
             const delta = container.scrollTop - lastScrollTop;
             if (Math.abs(delta) > 20) {
-                console.warn('[SCROLL-EVENT] Large scroll detected:', {
+                console.log('[SCROLL-EVENT] Large scroll detected:', {
                     from: lastScrollTop,
                     to: container.scrollTop,
                     delta,
@@ -1481,7 +1485,9 @@ document.addEventListener('DOMContentLoaded', () => {
             lastScrollTop = container.scrollTop;
         }, { passive: true });
 
-        console.log('[SCROLL-DEBUG] Scroll listener installed');
+        if (window.kanbanDebug?.enabled) {
+            console.log('[SCROLL-DEBUG] Scroll listener installed');
+        }
     })();
 
     // Request available Marp classes on load
@@ -1855,6 +1861,11 @@ if (!webviewEventListenersInitialized) {
     window.addEventListener('message', event => {
     const message = event.data;
 
+    // DEBUG: Log ALL backend messages when debug mode is active
+    if (window.kanbanDebug && window.kanbanDebug.enabled) {
+        console.warn('[BACKEND-MSG]', message.type, message);
+    }
+
     switch (message.type) {
         case 'batch':
             // Handle batched messages from backend (via WebviewBridge.sendBatched)
@@ -1925,6 +1936,16 @@ if (!webviewEventListenersInitialized) {
             break;
         }
         case 'boardUpdate':
+            // DEBUG: Log boardUpdate during editing
+            if (window.kanbanDebug?.enabled) {
+                const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+                console.log('[BOARD-UPDATE]', {
+                    isEditing,
+                    editorType: window.taskEditor?.currentEditor?.type,
+                    isFullRefresh: message.isFullRefresh,
+                    timestamp: performance.now()
+                });
+            }
             const previousBoard = window.cachedBoard;
 
             // Clear card focus when board is updated
