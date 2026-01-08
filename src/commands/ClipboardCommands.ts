@@ -16,7 +16,8 @@ import {
     RequestFileDropDialogueMessage,
     ExecuteFileDropCopyMessage,
     ExecuteFileDropLinkMessage,
-    LinkExistingFileMessage
+    LinkExistingFileMessage,
+    DiagramFileNameResponseMessage
 } from '../core/bridge/MessageTypes';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { FileSearchService, TrackedFileData } from '../fileSearchService';
@@ -56,12 +57,14 @@ export class ClipboardCommands extends SwitchBasedCommand {
             'linkExistingFile',
             'openMediaFolder',
             'searchForDroppedFile',
-            'createDiagramFile'
+            'createDiagramFile',
+            'diagramFileNameResponse'
         ],
         priority: 100
     };
 
     private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
+    private _pendingDiagramNameRequests = new Map<string, { resolve: (value: string | null) => void; timeout: NodeJS.Timeout }>();
 
     /**
      * Handler mapping for message dispatch
@@ -131,6 +134,10 @@ export class ClipboardCommands extends SwitchBasedCommand {
         'createDiagramFile': async (msg, ctx) => {
             const m = msg as any;
             await this.handleCreateDiagramFile(m.diagramType, m.columnId, m.insertionIndex, m.dropPosition, m.sourceFilePath, ctx);
+            return this.success();
+        },
+        'diagramFileNameResponse': async (msg, _ctx) => {
+            this.handleDiagramFileNameResponse(msg as DiagramFileNameResponseMessage);
             return this.success();
         }
     };
@@ -482,21 +489,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
             const diagramTypeLabel = diagramType === 'excalidraw' ? 'Excalidraw' : 'Draw.io';
             const defaultName = `diagram-${Date.now()}`;
 
-            const fileName = await vscode.window.showInputBox({
-                prompt: `Enter a name for the new ${diagramTypeLabel} diagram`,
-                value: defaultName,
-                placeHolder: 'diagram-name',
-                validateInput: (value) => {
-                    if (!value || value.trim().length === 0) {
-                        return 'Please enter a filename';
-                    }
-                    // Check for invalid characters
-                    if (/[<>:"/\\|?*]/.test(value)) {
-                        return 'Filename contains invalid characters';
-                    }
-                    return null;
-                }
-            });
+            const fileName = await this.requestDiagramFileName(diagramType, diagramTypeLabel, defaultName, context);
 
             if (!fileName) {
                 // User cancelled
@@ -591,6 +584,81 @@ export class ClipboardCommands extends SwitchBasedCommand {
             });
             showError(`Failed to create diagram: ${getErrorMessage(error)}`);
         }
+    }
+
+    private async requestDiagramFileName(
+        diagramType: 'excalidraw' | 'drawio',
+        diagramTypeLabel: string,
+        defaultName: string,
+        context: CommandContext
+    ): Promise<string | null> {
+        const bridge = context.getWebviewBridge();
+        const panel = context.getWebviewPanel();
+
+        if (!bridge || !panel) {
+            const input = await vscode.window.showInputBox({
+                prompt: `Enter a name for the new ${diagramTypeLabel} diagram`,
+                value: defaultName,
+                placeHolder: 'diagram-name',
+                validateInput: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Please enter a filename';
+                    }
+                    // Check for invalid characters
+                    if (/[<>:"/\\|?*]/.test(value)) {
+                        return 'Filename contains invalid characters';
+                    }
+                    return null;
+                }
+            });
+            return input ?? null;
+        }
+
+        const requestId = `diagram-name-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const response = new Promise<string | null>((resolve) => {
+            const timeout = setTimeout(() => {
+                this._pendingDiagramNameRequests.delete(requestId);
+                resolve(null);
+            }, 60000);
+
+            this._pendingDiagramNameRequests.set(requestId, { resolve, timeout });
+        });
+
+        bridge.send({
+            type: 'requestDiagramFileName',
+            requestId,
+            diagramType,
+            title: `${diagramTypeLabel} Diagram`,
+            prompt: `Enter a name for the new ${diagramTypeLabel} diagram`,
+            placeholder: 'diagram-name',
+            defaultValue: defaultName
+        });
+
+        return response;
+    }
+
+    private handleDiagramFileNameResponse(message: DiagramFileNameResponseMessage): void {
+        const requestId = message.requestId;
+        if (!requestId) {
+            return;
+        }
+
+        const pending = this._pendingDiagramNameRequests.get(requestId);
+        if (!pending) {
+            return;
+        }
+
+        clearTimeout(pending.timeout);
+        this._pendingDiagramNameRequests.delete(requestId);
+
+        if (message.cancelled) {
+            pending.resolve(null);
+            return;
+        }
+
+        const value = message.value?.trim();
+        pending.resolve(value && value.length > 0 ? value : null);
     }
 
     // ============= HELPER METHODS =============

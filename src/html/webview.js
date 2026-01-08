@@ -1546,7 +1546,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modal event listeners
     document.getElementById('input-modal').addEventListener('click', e => {
         if (e.target.id === 'input-modal') {
-            closeInputModal();
+            if (window.modalUtils && typeof window.modalUtils.cancelInputModal === 'function') {
+                window.modalUtils.cancelInputModal();
+            } else {
+                closeInputModal();
+            }
         }
     });
 
@@ -1706,6 +1710,62 @@ if (!webviewEventListenersInitialized) {
                 }
             }
             break;
+        case 'requestDiagramFileName': {
+            const requestId = message.requestId;
+            if (!requestId) {
+                break;
+            }
+
+            const diagramType = message.diagramType === 'excalidraw' ? 'Excalidraw' : 'Draw.io';
+            const title = message.title || `${diagramType} Diagram`;
+            const prompt = message.prompt || `Enter a name for the new ${diagramType} diagram`;
+            const placeholder = message.placeholder || 'diagram-name';
+            const defaultValue = message.defaultValue || '';
+            const invalidCharPattern = /[<>:"/\\|?*]/;
+
+            if (!window.modalUtils || typeof window.modalUtils.showInputModal !== 'function') {
+                vscode.postMessage({
+                    type: 'diagramFileNameResponse',
+                    requestId,
+                    value: defaultValue || null,
+                    cancelled: !defaultValue
+                });
+                break;
+            }
+
+            window.modalUtils.showInputModal(
+                title,
+                prompt,
+                placeholder,
+                (value) => {
+                    vscode.postMessage({
+                        type: 'diagramFileNameResponse',
+                        requestId,
+                        value
+                    });
+                },
+                () => {
+                    vscode.postMessage({
+                        type: 'diagramFileNameResponse',
+                        requestId,
+                        cancelled: true
+                    });
+                },
+                {
+                    defaultValue,
+                    validate: (value) => {
+                        if (!value || value.trim().length === 0) {
+                            return 'Please enter a filename';
+                        }
+                        if (invalidCharPattern.test(value)) {
+                            return 'Filename contains invalid characters';
+                        }
+                        return '';
+                    }
+                }
+            );
+            break;
+        }
         case 'boardUpdate':
             const previousBoard = window.cachedBoard;
 

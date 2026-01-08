@@ -2837,6 +2837,15 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   background-color: rgba(0,0,0,0.5);
 }
 
+#input-modal {
+  align-items: center;
+  justify-content: center;
+}
+
+#input-modal .modal-content {
+  margin: 0;
+}
+
 .modal-content {
   background-color: var(--vscode-editor-background);
   margin: 5vh auto;
@@ -2850,6 +2859,13 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+.input-modal-error {
+  display: none;
+  margin-top: 6px;
+  color: var(--vscode-errorForeground, #f14c4c);
+  font-size: 12px;
 }
 
 .modal-header {

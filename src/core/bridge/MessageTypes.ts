@@ -1000,6 +1000,29 @@ export interface CreateDiagramFileMessage extends BaseMessage {
     sourceFilePath: string | null;  // null means use main file
 }
 
+/**
+ * Request diagram filename prompt in webview
+ */
+export interface RequestDiagramFileNameMessage extends BaseMessage {
+    type: 'requestDiagramFileName';
+    requestId: string;
+    diagramType: 'excalidraw' | 'drawio';
+    title?: string;
+    prompt?: string;
+    placeholder?: string;
+    defaultValue?: string;
+}
+
+/**
+ * Response to diagram filename prompt
+ */
+export interface DiagramFileNameResponseMessage extends BaseMessage {
+    type: 'diagramFileNameResponse';
+    requestId: string;
+    value?: string;
+    cancelled?: boolean;
+}
+
 // ============= EXPORT MESSAGES =============
 
 /**
@@ -1711,6 +1734,7 @@ export type OutgoingMessage =
     | OperationCompletedMessage
     | StopEditingRequestMessage
     | UnfoldColumnsRequestMessage
+    | RequestDiagramFileNameMessage
     | ExportResultMessage
     | MarpThemesMessage
     | MarpStatusMessage
@@ -1828,6 +1852,7 @@ export type IncomingMessage =
     | LinkExistingFileMessage
     | OpenMediaFolderMessage
     | CreateDiagramFileMessage
+    | DiagramFileNameResponseMessage
     // Export messages
     | StopAutoExportMessage
     | GetExportDefaultFolderMessage

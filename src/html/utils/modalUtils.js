@@ -29,12 +29,17 @@ class ModalUtils {
      * @param {Function} onConfirm - Callback when confirmed
      * @param {Function} onCancel - Optional callback when cancelled
      */
-    showInputModal(title, message, placeholder, onConfirm, onCancel = null) {
+    showInputModal(title, message, placeholder, onConfirm, onCancel = null, options = {}) {
         const modalElement = document.getElementById('input-modal');
         if (!modalElement) {
             console.error('Input modal element not found');
             return;
         }
+
+        const {
+            defaultValue = '',
+            validate = null
+        } = options || {};
 
         // Set up modal content
         document.getElementById('input-modal-title').textContent = title;
@@ -42,10 +47,16 @@ class ModalUtils {
 
         const inputField = document.getElementById('input-modal-field');
         inputField.placeholder = placeholder;
-        inputField.value = '';
+        inputField.value = defaultValue;
+
+        const errorElement = document.getElementById('input-modal-error');
+        if (errorElement) {
+            errorElement.textContent = '';
+            errorElement.style.display = 'none';
+        }
 
         // Show modal
-        modalElement.style.display = 'block';
+        modalElement.style.display = 'flex';
         this.activeModals.add(modalElement);
 
         // Focus input after a brief delay
@@ -55,6 +66,16 @@ class ModalUtils {
         const confirmAction = () => {
             const value = inputField.value.trim();
             if (value) {
+                if (typeof validate === 'function') {
+                    const error = validate(value);
+                    if (error) {
+                        if (errorElement) {
+                            errorElement.textContent = error;
+                            errorElement.style.display = 'block';
+                        }
+                        return;
+                    }
+                }
                 this.closeInputModal();
                 onConfirm(value);
             }
@@ -101,6 +122,24 @@ class ModalUtils {
             this.activeModals.delete(modalElement);
             this.keyHandlers.delete(modalElement);
         }
+    }
+
+    /**
+     * Cancel input modal and invoke its cancel handler if present
+     */
+    cancelInputModal() {
+        const modalElement = document.getElementById('input-modal');
+        if (!modalElement) {
+            return;
+        }
+
+        const handlers = this.keyHandlers.get(modalElement);
+        if (handlers && typeof handlers.cancelAction === 'function') {
+            handlers.cancelAction();
+            return;
+        }
+
+        this.closeInputModal();
     }
 
     /**
@@ -247,7 +286,7 @@ class ModalUtils {
 
             // Try input modal first
             if (topModal.id === 'input-modal') {
-                this.closeInputModal();
+                this.cancelInputModal();
             } else {
                 this.closeModal(topModal);
             }
@@ -300,4 +339,3 @@ if (typeof window !== 'undefined') {
     window.showConfirm = modalUtils.showConfirm.bind(modalUtils);
     window.showLoading = modalUtils.showLoading.bind(modalUtils);
 }
-

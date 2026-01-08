@@ -616,6 +616,7 @@
             <div class="modal-body">
                 <p id="input-modal-message">Please enter a value:</p>
                 <input type="text" id="input-modal-field" class="form-input" placeholder="Enter value..." />
+                <div id="input-modal-error" class="input-modal-error" role="alert" aria-live="polite"></div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeInputModal()">Cancel</button>
@@ -1149,9 +1150,14 @@
             else if (e.key === 'ArrowUp') { e.preventDefault(); selectItem(selectedIndex - 1); }
         }
 
+        function ensureModalReady() {
+            if (!overlay) init();
+            return !!overlay;
+        }
+
         function show(path, initialSearch) {
             console.log('[FileSearchModal] show() called with path:', path, 'initialSearch:', initialSearch);
-            if (!overlay) init();
+            if (!ensureModalReady()) { return; }
             originalPath = path; results = []; selectedIndex = -1; brokenPathData = null; batchAnalysisData = null; batchAnalysisCache = {};
             originalPathEl.textContent = path;
             searchInputEl.value = initialSearch || '';
@@ -1170,11 +1176,18 @@
             vscode.postMessage({ type: 'fileSearchScanBrokenPath' });
         }
 
-        function close() { isVisible = false; overlay.classList.remove('visible'); vscode.postMessage({ type: 'fileSearchCancelled' }); }
+        function close() {
+            if (!overlay) { return; }
+            isVisible = false;
+            overlay.classList.remove('visible');
+            vscode.postMessage({ type: 'fileSearchCancelled' });
+        }
 
         function selectCurrentItem() {
+            if (!overlay) { return; }
             if (selectedIndex >= 0 && results[selectedIndex]) {
-                isVisible = false; overlay.classList.remove('visible');
+                isVisible = false;
+                overlay.classList.remove('visible');
                 vscode.postMessage({ type: 'fileSearchSelected', path: results[selectedIndex].fullPath, batchReplace: batchCheckboxEl.checked, pathFormat: pathFormat });
             }
         }
