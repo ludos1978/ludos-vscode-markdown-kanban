@@ -463,20 +463,25 @@ function setupGlobalDragAndDrop() {
         }
     }
     
+    function shouldSkipExternalDragIndicators() {
+        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) &&
+            !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
+            return true;
+        }
+        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
+            return true;
+        }
+        return false;
+    }
+
     // Board container dragover for external file drag indicators
     boardContainer.addEventListener('dragover', function(e) {
         // Always prevent default to allow drops
         e.preventDefault();
 
         // Skip visual indicators for internal column/task drags
-        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) &&
-            !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
-            return; // Don't show external drop indicators during internal drags
-        }
-
-        // Skip visual indicators for template drags - they use column drop zones
-        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
-            return; // Don't show external drop indicators during template drags
+        if (shouldSkipExternalDragIndicators()) {
+            return; // Don't show external drop indicators during internal/template drags
         }
 
         // DIAGNOSTIC: Log external file drag handling (once per session)
@@ -506,13 +511,8 @@ function setupGlobalDragAndDrop() {
     
     boardContainer.addEventListener('dragenter', function(e) {
         // Skip external file drag handling if we're dragging internal elements
-        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask)) {
-            return; // Don't show external drop feedback during internal drags
-        }
-
-        // Skip for template drags
-        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
-            return;
+        if (shouldSkipExternalDragIndicators()) {
+            return; // Don't show external drop feedback during internal/template drags
         }
 
         if (isExternalFileDrag(e)) {
