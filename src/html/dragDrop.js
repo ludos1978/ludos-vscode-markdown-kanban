@@ -335,14 +335,44 @@ function clearLeftViewFlag() {
     }
 }
 
-function isInternalDragActive() {
-    if (dragDropStateMachine.isLayoutDrag()) {
-        return true;
+function getCurrentDragMode() {
+    const state = dragDropStateMachine.getState();
+    if (state && state !== dragDropStateMachine.states.IDLE) {
+        return state;
     }
-    return dragState.isDragging &&
-        (dragState.draggedColumn || dragState.draggedTask) &&
-        !dragState.draggedClipboardCard &&
-        !dragState.draggedEmptyCard;
+
+    if (templateDragState?.isDragging) {
+        return dragDropStateMachine.states.TEMPLATE;
+    }
+    if (dragState.draggedTask) {
+        return dragDropStateMachine.states.TASK;
+    }
+    if (dragState.draggedColumn) {
+        return dragDropStateMachine.states.COLUMN;
+    }
+    if (dragState.draggedClipboardCard) {
+        return dragDropStateMachine.states.CLIPBOARD;
+    }
+    if (dragState.draggedEmptyCard) {
+        return dragDropStateMachine.states.EMPTY_CARD;
+    }
+    if (dragState.draggedDiagramCard) {
+        return dragDropStateMachine.states.DIAGRAM;
+    }
+    if (dragState.isDragging) {
+        return dragDropStateMachine.states.EXTERNAL;
+    }
+
+    return dragDropStateMachine.states.IDLE;
+}
+
+function isTemplateDragActive() {
+    return getCurrentDragMode() === dragDropStateMachine.states.TEMPLATE;
+}
+
+function isInternalDragActive() {
+    const mode = getCurrentDragMode();
+    return mode === dragDropStateMachine.states.TASK || mode === dragDropStateMachine.states.COLUMN;
 }
 
 function finalizeExternalDragState() {
@@ -598,10 +628,7 @@ function setupGlobalDragAndDrop() {
         if (isInternalDragActive()) {
             return true;
         }
-        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
-            return true;
-        }
-        return false;
+        return isTemplateDragActive();
     }
 
     // Board container dragover for external file drag indicators
@@ -3119,11 +3146,12 @@ function setupColumnDragAndDrop() {
     // NO CACHE - Direct DOM queries according to rules
     // Highlights .column-margin elements for drop position
     document.addEventListener('dragover', e => {
-        const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-        const isColumnDrag = !!dragState.draggedColumn;
-        const isTaskDrag = !!dragState.draggedTask;
-        const isClipboardDrag = !!dragState.draggedClipboardCard;
-        const isEmptyCardDrag = !!dragState.draggedEmptyCard;
+        const dragMode = getCurrentDragMode();
+        const isTemplateDrag = dragMode === dragDropStateMachine.states.TEMPLATE;
+        const isColumnDrag = dragMode === dragDropStateMachine.states.COLUMN;
+        const isTaskDrag = dragMode === dragDropStateMachine.states.TASK;
+        const isClipboardDrag = dragMode === dragDropStateMachine.states.CLIPBOARD;
+        const isEmptyCardDrag = dragMode === dragDropStateMachine.states.EMPTY_CARD;
 
         // Handle column drags, template drags, task drags, clipboard drags, empty card drags
         if (!isColumnDrag && !isTemplateDrag && !isTaskDrag && !isClipboardDrag && !isEmptyCardDrag) {return;}
@@ -3157,11 +3185,12 @@ function setupColumnDragAndDrop() {
             dragState.columnDragoverPending = false;
 
             // Re-check state in case drag ended
-            const stillTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-            const stillColumnDrag = !!dragState.draggedColumn;
-            const stillTaskDrag = !!dragState.draggedTask;
-            const stillClipboardDrag = !!dragState.draggedClipboardCard;
-            const stillEmptyCardDrag = !!dragState.draggedEmptyCard;
+            const currentMode = getCurrentDragMode();
+            const stillTemplateDrag = currentMode === dragDropStateMachine.states.TEMPLATE;
+            const stillColumnDrag = currentMode === dragDropStateMachine.states.COLUMN;
+            const stillTaskDrag = currentMode === dragDropStateMachine.states.TASK;
+            const stillClipboardDrag = currentMode === dragDropStateMachine.states.CLIPBOARD;
+            const stillEmptyCardDrag = currentMode === dragDropStateMachine.states.EMPTY_CARD;
             if (!stillColumnDrag && !stillTemplateDrag && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {return;}
 
             const board = document.getElementById('kanban-board');
