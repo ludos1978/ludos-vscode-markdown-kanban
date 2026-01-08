@@ -351,18 +351,7 @@ function setupGlobalDragAndDrop() {
         // Prevent default browser behavior
         e.preventDefault();
 
-        // Check if this is an internal column/task drag (not clipboard/empty cards)
-        const isInternalDrag = dragState.isDragging &&
-            (dragState.draggedColumn || dragState.draggedTask) &&
-            !dragState.draggedClipboardCard &&
-            !dragState.draggedEmptyCard;
-
-        if (isInternalDrag) {
-            return;
-        }
-
-        // Check if this is a template drag - let template handlers handle it
-        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
+        if (shouldSkipExternalDragIndicators()) {
             return;
         }
         

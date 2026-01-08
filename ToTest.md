@@ -9,4 +9,4 @@
 - [ ] Drag a task outside the board and re-enter to confirm drop indicators recover (no stuck "left view" state).
 - [ ] Drag clipboard/empty/diagram cards onto the board and confirm the drag state resets (no lingering drag highlights).
 - [ ] Drag internal columns/tasks and confirm external file drop indicators do not appear.
-- [ ] Drag external files over the board, then leave or drop outside; confirm indicators and highlights clear.
+- [ ] Drag external files over the board, drop to create cards, then leave or drop outside; confirm indicators and highlights clear.
