@@ -20,3 +20,5 @@
 - [ ] Reorder a column within the same row and confirm the column order updates without losing any columns.
 - [ ] Move a column between rows and confirm the #row tag updates correctly in the column title.
 - [ ] Insert an empty column before/after another column and confirm #row/#stack tags match the target row/stack.
+- [ ] Run a text search with HTML-like characters in titles/descriptions and confirm the search panel renders results without broken markup.
+- [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.

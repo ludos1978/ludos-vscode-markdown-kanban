@@ -980,6 +980,7 @@
     <script src="utils/dateUtils.js"></script>
     <script src="utils/colorUtils.js"></script>
     <script src="utils/fileTypeUtils.js"></script>
+    <script src="utils/stringUtils.js"></script>
     <script src="utils/tagUtils.js"></script>
     <script src="utils/configManager.js"></script>
     <script src="utils/styleManager.js"></script>
@@ -1020,6 +1021,7 @@
     <script>
     const fileSearchModal = (function() {
         'use strict';
+        const escapeHtml = window.escapeHtml;
         let overlay, originalPathEl, brokenBadgeEl, searchInputEl, caseBtnEl, wordBtnEl, regexBtnEl;
         let resultsEl, batchPanelEl, batchCountEl, batchListEl, batchCheckboxEl, batchInfoEl, cancelBtnEl, selectBtnEl;
         let formatAutoBtnEl, formatRelativeBtnEl, formatAbsoluteBtnEl, pathPreviewEl, pathPreviewValueEl, previewToggleEl;
@@ -1364,8 +1366,6 @@
             overlay.classList.remove('resizing');
             document.body.style.cursor = '';
         }
-
-        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
         function handleMessage(msg) {
             switch (msg.type) {

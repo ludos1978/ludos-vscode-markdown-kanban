@@ -295,6 +295,9 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         const styleUri = webview.asWebviewUri(
             vscode.Uri.joinPath(assetRoot, 'searchPanel.css')
         );
+        const stringUtilsUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(assetRoot, 'utils', 'stringUtils.js')
+        );
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(assetRoot, 'searchPanel.js')
         );
@@ -354,6 +357,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         </div>
     </div>
 
+    <script nonce="${nonce}" src="${stringUtilsUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

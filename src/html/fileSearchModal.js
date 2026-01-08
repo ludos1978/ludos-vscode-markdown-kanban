@@ -9,6 +9,8 @@
 const fileSearchModal = (function() {
     'use strict';
 
+    const escapeHtml = window.escapeHtml;
+
     // DOM elements
     let overlay;
     let originalPathEl;
@@ -465,15 +467,6 @@ const fileSearchModal = (function() {
             row.addEventListener('click', () => handleRowClick(index));
             row.addEventListener('dblclick', () => handleRowDblClick(index));
         });
-    }
-
-    /**
-     * Escape HTML entities
-     */
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
     }
 
     /**

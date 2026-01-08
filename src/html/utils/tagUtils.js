@@ -14,7 +14,7 @@ const TAG_PREFIXES = {
 };
 
 // Helper to escape special regex characters in prefixes
-const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = window.escapeRegExp;
 
 // Pre-escaped prefixes for regex patterns
 const P = {

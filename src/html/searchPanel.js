@@ -4,6 +4,9 @@
  */
 
 (function() {
+    const escapeHtml = window.escapeHtml;
+    const escapeRegExp = window.escapeRegExp;
+
     // VS Code API
     const vscode = acquireVsCodeApi();
 
@@ -389,26 +392,6 @@
         const matchEscaped = escapeHtml(matchText);
         const regex = new RegExp(`(${escapeRegExp(matchEscaped)})`, 'gi');
         return escaped.replace(regex, '<span class="highlight">$1</span>');
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    function escapeHtml(text) {
-        if (!text) return '';
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    /**
-     * Escape regex special characters
-     */
-    function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     /**
