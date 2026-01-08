@@ -278,6 +278,24 @@ let templateDragState = {
     lastInStackTarget: null  // { row, position, columnId } - saved when indicator shows between columns
 };
 
+let boardContainerElement = null;
+let dropFeedbackElement = null;
+
+function showDropFeedback() {
+    if (dropFeedbackElement) {
+        dropFeedbackElement.classList.add('active');
+    }
+}
+
+function hideDropFeedback() {
+    if (dropFeedbackElement) {
+        dropFeedbackElement.classList.remove('active');
+    }
+    if (boardContainerElement) {
+        boardContainerElement.classList.remove('drag-highlight');
+    }
+}
+
 // ============================================================================
 // DROP INDICATOR FUNCTIONS (moved to utils/dropIndicatorManager.js)
 // ============================================================================
@@ -393,6 +411,8 @@ function setupGlobalDragAndDrop() {
 
     const boardContainer = document.getElementById('kanban-container');
     const dropFeedback = document.getElementById('drop-zone-feedback');
+    boardContainerElement = boardContainer;
+    dropFeedbackElement = dropFeedback;
 
     if (!boardContainer) {
         // Board container not found
@@ -496,19 +516,6 @@ function setupGlobalDragAndDrop() {
                 eventType: e.type
             });
         }
-    }
-    
-    function showDropFeedback() {
-        if (dropFeedback) {
-            dropFeedback.classList.add('active');
-        }
-    }
-    
-    function hideDropFeedback() {
-        if (dropFeedback) {
-            dropFeedback.classList.remove('active');
-        }
-        boardContainer.classList.remove('drag-highlight');
     }
     
     // Main drop handler function  
