@@ -23,4 +23,4 @@
 - [ ] Run a text search with HTML-like characters in titles/descriptions and confirm the search panel renders results without broken markup.
 - [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
 - [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.
-- [ ] Open the extension settings and confirm UI-only options no longer appear while advanced config stays grouped.
+- [ ] Open the extension settings and confirm remaining options are grouped by how often a user would change them (frequent first, advanced last).
