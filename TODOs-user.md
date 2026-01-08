@@ -1,4 +1,4 @@
-- [ ] add an option to enable/disable the marp specific settings in the view (the marp layout settings in the file info header and he marp classes, marp headers & footers, marp colors). when disabled they should be hidden.
+- [x] add an option to enable/disable the marp specific settings in the view (the marp layout settings in the file info header and he marp classes, marp headers & footers, marp colors). when disabled they should be hidden. (Implemented toggle and preference sync.)
 
 - [ ] tab should not switch between field, instead it should indent all selected lines or at the cursors position, but alt+enter should end editing a field. shift+tab should unindent a line. we only use spaces to indent and unindent.
 
@@ -528,4 +528,3 @@ all the tags are processed, as the user might add it by text.
 - Re-Analyze the full process of file change detection and caching, conflict checking and user response as well as saving the data in the different ways. then i save the main file externally with an unsaved internal change its overwriting the external file. BUT THERE ARE OTHER PROBLEMS AS WELL. I WANT A COMPLETE AND FULL ANALYSIS, USING AN UML STRUCTURE. THEN VERIFY EACH STEP WETHER ITS NEEDED AND IN ORDER. THEN MAKE 3 SUGGESTIONS HOW TO SOLVE EACH OF THE PROBLEMS, IF CONFIDENCE IN SOLVING THE PROBLEM IS NOT 100% ANALYZE AGAIN AND REPEAT UNTIL YOU ARE SURE THE PROBLEM IS PROPERLY SOLVED. WORK AUTOMATICALLY UNTIL I INTERRUPT YOU!!!
 
 - [x] it seems as if the board is rendered twice when loading the board.
-
