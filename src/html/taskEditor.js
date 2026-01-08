@@ -11,6 +11,8 @@ class TaskEditor {
         this.keystrokeTimeout = null;
         this.lastEditContext = null; // Track what was last being edited
         this.indentUnit = '  ';
+        this._stackLayoutNeedsFullRecalc = false;
+        this._stackLayoutPendingColumns = new Set();
         this.setupGlobalHandlers();
     }
 
@@ -641,16 +643,12 @@ class TaskEditor {
      * @private
      */
     _recalculateStackLayout(containerElement) {
-        if (typeof window.applyStackedColumnStyles !== 'function') { return; }
-
         const stack = containerElement.closest('.kanban-column-stack');
         if (!stack || stack.querySelectorAll('.kanban-full-height-column').length <= 1) { return; }
 
         const column = containerElement.closest('.kanban-full-height-column');
         const stackColumnId = column ? column.dataset.columnId : null;
-        requestAnimationFrame(() => {
-            window.applyStackedColumnStyles(stackColumnId);
-        });
+        this._requestStackLayoutRecalc(stackColumnId);
     }
 
     /**
@@ -745,27 +743,53 @@ class TaskEditor {
             if (timeSinceLastRecalc >= MIN_DELAY_BETWEEN_RECALC) {
                 if (recalcTimeout) { clearTimeout(recalcTimeout); recalcTimeout = null; }
                 lastRecalcTime = now;
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        void stack.offsetHeight;
-                        window.applyStackedColumnStyles(colId);
-                    });
-                });
+                this._requestStackLayoutRecalc(colId);
             } else {
                 if (recalcTimeout) { clearTimeout(recalcTimeout); }
                 const delay = MIN_DELAY_BETWEEN_RECALC - timeSinceLastRecalc;
                 recalcTimeout = setTimeout(() => {
                     lastRecalcTime = Date.now();
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            void stack.offsetHeight;
-                            window.applyStackedColumnStyles(colId);
-                        });
-                    });
+                    this._requestStackLayoutRecalc(colId);
                     recalcTimeout = null;
                 }, delay);
             }
         };
+    }
+
+    /**
+     * Queue a stack layout recalculation until editing ends
+     * @private
+     */
+    _requestStackLayoutRecalc(columnId = null, forceFull = false) {
+        if (forceFull || columnId === null) {
+            this._stackLayoutNeedsFullRecalc = true;
+        } else if (!this._stackLayoutNeedsFullRecalc && columnId) {
+            this._stackLayoutPendingColumns.add(columnId);
+        }
+    }
+
+    /**
+     * Flush any queued stack layout recalculations
+     * @private
+     */
+    _flushStackLayoutRecalc() {
+        if (!this._stackLayoutNeedsFullRecalc && this._stackLayoutPendingColumns.size === 0) {
+            return;
+        }
+
+        if (typeof window.applyStackedColumnStyles !== 'function') {
+            this._stackLayoutNeedsFullRecalc = false;
+            this._stackLayoutPendingColumns.clear();
+            return;
+        }
+
+        const columnId = this._stackLayoutNeedsFullRecalc || this._stackLayoutPendingColumns.size !== 1
+            ? null
+            : Array.from(this._stackLayoutPendingColumns)[0];
+
+        window.applyStackedColumnStyles(columnId);
+        this._stackLayoutNeedsFullRecalc = false;
+        this._stackLayoutPendingColumns.clear();
     }
 
     /**
@@ -1130,11 +1154,7 @@ class TaskEditor {
             if (typeof window.renderBoard === 'function' && window.cachedBoard) {
                 window.renderBoard();
             }
-            if (typeof window.applyStackedColumnStyles === 'function') {
-                requestAnimationFrame(() => {
-                    window.applyStackedColumnStyles();
-                });
-            }
+            this._requestStackLayoutRecalc(null, true);
 
             this.currentEditor = savedEditor;
         }
@@ -1511,23 +1531,10 @@ class TaskEditor {
             displayElement.style.removeProperty('display');
         }
 
-        // For editing in stacked columns, recalculate positions after closing
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            const col = element.closest('.kanban-full-height-column');
-            if (col) {
-                const stack = col.closest('.kanban-column-stack');
-                if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
-                    // Get columnId to only recalculate THIS stack, not all stacks
-                    const closeColumnId = col.dataset.columnId || null;
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            void stack.offsetHeight;
-                            window.applyStackedColumnStyles(closeColumnId);
-                        });
-                    });
-                }
-            }
-        }
+        const col = element.closest('.kanban-full-height-column');
+        const closeColumnId = col ? col.dataset.columnId || null : null;
+        this._requestStackLayoutRecalc(closeColumnId);
+        this._flushStackLayoutRecalc();
 
         // Focus the card after editing ends
         if (type === 'task-title' || type === 'task-description') {
