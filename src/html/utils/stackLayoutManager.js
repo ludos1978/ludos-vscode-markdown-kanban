@@ -132,10 +132,11 @@ function enforceFoldModesForStacks(stackElement = null) {
  * @param {string|null} columnId - Column ID to update its stack, or null for all stacks
  */
 function applyStackedColumnStyles(columnId = null) {
-    // Preserve scroll position during layout changes
-    const kanbanBoard = document.getElementById('kanban-board');
-    const scrollLeft = kanbanBoard ? kanbanBoard.scrollLeft : 0;
-    const scrollTop = kanbanBoard ? kanbanBoard.scrollTop : 0;
+    // Preserve the actual viewport scroll before rearranging stacks
+    const scrollContainer = document.getElementById('kanban-container') ||
+        document.getElementById('kanban-board');
+    const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
 
     let targetStack = null;
     if (columnId) {
@@ -156,9 +157,9 @@ function applyStackedColumnStyles(columnId = null) {
     }
 
     // Restore scroll position immediately
-    if (kanbanBoard) {
-        kanbanBoard.scrollLeft = scrollLeft;
-        kanbanBoard.scrollTop = scrollTop;
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = scrollLeft;
+        scrollContainer.scrollTop = scrollTop;
     }
 }
 
