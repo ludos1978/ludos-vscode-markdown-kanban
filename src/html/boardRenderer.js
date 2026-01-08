@@ -1266,32 +1266,18 @@ function renderBoard(options = null) {
 
         // 3. Insert drop zones before, between, and after stacks/columns
         // Insert before first element
-        const firstDropZoneStack = createDropZoneStack('before');
+        const firstDropZoneStack = window.dropIndicatorManager.createDropZoneStack('before');
         rowContainer.insertBefore(firstDropZoneStack, children[0]);
 
         // Insert between elements
         for (let i = 0; i < children.length - 1; i++) {
-            const betweenDropZoneStack = createDropZoneStack('between');
+            const betweenDropZoneStack = window.dropIndicatorManager.createDropZoneStack('between');
             children[i].parentNode.insertBefore(betweenDropZoneStack, children[i].nextSibling);
         }
 
         // Insert after last element
-        const lastDropZoneStack = createDropZoneStack('after');
+        const lastDropZoneStack = window.dropIndicatorManager.createDropZoneStack('after');
         children[children.length - 1].parentNode.insertBefore(lastDropZoneStack, children[children.length - 1].nextSibling);
-    }
-
-    /**
-     * Creates a drop zone stack wrapper with a drop zone inside
-     */
-    function createDropZoneStack(position) {
-        const dropZoneStack = document.createElement('div');
-        dropZoneStack.className = 'kanban-column-stack column-drop-zone-stack';
-
-        const dropZone = document.createElement('div');
-        dropZone.className = `column-drop-zone column-drop-zone-${position}`;
-
-        dropZoneStack.appendChild(dropZone);
-        return dropZoneStack;
     }
 
     // Detect number of rows from the board

@@ -76,6 +76,22 @@ function createDropIndicator() {
     return indicator;
 }
 
+/**
+ * Create a column drop zone stack wrapper with a drop zone inside
+ * @param {string} position - before|between|after
+ * @returns {HTMLElement} drop zone stack element
+ */
+function createDropZoneStack(position) {
+    const dropZoneStack = document.createElement('div');
+    dropZoneStack.className = 'kanban-column-stack column-drop-zone-stack';
+
+    const dropZone = document.createElement('div');
+    dropZone.className = `column-drop-zone column-drop-zone-${position}`;
+
+    dropZoneStack.appendChild(dropZone);
+    return dropZoneStack;
+}
+
 // ============================================================================
 // POSITIONING HELPERS
 // ============================================================================
@@ -441,6 +457,7 @@ window.clearHighlights = clearHighlights;
 window.dropIndicatorManager = {
     // Creation
     createDropIndicator,
+    createDropZoneStack,
 
     // Positioning
     showTaskDropIndicator,

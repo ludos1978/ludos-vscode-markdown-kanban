@@ -22,3 +22,4 @@
 - [ ] Insert an empty column before/after another column and confirm #row/#stack tags match the target row/stack.
 - [ ] Run a text search with HTML-like characters in titles/descriptions and confirm the search panel renders results without broken markup.
 - [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
+- [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.

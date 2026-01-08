@@ -2867,17 +2867,17 @@ function cleanupAndRecreateDropZones(container) {
     // Insert new drop zones: before first, between each, and after last
     if (contentStacks.length > 0) {
         // Before first
-        const dropZoneBefore = createDropZoneStack('column-drop-zone-before');
+        const dropZoneBefore = window.dropIndicatorManager.createDropZoneStack('before');
         container.insertBefore(dropZoneBefore, contentStacks[0]);
 
         // Between each
         for (let i = 0; i < contentStacks.length - 1; i++) {
-            const dropZoneBetween = createDropZoneStack('column-drop-zone-between');
+            const dropZoneBetween = window.dropIndicatorManager.createDropZoneStack('between');
             container.insertBefore(dropZoneBetween, contentStacks[i].nextSibling);
         }
 
         // After last
-        const dropZoneAfter = createDropZoneStack('column-drop-zone-after');
+        const dropZoneAfter = window.dropIndicatorManager.createDropZoneStack('after');
         const addBtn = container.querySelector('.add-column-btn');
         if (addBtn) {
             container.insertBefore(dropZoneAfter, addBtn);
@@ -2885,20 +2885,6 @@ function cleanupAndRecreateDropZones(container) {
             container.appendChild(dropZoneAfter);
         }
     }
-}
-
-/**
- * Creates a drop zone stack with the specified class
- */
-function createDropZoneStack(dropZoneClass) {
-    const dropZoneStack = document.createElement('div');
-    dropZoneStack.className = 'kanban-column-stack column-drop-zone-stack';
-
-    const dropZone = document.createElement('div');
-    dropZone.className = `column-drop-zone ${dropZoneClass}`;
-
-    dropZoneStack.appendChild(dropZone);
-    return dropZoneStack;
 }
 
 /**
