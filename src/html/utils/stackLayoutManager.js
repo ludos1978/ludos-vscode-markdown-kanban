@@ -132,11 +132,25 @@ function enforceFoldModesForStacks(stackElement = null) {
  * @param {string|null} columnId - Column ID to update its stack, or null for all stacks
  */
 function applyStackedColumnStyles(columnId = null) {
-    // Preserve the actual viewport scroll before rearranging stacks
-    const scrollContainer = document.getElementById('kanban-container') ||
-        document.getElementById('kanban-board');
-    const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
-    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    // Preserve the actual viewport scroll for both container and board before rearranging stacks
+    const container = document.getElementById('kanban-container');
+    const board = document.getElementById('kanban-board');
+    const scrollPositions = [];
+
+    if (container) {
+        scrollPositions.push({
+            element: container,
+            left: container.scrollLeft,
+            top: container.scrollTop
+        });
+    }
+    if (board) {
+        scrollPositions.push({
+            element: board,
+            left: board.scrollLeft,
+            top: board.scrollTop
+        });
+    }
 
     let targetStack = null;
     if (columnId) {
@@ -156,11 +170,14 @@ function applyStackedColumnStyles(columnId = null) {
         window.updateStackBottomDropZones();
     }
 
-    // Restore scroll position immediately
-    if (scrollContainer) {
-        scrollContainer.scrollLeft = scrollLeft;
-        scrollContainer.scrollTop = scrollTop;
-    }
+    const restoreScroll = () => {
+        scrollPositions.forEach(({ element, left, top }) => {
+            element.scrollLeft = left;
+            element.scrollTop = top;
+        });
+    };
+
+    setTimeout(restoreScroll, 0);
 }
 
 // ============================================================================
