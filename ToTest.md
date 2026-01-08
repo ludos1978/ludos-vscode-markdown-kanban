@@ -19,3 +19,4 @@
 - [ ] Open the diagram filename prompt and confirm the input field spans the modal width.
 - [ ] Reorder a column within the same row and confirm the column order updates without losing any columns.
 - [ ] Move a column between rows and confirm the #row tag updates correctly in the column title.
+- [ ] Insert an empty column before/after another column and confirm #row/#stack tags match the target row/stack.

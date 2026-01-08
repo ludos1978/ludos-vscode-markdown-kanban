@@ -23,6 +23,7 @@ import { IdGenerator } from '../utils/idGenerator';
 import { getErrorMessage } from '../utils/stringUtils';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showError } from '../services/NotificationService';
+import { addStackTag, extractRowNumber, hasStackTag, setRowTag } from '../constants/TagPatterns';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -168,17 +169,6 @@ export class TemplateCommands extends SwitchBasedCommand {
                 UndoCapture.forFullBoard(currentBoard, 'createEmptyColumn')
             );
 
-            // Helper to get row from column title
-            const getColumnRow = (col: KanbanColumn): number => {
-                const rowMatch = col.title?.match(/#row(\d+)/i);
-                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
-            };
-
-            // Helper to check if column has #stack tag
-            const hasStackTag = (col: KanbanColumn): boolean => {
-                return /#stack\b/i.test(col.title || '');
-            };
-
             // Determine target row and whether we need #stack tag
             let targetRow = message.targetRow || 1;
             let insertIndex = currentBoard.columns.length;
@@ -188,11 +178,11 @@ export class TemplateCommands extends SwitchBasedCommand {
                 const afterIdx = currentBoard.columns.findIndex((c) => c.id === insertAfterColumnId);
                 if (afterIdx >= 0) {
                     insertIndex = afterIdx + 1;
-                    targetRow = getColumnRow(currentBoard.columns[afterIdx]);
+                    targetRow = extractRowNumber(currentBoard.columns[afterIdx].title || '');
 
                     // Check if next column exists in same row - if so, we're inserting into a stack
                     const nextCol = currentBoard.columns[afterIdx + 1];
-                    if (nextCol && getColumnRow(nextCol) === targetRow) {
+                    if (nextCol && extractRowNumber(nextCol.title || '') === targetRow) {
                         needsStackTag = true;
                     }
                 }
@@ -200,25 +190,24 @@ export class TemplateCommands extends SwitchBasedCommand {
                 const beforeIdx = currentBoard.columns.findIndex((c) => c.id === insertBeforeColumnId);
                 if (beforeIdx >= 0) {
                     insertIndex = beforeIdx;
-                    targetRow = getColumnRow(currentBoard.columns[beforeIdx]);
+                    targetRow = extractRowNumber(currentBoard.columns[beforeIdx].title || '');
 
                     // If beforeCol has #stack, we're inserting into an existing stack
-                    if (hasStackTag(currentBoard.columns[beforeIdx])) {
+                    if (hasStackTag(currentBoard.columns[beforeIdx].title || '')) {
                         needsStackTag = true;
                     }
                 }
             } else if (message.position === 'first') {
-                const firstInRow = currentBoard.columns.findIndex((c) => getColumnRow(c) === targetRow);
+                const firstInRow = currentBoard.columns.findIndex(
+                    (c) => extractRowNumber(c.title || '') === targetRow
+                );
                 insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
             }
 
             // Create column title with appropriate tags
-            let columnTitle = 'New Column';
-            if (targetRow > 1) {
-                columnTitle = `New Column #row${targetRow}`;
-            }
+            let columnTitle = setRowTag('New Column', targetRow);
             if (needsStackTag) {
-                columnTitle = columnTitle + ' #stack';
+                columnTitle = addStackTag(columnTitle);
             }
 
             // Create empty column structure
