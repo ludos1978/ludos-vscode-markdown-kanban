@@ -3,31 +3,7 @@
  */
 
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
-
-/**
- * Find a task by ID across all columns
- */
-export function findTask(board: KanbanBoard, taskId: string): KanbanTask | undefined {
-    for (const column of board.columns) {
-        const task = column.tasks.find(t => t.id === taskId);
-        if (task) return task;
-    }
-    return undefined;
-}
-
-/**
- * Find a task and its containing column
- */
-export function findTaskWithColumn(
-    board: KanbanBoard,
-    taskId: string
-): { task: KanbanTask; column: KanbanColumn } | undefined {
-    for (const column of board.columns) {
-        const task = column.tasks.find(t => t.id === taskId);
-        if (task) return { task, column };
-    }
-    return undefined;
-}
+import { setRowTag } from '../constants/TagPatterns';
 
 /**
  * Find a column by ID
@@ -59,22 +35,10 @@ export function getColumnRow(column: KanbanColumn): number {
 
     const rowMatch = column.title.match(/#row(\d+)\b/i);
     if (rowMatch) {
-        const rowNum = parseInt(rowMatch[1]);
+        const rowNum = parseInt(rowMatch[1], 10);
         return Math.max(rowNum, 1);
     }
     return 1;
-}
-
-/**
- * Remove row tag from title and return clean title
- */
-export function cleanRowTag(title: string): string {
-    return title
-        .replace(/#row\d+\b/gi, '')
-        .replace(/\s+#row\d+/gi, '')
-        .replace(/#row\d+\s+/gi, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
 }
 
 /**
@@ -87,6 +51,51 @@ export function extractNumericTag(title: string): number | null {
         return parseFloat(match[1]);
     }
     return null;
+}
+
+/**
+ * Update the #row tag in a column title (removes existing row tags)
+ */
+export function setColumnRowTag(column: KanbanColumn, rowNumber: number): void {
+    column.title = setRowTag(column.title, rowNumber);
+}
+
+/**
+ * Build a new column order after moving a column to a new position
+ */
+export function buildColumnOrderAfterMove(
+    columns: KanbanColumn[],
+    currentIndex: number,
+    newPosition: number
+): string[] | null {
+    if (currentIndex < 0 || currentIndex >= columns.length) {
+        return null;
+    }
+
+    const order = columns
+        .filter((_, index) => index !== currentIndex)
+        .map(column => column.id);
+
+    order.splice(newPosition, 0, columns[currentIndex].id);
+    return order;
+}
+
+/**
+ * Reorder board columns to match the provided ID order
+ */
+export function applyColumnOrder(board: KanbanBoard, order: string[]): void {
+    const columnMap = new Map<string, KanbanColumn>();
+    board.columns.forEach(column => columnMap.set(column.id, column));
+
+    const reordered: KanbanColumn[] = [];
+    order.forEach(id => {
+        const column = columnMap.get(id);
+        if (column) {
+            reordered.push(column);
+        }
+    });
+
+    board.columns = reordered;
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 
 import { BoardCrudOperations, NewTaskInput } from '../../board/BoardCrudOperations';
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
+import { KanbanBoard } from '../../markdownParser';
 
 // Helper to create a test board
 function createTestBoard(): KanbanBoard {
@@ -44,88 +44,6 @@ describe('BoardCrudOperations', () => {
 
     beforeEach(() => {
         operations = new BoardCrudOperations();
-    });
-
-    // ============= STATIC HELPER TESTS =============
-
-    describe('Static Helpers', () => {
-        describe('findColumnById', () => {
-            it('should find column by ID', () => {
-                const board = createTestBoard();
-                const column = BoardCrudOperations.findColumnById(board, 'col-2');
-
-                expect(column).toBeDefined();
-                expect(column?.title).toBe('In Progress');
-            });
-
-            it('should return undefined for non-existent column', () => {
-                const board = createTestBoard();
-                const column = BoardCrudOperations.findColumnById(board, 'non-existent');
-
-                expect(column).toBeUndefined();
-            });
-        });
-
-        describe('findTaskById', () => {
-            it('should find task across all columns', () => {
-                const board = createTestBoard();
-                const result = BoardCrudOperations.findTaskById(board, 'task-4');
-
-                expect(result).toBeDefined();
-                expect(result?.task.title).toBe('Task 4');
-                expect(result?.column.id).toBe('col-2');
-                expect(result?.index).toBe(0);
-            });
-
-            it('should return undefined for non-existent task', () => {
-                const board = createTestBoard();
-                const result = BoardCrudOperations.findTaskById(board, 'non-existent');
-
-                expect(result).toBeUndefined();
-            });
-        });
-
-        describe('findTaskInColumn', () => {
-            it('should find task in specific column', () => {
-                const board = createTestBoard();
-                const result = BoardCrudOperations.findTaskInColumn(board, 'col-1', 'task-2');
-
-                expect(result).toBeDefined();
-                expect(result?.task.title).toBe('Task 2');
-                expect(result?.index).toBe(1);
-            });
-
-            it('should return undefined if task not in specified column', () => {
-                const board = createTestBoard();
-                const result = BoardCrudOperations.findTaskInColumn(board, 'col-1', 'task-4');
-
-                expect(result).toBeUndefined();
-            });
-
-            it('should return undefined for non-existent column', () => {
-                const board = createTestBoard();
-                const result = BoardCrudOperations.findTaskInColumn(board, 'non-existent', 'task-1');
-
-                expect(result).toBeUndefined();
-            });
-        });
-
-        describe('findColumnContainingTask', () => {
-            it('should find column containing task', () => {
-                const board = createTestBoard();
-                const column = BoardCrudOperations.findColumnContainingTask(board, 'task-4');
-
-                expect(column).toBeDefined();
-                expect(column?.id).toBe('col-2');
-            });
-
-            it('should return undefined for non-existent task', () => {
-                const board = createTestBoard();
-                const column = BoardCrudOperations.findColumnContainingTask(board, 'non-existent');
-
-                expect(column).toBeUndefined();
-            });
-        });
     });
 
     // ============= TASK OPERATION TESTS =============
@@ -409,29 +327,6 @@ describe('BoardCrudOperations', () => {
     // ============= HELPER METHOD TESTS =============
 
     describe('Helper Methods', () => {
-        describe('getColumnRow', () => {
-            it('should return 1 for column without #row tag', () => {
-                const column: KanbanColumn = { id: '1', title: 'Test Column', tasks: [] };
-                const row = operations.getColumnRow(column);
-
-                expect(row).toBe(1);
-            });
-
-            it('should extract row number from #row tag', () => {
-                const column: KanbanColumn = { id: '1', title: 'Test #row3', tasks: [] };
-                const row = operations.getColumnRow(column);
-
-                expect(row).toBe(3);
-            });
-
-            it('should return 1 for #row0', () => {
-                const column: KanbanColumn = { id: '1', title: 'Test #row0', tasks: [] };
-                const row = operations.getColumnRow(column);
-
-                expect(row).toBe(1);
-            });
-        });
-
         describe('sortColumn', () => {
             it('should sort by title alphabetically', () => {
                 const board: KanbanBoard = {

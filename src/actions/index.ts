@@ -17,13 +17,10 @@ export { ActionExecutor, ExecutorDependencies, ExecuteOptions } from './executor
 
 // Helpers
 export {
-    findTask,
-    findTaskWithColumn,
     findColumn,
     findTaskIndex,
     findColumnIndex,
     getColumnRow,
-    cleanRowTag,
     extractNumericTag,
     findTaskById,
     findColumnContainingTask,

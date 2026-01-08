@@ -6,7 +6,7 @@
 
 import { BoardAction } from './types';
 import { KanbanColumn } from '../markdownParser';
-import { findColumn, findColumnIndex, cleanRowTag } from './helpers';
+import { findColumn, findColumnIndex, setColumnRowTag, buildColumnOrderAfterMove, applyColumnOrder } from './helpers';
 import { IdGenerator } from '../utils/idGenerator';
 
 // ============= CONTENT UPDATES (target: column) =============
@@ -254,36 +254,16 @@ export const moveWithRowUpdate = (
         if (!column) return false;
 
         // Update the row tag in the title
-        const cleanTitle = cleanRowTag(column.title);
-        if (newRow > 1) {
-            column.title = cleanTitle + ` #row${newRow}`;
-        } else {
-            column.title = cleanTitle;
-        }
+        setColumnRowTag(column, newRow);
 
         const currentIndex = findColumnIndex(board, columnId);
         if (currentIndex === -1) return false;
 
         // Build new order
-        const targetOrder: string[] = [];
-        board.columns.forEach((col, idx) => {
-            if (idx !== currentIndex) {
-                targetOrder.push(col.id);
-            }
-        });
-        targetOrder.splice(newPosition, 0, columnId);
+        const targetOrder = buildColumnOrderAfterMove(board.columns, currentIndex, newPosition);
+        if (!targetOrder) return false;
 
-        // Reorder columns
-        const reorderedColumns: KanbanColumn[] = [];
-        targetOrder.forEach(id => {
-            const col = board.columns.find(c => c.id === id);
-            if (col) {
-                reorderedColumns.push(col);
-            }
-        });
-
-        board.columns.length = 0;
-        board.columns.push(...reorderedColumns);
+        applyColumnOrder(board, targetOrder);
 
         return true;
     }
@@ -304,26 +284,9 @@ export const reorderWithRowTags = (
         if (!movedColumn) return false;
 
         // Update row tag for the moved column
-        const cleanTitle = cleanRowTag(movedColumn.title);
-        if (targetRow > 1) {
-            movedColumn.title = cleanTitle + ` #row${targetRow}`;
-        } else {
-            movedColumn.title = cleanTitle;
-        }
+        setColumnRowTag(movedColumn, targetRow);
 
-        // Rebuild columns array in the new order
-        const columnMap = new Map<string, KanbanColumn>();
-        board.columns.forEach(col => columnMap.set(col.id, col));
-
-        const reorderedColumns: KanbanColumn[] = [];
-        newOrder.forEach(id => {
-            const col = columnMap.get(id);
-            if (col) {
-                reorderedColumns.push(col);
-            }
-        });
-
-        board.columns = reorderedColumns;
+        applyColumnOrder(board, newOrder);
         return true;
     }
 });

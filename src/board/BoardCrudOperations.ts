@@ -6,10 +6,11 @@
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 import { IdGenerator } from '../utils/idGenerator';
 import {
-    findColumn as findColumnHelper,
-    findTaskById as findTaskByIdHelper,
-    findColumnContainingTask as findColumnContainingTaskHelper,
-    getColumnRow as getColumnRowHelper
+    applyColumnOrder,
+    buildColumnOrderAfterMove,
+    extractNumericTag,
+    getColumnRow,
+    setColumnRowTag
 } from '../actions/helpers';
 
 /**
@@ -266,11 +267,11 @@ export class BoardCrudOperations {
             tasks: []
         };
 
-        const targetRow = this.getColumnRow({ title } as KanbanColumn);
+        const targetRow = getColumnRow({ title } as KanbanColumn);
         let insertIndex = board.columns.length;
 
         for (let i = 0; i < board.columns.length; i++) {
-            const columnRow = this.getColumnRow(board.columns[i]);
+            const columnRow = getColumnRow(board.columns[i]);
 
             if (columnRow > targetRow) {
                 insertIndex = i;
@@ -344,32 +345,9 @@ export class BoardCrudOperations {
         if (!movedColumn) { return false; }
 
         // Update row tag for the moved column
-        let cleanTitle = movedColumn.title
-            .replace(/#row\d+\b/gi, '')
-            .replace(/\s+#row\d+/gi, '')
-            .replace(/#row\d+\s+/gi, '')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
+        setColumnRowTag(movedColumn, targetRow);
 
-        if (targetRow > 1) {
-            movedColumn.title = cleanTitle + ` #row${targetRow}`;
-        } else {
-            movedColumn.title = cleanTitle;
-        }
-
-        // Rebuild columns array in the new order
-        const columnMap = new Map<string, KanbanColumn>();
-        board.columns.forEach(col => columnMap.set(col.id, col));
-
-        const reorderedColumns: KanbanColumn[] = [];
-        newOrder.forEach(id => {
-            const col = columnMap.get(id);
-            if (col) {
-                reorderedColumns.push(col);
-            }
-        });
-
-        board.columns = reorderedColumns;
+        applyColumnOrder(board, newOrder);
         return true;
     }
 
@@ -378,41 +356,15 @@ export class BoardCrudOperations {
         if (!column) { return false; }
 
         // Update the row tag in the title
-        let cleanTitle = column.title
-            .replace(/#row\d+\b/gi, '')
-            .replace(/\s+#row\d+/gi, '')
-            .replace(/#row\d+\s+/gi, '')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-
-        if (newRow > 1) {
-            column.title = cleanTitle + ` #row${newRow}`;
-        } else {
-            column.title = cleanTitle;
-        }
+        setColumnRowTag(column, newRow);
 
         const currentIndex = board.columns.findIndex(col => col.id === columnId);
         if (currentIndex === -1) { return false; }
 
-        const targetOrder: string[] = [];
-        board.columns.forEach((col, idx) => {
-            if (idx !== currentIndex) {
-                targetOrder.push(col.id);
-            }
-        });
+        const targetOrder = buildColumnOrderAfterMove(board.columns, currentIndex, newPosition);
+        if (!targetOrder) { return false; }
 
-        targetOrder.splice(newPosition, 0, columnId);
-
-        const reorderedColumns: KanbanColumn[] = [];
-        targetOrder.forEach(id => {
-            const col = board.columns.find(c => c.id === id);
-            if (col) {
-                reorderedColumns.push(col);
-            }
-        });
-
-        board.columns.length = 0;
-        board.columns.push(...reorderedColumns);
+        applyColumnOrder(board, targetOrder);
 
         return true;
     }
@@ -444,8 +396,8 @@ export class BoardCrudOperations {
             });
         } else if (sortType === 'numericTag') {
             column.tasks.sort((a, b) => {
-                const numA = this._extractNumericTag(a.title);
-                const numB = this._extractNumericTag(b.title);
+                const numA = extractNumericTag(a.title);
+                const numB = extractNumericTag(b.title);
 
                 if (numA === null && numB === null) return 0;
                 if (numA === null) return 1;
@@ -474,65 +426,6 @@ export class BoardCrudOperations {
             }
         }
         return true;
-    }
-
-    private _extractNumericTag(title: string): number | null {
-        if (!title) return null;
-        const match = title.match(/#(\d+(?:\.\d+)?)\b/);
-        if (match && match[1]) {
-            return parseFloat(match[1]);
-        }
-        return null;
-    }
-
-    // ============= STATIC LOOKUP HELPERS =============
-    // Delegate to actions/helpers.ts for single source of truth
-
-    /**
-     * Find a column by ID in a board
-     * @deprecated Use findColumn from '../actions/helpers' directly
-     */
-    public static findColumnById(board: KanbanBoard, columnId: string): KanbanColumn | undefined {
-        return findColumnHelper(board, columnId);
-    }
-
-    /**
-     * Find a task by ID, searching all columns
-     * @deprecated Use findTaskById from '../actions/helpers' directly
-     */
-    public static findTaskById(board: KanbanBoard, taskId: string): { task: KanbanTask; column: KanbanColumn; index: number } | undefined {
-        return findTaskByIdHelper(board, taskId);
-    }
-
-    /**
-     * Find a task by ID within a specific column
-     * @deprecated Use findTaskById or findColumn from '../actions/helpers' directly
-     */
-    public static findTaskInColumn(board: KanbanBoard, columnId: string, taskId: string): { task: KanbanTask; column: KanbanColumn; index: number } | undefined {
-        const column = findColumnHelper(board, columnId);
-        if (!column) return undefined;
-
-        const index = column.tasks.findIndex(t => t.id === taskId);
-        if (index === -1) return undefined;
-
-        return { task: column.tasks[index], column, index };
-    }
-
-    /**
-     * Find the column that contains a task with the given ID
-     * @deprecated Use findColumnContainingTask from '../actions/helpers' directly
-     */
-    public static findColumnContainingTask(board: KanbanBoard, taskId: string): KanbanColumn | undefined {
-        return findColumnContainingTaskHelper(board, taskId);
-    }
-
-    // ============= HELPER METHODS =============
-
-    /**
-     * @deprecated Use getColumnRow from '../actions/helpers' directly
-     */
-    public getColumnRow(column: KanbanColumn): number {
-        return getColumnRowHelper(column);
     }
 
     public cleanupRowTags(board: KanbanBoard): boolean {

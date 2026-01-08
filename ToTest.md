@@ -17,3 +17,5 @@
 - [ ] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
 - [ ] Open the diagram filename prompt and confirm it is at least 200px wide and centered.
 - [ ] Open the diagram filename prompt and confirm the input field spans the modal width.
+- [ ] Reorder a column within the same row and confirm the column order updates without losing any columns.
+- [ ] Move a column between rows and confirm the #row tag updates correctly in the column title.
