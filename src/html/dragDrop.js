@@ -182,6 +182,12 @@ function cleanupDropZoneHighlightsLocal() {
     window.dropIndicatorManager.cleanupDropZoneHighlights();
 }
 
+function cleanupExternalDropIndicators() {
+    hideDropFeedback();
+    hideDropIndicatorWithState();
+    cleanupDropZoneHighlightsLocal();
+}
+
 function resetTaskDragState() {
     dragState.draggedTask = null;
     dragState.originalTaskParent = null;
@@ -364,8 +370,7 @@ function setupGlobalDragAndDrop() {
         e.stopPropagation();
         
         // Always clean up visual indicators
-        hideDropFeedback();
-        hideDropIndicatorWithState();
+        cleanupExternalDropIndicators();
 
         const dt = e.dataTransfer;
         if (!dt) {
@@ -528,9 +533,7 @@ function setupGlobalDragAndDrop() {
                                e.clientY < rect.top || e.clientY > rect.bottom;
 
         if (isReallyLeaving || (!boardContainer.contains(e.relatedTarget) && e.relatedTarget !== null)) {
-            hideDropFeedback();
-            hideDropIndicatorWithState();
-            cleanupDropZoneHighlightsLocal();
+            cleanupExternalDropIndicators();
         }
     }, false);
 
@@ -563,9 +566,7 @@ function setupGlobalDragAndDrop() {
         if (!boardContainer.contains(e.target)) {
             e.preventDefault();
             // Clean up indicators if drop happens outside board
-            hideDropFeedback();
-            hideDropIndicatorWithState();
-            cleanupDropZoneHighlightsLocal();
+            cleanupExternalDropIndicators();
         }
     }, false);
 
@@ -1436,12 +1437,8 @@ function setupGlobalDragAndDrop() {
             });
         }
 
-        // Clean up drop zone highlights
-        cleanupDropZoneHighlightsLocal();
-
-        // Hide drop feedback and indicators
-        hideDropFeedback();
-        hideDropIndicatorWithState();
+        // Clean up drop feedback and indicators
+        cleanupExternalDropIndicators();
     }
 
     function resetDragState() {
