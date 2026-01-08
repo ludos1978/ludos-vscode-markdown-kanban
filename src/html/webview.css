@@ -2930,7 +2930,8 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 .form-input {
-  /* width: 100%; */
+  width: 100%;
+  box-sizing: border-box;
   padding: 4px;
   border: 1px solid var(--vscode-input-border);
   border-radius: 4px;
