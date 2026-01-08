@@ -719,7 +719,32 @@ class TaskEditor {
         const MIN_DELAY_BETWEEN_RECALC = 300;
         let autoResizePending = false;
 
+        // DEBUG: Track ALL events on the edit element
+        editElement.addEventListener('keydown', (e) => {
+            console.log('[KEYDOWN-DEBUG]', {
+                key: e.key,
+                code: e.code,
+                target: e.target.className,
+                activeElement: document.activeElement?.className
+            });
+        });
+
+        editElement.addEventListener('focus', () => {
+            console.log('[FOCUS-DEBUG] Edit element gained focus');
+        });
+
+        editElement.addEventListener('blur', (e) => {
+            console.warn('[BLUR-DEBUG] Edit element LOST focus!', {
+                relatedTarget: e.relatedTarget?.className || 'null',
+                newActiveElement: document.activeElement?.className
+            });
+        });
+
         editElement.oninput = () => {
+            console.log('[ONINPUT-DEBUG] Input event fired!', {
+                valueLength: editElement.value.length,
+                scrollTop: document.getElementById('kanban-container')?.scrollTop
+            });
             const container = document.getElementById('kanban-container');
 
             // Throttle autoResize to max 60fps
