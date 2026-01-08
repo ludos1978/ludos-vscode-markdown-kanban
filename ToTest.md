@@ -24,3 +24,4 @@
 - [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
 - [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.
 - [ ] Open the extension settings and confirm remaining options are grouped by how often a user would change them (frequent first, advanced last).
+- [ ] Toggle the new Marp settings visibility option in the file bar menu and verify the global Marp burger plus column/task Marp submenu items hide/show accordingly.

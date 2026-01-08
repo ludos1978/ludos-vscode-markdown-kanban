@@ -227,6 +227,7 @@ window.createDisplayTitleWithPlaceholders = function(title, resolvedFiles) {
 
 // Layout Presets Configuration (will be loaded from backend)
 let layoutPresets = {};
+window.showMarpSettings = true;
 
 // Menu functions (getCurrentSettingValue, updateAllMenuIndicators, generateMenuHTML, populateDynamicMenus)
 // moved to utils/menuConfig.js
@@ -951,6 +952,44 @@ function applyAndSaveSetting(configKey, value, applyFunction, options = {}) {
     if (options.message) {
         vscode.postMessage({ type: 'showMessage', text: options.message });
     }
+}
+
+/**
+ * Apply Marp settings visibility
+ * @param {boolean} isEnabled
+ */
+function applyMarpSettingsVisibility(isEnabled) {
+    const enabled = isEnabled !== false; // default true
+    window.showMarpSettings = enabled;
+    const body = document.body;
+    if (body) {
+        body.classList.toggle('marp-settings-hidden', !enabled);
+    }
+    const toggleButton = document.getElementById('marp-settings-toggle');
+    if (toggleButton) {
+        toggleButton.classList.toggle('selected', enabled);
+        const checkmark = toggleButton.querySelector('.menu-checkmark');
+        if (checkmark) {
+            checkmark.textContent = enabled ? '✓' : '';
+        }
+    }
+}
+
+/**
+ * User-facing toggle for Marp-specific controls
+ */
+function toggleMarpSettingsVisibility() {
+    const nextState = !(window.showMarpSettings ?? true);
+    applyMarpSettingsVisibility(nextState);
+    if (window.configManager) {
+        window.configManager.setPreference('showMarpSettings', nextState);
+    } else {
+        vscode.postMessage({ type: 'setPreference', key: 'showMarpSettings', value: nextState });
+    }
+    if (window.cachedConfig) {
+        window.cachedConfig.showMarpSettings = nextState;
+    }
+    vscode.postMessage({ type: 'requestConfigurationRefresh' });
 }
 
 /**
@@ -2182,6 +2221,9 @@ if (!webviewEventListenersInitialized) {
 
             // Store all configuration in window.cachedConfig for global access
             window.cachedConfig = configData;
+            const marpSettingsValue = configData.showMarpSettings !== undefined ? Boolean(configData.showMarpSettings) : true;
+            applyMarpSettingsVisibility(marpSettingsValue);
+            window.cachedConfig.showMarpSettings = marpSettingsValue;
 
             // Apply tag category settings to window properties for menu generation
             if (configData.enabledTagCategoriesColumn !== undefined) {

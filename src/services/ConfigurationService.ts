@@ -31,6 +31,7 @@ export interface KanbanConfiguration {
     htmlCommentRenderMode: string;
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
+    showMarpSettings: boolean;
     marp: {
         enginePath: string;
         defaultTheme: string;
@@ -84,6 +85,7 @@ export class ConfigurationService {
         htmlCommentRenderMode: 'hidden',
         htmlContentRenderMode: 'html',
         arrowKeyFocusScroll: 'center',
+        showMarpSettings: true,
         marp: {
             enginePath: './marp-engine/engine.js',
             defaultTheme: 'default',
@@ -248,7 +250,8 @@ export class ConfigurationService {
             exportTagVisibility: this.getConfig('exportTagVisibility'),
             arrowKeyFocusScroll: this.getConfig('arrowKeyFocusScroll'),
             openLinksInNewTab: this.getConfig('openLinksInNewTab'),
-            pathGeneration: this.getConfig('pathGeneration')
+            pathGeneration: this.getConfig('pathGeneration'),
+            showMarpSettings: this.getConfig('showMarpSettings')
         };
     }
 

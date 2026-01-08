@@ -72,6 +72,7 @@ export interface BoardUpdateMessage extends BaseMessage {
     exportTagVisibility?: boolean;
     openLinksInNewTab?: boolean;
     pathGeneration?: 'relative' | 'absolute';
+    showMarpSettings?: boolean;
     imageMappings?: Record<string, string>;
     // Optional fields for full board loads
     isFullRefresh?: boolean;
