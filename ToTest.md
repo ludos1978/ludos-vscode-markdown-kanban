@@ -15,3 +15,4 @@
 - [ ] Drop external files or clipboard cards and confirm tasks are created without console errors about drop feedback cleanup.
 - [ ] Drag a diagram card (Excalidraw/Draw.io) and confirm the filename prompt is centered, validates invalid characters, and creates the task after confirmation.
 - [ ] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
+- [ ] Open the diagram filename prompt and confirm it is at least 200px wide and centered.

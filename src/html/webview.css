@@ -2844,6 +2844,8 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 
 #input-modal .modal-content {
   margin: 0;
+  min-width: 200px;
+  width: min(90%, 420px);
 }
 
 .modal-content {
