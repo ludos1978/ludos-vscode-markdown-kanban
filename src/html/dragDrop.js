@@ -574,36 +574,7 @@ function setupGlobalDragAndDrop() {
     // ============================================================================
 
     function restoreTaskToOriginalPosition() {
-        if (!dragState.draggedTask || !dragState.originalTaskParent) {
-            return;
-        }
-
-        // dragLogger.always('Restoring task to original position');
-
-        // Check if originalTaskNextSibling is still valid
-        const nextSiblingStillValid = dragState.originalTaskNextSibling &&
-            dragState.originalTaskNextSibling.parentNode === dragState.originalTaskParent;
-
-        // Remove from current position
-        if (dragState.draggedTask.parentNode) {
-            dragState.draggedTask.parentNode.removeChild(dragState.draggedTask);
-        }
-
-        // Restore to original position
-        if (nextSiblingStillValid) {
-            dragState.originalTaskParent.insertBefore(dragState.draggedTask, dragState.originalTaskNextSibling);
-        } else if (dragState.originalTaskIndex >= 0) {
-            // Use index as fallback
-            const children = Array.from(dragState.originalTaskParent.children);
-            const taskItems = children.filter(c => c.classList.contains('task-item'));
-            if (dragState.originalTaskIndex < taskItems.length) {
-                dragState.originalTaskParent.insertBefore(dragState.draggedTask, taskItems[dragState.originalTaskIndex]);
-            } else {
-                dragState.originalTaskParent.appendChild(dragState.draggedTask);
-            }
-        } else {
-            dragState.originalTaskParent.appendChild(dragState.draggedTask);
-        }
+        restoreTaskPosition();
     }
 
     function restoreColumnToOriginalPosition() {
