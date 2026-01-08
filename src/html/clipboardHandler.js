@@ -70,6 +70,10 @@ window.handleClipboardDragStart = function(e) {
             window.dragState.isDragging = true;
             // Don't set draggedClipboardCard for images - let dataTransfer handle it
         }
+        window.dragDropStateMachine?.start(window.dragDropStateMachine.states.CLIPBOARD, {
+            source: 'clipboard',
+            mode: 'image'
+        });
 
         e.target.classList.add('dragging');
         return;
@@ -83,6 +87,10 @@ window.handleClipboardDragStart = function(e) {
         if (window.dragState) {
             window.dragState.isDragging = true;
         }
+        window.dragDropStateMachine?.start(window.dragDropStateMachine.states.CLIPBOARD, {
+            source: 'clipboard',
+            mode: 'multiple-files'
+        });
 
         e.target.classList.add('dragging');
         return;
@@ -101,6 +109,10 @@ window.handleClipboardDragStart = function(e) {
         window.dragState.isDragging = true;
         window.dragState.draggedClipboardCard = tempTask;
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.CLIPBOARD, {
+        source: 'clipboard',
+        mode: 'text'
+    });
 
     // Set drag data
     const dragData = JSON.stringify({
@@ -131,6 +143,7 @@ window.handleClipboardDragEnd = function(e) {
         window.dragState.isDragging = false;
         window.dragState.draggedClipboardCard = null;
     }
+    window.dragDropStateMachine?.reset('clipboard-end');
 };
 
 /**
@@ -267,6 +280,9 @@ window.handleEmptyCardDragStart = function(e) {
         window.dragState.isDragging = true;
         window.dragState.draggedEmptyCard = tempTask;
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.EMPTY_CARD, {
+        source: 'empty-card'
+    });
 
     // Set drag data
     const dragData = JSON.stringify({
@@ -290,6 +306,7 @@ window.handleEmptyCardDragEnd = function(e) {
         window.dragState.isDragging = false;
         window.dragState.draggedEmptyCard = null;
     }
+    window.dragDropStateMachine?.reset('empty-card-end');
 };
 
 // =============================================================================
@@ -310,6 +327,9 @@ window.handleEmptyColumnDragStart = function(e) {
         window.templateDragState.isDropZone = false;
         window.templateDragState.lastInStackTarget = null;  // Reset last in-stack target
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.TEMPLATE, {
+        source: 'empty-column'
+    });
 
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
@@ -329,6 +349,7 @@ window.handleEmptyColumnDragEnd = function(e) {
     // Column creation is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+    window.dragDropStateMachine?.reset('empty-column-end');
 };
 
 // =============================================================================
@@ -357,6 +378,9 @@ window.handleClipboardColumnDragStart = function(e) {
         window.templateDragState.isDropZone = false;  // Initialize to false - will be updated during drag
         window.templateDragState.lastInStackTarget = null;  // Reset last in-stack target
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.TEMPLATE, {
+        source: 'clipboard-column'
+    });
 
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
@@ -376,6 +400,7 @@ window.handleClipboardColumnDragEnd = function(e) {
     // Column creation is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+    window.dragDropStateMachine?.reset('clipboard-column-end');
 };
 
 // =============================================================================
@@ -399,6 +424,11 @@ window.handleTemplateMenuDragStart = function(e) {
         window.templateDragState.templateName = templateName;
         window.templateDragState.isEmptyColumn = false;
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.TEMPLATE, {
+        source: 'template-menu',
+        templatePath,
+        templateName
+    });
 
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
@@ -422,6 +452,7 @@ window.handleTemplateMenuDragEnd = function(e) {
     // Template application is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+    window.dragDropStateMachine?.reset('template-menu-end');
 };
 
 // =============================================================================
@@ -484,6 +515,10 @@ window.handleDiagramCardDragStart = function(e, diagramType) {
             id: 'temp-diagram-' + Date.now()
         };
     }
+    window.dragDropStateMachine?.start(window.dragDropStateMachine.states.DIAGRAM, {
+        source: 'diagram-card',
+        diagramType
+    });
 
     // Set drag data
     const dragData = JSON.stringify({
@@ -512,6 +547,7 @@ window.handleDiagramCardDragEnd = function(e) {
         window.dragState.isDragging = false;
         window.dragState.draggedDiagramCard = null;
     }
+    window.dragDropStateMachine?.reset('diagram-card-end');
 };
 
 /**

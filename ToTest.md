@@ -11,3 +11,4 @@
 - [ ] Drag internal columns/tasks and confirm external file drop indicators do not appear.
 - [ ] Drag a task within the board and confirm external file handling stays inactive.
 - [ ] Drag external files over the board, drop to create cards, then leave or drop outside; confirm indicators and highlights clear.
+- [ ] Drag template/empty/clipboard columns onto the board and confirm drop zones, creation, and drag cleanup behave normally.

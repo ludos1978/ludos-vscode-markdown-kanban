@@ -148,6 +148,122 @@ function ensureDragStateDefaults(state) {
 let dragState = ensureDragStateDefaults(window.dragState);
 window.dragState = dragState;
 
+const DragDropStates = Object.freeze({
+    IDLE: 'idle',
+    TASK: 'task',
+    COLUMN: 'column',
+    CLIPBOARD: 'clipboard',
+    EMPTY_CARD: 'empty-card',
+    DIAGRAM: 'diagram',
+    TEMPLATE: 'template',
+    EXTERNAL: 'external'
+});
+
+function createDragDropStateMachine() {
+    let state = DragDropStates.IDLE;
+    let lastState = DragDropStates.IDLE;
+    let context = {};
+
+    const transitions = new Map([
+        [DragDropStates.IDLE, new Set([
+            DragDropStates.TASK,
+            DragDropStates.COLUMN,
+            DragDropStates.CLIPBOARD,
+            DragDropStates.EMPTY_CARD,
+            DragDropStates.DIAGRAM,
+            DragDropStates.TEMPLATE,
+            DragDropStates.EXTERNAL
+        ])],
+        [DragDropStates.TASK, new Set([DragDropStates.IDLE])],
+        [DragDropStates.COLUMN, new Set([DragDropStates.IDLE])],
+        [DragDropStates.CLIPBOARD, new Set([DragDropStates.IDLE])],
+        [DragDropStates.EMPTY_CARD, new Set([DragDropStates.IDLE])],
+        [DragDropStates.DIAGRAM, new Set([DragDropStates.IDLE])],
+        [DragDropStates.TEMPLATE, new Set([DragDropStates.IDLE])],
+        [DragDropStates.EXTERNAL, new Set([DragDropStates.IDLE])]
+    ]);
+
+    function canTransition(from, to) {
+        if (from === to) {
+            return true;
+        }
+        return transitions.get(from)?.has(to) ?? false;
+    }
+
+    function transition(nextState, meta = {}) {
+        if (!canTransition(state, nextState)) {
+            console.warn('[DragDropStateMachine] Invalid transition', {
+                from: state,
+                to: nextState,
+                meta
+            });
+            return false;
+        }
+
+        lastState = state;
+        state = nextState;
+        context = { ...meta };
+        dragState.dragState = state;
+        dragState.dragStateMeta = context;
+        return true;
+    }
+
+    function start(nextState, meta = {}) {
+        return transition(nextState, { ...meta, action: 'start' });
+    }
+
+    function reset(reason) {
+        return transition(DragDropStates.IDLE, { action: 'reset', reason });
+    }
+
+    function getState() {
+        return state;
+    }
+
+    function getLastState() {
+        return lastState;
+    }
+
+    function getContext() {
+        return { ...context };
+    }
+
+    function isLayoutDrag() {
+        return state === DragDropStates.TASK || state === DragDropStates.COLUMN;
+    }
+
+    function isTemplateDrag() {
+        return state === DragDropStates.TEMPLATE;
+    }
+
+    function isExternalDrag() {
+        return state === DragDropStates.EXTERNAL;
+    }
+
+    function isTaskLikeDrag() {
+        return state === DragDropStates.TASK ||
+            state === DragDropStates.CLIPBOARD ||
+            state === DragDropStates.EMPTY_CARD;
+    }
+
+    return {
+        states: DragDropStates,
+        start,
+        reset,
+        transition,
+        getState,
+        getLastState,
+        getContext,
+        isLayoutDrag,
+        isTemplateDrag,
+        isExternalDrag,
+        isTaskLikeDrag
+    };
+}
+
+const dragDropStateMachine = createDragDropStateMachine();
+window.dragDropStateMachine = dragDropStateMachine;
+
 // Template drag state (separate from main drag state for clarity)
 let templateDragState = {
     isDragging: false,
@@ -220,6 +336,9 @@ function clearLeftViewFlag() {
 }
 
 function isInternalDragActive() {
+    if (dragDropStateMachine.isLayoutDrag()) {
+        return true;
+    }
     return dragState.isDragging &&
         (dragState.draggedColumn || dragState.draggedTask) &&
         !dragState.draggedClipboardCard &&
@@ -231,6 +350,7 @@ function finalizeExternalDragState() {
     dragState.draggedEmptyCard = null;
     dragState.draggedDiagramCard = null;
     dragState.isDragging = false;
+    dragDropStateMachine.reset('external-drop');
 }
 
 /**
@@ -260,6 +380,7 @@ function setupGlobalDragAndDrop() {
             resetTaskDragState();
             dragState.isDragging = false;
             dragState.altKeyPressed = false;
+            dragDropStateMachine.reset('escape');
         }
     });
 
@@ -336,6 +457,15 @@ function setupGlobalDragAndDrop() {
         
         const hasUriList = Array.from(dt.types).some(t => t.toLowerCase() === 'text/uri-list');
         return hasUriList;
+    }
+
+    function markExternalDragActive(e) {
+        if (dragDropStateMachine.getState() === dragDropStateMachine.states.IDLE && isExternalFileDrag(e)) {
+            dragDropStateMachine.start(dragDropStateMachine.states.EXTERNAL, {
+                source: 'external',
+                eventType: e.type
+            });
+        }
     }
     
     function showDropFeedback() {
@@ -484,6 +614,8 @@ function setupGlobalDragAndDrop() {
             return; // Don't show external drop indicators during internal/template drags
         }
 
+        markExternalDragActive(e);
+
         // DIAGNOSTIC: Log external file drag handling (once per session)
         if (!window._externalDragLogged) {
             window._externalDragLogged = true;
@@ -514,6 +646,8 @@ function setupGlobalDragAndDrop() {
         if (shouldSkipExternalDragIndicators()) {
             return; // Don't show external drop feedback during internal/template drags
         }
+
+        markExternalDragActive(e);
 
         if (isExternalFileDrag(e)) {
             e.preventDefault();
@@ -1446,6 +1580,7 @@ function setupGlobalDragAndDrop() {
         dragState.lastDropTarget = null;
         dragState.leftView = false;
         dragState.leftViewTimestamp = null;
+        dragDropStateMachine.reset('dragend');
 
         // Reset drop target tracking
         resetDropTargets();
@@ -2421,6 +2556,10 @@ function setupTaskDragHandle(handle) {
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
             dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
+            dragDropStateMachine.start(dragDropStateMachine.states.TASK, {
+                taskId,
+                columnId
+            });
 
             // Set multiple data formats
             e.dataTransfer.effectAllowed = 'move';
@@ -2898,6 +3037,9 @@ function setupColumnDragAndDrop() {
             dragState.isDragging = true;
             dragState.lastDropTarget = null;  // Track last drop position
             dragState.styleUpdatePending = false;  // Track if style update is needed
+            dragDropStateMachine.start(dragDropStateMachine.states.COLUMN, {
+                columnId
+            });
 
             // Track throttling for column dragover
             dragState.columnDragoverThrottleId = null;
@@ -3323,6 +3465,11 @@ function handleTemplateDragStart(e) {
     templateDragState.isDragging = true;
     templateDragState.templatePath = templateItem.dataset.templatePath;
     templateDragState.templateName = templateItem.dataset.templateName;
+    dragDropStateMachine.start(dragDropStateMachine.states.TEMPLATE, {
+        source: 'template-bar',
+        templatePath: templateDragState.templatePath,
+        templateName: templateDragState.templateName
+    });
 
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
@@ -3373,6 +3520,7 @@ function handleTemplateDragEnd(e) {
     templateDragState.targetPosition = null;
     templateDragState.targetColumnId = null;
     templateDragState.isDropZone = false;
+    dragDropStateMachine.reset('template-end');
 }
 
 /**
