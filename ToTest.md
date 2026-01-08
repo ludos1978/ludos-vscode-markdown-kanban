@@ -5,8 +5,8 @@
 - [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
 - [ ] Verify image/PDF/diagram placeholders still render and resolve paths in includes and main files.
 - [ ] Open the search panel and export options to confirm hidden sections toggle visible as expected.
-- [ ] Start dragging a task, press Esc (or cancel drag), and confirm it snaps back with no stuck drag state.
-- [ ] Drag a task outside the board and re-enter to confirm drop indicators recover (no stuck "left view" state).
+- [x] Start dragging a task, press Esc (or cancel drag), and confirm it snaps back with no stuck drag state.
+- [ ] Drag a task outside the board and re-enter to confirm drop indicators recover (no stuck "left view" state). -> this FAILS
 - [ ] Drag clipboard/empty/diagram cards onto the board and confirm indicators show and drag state resets (no lingering drag highlights).
 - [ ] Drag internal columns/tasks and confirm external file drop indicators do not appear.
 - [ ] Drag a task within the board and confirm external file handling stays inactive.
@@ -14,12 +14,13 @@
 - [ ] Drag template/empty/clipboard columns onto the board and confirm drop zones, creation, and drag cleanup behave normally.
 - [ ] Drop external files or clipboard cards and confirm tasks are created without console errors about drop feedback cleanup.
 - [ ] Drag a diagram card (Excalidraw/Draw.io) and confirm the filename prompt is centered, validates invalid characters, and creates the task after confirmation.
-- [ ] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
-- [ ] Open the diagram filename prompt and confirm it is at least 200px wide and centered.
-- [ ] Open the diagram filename prompt and confirm the input field spans the modal width.
+- [x] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
+- [x] Open the diagram filename prompt and confirm it is at least 200px wide and centered.
+- [x] Open the diagram filename prompt and confirm the input field spans the modal width.
 - [ ] Reorder a column within the same row and confirm the column order updates without losing any columns.
 - [ ] Move a column between rows and confirm the #row tag updates correctly in the column title.
 - [ ] Insert an empty column before/after another column and confirm #row/#stack tags match the target row/stack.
 - [ ] Run a text search with HTML-like characters in titles/descriptions and confirm the search panel renders results without broken markup.
 - [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
 - [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.
+- [ ] Open the extension settings and confirm configuration entries are grouped in the new structured order.
