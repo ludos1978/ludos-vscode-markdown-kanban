@@ -391,8 +391,11 @@ function positionDropdownMenu(triggerButton, dropdown, options = {}) {
     dropdown.style.display = 'block';
 
     const dropdownRect = dropdown.getBoundingClientRect();
-    const dropdownWidth = dropdownRect.width || defaultWidth;
-    const dropdownHeight = dropdownRect.height || defaultHeight;
+    const dropdownWidth = Math.max(dropdownRect.width || 0, defaultWidth);
+    dropdown.style.minWidth = `${defaultWidth}px`;
+    dropdown.style.width = `${dropdownWidth}px`;
+    const heightRect = dropdown.getBoundingClientRect();
+    const dropdownHeight = Math.max(heightRect.height || 0, defaultHeight);
 
     // Calculate horizontal position (prefer right edge aligned with trigger)
     let left = rect.right - dropdownWidth;

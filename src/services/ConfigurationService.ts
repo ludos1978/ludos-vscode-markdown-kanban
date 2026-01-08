@@ -72,7 +72,7 @@ export class ConfigurationService {
         taskMinHeight: 'auto',
         sectionHeight: 'auto',
         taskSectionHeight: 'auto',
-        fontSize: 'small',
+        fontSize: '1x',
         fontFamily: 'system',
         columnWidth: 'medium',
         columnBorder: '1px solid var(--vscode-panel-border)',

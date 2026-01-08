@@ -21,6 +21,7 @@ import {
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelContext } from './PanelContext';
 import { findColumn, findColumnContainingTask } from '../actions/helpers';
+import { logger } from '../utils/logger';
 
 /**
  * Dependencies required by IncludeFileCoordinator
@@ -225,7 +226,7 @@ export class IncludeFileCoordinator {
             let includeError: boolean;
 
             if (isDebug) {
-                console.log('[kanban.IncludeFileCoordinator.includeColumn.update]', {
+                logger.debug('[kanban.IncludeFileCoordinator.includeColumn.update]', {
                     columnId: column.id,
                     columnTitle: column.title,
                     relativePath,
@@ -252,7 +253,7 @@ export class IncludeFileCoordinator {
             column.includeError = includeError;
 
             if (isDebug) {
-                console.log('[kanban.IncludeFileCoordinator.includeColumn.parsed]', {
+                logger.debug('[kanban.IncludeFileCoordinator.includeColumn.parsed]', {
                     columnId: column.id,
                     relativePath,
                     taskCount: tasks.length,
@@ -334,7 +335,7 @@ export class IncludeFileCoordinator {
             let includeError: boolean;
 
             if (isDebug) {
-                console.log('[kanban.IncludeFileCoordinator.includeTask.update]', {
+                logger.debug('[kanban.IncludeFileCoordinator.includeTask.update]', {
                     columnId: foundColumn.id,
                     taskId: foundTask.id,
                     taskTitle: foundTask.title,
@@ -361,7 +362,7 @@ export class IncludeFileCoordinator {
             foundTask.includeError = includeError;
 
             if (isDebug) {
-                console.log('[kanban.IncludeFileCoordinator.includeTask.parsed]', {
+                logger.debug('[kanban.IncludeFileCoordinator.includeTask.parsed]', {
                     columnId: foundColumn.id,
                     taskId: foundTask.id,
                     relativePath,

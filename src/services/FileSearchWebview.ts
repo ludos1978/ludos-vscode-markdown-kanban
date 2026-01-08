@@ -22,6 +22,7 @@ import {
     MAX_REGEX_RESULTS
 } from '../constants/TimeoutConstants';
 import { BINARY_FILE_EXTENSIONS, hasExtension } from '../constants/FileExtensions';
+import { logger } from '../utils/logger';
 
 interface SearchResult {
     label: string;
@@ -335,15 +336,15 @@ export class FileSearchWebview {
                     `${escapedNameOnly}`       // Exact name without extension at root
                 ];
             }
-            console.log(`[FileSearchWebview] Exact glob patterns for "${rawTerm}":`, patterns);
+            logger.debug(`[FileSearchWebview] Exact glob patterns for "${rawTerm}":`, patterns);
         } else if (this._useRegex) {
             // Regex mode: must scan all files and filter in JS
             patterns = ['**/*'];
-            console.log('[FileSearchWebview] Using full scan pattern for regex: **/*');
+            logger.debug('[FileSearchWebview] Using full scan pattern for regex: **/*');
         } else {
             // Empty term - show recent files
             patterns = ['**/*'];
-            console.log('[FileSearchWebview] Empty term, using: **/*');
+            logger.debug('[FileSearchWebview] Empty term, using: **/*');
         }
 
         try {

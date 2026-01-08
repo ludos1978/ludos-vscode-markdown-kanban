@@ -9,6 +9,7 @@ import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBo
 import type { IMessageHandler, IFileFactory, CapturedEdit } from './FileInterfaces';
 import type { PanelContext } from '../panel/PanelContext';
 import { safeDecodeURIComponent } from '../utils/stringUtils';
+import { logger } from '../utils/logger';
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -398,11 +399,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         // Note: A file can be used in multiple contexts (column include in one place,
         // task include in another). Don't check file type - just use the file content.
         const mainFilePath = mainFile.getPath();
-        console.log(`[MarkdownFileRegistry] generateBoard() - Processing ${board.columns.length} columns`);
+        logger.debug(`[MarkdownFileRegistry] generateBoard() - Processing ${board.columns.length} columns`);
 
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
-                console.log(`[MarkdownFileRegistry] generateBoard() - Column ${column.id} has includeFiles:`, column.includeFiles);
+                logger.debug(`[MarkdownFileRegistry] generateBoard() - Column ${column.id} has includeFiles:`, column.includeFiles);
 
                 for (const relativePath of column.includeFiles) {
                     const decodedPath = safeDecodeURIComponent(relativePath);
@@ -418,7 +419,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         : path.resolve(mainFileDir, relativePath);
                     const fileExistsOnDisk = fs.existsSync(absolutePath);
 
-                    console.log(`[MarkdownFileRegistry] generateBoard() - Column include check: relativePath=${relativePath}, absolutePath=${absolutePath}, fileInRegistry=${!!file}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${file?.exists()}`);
+                    logger.debug(`[MarkdownFileRegistry] generateBoard() - Column include check: relativePath=${relativePath}, absolutePath=${absolutePath}, fileInRegistry=${!!file}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${file?.exists()}`);
 
                     if (fileExistsOnDisk) {
                         // File exists on disk - clear error even if not registered yet
@@ -499,7 +500,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             }
         }
 
-        console.log(`[MarkdownFileRegistry] generateBoard() - Finished, returning board`);
+        logger.debug(`[MarkdownFileRegistry] generateBoard() - Finished, returning board`);
         return board;
     }
 

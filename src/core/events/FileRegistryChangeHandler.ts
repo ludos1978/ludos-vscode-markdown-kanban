@@ -44,9 +44,10 @@ export class FileRegistryChangeHandler {
      * Subscribe to file registry change events
      */
     private _subscribe(): void {
-        this._unsubscribe = this._deps.fileRegistry.onDidChange((event) => {
+        const disposable = this._deps.fileRegistry.onDidChange((event) => {
             this._handleChange(event);
-        }).dispose;
+        });
+        this._unsubscribe = () => disposable.dispose();
     }
 
     /**
@@ -145,10 +146,10 @@ export class FileRegistryChangeHandler {
     /**
      * Dispose handler and unsubscribe from events
      */
-    public dispose(): void {
+    public dispose = (): void => {
         if (this._unsubscribe) {
             this._unsubscribe();
             this._unsubscribe = null;
         }
-    }
+    };
 }

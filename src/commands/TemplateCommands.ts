@@ -26,10 +26,11 @@ import { showError } from '../services/NotificationService';
 import { addStackTag, extractRowNumber, hasStackTag, setRowTag } from '../constants/TagPatterns';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG = false;
-const log = DEBUG ? console.log.bind(console, '[TemplateCommands]') : () => {};
+const log = DEBUG ? logger.debug.bind(logger, '[TemplateCommands]') : () => {};
 
 /**
  * Template Commands Handler
@@ -398,7 +399,7 @@ export class TemplateCommands extends SwitchBasedCommand {
                 variables,
                 template.variables
             );
-            console.log(`[TemplateCommands.processTemplateColumns] Column title: "${col.title}" -> "${processedTitle}"`);
+            logger.debug(`[TemplateCommands.processTemplateColumns] Column title: "${col.title}" -> "${processedTitle}"`);
 
             // Process tasks
             const processedTasks = (col.tasks || []).map((task: TemplateTask) => {

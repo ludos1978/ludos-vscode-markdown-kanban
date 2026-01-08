@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.91.33",
+  "version": "0.91.36",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -194,6 +194,269 @@
                 }
               }
             }
+          },
+          
+          
+          
+          "markdown-kanban.columnWidth": {
+            "type": "string",
+            "enum": [
+              "250px",
+              "350px",
+              "450px",
+              "650px",
+              "33percent",
+              "50percent",
+              "66percent",
+              "100percent",
+              "small",
+              "medium",
+              "wide",
+              "40",
+              "66",
+              "100"
+            ],
+            "default": "medium",
+            "description": "Column width preference for the kanban board. Supports pixel and viewport values and retains compatibility with legacy string keys."
+          },
+          
+          
+          
+          "markdown-kanban.layoutRows": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Number of layout rows to show in the board view."
+          },
+          
+          
+          
+          "markdown-kanban.rowHeight": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "300px",
+              "500px",
+              "700px",
+              "33percent",
+              "50percent",
+              "66percent",
+              "100percent",
+              "19em",
+              "31em",
+              "44em"
+            ],
+            "default": "auto",
+            "description": "Row height configuration used when multiple rows exist."
+          },
+          
+          
+          
+          "markdown-kanban.whitespace": {
+            "type": "string",
+            "enum": [
+              "4px",
+              "8px",
+              "12px",
+              "16px",
+              "24px",
+              "36px",
+              "48px",
+              "60px"
+            ],
+            "default": "4px",
+            "description": "Spacing value between cards."
+          },
+          
+          
+          
+          "markdown-kanban.taskMinHeight": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "200px",
+              "400px",
+              "600px",
+              "33percent",
+              "50percent",
+              "66percent",
+              "100percent"
+            ],
+            "default": "auto",
+            "description": "Minimum height for each task card."
+          },
+          
+          
+          
+          "markdown-kanban.sectionHeight": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "200px",
+              "400px",
+              "600px",
+              "33percent",
+              "50percent",
+              "66percent",
+              "100percent"
+            ],
+            "default": "auto",
+            "description": "Section height configuration for the kanban board."
+          },
+          
+          
+          
+          "markdown-kanban.taskSectionHeight": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "150px",
+              "300px",
+              "500px",
+              "33percent",
+              "50percent",
+              "66percent",
+              "100percent"
+            ],
+            "default": "auto",
+            "description": "Task section height used inside the column cards."
+          },
+          
+          
+          
+          "markdown-kanban.fontSize": {
+            "type": "string",
+            "enum": [
+              "0_5x",
+              "0_75x",
+              "1x",
+              "1_25x",
+              "1_5x",
+              "2x",
+              "2_5x",
+              "3x",
+              "4x",
+              "5x"
+            ],
+            "default": "1x",
+            "description": "Base font size multiplier applied on the board."
+          },
+          
+          
+          
+          "markdown-kanban.fontFamily": {
+            "type": "string",
+            "enum": [
+              "system",
+              "roboto",
+              "opensans",
+              "lato",
+              "poppins",
+              "inter",
+              "helvetica",
+              "arial",
+              "georgia",
+              "times",
+              "firacode",
+              "jetbrains",
+              "sourcecodepro",
+              "consolas"
+            ],
+            "default": "system",
+            "description": "Primary font family used for the kanban board text."
+          },
+          
+          
+          
+          "markdown-kanban.layoutPreset": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "normal",
+              "grid3x",
+              "focused"
+            ],
+            "default": "normal",
+            "description": "Default layout preset applied at startup."
+          },
+          
+          
+          
+          "markdown-kanban.stickyStackMode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "titleonly"
+            ],
+            "default": "titleonly",
+            "description": "Sticky stack behavior for column stacks."
+          },
+          
+          
+          
+          "markdown-kanban.tagVisibility": {
+            "type": "string",
+            "enum": [
+              "all",
+              "allexcludinglayout",
+              "customonly",
+              "mentionsonly",
+              "none",
+              "standard",
+              "custom",
+              "mentions"
+            ],
+            "default": "allexcludinglayout",
+            "description": "Tag visibility and filtering within the board."
+          },
+          
+          
+          
+          "markdown-kanban.exportTagVisibility": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include tag visibility settings when exporting."
+          },
+          
+          
+          
+          "markdown-kanban.htmlCommentRenderMode": {
+            "type": "string",
+            "enum": [
+              "hidden",
+              "text"
+            ],
+            "default": "hidden",
+            "description": "How HTML comments should render inside tasks."
+          },
+          
+          
+          
+          "markdown-kanban.htmlContentRenderMode": {
+            "type": "string",
+            "enum": [
+              "html",
+              "text"
+            ],
+            "default": "html",
+            "description": "How HTML content within the board should render."
+          },
+          
+          
+          
+          "markdown-kanban.openLinksInNewTab": {
+            "type": "boolean",
+            "default": false,
+            "description": "Open extracted links in a new tab when activated."
+          },
+          
+          
+          
+          "markdown-kanban.showMarpSettings": {
+            "type": "boolean",
+            "default": true,
+            "description": "Toggle visibility of Marp-specific controls in the kanban view."
           },
           
           
@@ -4173,6 +4436,14 @@
             "type": "boolean",
             "default": true,
             "description": "Allow Marp to access local files (images, etc.)"
+          },
+          
+          
+          
+          "markdown-kanban.marp.keepTempFiles": {
+            "type": "boolean",
+            "default": false,
+            "description": "Keep temporary files created during Marp exports instead of deleting them immediately."
           },
           
           

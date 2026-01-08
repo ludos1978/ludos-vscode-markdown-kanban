@@ -19,6 +19,7 @@ import { FileFactory } from '../files/FileFactory';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { MainKanbanFile } from '../files/MainKanbanFile';
 import { IncludeFile } from '../files/IncludeFile';
+import { logger } from '../utils/logger';
 
 /**
  * Interface for webview panel dependencies needed by this processor
@@ -180,7 +181,7 @@ export class IncludeLoadingProcessor {
         fileFactory: FileFactory,
         context: ChangeContext
     ): Promise<void> {
-        console.log(`[IncludeLoadingProcessor] _loadColumnContent called for column ${column.id}, includeFiles:`, includeFiles);
+        logger.debug(`[IncludeLoadingProcessor] _loadColumnContent called for column ${column.id}, includeFiles:`, includeFiles);
 
         // Update column properties
         column.includeFiles = includeFiles;
@@ -243,7 +244,7 @@ export class IncludeLoadingProcessor {
             // The _exists flag can be stale if _readFromDiskWithVerification() short-circuited
             const absolutePath = includeFile.getPath();
             const fileExistsOnDisk = fs.existsSync(absolutePath);
-            console.log(`[IncludeLoadingProcessor] Checking file existence: relativePath=${relativePath}, absolutePath=${absolutePath}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${includeFile.exists()}`);
+            logger.debug(`[IncludeLoadingProcessor] Checking file existence: relativePath=${relativePath}, absolutePath=${absolutePath}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${includeFile.exists()}`);
             if (!fileExistsOnDisk) {
                 includeFile.setExists(false);  // Update cached state
                 console.warn(`[IncludeLoadingProcessor] File does not exist: ${relativePath}`);
@@ -273,7 +274,7 @@ export class IncludeLoadingProcessor {
         }
 
         column.tasks = tasks;
-        console.log(`[IncludeLoadingProcessor] _loadColumnContent finished: columnId=${column.id}, includeError=${column.includeError}, taskCount=${tasks.length}, hasErrorTask=${tasks.some(t => t.includeError)}`);
+        logger.debug(`[IncludeLoadingProcessor] _loadColumnContent finished: columnId=${column.id}, includeError=${column.includeError}, taskCount=${tasks.length}, hasErrorTask=${tasks.some(t => t.includeError)}`);
     }
 
     /**

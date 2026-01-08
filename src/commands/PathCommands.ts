@@ -24,6 +24,7 @@ import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showInfo, showWarning } from '../services/NotificationService';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { logger } from '../utils/logger';
 
 /**
  * Path Commands Handler
@@ -752,11 +753,11 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         if (!foundFile) {
-            console.log('[PathCommands] Path not found in any file. Tried variants:', uniqueVariants);
+            logger.debug('[PathCommands] Path not found in any file. Tried variants:', uniqueVariants);
             return this.failure('Old path not found in any file');
         }
 
-        console.log('[PathCommands] Found path variant:', actualOldPath, 'in file:', foundFile.getRelativePath());
+        logger.debug('[PathCommands] Found path variant:', actualOldPath, 'in file:', foundFile.getRelativePath());
 
         // Use the FOUND FILE's directory as base for relative path calculation
         // This is critical for include files in different directories
@@ -799,7 +800,7 @@ export class PathCommands extends SwitchBasedCommand {
         // Targeted updates for include files have encoding issues
         const isIncludeFile = foundFile !== mainFile;
         if (isIncludeFile) {
-            console.log('[PathCommands] Path found in include file, triggering full refresh');
+            logger.debug('[PathCommands] Path found in include file, triggering full refresh');
             await this.refreshBoard(context);
         }
         // Send targeted update based on context (only for main file)

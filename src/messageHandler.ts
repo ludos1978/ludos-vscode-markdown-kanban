@@ -26,6 +26,7 @@ export interface MessageHandlerDeps {
     getWebviewPanel: () => any;
     getWebviewBridge?: () => any;
     emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
+    extensionContext: vscode.ExtensionContext;
 }
 
 export class MessageHandler {
@@ -110,7 +111,8 @@ export class MessageHandler {
             requestStopEditing: () => this.requestStopEditing(),
 
             // Configuration
-            refreshConfiguration: () => this._deps.getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve()
+            refreshConfiguration: () => this._deps.getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve(),
+            extensionContext: this._deps.extensionContext
         };
 
         // Register command handlers

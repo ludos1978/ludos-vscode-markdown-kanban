@@ -15,6 +15,7 @@ import * as crypto from 'crypto';
 import initSqlJs, { Database } from 'sql.js';
 import { DOTTED_EXTENSIONS } from '../shared/fileTypeDefinitions';
 import { DRAWIO_EXTENSIONS, EXCALIDRAW_EXTENSIONS } from '../constants/FileExtensions';
+import { logger } from '../utils/logger';
 
 export type MediaType = 'image' | 'video' | 'audio' | 'document' | 'diagram';
 
@@ -106,10 +107,10 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             if (fs.existsSync(this.dbPath)) {
                 const buffer = fs.readFileSync(this.dbPath);
                 this.db = new SQL.Database(buffer);
-                console.log('[WorkspaceMediaIndex] Loaded existing database');
+                logger.debug('[WorkspaceMediaIndex] Loaded existing database');
             } else {
                 this.db = new SQL.Database();
-                console.log('[WorkspaceMediaIndex] Created new database');
+                logger.debug('[WorkspaceMediaIndex] Created new database');
             }
 
             // Create schema
@@ -127,7 +128,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
 
             this.save();
             this.initialized = true;
-            console.log('[WorkspaceMediaIndex] Initialized successfully');
+            logger.debug('[WorkspaceMediaIndex] Initialized successfully');
 
         } catch (error) {
             console.error('[WorkspaceMediaIndex] Failed to initialize:', error);
@@ -164,7 +165,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             this.scanCancellation.dispose();
             this.scanCancellation = null;
             this.isScanning = false;
-            console.log('[WorkspaceMediaIndex] Scan cancelled by user');
+            logger.debug('[WorkspaceMediaIndex] Scan cancelled by user');
         }
     }
 
@@ -191,7 +192,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         if (stats.totalFiles > 0) {
             // Database already has data from a previous session
             this.hasScanned = true;
-            console.log(`[WorkspaceMediaIndex] Using existing index with ${stats.totalFiles} files`);
+            logger.debug(`[WorkspaceMediaIndex] Using existing index with ${stats.totalFiles} files`);
             return;
         }
 
@@ -204,7 +205,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
      */
     async scanWithProgress(): Promise<number> {
         if (this.isScanning) {
-            console.log('[WorkspaceMediaIndex] Scan already in progress');
+            logger.debug('[WorkspaceMediaIndex] Scan already in progress');
             return 0;
         }
 
@@ -451,7 +452,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         for (const pattern of patterns) {
             // Check for cancellation before starting each pattern
             if (cancellationToken?.isCancellationRequested) {
-                console.log('[WorkspaceMediaIndex] Scan cancelled');
+                logger.debug('[WorkspaceMediaIndex] Scan cancelled');
                 return totalUpdated;
             }
 
@@ -461,7 +462,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             for (let i = 0; i < files.length; i++) {
                 // Check for cancellation periodically
                 if (cancellationToken?.isCancellationRequested) {
-                    console.log(`[WorkspaceMediaIndex] Scan cancelled after ${totalUpdated} files`);
+                    logger.debug(`[WorkspaceMediaIndex] Scan cancelled after ${totalUpdated} files`);
                     return totalUpdated;
                 }
 
@@ -477,7 +478,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             }
         }
 
-        console.log(`[WorkspaceMediaIndex] Scanned ${totalFiles} files, updated ${totalUpdated}`);
+        logger.debug(`[WorkspaceMediaIndex] Scanned ${totalFiles} files, updated ${totalUpdated}`);
         return totalUpdated;
     }
 
@@ -540,7 +541,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         if (!this.db) return;
         this.db.run('DELETE FROM media_files');
         this.save();
-        console.log('[WorkspaceMediaIndex] Index cleared');
+        logger.debug('[WorkspaceMediaIndex] Index cleared');
     }
 
     /**
@@ -568,6 +569,6 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         }
         this.initialized = false;
         WorkspaceMediaIndex.instance = null;
-        console.log('[WorkspaceMediaIndex] Disposed');
+        logger.debug('[WorkspaceMediaIndex] Disposed');
     }
 }

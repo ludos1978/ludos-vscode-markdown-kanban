@@ -20,9 +20,11 @@ import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { PanelContext } from '../panel/PanelContext';
 import { WebviewManager } from '../panel/WebviewManager';
 import { configService } from './ConfigurationService';
+import { getDocumentPreference } from '../utils/documentPreference';
 import { KeybindingService } from './KeybindingService';
 import { findColumn, findTaskById } from '../actions/helpers';
 import { eventBus, WebviewUpdateRequestedEvent } from '../core/events';
+import { logger } from '../utils/logger';
 import {
     BoardUpdateMessage,
     UpdateIncludeContentMessage,
@@ -44,6 +46,7 @@ export interface WebviewUpdateDependencies {
     panelContext: PanelContext;
     getBoard: () => KanbanBoard | undefined;
     hasPanel: () => boolean;
+    extensionContext: vscode.ExtensionContext;
 }
 
 /**
@@ -80,16 +83,16 @@ export class WebviewUpdateService {
      */
     public async sendBoardUpdate(options: BoardUpdateOptions = {}): Promise<void> {
         const { applyDefaultFolding = false, isFullRefresh = false } = options;
-        console.log('[WebviewUpdateService.sendBoardUpdate] START - webviewReady:', this._deps.panelContext.webviewReady, 'hasPanel:', this._deps.hasPanel(), 'isFullRefresh:', isFullRefresh, 'applyDefaultFolding:', applyDefaultFolding);
+        logger.debug('[WebviewUpdateService.sendBoardUpdate] START - webviewReady:', this._deps.panelContext.webviewReady, 'hasPanel:', this._deps.hasPanel(), 'isFullRefresh:', isFullRefresh, 'applyDefaultFolding:', applyDefaultFolding);
 
         if (!this._deps.hasPanel()) {
-            console.log('[WebviewUpdateService.sendBoardUpdate] No panel - returning');
+            logger.debug('[WebviewUpdateService.sendBoardUpdate] No panel - returning');
             return;
         }
 
         // Queue update if webview not ready yet
         if (!this._deps.panelContext.webviewReady) {
-            console.log('[WebviewUpdateService.sendBoardUpdate] Webview not ready - queueing pending update');
+            logger.debug('[WebviewUpdateService.sendBoardUpdate] Webview not ready - queueing pending update');
             this._deps.panelContext.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
             return;
         }
@@ -101,7 +104,7 @@ export class WebviewUpdateService {
             yamlHeader: null,
             kanbanFooter: null
         };
-        console.log('[WebviewUpdateService.sendBoardUpdate] Board valid:', board.valid, 'columns:', board.columns?.length);
+        logger.debug('[WebviewUpdateService.sendBoardUpdate] Board valid:', board.valid, 'columns:', board.columns?.length);
 
         // Update webview permissions to include asset directories
         this._deps.webviewManager.updatePermissionsForAssets();
@@ -110,7 +113,7 @@ export class WebviewUpdateService {
         const version = extension?.packageJSON?.version || 'Unknown';
 
         // Send board update message
-        console.log('[WebviewUpdateService.sendBoardUpdate] Sending boardUpdate message');
+        logger.debug('[WebviewUpdateService.sendBoardUpdate] Sending boardUpdate message');
         this._sendBoardUpdateMessage(board, {
             isFullRefresh,
             applyDefaultFolding,
@@ -142,6 +145,7 @@ export class WebviewUpdateService {
         // Use centralized getBoardViewConfig() - single source of truth
         const layoutPresets = this._deps.webviewManager.getLayoutPresetsConfiguration();
         const viewConfig = configService.getBoardViewConfig(layoutPresets);
+        this._applyDocumentMarpPreference(viewConfig);
 
         // BoardUpdateMessage type matches getBoardViewConfig() output
         const message = {
@@ -193,7 +197,7 @@ export class WebviewUpdateService {
 
             // 2. Load all workspace settings and send to webview
             const layoutPresets = this._deps.webviewManager.getLayoutPresetsConfiguration();
-            const config = configService.getBoardViewConfig(layoutPresets);
+            const config = this._applyDocumentMarpPreference(configService.getBoardViewConfig(layoutPresets));
 
             // Send configuration to webview
             const configMessage: ConfigurationUpdateMessage = {
@@ -223,6 +227,18 @@ export class WebviewUpdateService {
         } catch (error) {
             console.error('[WebviewUpdateService] Failed to send shortcuts to webview:', error);
         }
+    }
+
+    private _applyDocumentMarpPreference<T extends { showMarpSettings?: boolean }>(config: T): T {
+        const documentUri = this._deps.panelContext.lastDocumentUri;
+        if (!documentUri) {
+            return config;
+        }
+        const storedMarpPreference = getDocumentPreference(this._deps.extensionContext, documentUri, 'showMarpSettings');
+        if (storedMarpPreference !== undefined) {
+            config.showMarpSettings = Boolean(storedMarpPreference);
+        }
+        return config;
     }
 
     /**

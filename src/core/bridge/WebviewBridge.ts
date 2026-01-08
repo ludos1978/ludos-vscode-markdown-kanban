@@ -17,6 +17,7 @@ import * as vscode from 'vscode';
 import {
     OutgoingMessage
 } from './MessageTypes';
+import { logger } from '../../utils/logger';
 
 // ============= TYPES =============
 
@@ -80,12 +81,12 @@ export class WebviewBridge implements vscode.Disposable {
      */
     send<T extends OutgoingMessage>(message: T): boolean {
         if (!this._webview) {
-            console.warn(`[WebviewBridge] Cannot send message: no webview (type: ${message.type})`);
+            logger.warn(`[WebviewBridge] Cannot send message: no webview (type: ${message.type})`);
             return false;
         }
 
         if (this._isDisposed) {
-            console.warn(`[WebviewBridge] Cannot send message: bridge disposed (type: ${message.type})`);
+            logger.warn(`[WebviewBridge] Cannot send message: bridge disposed (type: ${message.type})`);
             return false;
         }
 
@@ -93,7 +94,7 @@ export class WebviewBridge implements vscode.Disposable {
             this._webview.postMessage(message);
             return true;
         } catch (error) {
-            console.error(`[WebviewBridge] Error sending message:`, error);
+            logger.error(`[WebviewBridge] Error sending message:`, error);
             return false;
         }
     }
@@ -104,7 +105,7 @@ export class WebviewBridge implements vscode.Disposable {
      */
     sendBatched<T extends OutgoingMessage>(message: T): void {
         if (!this._webview || this._isDisposed) {
-            console.warn(`[WebviewBridge] Cannot batch message: bridge not ready (type: ${message.type})`);
+            logger.warn(`[WebviewBridge] Cannot batch message: bridge not ready (type: ${message.type})`);
             return;
         }
 
@@ -154,7 +155,7 @@ export class WebviewBridge implements vscode.Disposable {
 
     private _log(message: string): void {
         if (this._debug) {
-            console.log(`[WebviewBridge] ${message}`);
+            logger.debug(`[WebviewBridge] ${message}`);
         }
     }
 

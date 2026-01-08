@@ -182,6 +182,12 @@ function pushMediaToken(state, media, options) {
   }
 
   addMediaAttrs(token, media, options?.attrs?.[mediaType]);
+  if (media.start) {
+    token.attrSet("data-start-time", media.start);
+  }
+  if (media.end) {
+    token.attrSet("data-end-time", media.end);
+  }
 
   return token;
 }

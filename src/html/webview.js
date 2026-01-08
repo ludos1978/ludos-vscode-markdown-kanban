@@ -29,6 +29,18 @@ window.kanbanDebug = window.kanbanDebug || {
     }
 };
 
+const originalConsoleLog = console.log.bind(console);
+const originalConsoleInfo = console.info ? console.info.bind(console) : null;
+
+function updateWebviewConsoleLogging(enabled) {
+    console.log = enabled ? originalConsoleLog : () => {};
+    if (originalConsoleInfo) {
+        console.info = enabled ? originalConsoleInfo : () => {};
+    }
+}
+
+updateWebviewConsoleLogging(window.kanbanDebug.enabled);
+
 function updateVersionDisplay(nextVersion) {
     const versionElement = document.getElementById('build-version');
     if (!versionElement) {
@@ -51,6 +63,7 @@ function updateVersionDisplay(nextVersion) {
 function setDebugMode(enabled, options = {}) {
     window.kanbanDebug.enabled = !!enabled;
     updateVersionDisplay();
+    updateWebviewConsoleLogging(window.kanbanDebug.enabled);
 
     if (options.notifyBackend !== false && typeof vscode !== 'undefined') {
         vscode.postMessage({
@@ -228,6 +241,7 @@ window.createDisplayTitleWithPlaceholders = function(title, resolvedFiles) {
 // Layout Presets Configuration (will be loaded from backend)
 let layoutPresets = {};
 window.showMarpSettings = true;
+window.pendingMarpSettingsOverride = undefined;
 
 // Menu functions (getCurrentSettingValue, updateAllMenuIndicators, generateMenuHTML, populateDynamicMenus)
 // moved to utils/menuConfig.js
@@ -697,10 +711,15 @@ function toggleFileBarMenu(event, button) {
                         submenu.style.visibility = 'hidden';
                         submenu.style.display = 'block';
                         const submenuRect = submenu.getBoundingClientRect();
-                        const submenuWidth = submenuRect.width || 200;
+                        const minimalSubmenuWidth = 200;
+                        const baseWidth = Math.max(submenuRect.width || 0, minimalSubmenuWidth);
+                        const arrowPadding = 16;
+                        const totalWidth = baseWidth + arrowPadding;
+                        submenu.style.minWidth = minimalSubmenuWidth + 'px';
+                        submenu.style.width = totalWidth + 'px';
+                        submenu.style.paddingLeft = arrowPadding + 'px';
                         
-                        // Position to the left of the menu item, aligned with its left edge
-                        let left = rect.left - submenuWidth + 1; // 1px overlap for smooth hover
+                        let left = rect.left - totalWidth + 1; // include arrow space
                         let top = rect.top;
                         
                         // Adjust if it would go off-screen
@@ -980,6 +999,7 @@ function applyMarpSettingsVisibility(isEnabled) {
  */
 function toggleMarpSettingsVisibility() {
     const nextState = !(window.showMarpSettings ?? true);
+    window.pendingMarpSettingsOverride = nextState;
     applyMarpSettingsVisibility(nextState);
     if (window.configManager) {
         window.configManager.setPreference('showMarpSettings', nextState);
@@ -988,6 +1008,15 @@ function toggleMarpSettingsVisibility() {
     }
     if (window.cachedConfig) {
         window.cachedConfig.showMarpSettings = nextState;
+    }
+    const docUri = window.currentFilePath || window.currentKanbanFilePath || (typeof window.getCurrentDocumentUri === 'function' ? window.getCurrentDocumentUri() : undefined);
+    if (docUri) {
+        vscode.postMessage({
+            type: 'setFilePreference',
+            key: 'showMarpSettings',
+            value: nextState,
+            documentUri: docUri
+        });
     }
     vscode.postMessage({ type: 'requestConfigurationRefresh' });
 }
@@ -2218,12 +2247,18 @@ if (!webviewEventListenersInitialized) {
             // ⚠️ CONFIGURATION REFRESH - Cache all workspace settings
             // This is called on view focus and initial load to ensure fresh configuration
             const configData = message.config || {};
+            const pendingMarpOverride = window.pendingMarpSettingsOverride;
+            const marpSettingsValue = typeof pendingMarpOverride === 'boolean'
+                ? pendingMarpOverride
+                : (configData.showMarpSettings !== undefined ? Boolean(configData.showMarpSettings) : true);
 
             // Store all configuration in window.cachedConfig for global access
             window.cachedConfig = configData;
-            const marpSettingsValue = configData.showMarpSettings !== undefined ? Boolean(configData.showMarpSettings) : true;
             applyMarpSettingsVisibility(marpSettingsValue);
             window.cachedConfig.showMarpSettings = marpSettingsValue;
+            if (typeof pendingMarpOverride === 'boolean') {
+                window.pendingMarpSettingsOverride = undefined;
+            }
 
             // Apply tag category settings to window properties for menu generation
             if (configData.enabledTagCategoriesColumn !== undefined) {

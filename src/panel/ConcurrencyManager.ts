@@ -10,6 +10,8 @@
  * @module panel/ConcurrencyManager
  */
 
+import { logger } from '../utils/logger';
+
 /**
  * Pending operation in the queue
  */
@@ -169,7 +171,7 @@ export class ConcurrencyManager {
 
     private _log(message: string): void {
         if (this._debugMode) {
-            console.log(`[ConcurrencyManager] ${message}`);
+            logger.debug(`[ConcurrencyManager] ${message}`);
         }
     }
 }

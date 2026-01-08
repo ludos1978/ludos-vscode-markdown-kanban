@@ -23,6 +23,7 @@
  */
 
 import { AppEvent, EventType } from './EventTypes';
+import { logger } from '../../utils/logger';
 
 type EventHandler<T extends AppEvent = AppEvent> = (event: T) => void | Promise<void>;
 
@@ -99,7 +100,7 @@ export class EventBus {
         }
 
         if (this._debugMode) {
-            console.log(`[EventBus] ${event.type} from ${event.source}`, event);
+            logger.debug(`[EventBus] ${event.type} from ${event.source}`, event);
         }
 
         // Get handlers for this event type

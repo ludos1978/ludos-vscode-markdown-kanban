@@ -129,7 +129,9 @@ export interface CommandContext extends
     EditContext,
     IncludeContext,
     ExportContext,
-    ServiceContext {}
+    ServiceContext {
+    extensionContext: vscode.ExtensionContext;
+}
 
 /**
  * Metadata for a message command

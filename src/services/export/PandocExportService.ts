@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { ConfigurationService } from '../ConfigurationService';
+import { logger } from '../../utils/logger';
 
 export type PandocOutputFormat = 'docx' | 'odt' | 'epub';
 
@@ -164,7 +165,7 @@ export class PandocExportService {
             const pandocPath = options.customPath || this.getPandocPath();
             const args = this.buildCliArgs(options);
 
-            console.log(`[PandocExportService] Exporting to ${options.format}: pandoc ${args.join(' ')}`);
+            logger.debug(`[PandocExportService] Exporting to ${options.format}: pandoc ${args.join(' ')}`);
 
             // Use the directory of the input file as CWD for relative path resolution
             const inputFileDir = path.dirname(options.inputFilePath);
@@ -190,7 +191,7 @@ export class PandocExportService {
 
                 pandocProcess.on('exit', (code) => {
                     if (code === 0) {
-                        console.log(`[PandocExportService] Export successful: ${options.outputPath}`);
+                        logger.debug(`[PandocExportService] Export successful: ${options.outputPath}`);
                         resolve();
                     } else {
                         const errorMessage = stderrOutput.trim() || `Exit code ${code}`;

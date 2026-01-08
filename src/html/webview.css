@@ -1495,6 +1495,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 	padding-left: 8px;
 	padding-right: 8px;
   margin-left: 0;
+  margin-top: var(--whitespace-div2);
   order: 1;
   flex-shrink: 0;
 }
@@ -1577,6 +1578,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   /* max-width: var(--task-title-width); */
   cursor: pointer;
   overflow: hidden;
+
 }
 
 .task-title-container:hover {
@@ -2121,21 +2123,34 @@ button.file-bar-menu-item {
 
 .donut-menu-item.has-submenu,
 .file-bar-menu-item.has-submenu {
-  padding-right: 24px;
+  padding-right: 32px;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .donut-menu-item.has-submenu::after {
-  content: '▶';
+  content: '';
   position: absolute;
-  right: 8px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
-  opacity: 0.6;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 6px solid var(--vscode-dropdown-foreground);
+  pointer-events: none;
+}
+
+.kanban-full-height-column .donut-menu-item.has-submenu {
+  padding-left: 32px;
 }
 
 .kanban-full-height-column .donut-menu-item.has-submenu::after {
-  content: '◀';
+  right: auto;
+  left: 12px;
+  border-left: none;
+  border-right: 6px solid var(--vscode-dropdown-foreground);
 }
 
 .file-bar-menu-item.has-submenu::after {
@@ -2157,6 +2172,13 @@ button.file-bar-menu-item {
   width: 10px;
   height: 100%;
   z-index: 50;
+  pointer-events: none;
+  background: var(--vscode-dropdown-background);
+  border-top: 1px solid var(--vscode-dropdown-border);
+  border-bottom: 1px solid var(--vscode-dropdown-border);
+  border-right: 1px solid var(--vscode-dropdown-border);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
 }
 
 .donut-menu-item.has-submenu::before {
@@ -2166,6 +2188,9 @@ button.file-bar-menu-item {
 .kanban-full-height-column .donut-menu-item.has-submenu::before,
 .file-bar-menu-item.has-submenu::before {
   right: 100%;
+  border-left: 1px solid var(--vscode-dropdown-border);
+  border-right: none;
+  border-radius: 4px 0 0 4px;
 }
 
 .donut-menu-submenu,
@@ -2198,6 +2223,7 @@ button.file-bar-menu-item {
 
 .file-bar-menu-submenu {
   min-width: 140px;
+  box-sizing: border-box;
 }
 
 /* Ensure all submenu content respects container bounds */
@@ -3856,7 +3882,7 @@ blockquote {
   max-height: 400px;
   width: auto;
   height: auto;
-  margin: 8px 0;
+  margin: 0;
   display: block;
   object-fit: contain;
 }

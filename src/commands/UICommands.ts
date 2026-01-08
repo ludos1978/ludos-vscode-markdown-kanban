@@ -21,12 +21,15 @@ import {
     SetContextMessage,
     UpdateTaskContentExtendedMessage,
     UpdateColumnContentExtendedMessage,
-    OpenSearchPanelMessage
+    OpenSearchPanelMessage,
+    SetFilePreferenceMessage
 } from '../core/bridge/MessageTypes';
 import { ResolvedTarget } from '../core/stores/BoardStore';
 import { KanbanBoard } from '../markdownParser';
 import { showError as notifyError, showWarning, showInfo as notifyInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
+import { setDocumentPreference } from '../utils/documentPreference';
+import { logger } from '../utils/logger';
 
 /**
  * UI Commands Handler
@@ -48,6 +51,7 @@ export class UICommands extends SwitchBasedCommand {
             'showError',
             'showInfo',
             'setPreference',
+            'setFilePreference',
             'setContext',
             'requestConfigurationRefresh',
             'openSearchPanel'
@@ -68,6 +72,7 @@ export class UICommands extends SwitchBasedCommand {
         'showError': (msg, _ctx) => this.handleShowError(msg as ShowErrorMessage),
         'showInfo': (msg, _ctx) => this.handleShowInfo(msg as ShowInfoMessage),
         'setPreference': (msg, _ctx) => this.handleSetPreference(msg as SetPreferenceMessage),
+        'setFilePreference': (msg, ctx) => this.handleSetFilePreference(msg as SetFilePreferenceMessage, ctx),
         'setContext': (msg, _ctx) => this.handleSetContext(msg as SetContextMessage),
         'requestConfigurationRefresh': (_msg, ctx) => this.handleRequestConfigurationRefresh(ctx),
         'openSearchPanel': (msg, ctx) => this.handleOpenSearchPanel(msg as OpenSearchPanelMessage, ctx)
@@ -79,14 +84,14 @@ export class UICommands extends SwitchBasedCommand {
      * Handle undo command
      */
     private async handleUndo(context: CommandContext): Promise<CommandResult> {
-        console.log(`[UICommands] handleUndo: canUndo=${context.boardStore.canUndo()}, stackSize=${context.boardStore.getUndoStackSize()}`);
+        logger.debug(`[UICommands] handleUndo: canUndo=${context.boardStore.canUndo()}, stackSize=${context.boardStore.getUndoStackSize()}`);
         context.setUndoRedoOperation(true);
 
         const result = context.boardStore.undo();
         if (result) {
             context.setBoard(result.board);
             context.emitBoardChanged(result.board, 'undo');
-            console.log('[kanban.UICommands.handleUndo.emitBoardChanged]', {
+            logger.debug('[kanban.UICommands.handleUndo.emitBoardChanged]', {
                 trigger: 'undo',
                 targetCount: result.targets?.length ?? 0
             });
@@ -117,15 +122,15 @@ export class UICommands extends SwitchBasedCommand {
      * Handle redo command
      */
     private async handleRedo(context: CommandContext): Promise<CommandResult> {
-        console.log(`[kanban.UICommands.handleRedo.undo] canRedo=${context.boardStore.canRedo()}, stackSize=${context.boardStore.getRedoStackSize()}`);
+        logger.debug(`[kanban.UICommands.handleRedo.undo] canRedo=${context.boardStore.canRedo()}, stackSize=${context.boardStore.getRedoStackSize()}`);
         context.setUndoRedoOperation(true);
 
         const result = context.boardStore.redo();
-        console.log(`[kanban.UICommands.handleRedo.undo] result=${result ? 'restored' : 'none'}`);
+        logger.debug(`[kanban.UICommands.handleRedo.undo] result=${result ? 'restored' : 'none'}`);
         if (result) {
             context.setBoard(result.board);
             context.emitBoardChanged(result.board, 'redo');
-            console.log('[kanban.UICommands.handleRedo.emitBoardChanged]', {
+            logger.debug('[kanban.UICommands.handleRedo.emitBoardChanged]', {
                 trigger: 'redo',
                 targetCount: result.targets?.length ?? 0
             });
@@ -173,13 +178,13 @@ export class UICommands extends SwitchBasedCommand {
         const allColumns = targets.every(target => target.type === 'column');
         if (allColumns) {
             const uniqueColumnIds = Array.from(new Set(targets.map(target => target.id)));
-            console.log('[kanban.UICommands.tryTargetedUpdate.columns]', {
+            logger.debug('[kanban.UICommands.tryTargetedUpdate.columns]', {
                 columnIds: uniqueColumnIds,
                 targetCount: targets.length
             });
             for (const columnId of uniqueColumnIds) {
                 const column = board.columns.find(c => c.id === columnId);
-                console.log('[kanban.UICommands.tryTargetedUpdate.column]', {
+                logger.debug('[kanban.UICommands.tryTargetedUpdate.column]', {
                     columnId: columnId,
                     columnFound: !!column,
                     taskCount: column?.tasks?.length ?? 0
@@ -302,6 +307,27 @@ export class UICommands extends SwitchBasedCommand {
         }
         const config = vscode.workspace.getConfiguration('markdown-kanban');
         await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
+        return this.success();
+    }
+
+    /**
+     * Handle setFilePreference command
+     */
+    private async handleSetFilePreference(message: SetFilePreferenceMessage, context: CommandContext): Promise<CommandResult> {
+        if (!message.key) {
+            console.error('[UICommands] setFilePreference called with undefined key');
+            return this.failure('setFilePreference requires a key');
+        }
+
+        const documentUriFromManager = context.fileManager?.getDocument()?.uri.toString();
+        const targetUri = message.documentUri || documentUriFromManager;
+
+        if (!targetUri) {
+            console.error('[UICommands] setFilePreference missing documentUri');
+            return this.failure('setFilePreference requires a documentUri');
+        }
+
+        await setDocumentPreference(context.extensionContext, targetUri, message.key, message.value);
         return this.success();
     }
 

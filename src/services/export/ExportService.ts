@@ -21,6 +21,7 @@ import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
 import { MarkdownKanbanParser } from '../../markdownParser';
+import { logger } from '../../utils/logger';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -1628,7 +1629,7 @@ export class ExportService {
         mermaidService?: MermaidExportService
     ): Promise<ExportResult> {
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
-        console.log(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
+        logger.debug(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
 
         // Build output path
         const dir = path.dirname(markdownPath);
@@ -1797,7 +1798,7 @@ export class ExportService {
         mermaidService?: MermaidExportService
     ): Promise<ExportResult> {
         const pandocFormat: PandocOutputFormat = options.pandocFormat || 'docx';
-        console.log(`[ExportService] runPandocConversion - pandocFormat: ${pandocFormat}`);
+        logger.debug(`[ExportService] runPandocConversion - pandocFormat: ${pandocFormat}`);
 
         // Check availability
         const isAvailable = await PandocExportService.isPandocAvailable();

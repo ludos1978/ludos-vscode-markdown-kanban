@@ -38,6 +38,67 @@ function isAlphanumeric(char) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string | null}
+ */
+function normalizeTimeValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim().replace(/s$/i, "");
+  if (trimmed === "") {
+    return null;
+  }
+
+  const numeric = Number(trimmed);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  return String(numeric);
+}
+
+/**
+ * @param {string} href
+ * @returns {{ normalizedSrc: string, startTime: string | null, endTime: string | null }}
+ */
+function extractTimeParams(href) {
+  const hashIndex = href.indexOf("#");
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  const withoutHash = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+
+  let path = withoutHash;
+  let query = "";
+
+  const questionIndex = withoutHash.indexOf("?");
+  if (questionIndex >= 0) {
+    path = withoutHash.slice(0, questionIndex);
+    query = withoutHash.slice(questionIndex + 1);
+  } else if (withoutHash.includes("&")) {
+    const ampIndex = withoutHash.indexOf("&");
+    path = withoutHash.slice(0, ampIndex);
+    query = withoutHash.slice(ampIndex + 1);
+  }
+
+  const params = new URLSearchParams(query);
+  const startTime = normalizeTimeValue(params.get("start"));
+  const endTime = normalizeTimeValue(params.get("end"));
+
+  params.delete("start");
+  params.delete("end");
+
+  const rest = params.toString();
+  const normalizedSrc = `${path}${rest ? `?${rest}` : ""}${hash}`;
+
+  return {
+    normalizedSrc,
+    startTime,
+    endTime,
+  };
+}
+
+/**
  * @param {string} src
  * @param {number} start
  * @param {number} end
@@ -96,7 +157,7 @@ function parseMediaType(src, start, end) {
 }
 
 /**
- * @typedef {{ src: string, type: string | null }} Source
+ * @typedef {{ src: string, type: string | null, start: string | null, end: string | null }} Source
  * @param {string} src
  * @param {number} start
  * @param {number} end
@@ -150,11 +211,15 @@ function parseMediaSource(src, start, end, md = markdownIt()) {
     return null;
   }
 
+  const { normalizedSrc, startTime, endTime } = extractTimeParams(href);
+
   return {
     pos: pos + 1,
     res: {
-      src: href,
+      src: normalizedSrc,
       type: mediaType.value,
+      start: startTime,
+      end: endTime,
     },
   };
 }
@@ -416,6 +481,8 @@ function parseMediaArgs(state, start) {
     poster: null,
     width: null,
     height: null,
+    start: null,
+    end: null,
     sources: [],
     captions: [],
   };
@@ -463,6 +530,12 @@ function parseMediaArgs(state, start) {
 
   while (mediaSource) {
     res.sources.push(mediaSource.res);
+    if (!res.start && mediaSource.res.start) {
+      res.start = mediaSource.res.start;
+    }
+    if (!res.end && mediaSource.res.end) {
+      res.end = mediaSource.res.end;
+    }
 
     // [label](  <src>  ...<src>  )
     //                ^^ skipping these spaces

@@ -338,6 +338,7 @@ export class WebviewManager {
             'utils/dateUtils.js',
             'utils/colorUtils.js',
             'utils/fileTypeUtils.js',
+            'utils/stringUtils.js',
             'utils/tagUtils.js',
             'utils/configManager.js',
             'utils/styleManager.js',

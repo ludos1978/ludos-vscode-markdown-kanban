@@ -814,6 +814,13 @@ export interface SetPreferenceMessage extends BaseMessage {
     value: unknown;
 }
 
+export interface SetFilePreferenceMessage extends BaseMessage {
+    type: 'setFilePreference';
+    documentUri?: string;
+    key: string;
+    value: unknown;
+}
+
 /**
  * Set context request
  */
@@ -1836,6 +1843,7 @@ export type IncomingMessage =
     | ShowErrorMessage
     | ShowInfoMessage
     | SetPreferenceMessage
+    | SetFilePreferenceMessage
     | SetContextMessage
     | RequestConfigurationRefreshMessage
     | OpenSearchPanelMessage

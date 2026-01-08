@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { getErrorMessage } from '../../utils/stringUtils';
+import { logger } from '../../utils/logger';
 
 /**
  * Backend service for rendering PlantUML diagrams using Java + PlantUML JAR
@@ -74,7 +75,7 @@ export class PlantUMLService {
                 const plantumlJar = path.join(vendorPath, 'plantuml-modern.jar');  // Use modern v1.2024.7
 
                 // Debug: log the resolved path
-                console.log('[PlantUML Service] JAR path:', plantumlJar);
+                logger.debug('[PlantUML Service] JAR path:', plantumlJar);
 
                 // Verify JAR file exists
                 if (!fs.existsSync(plantumlJar)) {

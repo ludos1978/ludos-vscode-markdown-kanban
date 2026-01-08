@@ -3,6 +3,7 @@ import { MarkdownFile } from '../files/MarkdownFile';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 import { FileSaveService } from './FileSaveService';
 import { PanelContext } from '../panel/PanelContext';
+import { logger } from '../utils/logger';
 
 // Re-export types from ChangeTypes
 export {
@@ -631,7 +632,7 @@ export class ChangeStateMachine {
             column.includeError = false;
         }
 
-        console.log(`[ChangeStateMachine] _sendColumnUpdate: columnId=${column.id}, isLoadingContent=${isLoadingContent}, includeError=${column.includeError}, includeMode=${column.includeMode}, includeFiles=${JSON.stringify(column.includeFiles)}`);
+        logger.debug(`[ChangeStateMachine] _sendColumnUpdate: columnId=${column.id}, isLoadingContent=${isLoadingContent}, includeError=${column.includeError}, includeMode=${column.includeMode}, includeFiles=${JSON.stringify(column.includeFiles)}`);
 
         panel.webview.postMessage({
             type: 'updateColumnContent',

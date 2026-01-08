@@ -6,6 +6,7 @@
  *
  * This replaces the global EventBus singleton for panel-specific events.
  */
+import { logger } from '../../utils/logger';
 
 type EventHandler<T> = (data: T) => void | Promise<void>;
 
@@ -137,6 +138,6 @@ export class ScopedEventBus {
 
         this._disposed = true;
         this._handlers.clear();
-        console.log(`[ScopedEventBus:${this._panelId}] Disposed`);
+        logger.debug(`[ScopedEventBus:${this._panelId}] Disposed`);
     }
 }

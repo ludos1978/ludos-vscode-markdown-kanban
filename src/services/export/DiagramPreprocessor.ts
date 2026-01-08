@@ -7,10 +7,11 @@ import { showError } from '../NotificationService';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { logger } from '../../utils/logger';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG = false;
-const log = DEBUG ? console.log.bind(console, '[DiagramPreprocessor]') : () => {};
+const log = DEBUG ? logger.debug.bind(logger, '[DiagramPreprocessor]') : () => {};
 
 interface DiagramBlock {
     type: 'plantuml' | 'mermaid' | 'drawio' | 'excalidraw';

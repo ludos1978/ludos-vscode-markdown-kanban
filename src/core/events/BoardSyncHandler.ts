@@ -25,6 +25,7 @@ import { BackupManager } from '../../services/BackupManager';
 import { sortColumnsByRow } from '../../utils/columnUtils';
 import { safeDecodeURIComponent } from '../../utils/stringUtils';
 import { PanelContext } from '../../panel/PanelContext';
+import { logger } from '../../utils/logger';
 
 /**
  * Dependencies required by BoardSyncHandler
@@ -105,7 +106,7 @@ export class BoardSyncHandler {
         }
 
         if (isDebug && (event.data.trigger === 'undo' || event.data.trigger === 'redo')) {
-            console.log('[kanban.BoardSyncHandler.undoRedo.start]', {
+            logger.debug('[kanban.BoardSyncHandler.undoRedo.start]', {
                 trigger: event.data.trigger,
                 columnCount: normalizedBoard.columns.length,
                 includeColumns: normalizedBoard.columns.filter(col => col.includeFiles && col.includeFiles.length > 0).map(col => col.id)
@@ -194,7 +195,7 @@ export class BoardSyncHandler {
                     // Only update if content differs from current cached content
                     if (content !== currentContent) {
                         if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
-                            console.log('[kanban.BoardSyncHandler.undoRedo.includeColumnUpdate]', {
+                            logger.debug('[kanban.BoardSyncHandler.undoRedo.includeColumnUpdate]', {
                                 trigger,
                                 columnId: column.id,
                                 includePath: includeFile.getPath(),
@@ -210,7 +211,7 @@ export class BoardSyncHandler {
                             const openContent = openDoc.getText();
                             if (openContent !== content) {
                                 if (isDebug) {
-                                    console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                    logger.debug('[kanban.BoardSyncHandler.include.openDocUpdate]', {
                                         includePath,
                                         isDirty: openDoc.isDirty,
                                         contentLength: content.length
@@ -267,7 +268,7 @@ export class BoardSyncHandler {
                         // Only update if content differs from current cached content
                         if (fullContent !== currentContent) {
                             if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
-                                console.log('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
+                                logger.debug('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
                                     trigger,
                                     taskId: task.id,
                                     includePath: includeFile.getPath(),
@@ -282,7 +283,7 @@ export class BoardSyncHandler {
                                 const openContent = openDoc.getText();
                                 if (openContent !== fullContent) {
                                     if (isDebug) {
-                                        console.log('[kanban.BoardSyncHandler.include.openDocUpdate]', {
+                                        logger.debug('[kanban.BoardSyncHandler.include.openDocUpdate]', {
                                             includePath,
                                             isDirty: openDoc.isDirty,
                                             contentLength: fullContent.length

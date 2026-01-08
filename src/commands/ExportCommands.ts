@@ -23,10 +23,11 @@ import { FileChangeEvent } from '../files/MarkdownFile';
 import { showError, showInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG = false;
-const log = DEBUG ? console.log.bind(console, '[ExportCommands]') : () => {};
+const log = DEBUG ? logger.debug.bind(logger, '[ExportCommands]') : () => {};
 
 // Track auto-export subscriptions (file path -> disposable)
 const autoExportSubscriptions = new Map<string, vscode.Disposable>();

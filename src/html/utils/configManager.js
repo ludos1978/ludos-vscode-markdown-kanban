@@ -22,7 +22,7 @@ class ConfigManager {
             whitespace: 'normal',
             maxRowHeight: 'auto',
             taskMinHeight: 'auto',
-            fontSize: 'medium',
+            fontSize: '1x',
             fontFamily: 'default',
             columnWidth: 'auto',
             columnBorder: '1px solid var(--vscode-panel-border)',
@@ -36,7 +36,8 @@ class ConfigManager {
             arrowKeyFocusScroll: 'center',
             tagColors: {},
             htmlCommentRenderMode: 'hidden',
-            htmlContentRenderMode: 'html'
+            htmlContentRenderMode: 'html',
+            showMarpSettings: true
         };
     }
 
@@ -195,7 +196,18 @@ class ConfigManager {
             case 'layoutRows':
                 return typeof value === 'number' && value >= 1;
             case 'fontSize':
-                return ['small', 'medium', 'large', 'xlarge'].includes(value);
+                return [
+                    '0_5x',
+                    '0_75x',
+                    '1x',
+                    '1_25x',
+                    '1_5x',
+                    '2x',
+                    '2_5x',
+                    '3x',
+                    '4x',
+                    '5x'
+                ].includes(value);
             case 'whitespace':
                 return ['normal', 'nowrap', 'pre', 'pre-wrap'].includes(value);
             case 'tagVisibility':

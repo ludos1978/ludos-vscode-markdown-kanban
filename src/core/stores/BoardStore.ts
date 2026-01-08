@@ -18,6 +18,7 @@
 import * as vscode from 'vscode';
 import { KanbanBoard } from '../../markdownParser';
 import { UndoEntry, UndoCapture, ResolvedTarget } from './UndoCapture';
+import { logger } from '../../utils/logger';
 
 // Re-export for consumers
 export { UndoEntry, UndoCapture, ResolvedTarget };
@@ -236,7 +237,7 @@ export class BoardStore implements vscode.Disposable {
         const restoredEntry = this._state.undoStack.pop()!;
 
         if (restoredEntry.payload?.type === 'task-move' && currentBoard && currentBoard.valid) {
-            console.log('[kanban.BoardStore.undo.task-move]', {
+            logger.debug('[kanban.BoardStore.undo.task-move]', {
                 taskId: restoredEntry.payload.taskId,
                 fromColumnId: restoredEntry.payload.fromColumnId,
                 toColumnId: restoredEntry.payload.toColumnId,

@@ -9,6 +9,7 @@ import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
 import { getErrorMessage } from './utils/stringUtils';
+import { logger } from './utils/logger';
 import { PanelContext, WebviewManager } from './panel';
 import { BoardStore } from './core/stores';
 import { DOCUMENT_CHANGE_DEBOUNCE_MS } from './constants/TimeoutConstants';
@@ -293,11 +294,11 @@ export class KanbanFileService {
         if (boardBeforeSend?.columns) {
             for (const col of boardBeforeSend.columns) {
                 if (col.includeFiles && col.includeFiles.length > 0) {
-                    console.log(`[KanbanFileService] BEFORE sendBoardUpdate - column ${col.id}: includeMode=${col.includeMode}, includeError=${col.includeError}, includeFiles=${JSON.stringify(col.includeFiles)}`);
+                    logger.debug(`[KanbanFileService] BEFORE sendBoardUpdate - column ${col.id}: includeMode=${col.includeMode}, includeError=${col.includeError}, includeFiles=${JSON.stringify(col.includeFiles)}`);
                 }
                 for (const task of col.tasks || []) {
                     if (task.includeFiles && task.includeFiles.length > 0) {
-                        console.log(`[KanbanFileService] BEFORE sendBoardUpdate - task ${task.id}: includeMode=${task.includeMode}, includeError=${task.includeError}, includeFiles=${JSON.stringify(task.includeFiles)}`);
+                        logger.debug(`[KanbanFileService] BEFORE sendBoardUpdate - task ${task.id}: includeMode=${task.includeMode}, includeError=${task.includeError}, includeFiles=${JSON.stringify(task.includeFiles)}`);
                     }
                 }
             }
@@ -501,8 +502,8 @@ export class KanbanFileService {
                                 while (diffIndex < minLen && currentDocContent[diffIndex] === currentCacheContent[diffIndex]) {
                                     diffIndex++;
                                 }
-                                console.log('[KanbanFileService] Document content changed (possibly undo), syncing cache and reparsing');
-                                console.log('[KanbanFileService] Content diff details:',
+                                logger.debug('[KanbanFileService] Document content changed (possibly undo), syncing cache and reparsing');
+                                logger.debug('[KanbanFileService] Content diff details:',
                                     'docLen=' + currentDocContent.length,
                                     'cacheLen=' + currentCacheContent.length,
                                     'diffAt=' + diffIndex,
@@ -558,7 +559,7 @@ export class KanbanFileService {
                 return;
             }
 
-            console.log('[KanbanFileService] Sync include file content on open', {
+            logger.debug('[KanbanFileService] Sync include file content on open', {
                 includePath: includeFile.getPath(),
                 documentPath: document.uri.fsPath,
                 contentLength: cachedContent.length
@@ -677,7 +678,7 @@ export class KanbanFileService {
                         : path.resolve(basePath, relativePath);
 
                     const fileExists = fs.existsSync(absolutePath);
-                    console.log(`[KanbanFileService] Initial load include check: column=${column.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
+                    logger.debug(`[KanbanFileService] Initial load include check: column=${column.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
 
                     if (!fileExists) {
                         (column as any).includeMode = true;  // REQUIRED for frontend to show error styling
@@ -697,7 +698,7 @@ export class KanbanFileService {
                             : path.resolve(basePath, relativePath);
 
                         const fileExists = fs.existsSync(absolutePath);
-                        console.log(`[KanbanFileService] Initial load include check: task=${task.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
+                        logger.debug(`[KanbanFileService] Initial load include check: task=${task.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
 
                         if (!fileExists) {
                             (task as any).includeMode = true;  // REQUIRED for frontend to show error styling

@@ -16,6 +16,7 @@ import {
     MarkdownFileRegistry,
     FileFactory
 } from './files';
+import { logger } from './utils/logger';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
@@ -39,6 +40,8 @@ interface PersistedPanelState {
     documentUri: string;
     lastAccessed: number;
 }
+
+const DEBUG_MODE_STATE_KEY = 'kanban_debug_mode';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -113,7 +116,8 @@ export class KanbanWebviewPanel {
             { enableScripts: true, localResourceRoots, retainContextWhenHidden: true, enableCommandUris: true }
         );
 
-        const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
+        const debugMode = KanbanWebviewPanel._loadPersistedDebugMode(context);
+        const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context, debugMode);
 
         if (document) {
             const docUri = document.uri.toString();
@@ -142,19 +146,24 @@ export class KanbanWebviewPanel {
         return roots;
     }
 
+    private static _loadPersistedDebugMode(context: vscode.ExtensionContext): boolean {
+        return context.globalState.get<boolean>(DEBUG_MODE_STATE_KEY) ?? false;
+    }
+
     private static _revivedUris: Set<string> = new Set();
 
     public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext, state?: any) {
-        console.log('[KanbanWebviewPanel.revive] START - state:', JSON.stringify(state));
-        console.log('[KanbanWebviewPanel.revive] Panel title from VS Code:', panel.title);
+        logger.debug('[KanbanWebviewPanel.revive] START - state:', JSON.stringify(state));
+        logger.debug('[KanbanWebviewPanel.revive] Panel title from VS Code:', panel.title);
 
         const localResourceRoots = KanbanWebviewPanel._buildResourceRoots(extensionUri);
         panel.webview.options = { enableScripts: true, localResourceRoots };
 
-        const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
+        const debugMode = KanbanWebviewPanel._loadPersistedDebugMode(context);
+        const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context, debugMode);
         const documentPath = state?.documentUri;
 
-        console.log('[KanbanWebviewPanel.revive] documentPath from state:', documentPath);
+        logger.debug('[KanbanWebviewPanel.revive] documentPath from state:', documentPath);
 
         // Validate: must be a non-empty string that looks like a file path
         if (documentPath && typeof documentPath === 'string' && documentPath.length > 0) {
@@ -168,11 +177,11 @@ export class KanbanWebviewPanel {
 
             (async () => {
                 try {
-                    console.log('[KanbanWebviewPanel.revive] Opening document:', documentUri.toString());
+                    logger.debug('[KanbanWebviewPanel.revive] Opening document:', documentUri.toString());
                     const document = await vscode.workspace.openTextDocument(documentUri);
-                    console.log('[KanbanWebviewPanel.revive] Document opened successfully:', document.fileName);
+                    logger.debug('[KanbanWebviewPanel.revive] Document opened successfully:', document.fileName);
                     await kanbanPanel.loadMarkdownFile(document);
-                    console.log('[KanbanWebviewPanel.revive] loadMarkdownFile completed');
+                    logger.debug('[KanbanWebviewPanel.revive] loadMarkdownFile completed');
                 } catch (err) {
                     console.error('[KanbanWebviewPanel.revive] Failed to revive document:', err);
                 }
@@ -217,18 +226,20 @@ export class KanbanWebviewPanel {
     public getPanel(): vscode.WebviewPanel { return this._panel; }
     public hasUnsavedChanges(): boolean { return this._fileRegistry.getMainFile()?.hasUnsavedChanges() || false; }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext, initialDebugMode: boolean) {
         this._panel = panel;
         this._extensionUri = extensionUri;
         this._extensionContext = context;
 
         const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
-        this._context = new PanelContext(undefined, false);
-        this._concurrency = new ConcurrencyManager(false);
+        this._context = new PanelContext(undefined, initialDebugMode);
+        this._concurrency = new ConcurrencyManager(initialDebugMode);
 
         this._boardStore = new BoardStore({ webview: this._panel.webview, maxUndoStackSize: MAX_UNDO_STACK_SIZE });
-        this._webviewBridge = new WebviewBridge({ maxBatchSize: MAX_BATCH_SIZE, batchFlushDelay: BATCH_FLUSH_DELAY_MS, debug: false });
+        this._webviewBridge = new WebviewBridge({ maxBatchSize: MAX_BATCH_SIZE, batchFlushDelay: BATCH_FLUSH_DELAY_MS, debug: initialDebugMode });
         this._webviewBridge.setWebview(this._panel.webview);
+        logger.setDebugMode(initialDebugMode);
+        eventBus.setDebugMode(initialDebugMode);
 
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
         this._boardOperations = new BoardOperations();
@@ -292,7 +303,8 @@ export class KanbanWebviewPanel {
             onInitializeFile: this.initializeFile.bind(this),
             getWebviewPanel: () => this,
             getWebviewBridge: () => this._webviewBridge,
-            emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
+            emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger),
+            extensionContext: this._extensionContext
         }, this._context);
 
         this._fileRegistry.setMessageHandler(this._messageHandler);
@@ -320,7 +332,8 @@ export class KanbanWebviewPanel {
         this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
         this._webviewUpdateService = new WebviewUpdateService({
             boardStore: this._boardStore, webviewBridge: this._webviewBridge, fileRegistry: this._fileRegistry,
-            webviewManager: this._webviewManager, panelContext: this._context, getBoard: () => this.getBoard(), hasPanel: () => !!this._panel
+            webviewManager: this._webviewManager, panelContext: this._context, getBoard: () => this.getBoard(), hasPanel: () => !!this._panel,
+            extensionContext: this._extensionContext
         });
         this._boardInitHandler = new BoardInitializationHandler({
             fileRegistry: this._fileRegistry, fileFactory: this._fileFactory, includeCoordinator: this._includeCoordinator,
@@ -356,10 +369,16 @@ export class KanbanWebviewPanel {
     public isDisposed(): boolean { return this._context.disposed; }
     public getFileRegistry(): MarkdownFileRegistry { return this._fileRegistry; }
     public setDebugMode(enabled: boolean): void {
+        if (this._context.debugMode === enabled) {
+            return;
+        }
+
         this._context.setDebugMode(enabled);
         this._concurrency.setDebugMode(enabled);
         this._webviewBridge.setDebugMode(enabled);
+        logger.setDebugMode(enabled);
         eventBus.setDebugMode(enabled);
+        void this._extensionContext.globalState.update(DEBUG_MODE_STATE_KEY, enabled);
     }
     public getDebugMode(): boolean { return this._context.debugMode; }
 
@@ -409,12 +428,12 @@ export class KanbanWebviewPanel {
     private _handleWebviewReady(): void {
         const wasAlreadyReady = this._context.webviewReady;
         this._context.setWebviewReady(true);
-        console.log('[KanbanWebviewPanel._handleWebviewReady] wasAlreadyReady:', wasAlreadyReady);
+        logger.debug('[KanbanWebviewPanel._handleWebviewReady] wasAlreadyReady:', wasAlreadyReady);
 
         const pendingUpdate = this._context.consumePendingBoardUpdate();
-        console.log('[KanbanWebviewPanel._handleWebviewReady] pendingUpdate:', pendingUpdate);
+        logger.debug('[KanbanWebviewPanel._handleWebviewReady] pendingUpdate:', pendingUpdate);
         if (pendingUpdate) {
-            console.log('[KanbanWebviewPanel._handleWebviewReady] Sending pending update');
+            logger.debug('[KanbanWebviewPanel._handleWebviewReady] Sending pending update');
             this._fileManager.sendFileInfo();
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
             return;
@@ -423,12 +442,12 @@ export class KanbanWebviewPanel {
         // No pending update - check if this is a duplicate ready message
         if (wasAlreadyReady) {
             // Already handled webviewReady before - skip duplicate
-            console.log('[KanbanWebviewPanel._handleWebviewReady] Duplicate webviewReady - skipping');
+            logger.debug('[KanbanWebviewPanel._handleWebviewReady] Duplicate webviewReady - skipping');
             return;
         }
 
         // First ready without pending update - nothing to do
-        console.log('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
+        logger.debug('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
     }
 
     private async _ensureBoardAndSendUpdate() {
@@ -437,19 +456,19 @@ export class KanbanWebviewPanel {
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, forceReload: boolean = false) {
-        console.log('[KanbanWebviewPanel.loadMarkdownFile] START - document:', document.fileName);
+        logger.debug('[KanbanWebviewPanel.loadMarkdownFile] START - document:', document.fileName);
         return this._concurrency.withLock('loadMarkdownFile', async () => {
             this._context.setInitialBoardLoad(true);
             await this._fileService.loadMarkdownFile(document, forceReload);
-            console.log('[KanbanWebviewPanel.loadMarkdownFile] fileService.loadMarkdownFile completed');
+            logger.debug('[KanbanWebviewPanel.loadMarkdownFile] fileService.loadMarkdownFile completed');
             this._restoreStateFromFileService();
             await this._initializeBoardFromDocument(document);
-            console.log('[KanbanWebviewPanel.loadMarkdownFile] DONE - board valid:', this.getBoard()?.valid);
+            logger.debug('[KanbanWebviewPanel.loadMarkdownFile] DONE - board valid:', this.getBoard()?.valid);
         });
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        console.log('[KanbanWebviewPanel.sendBoardUpdate] webviewReady:', this._context.webviewReady, 'hasService:', !!this._webviewUpdateService);
+        logger.debug('[KanbanWebviewPanel.sendBoardUpdate] webviewReady:', this._context.webviewReady, 'hasService:', !!this._webviewUpdateService);
         await this._webviewUpdateService?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }
 

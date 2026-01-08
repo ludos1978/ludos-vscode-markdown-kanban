@@ -1,14 +1,9 @@
-- [x] add an option to enable/disable the marp specific settings in the view (the marp layout settings in the file info header and he marp classes, marp headers & footers, marp colors). when disabled they should be hidden. (Implemented toggle and preference sync.)
-
-- [ ] tab should not switch between field, instead it should indent all selected lines or at the cursors position, but alt+enter should end editing a field. shift+tab should unindent a line. we only use spaces to indent and unindent.
+- [ ] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
 
 - [ ] check the code for any timeout calls, i want to minimize usage of timeout!
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
-- [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
-
-- [ ] analyze the html structure and make a detailed hierarchy structure in a agent/HTML-STRUCTURE.md with structural documentation. i can provide a html of a typical presentation if you need. we will use it to simplify the css afterwards. so include any relevant data needed for a css analysation.
 
 - [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
 
@@ -16,7 +11,7 @@
 
 - [ ] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
 
-- [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
+- [x] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
@@ -63,6 +58,16 @@ A column can have multiple query tags:
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
+
+- [x] the debug option must be stored across instances.
+
+- [x] add an option to enable/disable the marp specific settings in the view (the marp layout settings in the file info header and he marp classes, marp headers & footers, marp colors). when disabled they should be hidden. (Implemented toggle and preference sync.)
+
+- [x] tab should not switch between field, instead it should indent all selected lines or at the cursors position, but alt+enter should end editing a field. shift+tab should unindent a line. we only use spaces to indent and unindent.
+
+- [x] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
+
+- [x] analyze the html structure and make a detailed hierarchy structure in a agent/HTML-STRUCTURE.md with structural documentation. i can provide a html of a typical presentation if you need. we will use it to simplify the css afterwards. so include any relevant data needed for a css analysation.
 
 - [x] could we include pandoc and it's conversion methods into the kanban exporter? are there any other worthwile exporters or converters that use markdown as basic format?
 

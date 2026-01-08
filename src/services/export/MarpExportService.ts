@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { ConfigurationService } from '../ConfigurationService';
+import { logger } from '../../utils/logger';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
 
@@ -154,7 +155,7 @@ export class MarpExportService {
         try {
             // Build Marp CLI arguments using input file path
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
-            console.log(`[MarpExportService] format: ${options.format}, args:`, args.join(' '));
+            logger.debug(`[MarpExportService] format: ${options.format}, args:`, args.join(' '));
 
             // IMPORTANT: Use the directory of the input file as CWD
             // This ensures markdown-it-include resolves paths relative to the markdown file location

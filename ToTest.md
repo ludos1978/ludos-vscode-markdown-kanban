@@ -5,6 +5,7 @@
 - [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
 - [ ] Verify image/PDF/diagram placeholders still render and resolve paths in includes and main files.
 - [ ] Open the search panel and export options to confirm hidden sections toggle visible as expected.
+- [ ] Close the kanban panel (or switch files) several times and confirm no "Unbound disposable context" errors appear in the extension host logs, indicating FileRegistryChangeHandler disposes cleanly.
 - [x] Start dragging a task, press Esc (or cancel drag), and confirm it snaps back with no stuck drag state.
 - [ ] Drag a task outside the board and re-enter to confirm drop indicators recover (no stuck "left view" state). -> this FAILS
 - [ ] Drag clipboard/empty/diagram cards onto the board and confirm indicators show and drag state resets (no lingering drag highlights).
@@ -13,6 +14,7 @@
 - [ ] Drag external files over the board, drop to create cards, then leave or drop outside; confirm indicators and highlights clear.
 - [ ] Drag template/empty/clipboard columns onto the board and confirm drop zones, creation, and drag cleanup behave normally.
 - [ ] Drop external files or clipboard cards and confirm tasks are created without console errors about drop feedback cleanup.
+- [ ] Verify column headers are rendered through markdown-it so markup (e.g., `## Title`) displays as rich text and include badges still appear instead of raw markdown.
 - [ ] Drag a diagram card (Excalidraw/Draw.io) and confirm the filename prompt is centered, validates invalid characters, and creates the task after confirmation.
 - [x] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
 - [x] Open the diagram filename prompt and confirm it is at least 200px wide and centered.
@@ -24,4 +26,7 @@
 - [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
 - [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.
 - [ ] Open the extension settings and confirm remaining options are grouped by how often a user would change them (frequent first, advanced last).
-- [ ] Toggle the new Marp settings visibility option in the file bar menu and verify the global Marp burger plus column/task Marp submenu items hide/show accordingly.
+- [ ] Toggle the new Marp settings visibility option in the file bar menu and verify the global Marp burger plus column/task Marp submenu items hide/show accordingly, confirm the document-level preference stays sticky (reopen or switch back to the board) via the new `setFilePreference` storage, and ensure no `setPreference` errors appear in the console.
+- [ ] Adjust the font size control from the file bar menu (or settings) so the board text scales, confirm the preference is stored under `markdown-kanban.fontSize`, and check the console for the absence of `setPreference` errors when switching values.
+- [ ] Open any burger menu (e.g., task or column actions) and confirm the dropdown uses the configured minimum width (≈200px) so items do not overflow, then open a submenu and verify the repositioned panel stays within the screen bounds.
+- [ ] Verify the submenu's arrow and surrounding area stay totally within the dropdown background so there are no floating pointers or clipped highlights.

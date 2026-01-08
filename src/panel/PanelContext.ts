@@ -13,6 +13,7 @@ import { ScopedEventBus } from '../core/events/ScopedEventBus';
 import { FileSaveService } from '../core/FileSaveService';
 import { ConflictResolver } from '../services/ConflictResolver';
 import { MermaidExportService } from '../services/export/MermaidExportService';
+import { logger } from '../utils/logger';
 
 /**
  * Pending board update structure
@@ -238,13 +239,13 @@ export class PanelContext {
 
     private _log(property: string, oldValue: any, newValue: any): void {
         if (this._debugMode) {
-            console.log(`[PanelContext] ${property}: ${oldValue} → ${newValue}`);
+            logger.debug(`[PanelContext] ${property}: ${oldValue} → ${newValue}`);
         }
     }
 
     private _logWarning(message: string): void {
         if (this._debugMode) {
-            console.warn(`[PanelContext] ${message}`);
+            logger.warn(`[PanelContext] ${message}`);
         }
     }
 
@@ -252,7 +253,7 @@ export class PanelContext {
         if (this._debugMode !== enabled) {
             this._debugMode = enabled;
             if (this._debugMode) {
-                console.log(`[PanelContext] debugMode: enabled`);
+            logger.debug(`[PanelContext] debugMode: enabled`);
             }
         }
     }
