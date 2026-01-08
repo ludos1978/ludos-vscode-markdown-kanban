@@ -5623,6 +5623,28 @@ figcaption {
     pointer-events: none;
 }
 
+#debug-toggle-toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: var(--vscode-editorPane-background, rgba(60, 63, 65, 0.95));
+    color: var(--vscode-editor-foreground, #fff);
+    padding: 0.5rem 0.9rem;
+    border-radius: 4px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    font-size: 0.85rem;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 200ms ease, transform 200ms ease;
+    z-index: 12000;
+    pointer-events: none;
+}
+
+#debug-toggle-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .debug-panel {
     background: var(--vscode-editor-background);
     border: 1px solid var(--vscode-panel-border);

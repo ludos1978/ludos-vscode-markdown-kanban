@@ -157,6 +157,18 @@ class KanbanSearch {
         return results;
     }
     
+    logNavigateScroll(reason, element, extra = {}) {
+        if (typeof window.logViewMovement === 'function' && element) {
+            window.logViewMovement('search.navigateToResult', {
+                reason,
+                columnId: element.closest ? element.closest('[data-column-id]')?.getAttribute('data-column-id') : null,
+                taskId: element.getAttribute ? element.getAttribute('data-task-id') : null,
+                selector: element.tagName,
+                ...extra
+            });
+        }
+    }
+
     navigateToResult(index) {
         if (index < 0 || index >= this.searchResults.length) {
             return;
@@ -180,12 +192,18 @@ class KanbanSearch {
             
             // Scroll to task
             setTimeout(() => {
+                if (taskElement) {
+                    this.logNavigateScroll('task', taskElement, { field: result.field });
+                }
                 taskElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
         } else if (result.type === 'column') {
             // Scroll to column title (not the full column)
             const columnTitle = columnElement?.querySelector('.column-title');
             setTimeout(() => {
+                if (columnTitle) {
+                    this.logNavigateScroll('column', columnTitle);
+                }
                 columnTitle?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
             }, 100);
         }

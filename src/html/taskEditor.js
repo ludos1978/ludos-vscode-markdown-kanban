@@ -720,11 +720,23 @@ class TaskEditor {
         let autoResizePending = false;
 
         editElement.oninput = () => {
+            const container = document.getElementById('kanban-container');
+
             // Throttle autoResize to max 60fps
             if (!autoResizePending) {
                 autoResizePending = true;
                 requestAnimationFrame(() => {
+                    const scrollBeforeResize = container?.scrollTop || 0;
                     this.autoResize(editElement);
+                    const scrollAfterResize = container?.scrollTop || 0;
+
+                    if (scrollBeforeResize !== scrollAfterResize) {
+                        console.warn('[INPUT-DEBUG] autoResize changed scroll:', {
+                            before: scrollBeforeResize,
+                            after: scrollAfterResize,
+                            delta: scrollAfterResize - scrollBeforeResize
+                        });
+                    }
                     autoResizePending = false;
                 });
             }
@@ -744,12 +756,27 @@ class TaskEditor {
                 if (recalcTimeout) { clearTimeout(recalcTimeout); recalcTimeout = null; }
                 lastRecalcTime = now;
                 this._requestStackLayoutRecalc(colId);
+                if (typeof window.logViewMovement === 'function') {
+                    window.logViewMovement('taskEditor.queueStackLayout.immediate', {
+                        columnId: colId,
+                        valueLength: editElement.value.length,
+                        editorType: this.currentEditor?.type
+                    });
+                }
             } else {
                 if (recalcTimeout) { clearTimeout(recalcTimeout); }
                 const delay = MIN_DELAY_BETWEEN_RECALC - timeSinceLastRecalc;
                 recalcTimeout = setTimeout(() => {
                     lastRecalcTime = Date.now();
                     this._requestStackLayoutRecalc(colId);
+                    if (typeof window.logViewMovement === 'function') {
+                        window.logViewMovement('taskEditor.queueStackLayout.delayed', {
+                            columnId: colId,
+                            delay,
+                            valueLength: editElement.value.length,
+                            editorType: this.currentEditor?.type
+                        });
+                    }
                     recalcTimeout = null;
                 }, delay);
             }
@@ -783,9 +810,19 @@ class TaskEditor {
             return;
         }
 
-        const columnId = this._stackLayoutNeedsFullRecalc || this._stackLayoutPendingColumns.size !== 1
+        const pendingCount = this._stackLayoutPendingColumns.size;
+        const columnId = this._stackLayoutNeedsFullRecalc || pendingCount !== 1
             ? null
             : Array.from(this._stackLayoutPendingColumns)[0];
+
+        if (typeof window.logViewMovement === 'function') {
+            window.logViewMovement('taskEditor.flushStackLayout', {
+                columnId,
+                pendingCount,
+                needsFullRecalc: this._stackLayoutNeedsFullRecalc,
+                editorType: this.currentEditor?.type
+            });
+        }
 
         window.applyStackedColumnStyles(columnId);
         this._stackLayoutNeedsFullRecalc = false;
@@ -1658,8 +1695,27 @@ class TaskEditor {
      * @param {HTMLTextAreaElement} textarea - Textarea to resize
      */
     autoResize(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = textarea.scrollHeight + 'px';
+        const container = document.getElementById('kanban-container');
+        const scrollBefore = container?.scrollTop || 0;
+
+        textarea.style.height = 'auto';  // COLLAPSE
+
+        const scrollAfterCollapse = container?.scrollTop || 0;
+
+        textarea.style.height = textarea.scrollHeight + 'px';  // EXPAND
+
+        const scrollAfterExpand = container?.scrollTop || 0;
+
+        if (scrollBefore !== scrollAfterCollapse || scrollBefore !== scrollAfterExpand) {
+            console.warn('[AUTORESIZE-DEBUG] Scroll changed during autoResize:', {
+                before: scrollBefore,
+                afterCollapse: scrollAfterCollapse,
+                afterExpand: scrollAfterExpand,
+                deltaCollapse: scrollAfterCollapse - scrollBefore,
+                deltaExpand: scrollAfterExpand - scrollBefore,
+                textareaHeight: textarea.scrollHeight
+            });
+        }
     }
 
     /**

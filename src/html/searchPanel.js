@@ -342,6 +342,19 @@
         });
     }
 
+    function logSearchScroll(index, element) {
+        if (typeof window.logViewMovement === 'function' && element) {
+            window.logViewMovement('searchPanel.navigateToIndex', {
+                index,
+                element: {
+                    tag: element.tagName,
+                    id: element.id,
+                    class: element.className
+                }
+            });
+        }
+    }
+
     function updateActiveResult() {
         resultElements.forEach((el, index) => {
             if (!el) return;
@@ -363,6 +376,7 @@
         if (scroll) {
             const el = resultElements[index];
             if (el && typeof el.scrollIntoView === 'function') {
+                logSearchScroll(index, el);
                 el.scrollIntoView({ block: 'nearest' });
             }
         }

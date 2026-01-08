@@ -7,6 +7,28 @@
 let currentFocusedCard = null;
 let allCards = [];
 
+function describeElementForDebug(element) {
+    if (!element) { return null; }
+    const column = element.closest && element.closest('.kanban-full-height-column');
+    return {
+        tag: element.tagName,
+        id: element.id || null,
+        class: element.className,
+        columnId: column ? column.getAttribute('data-column-id') : null,
+        taskId: element.getAttribute ? element.getAttribute('data-task-id') : null
+    };
+}
+
+function logNavigationScroll(reason, element, options = {}) {
+    if (typeof window.logViewMovement === 'function') {
+        window.logViewMovement('navigationHandler', {
+            reason,
+            element: describeElementForDebug(element),
+            options
+        });
+    }
+}
+
 // Card navigation functions
 function updateCardList() {
     // Use more flexible selector to handle class name variations
@@ -30,16 +52,12 @@ function focusCard(card) {
         // Get scroll behavior from settings
         const scrollBehavior = window.currentArrowKeyFocusScroll || 'center';
 
-        if (scrollBehavior === 'nearest') {
-            // Just bring into view with minimal scrolling
-            card.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'nearest'
-            });
-        } else {
-            // Center behavior (default)
-            // Check if card is larger than viewport
+        let scrollOptions = {
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        };
+        if (scrollBehavior !== 'nearest') {
             const cardRect = card.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
@@ -47,22 +65,23 @@ function focusCard(card) {
             const cardTallerThanViewport = cardRect.height > viewportHeight;
             const cardWiderThanViewport = cardRect.width > viewportWidth;
 
-            // If card is larger than viewport, scroll to show top-left corner
-            // Otherwise, center the card
             if (cardTallerThanViewport || cardWiderThanViewport) {
-                card.scrollIntoView({
+                scrollOptions = {
                     behavior: 'smooth',
-                    block: 'start',    // Show top of card
-                    inline: 'start'    // Show left of card
-                });
+                    block: 'start',
+                    inline: 'start'
+                };
             } else {
-                card.scrollIntoView({
+                scrollOptions = {
                     behavior: 'smooth',
-                    block: 'center',   // Center vertically
-                    inline: 'center'   // Center horizontally
-                });
+                    block: 'center',
+                    inline: 'center'
+                };
             }
         }
+
+        logNavigationScroll('focusCard-scroll', card, scrollOptions);
+        card.scrollIntoView(scrollOptions);
 
         currentFocusedCard = card;
     } else {
@@ -89,7 +108,9 @@ function focusSection(section) {
 
     // Focus the section
     section.focus();
-    section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const sectionScrollOptions = { block: 'nearest', behavior: 'smooth' };
+    logNavigationScroll('focusSection.scroll', section, sectionScrollOptions);
+    section.scrollIntoView(sectionScrollOptions);
 }
 
 // Helper function to get visible (non-collapsed) task cards from a column

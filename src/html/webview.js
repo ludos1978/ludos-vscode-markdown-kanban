@@ -29,6 +29,19 @@ window.kanbanDebug = window.kanbanDebug || {
     }
 };
 
+function describeScrollTarget(element) {
+    if (!element) return null;
+    const column = element.closest ? element.closest('[data-column-id]') : null;
+    const taskId = element.getAttribute ? element.getAttribute('data-task-id') : null;
+    return {
+        tag: element.tagName,
+        id: element.id || null,
+        class: element.className || null,
+        columnId: column ? column.getAttribute('data-column-id') : null,
+        taskId
+    };
+}
+
 const originalConsoleLog = console.log.bind(console);
 const originalConsoleInfo = console.info ? console.info.bind(console) : null;
 
@@ -60,10 +73,51 @@ function updateVersionDisplay(nextVersion) {
     versionElement.textContent = displayVersion || '';
 }
 
+function logDebugModeToggle(entry) {
+    originalConsoleLog('[view-scroll] debugMode', entry);
+    if (window.kanbanDebug && window.kanbanDebug.enabled) {
+        window.kanbanDebug.log('[view-scroll] debugMode', entry);
+    }
+    showDebugToggleToast(entry.current);
+}
+
+let debugToggleToastTimer = null;
+function showDebugToggleToast(enabled) {
+    let toast = document.getElementById('debug-toggle-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'debug-toggle-toast';
+        document.body.appendChild(toast);
+    }
+
+    toast.textContent = enabled ? 'Debug logging enabled' : 'Debug logging disabled';
+    toast.classList.remove('visible');
+    // Force DOM update before adding visible class
+    requestAnimationFrame(() => {
+        toast.classList.add('visible');
+    });
+
+    if (debugToggleToastTimer) {
+        clearTimeout(debugToggleToastTimer);
+    }
+    debugToggleToastTimer = setTimeout(() => {
+        toast.classList.remove('visible');
+        debugToggleToastTimer = null;
+    }, 2500);
+}
+
 function setDebugMode(enabled, options = {}) {
+    const previousState = window.kanbanDebug.enabled;
     window.kanbanDebug.enabled = !!enabled;
     updateVersionDisplay();
     updateWebviewConsoleLogging(window.kanbanDebug.enabled);
+
+    logDebugModeToggle({
+        previous: previousState,
+        current: window.kanbanDebug.enabled,
+        source: options.source || 'unknown',
+        timestamp: new Date().toISOString()
+    });
 
     if (options.notifyBackend !== false && typeof vscode !== 'undefined') {
         vscode.postMessage({
@@ -74,7 +128,7 @@ function setDebugMode(enabled, options = {}) {
 }
 
 function toggleDebugMode() {
-    setDebugMode(!window.kanbanDebug.enabled);
+    setDebugMode(!window.kanbanDebug.enabled, { source: 'manual-toggle' });
 }
 
 window.toggleKanbanDebugMode = toggleDebugMode;
@@ -1406,6 +1460,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     webviewEventListenersInitialized = true;
 
+    // DEBUG: Global scroll listener to catch all scroll events
+    (function setupScrollDebug() {
+        const container = document.getElementById('kanban-container');
+        if (!container) return;
+
+        let lastScrollTop = container.scrollTop;
+
+        container.addEventListener('scroll', () => {
+            const delta = container.scrollTop - lastScrollTop;
+            if (Math.abs(delta) > 20) {
+                console.warn('[SCROLL-EVENT] Large scroll detected:', {
+                    from: lastScrollTop,
+                    to: container.scrollTop,
+                    delta,
+                    timestamp: performance.now(),
+                    stack: new Error().stack.split('\n').slice(0, 8).join('\n')
+                });
+            }
+            lastScrollTop = container.scrollTop;
+        }, { passive: true });
+
+        console.log('[SCROLL-DEBUG] Scroll listener installed');
+    })();
+
     // Request available Marp classes on load
     vscode.postMessage({
         type: 'getMarpAvailableClasses'
@@ -1718,11 +1796,23 @@ function performFocusActions(focusTargets) {
         if (element && index === 0) {
             // Only scroll to and highlight the first target to avoid jarring jumps
             // Scroll to element with proper horizontal scrolling for right-side elements
-            element.scrollIntoView({ 
-                behavior: 'smooth', 
+            const focusOptions = {
+                behavior: 'smooth',
                 block: 'center',
-                inline: 'center'  // Changed from 'nearest' to 'center' for better right-side visibility
-            });
+                inline: 'center'
+            };
+            if (typeof window.logViewMovement === 'function') {
+                window.logViewMovement('performFocusActions', {
+                    target,
+                    element: {
+                        tag: element.tagName,
+                        id: element.id,
+                        class: element.className
+                    },
+                    options: focusOptions
+                });
+            }
+            element.scrollIntoView(focusOptions);
             
             // Add highlight effect
             element.classList.add('focus-highlight');
@@ -1893,7 +1983,7 @@ if (!webviewEventListenersInitialized) {
             }
 
             if (typeof message.debugMode === 'boolean') {
-                setDebugMode(message.debugMode, { notifyBackend: false });
+                setDebugMode(message.debugMode, { notifyBackend: false, source: 'backend' });
             }
 
             // Prevent renderBoard() calls during initial config application
@@ -3078,28 +3168,30 @@ if (!webviewEventListenersInitialized) {
         case 'stopEditing':
             // Backend requests to stop editing (e.g., due to external file conflict)
             let capturedEdit = null;
+            const editor = window.taskEditor;
 
-            if (window.taskEditor && window.taskEditor.currentEditor) {
+            if (editor && editor.currentEditor) {
+                const current = editor.currentEditor;
 
                 if (message.captureValue) {
                     // CAPTURE mode: Extract edit value WITHOUT modifying board
-                    const editor = window.taskEditor.currentEditor;
                     capturedEdit = {
-                        type: editor.type,
-                        taskId: editor.taskId,
-                        columnId: editor.columnId,
-                        value: editor.element.value,
-                        originalValue: editor.originalValue
+                        type: current.type,
+                        taskId: current.taskId,
+                        columnId: current.columnId,
+                        value: current.element.value,
+                        originalValue: current.originalValue
                     };
-                } else {
-                    // SAVE mode: Normal save
-                    if (typeof window.taskEditor.saveCurrentField === 'function') {
-                        window.taskEditor.saveCurrentField();
-                    }
+                } else if (typeof editor.save === 'function') {
+                    // SAVE mode: normal save will close the editor internally
+                    editor.save();
                 }
 
-                // Clear editor state
-                window.taskEditor.currentEditor = null;
+                if (typeof editor.closeEditor === 'function') {
+                    editor.closeEditor();
+                } else {
+                    editor.currentEditor = null;
+                }
             }
 
             // Send confirmation back to backend with captured value
@@ -3544,6 +3636,16 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
     }
 
     // Scroll the element into view
+    if (typeof window.logViewMovement === 'function') {
+        window.logViewMovement('scrollToAndHighlight', {
+            columnId,
+            taskId,
+            element: describeScrollTarget(targetElement),
+            elementPath,
+            elementType,
+            field
+        });
+    }
     targetElement.scrollIntoView({
         behavior: 'smooth',
         block: 'center',

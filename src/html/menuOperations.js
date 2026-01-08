@@ -10,6 +10,28 @@ if (typeof window !== 'undefined') {
 // Global state
 let activeTagMenu = null;
 
+function describeForScrollDebug(element) {
+    if (!element) return null;
+    const column = element.closest ? element.closest('[data-column-id]') : null;
+    return {
+        tag: element.tagName,
+        id: element.id,
+        class: element.className,
+        columnId: column ? column.getAttribute('data-column-id') : null,
+        taskId: element.getAttribute ? element.getAttribute('data-task-id') : null
+    };
+}
+
+function logMenuScroll(reason, element, detail = {}) {
+    if (typeof window.logViewMovement === 'function' && element) {
+        window.logViewMovement('menuOperations', {
+            reason,
+            element: describeForScrollDebug(element),
+            ...detail
+        });
+    }
+}
+
 /**
  * Scrolls an element into view only if it's outside the viewport
  * @param {HTMLElement} element - Element to check and potentially scroll
@@ -31,6 +53,7 @@ function scrollToElementIfNeeded(element, type = 'element') {
 
 
     if (!isVisible) {
+        logMenuScroll('scrollToElementIfNeeded', element, { type });
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }

@@ -245,6 +245,13 @@ const fileSearchModal = (function() {
         // Scroll into view
         const rows = resultsEl.querySelectorAll('tr[data-index]');
         if (rows[index]) {
+            if (typeof window.logViewMovement === 'function') {
+                window.logViewMovement('fileSearchModal.selectItem', {
+                    rowIndex: index,
+                    rowId: rows[index].id,
+                    rowClass: rows[index].className
+                });
+            }
             rows[index].scrollIntoView({ block: 'nearest' });
         }
 

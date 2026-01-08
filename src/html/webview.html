@@ -1208,7 +1208,20 @@
             renderResults(); updateBatchInfo(); updatePathPreview();
             if (filePreviewEnabled && results[index]) vscode.postMessage({ type: 'fileSearchPreview', path: results[index].fullPath });
             const rows = resultsEl.querySelectorAll('tr[data-index]');
-            if (rows[index]) rows[index].scrollIntoView({ block: 'nearest' });
+            if (rows[index]) {
+                const logPayload = {
+                    reason: 'fileSearchModal.html.selectItem',
+                    rowIndex: index,
+                    rowId: rows[index].id,
+                    rowClass: rows[index].className
+                };
+                if (window.logViewMovement) {
+                    window.logViewMovement(logPayload.reason, logPayload);
+                } else {
+                    console.log('[view-scroll]', logPayload);
+                }
+                rows[index].scrollIntoView({ block: 'nearest' });
+            }
             selectBtnEl.disabled = selectedIndex < 0;
             if (batchCheckboxEl.checked) requestBatchAnalysis();
         }

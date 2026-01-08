@@ -902,6 +902,12 @@ function renderSingleColumn(columnId, columnData) {
     // Restore scroll position
     const newTasksContainer = newColumnElement.querySelector(`#tasks-${columnId}`);
     if (newTasksContainer) {
+        if (typeof window.logViewMovement === 'function') {
+            window.logViewMovement('renderSingleColumn.restoreScroll', {
+                columnId,
+                scrollTop
+            });
+        }
         newTasksContainer.scrollTop = scrollTop;
     }
 
@@ -1124,6 +1130,14 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
+    if (typeof window.logViewMovement === 'function') {
+        window.logViewMovement('renderBoard.start', {
+            options: options ? Object.keys(options) : null,
+            columnCount: window.cachedBoard?.columns?.length ?? 0,
+            editing: Boolean(window.taskEditor && window.taskEditor.currentEditor)
+        });
+    }
+
     // Apply tag styles first
     applyTagStyles();
 
@@ -1399,6 +1413,12 @@ function renderBoard(options = null) {
         scrollPositions.forEach((scrollTop, columnId) => {
             const container = document.getElementById(`tasks-${columnId}`);
             if (container) {
+                if (typeof window.logViewMovement === 'function') {
+                    window.logViewMovement('renderBoard.restoreScroll', {
+                        columnId,
+                        scrollTop
+                    });
+                }
                 container.scrollTop = scrollTop;
             }
         });

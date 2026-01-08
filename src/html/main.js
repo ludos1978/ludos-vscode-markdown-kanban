@@ -7,6 +7,7 @@
  */
 
 // Utility modules (order matters - later modules may depend on earlier ones)
+import './utils/viewLogger.js';
 import './utils/colorUtils.js';
 import './utils/fileTypeUtils.js';
 import './utils/tagUtils.js';
@@ -36,4 +37,3 @@ import './foldingStateManager.js';
 import './templateDialog.js';
 import './exportMarpUI.js';
 import './webview.js';
-

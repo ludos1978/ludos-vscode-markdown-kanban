@@ -19,6 +19,17 @@
 let updateStackLayoutTimer = null;
 let pendingStackElement = null;
 
+function describeScrollElement(element) {
+    if (!element) return null;
+    const columnId = element.getAttribute ? element.getAttribute('data-column-id') : null;
+    return {
+        tag: element.tagName,
+        id: element.id || null,
+        class: element.className || null,
+        columnId
+    };
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -133,6 +144,15 @@ function enforceFoldModesForStacks(stackElement = null) {
  */
 function applyStackedColumnStyles(columnId = null) {
     // Preserve the actual viewport scroll for both container and board before rearranging stacks
+    if (typeof window.logViewMovement === 'function') {
+        const stackSummary = pendingStackElement
+            ? (pendingStackElement.id || pendingStackElement.getAttribute('data-column-id') || 'stack-element')
+            : 'all-stacks';
+        window.logViewMovement('applyStackedColumnStyles.start', {
+            columnId,
+            stackSummary
+        });
+    }
     const container = document.getElementById('kanban-container');
     const board = document.getElementById('kanban-board');
     const scrollPositions = [];
@@ -172,6 +192,13 @@ function applyStackedColumnStyles(columnId = null) {
 
     const restoreScroll = () => {
         scrollPositions.forEach(({ element, left, top }) => {
+            if (typeof window.logViewMovement === 'function') {
+                window.logViewMovement('applyStackedColumnStyles.restore', {
+                    element: describeScrollElement(element),
+                    left,
+                    top
+                });
+            }
             element.scrollLeft = left;
             element.scrollTop = top;
         });
