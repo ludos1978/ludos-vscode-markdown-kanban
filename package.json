@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.91.30",
+  "version": "0.91.31",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -46,279 +46,14 @@
               "Generate absolute file system paths"
             ]
           },
-          "markdown-kanban.openLinksInNewTab": {
-            "type": "boolean",
-            "default": false,
-            "description": "Open file links in new tabs instead of replacing the current editor"
-          },
-          "markdown-kanban.columnWidth": {
-            "type": "string",
-            "default": "medium",
-            "description": "The width of kanban columns",
-            "enum": [
-              "small",
-              "medium",
-              "wide",
-              "66",
-              "100"
-            ],
-            "enumDescriptions": [
-              "Small columns (250px)",
-              "Medium columns (350px)",
-              "Wide columns (450px)",
-              "Half screen width (48.5%)",
-              "Full screen width (98%)"
-            ]
-          },
-          "markdown-kanban.taskMinHeight": {
-            "type": "string",
-            "default": "auto",
-            "description": "The minimum height for task cards (e.g., 'auto', '200px', '400px', '43.5vh', '89vh')",
-            "enum": [
-              "auto",
-              "200px",
-              "400px",
-              "43.5vh",
-              "89vh"
-            ],
-            "enumDescriptions": [
-              "Automatic height based on content",
-              "Fixed minimum height of 200 pixels",
-              "Fixed minimum height of 400 pixels",
-              "Minimum height of 43.5% of viewport height",
-              "Minimum height of 89% of viewport height"
-            ]
-          },
-          "markdown-kanban.sectionHeight": {
-            "type": "string",
-            "default": "auto",
-            "description": "Height for content sections between horizontal rules (HRs) in task descriptions (sets both min and max to same value)",
-            "enum": [
-              "auto",
-              "200px",
-              "400px",
-              "600px",
-              "33percent",
-              "50percent",
-              "66percent",
-              "100percent"
-            ],
-            "enumDescriptions": [
-              "No height limit (automatic based on content)",
-              "Fixed 200 pixels",
-              "Fixed 400 pixels",
-              "Fixed 600 pixels",
-              "1/3 of viewport height",
-              "1/2 of viewport height",
-              "2/3 of viewport height",
-              "Full viewport height"
-            ]
-          },
-          "markdown-kanban.taskSectionHeight": {
-            "type": "string",
-            "default": "auto",
-            "description": "Height for task section content areas (sets both min and max to same value)",
-            "enum": [
-              "auto",
-              "150px",
-              "300px",
-              "500px",
-              "33percent",
-              "50percent",
-              "66percent",
-              "100percent"
-            ],
-            "enumDescriptions": [
-              "No height limit (automatic based on content)",
-              "Fixed 150 pixels",
-              "Fixed 300 pixels",
-              "Fixed 500 pixels",
-              "1/3 of viewport height",
-              "1/2 of viewport height",
-              "2/3 of viewport height",
-              "Full viewport height"
-            ]
-          },
-          "markdown-kanban.whitespace": {
-            "type": "string",
-            "default": "4px",
-            "description": "The amount of whitespace-padding to use in the Kanban board (e.g., '4px', '8px', '2px')",
-            "pattern": "^\\d+(\\.\\d+)?(px|em|rem)$",
-            "patternErrorMessage": "Please enter a valid CSS size value (e.g., '4px', '0.5em', '1rem')"
-          },
-          "markdown-kanban.fontSize": {
-            "type": "string",
-            "default": "small",
-            "description": "The font size for task cards and content",
-            "enum": [
-              "small",
-              "normal",
-              "bigger",
-              "large",
-              "xlarge"
-            ],
-            "enumDescriptions": [
-              "Small font size",
-              "Normal/default font size",
-              "Bigger font size",
-              "Large font size",
-              "Extra large font size"
-            ]
-          },
-          "markdown-kanban.fontFamily": {
-            "type": "string",
-            "default": "system",
-            "description": "The font family for task cards and content",
-            "enum": [
-              "system",
-              "roboto",
-              "opensans",
-              "lato",
-              "poppins",
-              "inter",
-              "helvetica",
-              "arial",
-              "georgia",
-              "times",
-              "firacode",
-              "jetbrains",
-              "sourcecodepro",
-              "consolas"
-            ],
-            "enumDescriptions": [
-              "System default fonts",
-              "Roboto (Google font)",
-              "Open Sans (Google font)",
-              "Lato (Google font)",
-              "Poppins (Google font)",
-              "Inter (Google font)",
-              "Helvetica Neue / Helvetica / Arial",
-              "Arial",
-              "Georgia (serif)",
-              "Times New Roman (serif)",
-              "Fira Code (monospace)",
-              "JetBrains Mono (monospace)",
-              "Source Code Pro (monospace)",
-              "Consolas (monospace)"
-            ]
-          },
-          "markdown-kanban.layoutRows": {
-            "type": "number",
-            "default": 1,
-            "description": "The number of rows in the kanban layout",
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              5,
-              6
-            ],
-            "enumDescriptions": [
-              "1 row",
-              "2 rows",
-              "3 rows",
-              "4 rows",
-              "5 rows",
-              "6 rows"
-            ]
-          },
+          
           "markdown-kanban.maxRowHeight": {
             "type": "number",
             "default": 0,
             "description": "Maximum height for kanban rows in pixels. Set to 0 for unlimited height (full card height). Other values limit the row height.",
             "minimum": 0
           },
-          "markdown-kanban.rowHeight": {
-            "type": "string",
-            "default": "auto",
-            "description": "The height of kanban rows",
-            "enum": [
-              "95vh",
-              "63vh",
-              "48vh",
-              "31.5vh",
-              "44em",
-              "31em",
-              "19em",
-              "auto"
-            ],
-            "enumDescriptions": [
-              "100% of screen height",
-              "2/3 of screen height",
-              "1/2 of screen height",
-              "1/3 of screen height",
-              "700px (~47em)",
-              "500px (~31em)",
-              "300px (~19em)",
-              "Automatic height based on content"
-            ]
-          },
-          "markdown-kanban.stickyStackMode": {
-            "type": "string",
-            "default": "titleonly",
-            "description": "Control sticky positioning behavior in column stacks",
-            "enum": [
-              "full",
-              "titleonly",
-              "none"
-            ],
-            "enumDescriptions": [
-              "Header, title, footer & margin all sticky (original behavior)",
-              "Only title sticky (default)",
-              "Nothing sticky in stacks"
-            ]
-          },
-          "markdown-kanban.tagVisibility": {
-            "type": "string",
-            "default": "all",
-            "description": "Control which types of tags are displayed on cards",
-            "enum": [
-              "all",
-              "standard",
-              "custom",
-              "mentions",
-              "none"
-            ],
-            "enumDescriptions": [
-              "Show all tags including #span, #row, and @ tags",
-              "Show all except #span and #row (includes @ tags)",
-              "Show only custom tags (not configured ones) and @ tags",
-              "Show only @ tags",
-              "Hide all tags"
-            ]
-          },
-          "markdown-kanban.htmlCommentRenderMode": {
-            "type": "string",
-            "default": "hidden",
-            "enum": [
-              "hidden",
-              "text"
-            ],
-            "enumDescriptions": [
-              "Hide HTML comments (default markdown behavior)",
-              "Render HTML comments as visible text"
-            ],
-            "description": "How to render HTML comments (<!-- -->) in the kanban view"
-          },
-          "markdown-kanban.htmlContentRenderMode": {
-            "type": "string",
-            "default": "html",
-            "enum": [
-              "html",
-              "text"
-            ],
-            "enumDescriptions": [
-              "Render HTML tags as HTML (default)",
-              "Render HTML tags as visible text"
-            ],
-            "description": "How to render HTML content (e.g., <div>, <span>) in the kanban view"
-          },
-          "markdown-kanban.layoutPreset": {
-            "type": "string",
-            "default": "normal",
-            "description": "The currently selected layout preset"
-          },
+          
           "markdown-kanban.layoutPresets": {
             "type": "object",
             "default": {
@@ -449,6 +184,7 @@
               }
             }
           },
+          
           "markdown-kanban.arrowKeyFocusScroll": {
             "type": "string",
             "default": "center",
@@ -462,16 +198,19 @@
               "Scroll just enough to bring the item into view"
             ]
           },
+          
           "markdown-kanban.columnBorder": {
             "type": "string",
             "default": "1px solid var(--vscode-panel-border)",
             "description": "Complete border style for columns (e.g., '1px solid var(--vscode-panel-border)', '1px dashed red', 'none'). Full CSS border shorthand supported."
           },
+          
           "markdown-kanban.taskBorder": {
             "type": "string",
             "default": "1px solid var(--vscode-panel-border)",
             "description": "Complete border style for task cards (e.g., '1px solid var(--vscode-panel-border)', '2px dotted blue', 'none'). Full CSS border shorthand supported."
           },
+          
           "markdown-kanban.tagColors": {
             "type": "object",
             "default": {
@@ -4185,10 +3924,12 @@
             },
             "description": "Grouped color and style configuration for tags in kanban boards with various visual indicators."
           },
+          
           "markdown-kanban.tagCategoryReference": {
             "type": "null",
             "markdownDescription": "## Tag Category Reference\n\nAll 26 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n- `schedule` - Schedule phases: schedule, planning, preparation, verify\n- `overview` - Overview content: overview, information, presentation\n- `example` - Example content: example, tasks, homework\n- `deliveries` - Deliverables: deliveries, handouts, references\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `positivity` - Sentiment levels: ++ (very positive), + (positive), ø (neutral), - (negative), -- (very negative)\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
           },
+          
           "markdown-kanban.enabledTagCategoriesColumn": {
             "type": "array",
             "items": {
@@ -4231,6 +3972,7 @@
             "uniqueItems": true,
             "markdownDescription": "**Column Tag Categories** - Select which categories appear in column burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Column Defaults (4):** workflow, positivity, colors, complexity"
           },
+          
           "markdown-kanban.enabledTagCategoriesTask": {
             "type": "array",
             "items": {
@@ -4273,6 +4015,7 @@
             "uniqueItems": true,
             "markdownDescription": "**Task Tag Categories** - Select which categories appear in task burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Task Defaults (4):** positivity, status, colors, impact"
           },
+          
           "markdown-kanban.customTagCategories": {
             "type": "object",
             "default": {},
@@ -4286,11 +4029,13 @@
               }
             }
           },
+          
           "markdown-kanban.enableBackups": {
             "type": "boolean",
             "default": true,
             "description": "Enable automatic backups of kanban files"
           },
+          
           "markdown-kanban.backupInterval": {
             "type": "number",
             "default": 15,
@@ -4298,6 +4043,7 @@
             "maximum": 120,
             "description": "Interval in minutes between automatic backups (1-60 minutes)"
           },
+          
           "markdown-kanban.backupLocation": {
             "type": "string",
             "enum": [
@@ -4313,6 +4059,7 @@
               "Store backups in a custom location (set customBackupPath)"
             ]
           },
+          
           "markdown-kanban.maxBackupsPerFile": {
             "type": "number",
             "default": 3,
@@ -4320,56 +4067,67 @@
             "maximum": 50,
             "description": "Maximum number of backups to keep per file (older backups will be deleted)"
           },
+          
           "markdown-kanban.popplerPath": {
             "type": "string",
             "default": "",
             "description": "Path to poppler tools directory (containing pdftoppm and pdfinfo). Leave empty for auto-detection. Example: /opt/homebrew/bin"
           },
+          
           "markdown-kanban.drawioPath": {
             "type": "string",
             "default": "",
             "description": "Path to draw.io CLI executable. Leave empty for auto-detection. Example: /opt/homebrew/bin/drawio"
           },
+          
           "markdown-kanban.graphvizPath": {
             "type": "string",
             "default": "",
             "description": "Path to Graphviz dot executable (used by PlantUML). Leave empty for auto-detection. Example: /opt/homebrew/bin/dot"
           },
+          
           "markdown-kanban.javaPath": {
             "type": "string",
             "default": "",
             "description": "Path to Java executable (used by PlantUML). Leave empty for auto-detection. Example: /usr/bin/java"
           },
+          
           "markdown-kanban.pandoc.path": {
             "type": "string",
             "default": "",
             "description": "Custom path to Pandoc binary. Leave empty to use system PATH. Install Pandoc from https://pandoc.org/installing.html"
           },
+          
           "markdown-kanban.templates.path": {
             "type": "string",
             "default": "",
             "description": "Path to the folder containing column templates. Each template should be in its own subfolder with a template.md file."
           },
+          
           "markdown-kanban.templates.showBar": {
             "type": "boolean",
             "default": true,
             "description": "Show the template bar at the top of the kanban board when templates are available"
           },
+          
           "markdown-kanban.marp.enginePath": {
             "type": "string",
             "default": "./marp-engine/engine.js",
             "description": "Path to the Marp engine JavaScript file"
           },
+          
           "markdown-kanban.marp.defaultTheme": {
             "type": "string",
             "default": "default",
             "description": "Default theme to use for Marp presentations"
           },
+          
           "markdown-kanban.marp.allowLocalFiles": {
             "type": "boolean",
             "default": true,
             "description": "Allow Marp to access local files (images, etc.)"
           },
+          
           "markdown-kanban.marp.browser": {
             "type": "string",
             "enum": [
@@ -4387,6 +4145,7 @@
               "Use Firefox"
             ]
           },
+          
           "markdown-kanban.marp.themeFolders": {
             "type": "array",
             "default": [],
@@ -4396,6 +4155,7 @@
               "description": "Path to a directory containing Marp theme CSS files"
             }
           },
+          
           "markdown-kanban.marp.availableClasses": {
             "type": "array",
             "default": [
@@ -4434,6 +4194,7 @@
               "description": "CSS class name (without the dot)"
             }
           },
+          
           "markdown-kanban.marp.commonColors": {
             "type": "array",
             "default": [
@@ -4458,6 +4219,7 @@
               "type": "string"
             }
           },
+          
           "markdown-kanban.marp.globalClasses": {
             "type": "array",
             "default": [],
@@ -4467,6 +4229,7 @@
               "description": "CSS class name from availableClasses"
             }
           },
+          
           "markdown-kanban.marp.localClasses": {
             "type": "array",
             "default": [],
