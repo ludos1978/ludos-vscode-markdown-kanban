@@ -457,11 +457,8 @@ body {
 body.marp-settings-hidden .marp-global-menu,
 body.marp-settings-hidden .marp-global-menu-dropdown,
 body.marp-settings-hidden .donut-menu-item[data-submenu-type^="marp-"],
-body.marp-settings-hidden .donut-menu-submenu[data-menu="marpClasses"],
-body.marp-settings-hidden .donut-menu-submenu[data-menu="marpColors"],
-body.marp-settings-hidden .donut-menu-submenu[data-menu="marpHeaderFooter"],
 body.marp-settings-hidden .donut-menu-submenu[data-submenu-type^="marp-"],
-body.marp-settings-hidden .marp-menu-panel {
+body.marp-settings-hidden .donut-menu-submenu .marp-menu-panel {
   display: none !important;
   visibility: hidden !important;
 }
