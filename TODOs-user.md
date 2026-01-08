@@ -1,8 +1,8 @@
+- [ ] add an option to enable/disable the marp specific settings in the view (the marp layout settings in the file info header and he marp classes, marp headers & footers, marp colors). when disabled they should be hidden.
+
 - [ ] tab should not switch between field, instead it should indent all selected lines or at the cursors position, but alt+enter should end editing a field. shift+tab should unindent a line. we only use spaces to indent and unindent.
 
-- [ ] check the code for any timeout calls, i dont want timeout used!
-
-- [ ] could we include pandoc and it's conversion methods into the kanban exporter? are there any other worthwile exporters or converters that use markdown as basic format?
+- [ ] check the code for any timeout calls, i want to minimize usage of timeout!
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
@@ -11,10 +11,6 @@
 - [ ] analyze the html structure and make a detailed hierarchy structure in a agent/HTML-STRUCTURE.md with structural documentation. i can provide a html of a typical presentation if you need. we will use it to simplify the css afterwards. so include any relevant data needed for a css analysation.
 
 - [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
-
-- [ ] when using the search for file, could we add a checkbox to the dialogue searching for the alternative files, which would allow replacing all paths that have the same error. so it searches for the filename, the user selects the file. the path element is taken from the broken file (broken-path) and the newly found file (new-path). and all occurances of the broken-path are replaced by the new- path (if the filename exists under the new path). if we check the checkbox, then search trough the kanban board for the same (broken-path) and show the number of files that have this path. also search for the filenames in the new-path, which contain the same filename as the files in the kanban board with the broken-path. 
-
-- [ ] the excalidraw converter doesnt show embedded images and manually drawn strokes. i need them to work!
 
 - [ ] add a table editor that allows sorting of content by each category.
 
@@ -68,7 +64,12 @@ A column can have multiple query tags:
 
 Collects all cards that didn't match any gather rule:
 
+- [x] could we include pandoc and it's conversion methods into the kanban exporter? are there any other worthwile exporters or converters that use markdown as basic format?
 
+
+- [x] when using the search for file, could we add a checkbox to the dialogue searching for the alternative files, which would allow replacing all paths that have the same error. so it searches for the filename, the user selects the file. the path element is taken from the broken file (broken-path) and the newly found file (new-path). and all occurances of the broken-path are replaced by the new- path (if the filename exists under the new path). if we check the checkbox, then search trough the kanban board for the same (broken-path) and show the number of files that have this path. also search for the filenames in the new-path, which contain the same filename as the files in the kanban board with the broken-path. 
+
+- [x] the excalidraw converter doesnt show embedded images and manually drawn strokes. i need them to work!
 
 - [x] when clicking the version number in the burger menu, the code should switch to debug mode. where all debug logs are activated. also the version number should add (debug) after the number while it's active.
 
