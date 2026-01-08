@@ -219,6 +219,13 @@ function clearLeftViewFlag() {
     }
 }
 
+function isInternalDragActive() {
+    return dragState.isDragging &&
+        (dragState.draggedColumn || dragState.draggedTask) &&
+        !dragState.draggedClipboardCard &&
+        !dragState.draggedEmptyCard;
+}
+
 function finalizeExternalDragState() {
     dragState.draggedClipboardCard = null;
     dragState.draggedEmptyCard = null;
@@ -323,7 +330,7 @@ function setupGlobalDragAndDrop() {
             return true;
         }
         
-        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
+        if (isInternalDragActive()) {
             return false;
         }
         
@@ -458,8 +465,7 @@ function setupGlobalDragAndDrop() {
     }
     
     function shouldSkipExternalDragIndicators() {
-        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) &&
-            !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
+        if (isInternalDragActive()) {
             return true;
         }
         if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
