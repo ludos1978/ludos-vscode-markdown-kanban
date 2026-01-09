@@ -3944,7 +3944,6 @@ blockquote {
   position: relative;
   display: inline-block;
   max-width: 100%;
-  width: 100%;
   overflow-wrap: anywhere;
   word-wrap: normal;
   min-height: 28px;

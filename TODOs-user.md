@@ -1,8 +1,8 @@
-- [ ] can we change the image-path-overlay-container from div to span?
+- [x] can we change the image-path-overlay-container from div to span?
 
-- [ ] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
+- [x] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
 
-- [ ] check the code for any timeout calls, i want to minimize usage of timeout!
+- [x] check the code for any timeout calls, i want to minimize usage of timeout!
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
@@ -19,14 +19,9 @@
 
 - [ ] would it be possible to take a screenshot of a webpage if a link is added to the board?
 
-  1. Open Graph images (simplest) - Fetch og:image meta
-  tags from URLs. Most websites provide preview images.
-  No screenshot needed, just an HTTP fetch + HTML
-  parsing.
-  2. Puppeteer/Playwright (full screenshots) - Run
-  headless browser in extension backend to capture
-  actual screenshots. Heavier dependency (~100-400MB),
-  slower, but gives real screenshots.
+  1. Open Graph images (simplest) - Fetch og:image meta tags from URLs. Most websites provide preview images. No screenshot needed, just an HTTP fetch + HTML
+  parsing. 
+  2. Puppeteer/Playwright (full screenshots) - Run headless browser in extension backend to capture actual screenshots. Heavier dependency (~100-400MB), slower, but gives real screenshots.
 
 - [ ] #### Combined Queries
 
