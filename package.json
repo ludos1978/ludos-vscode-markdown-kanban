@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.93.23",
+  "version": "0.95.25",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -461,6 +461,14 @@
           
           
           
+          "markdown-kanban.showSpecialCharacters": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show visual markers for whitespace characters inside cards."
+          },
+
+
+
           "markdown-kanban.tagColors": {
             "type": "object",
             "default": {

@@ -37,7 +37,8 @@ class ConfigManager {
             tagColors: {},
             htmlCommentRenderMode: 'hidden',
             htmlContentRenderMode: 'html',
-            showMarpSettings: true
+            showMarpSettings: true,
+            showSpecialCharacters: false
         };
     }
 

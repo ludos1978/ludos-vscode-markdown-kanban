@@ -155,6 +155,7 @@ let currentColumnWidth = '350px';
 let currentWhitespace = '8px';
 let currentTaskMinHeight = 'auto';
 let currentLayoutRows = 1;
+window.showSpecialCharacters = window.configManager?.getPreference('showSpecialCharacters', false) ?? false;
 
 // ============================================================================
 // PlantUML Initialization
@@ -1074,6 +1075,175 @@ function toggleMarpSettingsVisibility() {
     }
     vscode.postMessage({ type: 'requestConfigurationRefresh' });
 }
+
+const SPECIAL_CHAR_SYMBOLS = {
+    space: '·',
+    tab: '⇥',
+    newline: '↵',
+    'carriage-return': '␍'
+};
+
+function getSpecialCharacterType(char) {
+    switch (char) {
+        case ' ':
+            return 'space';
+        case '\t':
+            return 'tab';
+        case '\r':
+            return 'carriage-return';
+        case '\n':
+            return 'newline';
+        default:
+            return null;
+    }
+}
+
+function renderSpecialCharacterHtml(text) {
+    if (!text) { return ''; }
+    const builder = [];
+    for (const char of text) {
+        const type = getSpecialCharacterType(char);
+        if (!type) {
+            builder.push(escapeHtml(char));
+            continue;
+        }
+        if (type === 'newline') {
+            builder.push('<span class="special-char special-newline"></span>\n');
+        } else if (type === 'carriage-return') {
+            builder.push('<span class="special-char special-carriage-return"></span>');
+        } else {
+            builder.push(`<span class="special-char special-${type}">${escapeHtml(char)}</span>`);
+        }
+    }
+    return builder.join('');
+}
+
+function updateSpecialCharOverlay(editElement) {
+    if (!editElement || !editElement._specialCharOverlay) { return; }
+    const overlay = editElement._specialCharOverlay;
+    const inner = editElement._specialCharOverlayInner;
+    const isVisible = Boolean(window.showSpecialCharacters && window.isTaskEditorActive);
+    overlay.style.display = isVisible ? '' : 'none';
+    editElement.classList.toggle('special-char-textarea', isVisible);
+    alignSpecialCharOverlayStyles(editElement);
+    if (inner) {
+        inner.innerHTML = renderSpecialCharacterHtml(editElement.value || '');
+    }
+}
+
+function createSpecialCharOverlay(editElement) {
+    if (!editElement || editElement._specialCharOverlay) { return; }
+    const container = editElement.parentElement;
+    if (!container) { return; }
+    const originalPosition = container.style.position;
+    if (!container.style.position || container.style.position === 'static') {
+        container.style.position = 'relative';
+        container._specialCharOriginalPosition = originalPosition || '';
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'special-char-overlay';
+    const inner = document.createElement('div');
+    inner.className = 'special-char-overlay-inner';
+    overlay.appendChild(inner);
+    container.appendChild(overlay);
+
+    const syncScroll = () => {
+        overlay.scrollTop = editElement.scrollTop;
+        overlay.scrollLeft = editElement.scrollLeft;
+    };
+    editElement.addEventListener('scroll', syncScroll);
+
+    editElement._specialCharOverlay = overlay;
+    editElement._specialCharOverlayInner = inner;
+    editElement._specialCharOverlayScrollHandler = syncScroll;
+
+    updateSpecialCharOverlay(editElement);
+}
+
+function alignSpecialCharOverlayStyles(editElement) {
+    if (!editElement || !editElement._specialCharOverlay) { return; }
+    const overlay = editElement._specialCharOverlay;
+    const computed = window.getComputedStyle(editElement);
+    overlay.style.fontFamily = computed.fontFamily;
+    overlay.style.fontSize = computed.fontSize;
+    overlay.style.lineHeight = computed.lineHeight;
+    overlay.style.fontWeight = computed.fontWeight;
+    overlay.style.fontStyle = computed.fontStyle;
+    overlay.style.letterSpacing = computed.letterSpacing;
+    overlay.style.wordSpacing = computed.wordSpacing;
+    overlay.style.textTransform = computed.textTransform;
+    overlay.style.textIndent = computed.textIndent;
+    overlay.style.textAlign = computed.textAlign;
+    overlay.style.paddingTop = computed.paddingTop;
+    overlay.style.paddingRight = computed.paddingRight;
+    overlay.style.paddingBottom = computed.paddingBottom;
+    overlay.style.paddingLeft = computed.paddingLeft;
+
+    overlay.style.boxSizing = computed.boxSizing;
+}
+function removeSpecialCharOverlay(editElement) {
+    if (!editElement || !editElement._specialCharOverlay) { return; }
+    const overlay = editElement._specialCharOverlay;
+    if (overlay.parentElement) {
+        overlay.parentElement.removeChild(overlay);
+    }
+    if (editElement._specialCharOverlayScrollHandler) {
+        editElement.removeEventListener('scroll', editElement._specialCharOverlayScrollHandler);
+    }
+    const container = editElement.parentElement;
+    if (container && container._specialCharOriginalPosition !== undefined) {
+        container.style.position = container._specialCharOriginalPosition;
+        delete container._specialCharOriginalPosition;
+    }
+    editElement._specialCharOverlay = null;
+    editElement._specialCharOverlayInner = null;
+    editElement._specialCharOverlayScrollHandler = null;
+    editElement.classList.remove('special-char-textarea');
+}
+
+function updateActiveSpecialCharOverlay() {
+    const activeEditor = window.taskEditor?.currentEditor?.element;
+    if (activeEditor) {
+        updateSpecialCharOverlay(activeEditor);
+    }
+}
+
+function updateSpecialCharToggleUI(isEnabled) {
+    const toggleButton = document.getElementById('special-chars-toggle');
+    if (!toggleButton) { return; }
+    toggleButton.classList.toggle('selected', isEnabled);
+    const checkmark = toggleButton.querySelector('.menu-checkmark');
+    if (checkmark) {
+        checkmark.textContent = isEnabled ? '✓' : '';
+    }
+}
+
+function toggleSpecialCharacterDisplay() {
+    const nextState = !window.showSpecialCharacters;
+    window.showSpecialCharacters = nextState;
+    if (window.configManager) {
+        window.configManager.setPreference('showSpecialCharacters', nextState);
+    } else {
+        vscode.postMessage({ type: 'setPreference', key: 'showSpecialCharacters', value: nextState });
+    }
+    if (window.cachedConfig) {
+        window.cachedConfig.showSpecialCharacters = nextState;
+    }
+    updateSpecialCharToggleUI(nextState);
+    updateActiveSpecialCharOverlay();
+}
+
+window.toggleSpecialCharacterDisplay = toggleSpecialCharacterDisplay;
+window.createSpecialCharOverlay = createSpecialCharOverlay;
+window.updateSpecialCharOverlay = updateSpecialCharOverlay;
+window.removeSpecialCharOverlay = removeSpecialCharOverlay;
+window.updateActiveSpecialCharOverlay = updateActiveSpecialCharOverlay;
+window.isTaskEditorActive = false;
+window.setTaskEditorActive = function (isActive) {
+    window.isTaskEditorActive = Boolean(isActive);
+    updateActiveSpecialCharOverlay();
+};
 
 /**
  * Sets the width of all kanban columns
@@ -2367,6 +2537,13 @@ if (!webviewEventListenersInitialized) {
             window.cachedConfig = configData;
             applyMarpSettingsVisibility(marpSettingsValue);
             window.cachedConfig.showMarpSettings = marpSettingsValue;
+            const specialCharsValue = typeof configData.showSpecialCharacters === 'boolean'
+                ? configData.showSpecialCharacters
+                : window.showSpecialCharacters;
+            window.showSpecialCharacters = Boolean(specialCharsValue);
+            updateSpecialCharToggleUI(window.showSpecialCharacters);
+            refreshSpecialCharacterMarkers();
+            window.cachedConfig.showSpecialCharacters = window.showSpecialCharacters;
             if (typeof pendingMarpOverride === 'boolean') {
                 window.pendingMarpSettingsOverride = undefined;
             }
@@ -4506,6 +4683,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize layout presets menu
     initializeLayoutPresetsMenu();
+
+    // Update special character toggle UI
+    updateSpecialCharToggleUI(window.showSpecialCharacters ?? false);
 });
 } // End of third webviewEventListenersInitialized guard
 

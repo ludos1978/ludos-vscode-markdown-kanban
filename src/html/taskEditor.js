@@ -577,6 +577,9 @@ class TaskEditor {
             if (element.tagName === 'TEXTAREA' && this.autoResize) {
                 this.autoResize(element);
             }
+            if (typeof window.updateSpecialCharOverlay === 'function') {
+                window.updateSpecialCharOverlay(element);
+            }
             return;
         }
 
@@ -595,6 +598,9 @@ class TaskEditor {
         if (element.tagName === 'TEXTAREA' && this.autoResize) {
             this.autoResize(element);
         }
+        if (typeof window.updateSpecialCharOverlay === 'function') {
+            window.updateSpecialCharOverlay(element);
+        }
     }
 
     _unindentSelection(element) {
@@ -603,6 +609,34 @@ class TaskEditor {
         const end = element.selectionEnd ?? start;
 
         const { lineStart, lineEnd } = this._getLineRange(value, start, end);
+        if (start === end && start > lineStart && start > 0) {
+            const indentLen = this.indentUnit.length;
+            const beforeCursorStart = Math.max(0, start - indentLen);
+            const precedingSegment = value.slice(beforeCursorStart, start);
+            const charBefore = value.charAt(start - 1);
+            let removeCount = 0;
+            if (charBefore === '\t') {
+                removeCount = 1;
+            } else if (precedingSegment.length === indentLen && [...precedingSegment].every(c => c === ' ')) {
+                removeCount = indentLen;
+            } else if (charBefore === ' ') {
+                removeCount = 1;
+            }
+
+            if (removeCount > 0) {
+                element.value = value.slice(0, start - removeCount) + value.slice(end);
+                const newCursor = start - removeCount;
+                element.selectionStart = newCursor;
+                element.selectionEnd = newCursor;
+                if (element.tagName === 'TEXTAREA' && this.autoResize) {
+                    this.autoResize(element);
+                }
+                if (typeof window.updateSpecialCharOverlay === 'function') {
+                    window.updateSpecialCharOverlay(element);
+                }
+                return;
+            }
+        }
         const selected = value.slice(lineStart, lineEnd);
         const lines = selected.split('\n');
         const removedCounts = [];
@@ -625,6 +659,9 @@ class TaskEditor {
         element.selectionEnd = newSelectionEnd;
         if (element.tagName === 'TEXTAREA' && this.autoResize) {
             this.autoResize(element);
+        }
+        if (typeof window.updateSpecialCharOverlay === 'function') {
+            window.updateSpecialCharOverlay(element);
         }
     }
 
@@ -692,6 +729,10 @@ class TaskEditor {
             columnId: columnId || window.getColumnIdFromElement(editElement),
             originalValue: editElement.value
         };
+
+        if (typeof window.createSpecialCharOverlay === 'function') {
+            window.createSpecialCharOverlay(editElement);
+        }
     }
 
     /**
@@ -717,6 +758,10 @@ class TaskEditor {
             taskId: taskId,
             columnId: columnId
         });
+
+        if (typeof window.setTaskEditorActive === 'function') {
+            window.setTaskEditorActive(true);
+        }
     }
 
     /**
@@ -819,6 +864,10 @@ class TaskEditor {
                     }
                     autoResizePending = false;
                 });
+            }
+
+            if (typeof window.updateSpecialCharOverlay === 'function') {
+                window.updateSpecialCharOverlay(editElement);
             }
 
             // Throttled stack layout recalculation
@@ -1658,9 +1707,12 @@ class TaskEditor {
 
         const { element, displayElement, type } = this.currentEditor;
 
+        if (typeof window.removeSpecialCharOverlay === 'function') {
+            window.removeSpecialCharOverlay(element);
+        }
+
         // Clean up event listeners
         element.onblur = null;
-        element.oninput = null;
         element.removeEventListener('mousedown', this._handleMouseDown);
         element.removeEventListener('dblclick', this._handleDblClick);
 
@@ -1746,6 +1798,10 @@ class TaskEditor {
         }
 
         this.currentEditor = null;
+
+        if (typeof window.setTaskEditorActive === 'function') {
+            window.setTaskEditorActive(false);
+        }
     }
 
 

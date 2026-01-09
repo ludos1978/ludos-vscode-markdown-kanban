@@ -1501,6 +1501,10 @@ function renderBoard(options = null) {
 
     }, 20);
 
+    if (typeof window.refreshSpecialCharacterMarkers === 'function') {
+        window.refreshSpecialCharacterMarkers();
+    }
+
     // Setup compact view detection for ALL columns
     // DISABLED: Causes severe performance issues with expensive scroll handlers
     // - Runs querySelectorAll on every scroll event

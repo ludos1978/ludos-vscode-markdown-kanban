@@ -31,3 +31,8 @@
 - [ ] Adjust the font size control from the file bar menu (or settings) so the board text scales, confirm the preference is stored under `markdown-kanban.fontSize`, and check the console for the absence of `setPreference` errors when switching values.
 - [ ] Open any burger menu (e.g., task or column actions) and confirm the dropdown uses the configured minimum width (≈200px) so items do not overflow, then open a submenu and verify the repositioned panel stays within the screen bounds.
 - [ ] Verify the submenu's arrow and surrounding area stay totally within the dropdown background so there are no floating pointers or clipped highlights.
+- [ ] Toggle the new Show special characters option in the file bar menu and confirm spaces, tabs, newline, and carriage return indicators appear and disappear on task titles and descriptions.
+- [ ] While editing a task title or description, press Shift+Tab from a mid-line cursor and confirm it removes a tab or two spaces at the cursor position (not just at the line start).
+- [ ] With the special characters toggle enabled, confirm no markers are visible while viewing tasks normally, and that they appear only after entering edit mode (then disappear again when editing ends).
+- [ ] Enable the show-special-characters toggle while editing and verify the glyph overlay is limited to the currently active editor, not leaking onto other display-only text fields or other editors.
+- [ ] With show-special-characters enabled, make sure the caret stays aligned with the visible characters/mapping glyphs (any padding/font differences should be copied from the edit field).
