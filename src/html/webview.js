@@ -78,7 +78,10 @@ function logDebugModeToggle(entry) {
     if (window.kanbanDebug && window.kanbanDebug.enabled) {
         window.kanbanDebug.log('[view-scroll] debugMode', entry);
     }
-    showDebugToggleToast(entry.current);
+    // Only show toast on manual toggle, not on backend-initiated changes (like startup)
+    if (entry.source === 'manual-toggle') {
+        showDebugToggleToast(entry.current);
+    }
 }
 
 let debugToggleToastTimer = null;

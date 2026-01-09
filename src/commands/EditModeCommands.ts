@@ -12,7 +12,6 @@
  * - triggerVSCodeSnippet, handleEditorShortcut
  * - performSort
  * - runtimeTrackingReport
- * - getTemplates, applyTemplate, submitTemplateVariables
  *
  * @module commands/EditModeCommands
  */
@@ -33,7 +32,7 @@ export class EditModeCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'edit-mode-commands',
         name: 'Edit Mode Commands',
-        description: 'Handles edit mode, rendering lifecycle, templates, and miscellaneous operations',
+        description: 'Handles edit mode, rendering lifecycle, and miscellaneous operations',
         messageTypes: [
             'editModeStart',
             'editModeEnd',
@@ -51,10 +50,7 @@ export class EditModeCommands extends SwitchBasedCommand {
             'triggerVSCodeSnippet',
             'handleEditorShortcut',
             'performSort',
-            'runtimeTrackingReport',
-            'getTemplates',
-            'applyTemplate',
-            'submitTemplateVariables'
+            'runtimeTrackingReport'
         ],
         priority: 100
     };
@@ -76,10 +72,7 @@ export class EditModeCommands extends SwitchBasedCommand {
         'triggerVSCodeSnippet': (msg, ctx) => this._handleTriggerVSCodeSnippet(msg, ctx),
         'handleEditorShortcut': (msg, ctx) => this._handleEditorShortcut(msg, ctx),
         'performSort': (_msg, ctx) => this._handlePerformSort(ctx),
-        'runtimeTrackingReport': () => Promise.resolve(this.success()),
-        'getTemplates': (_msg, ctx) => this._handleGetTemplates(ctx),
-        'applyTemplate': (msg, ctx) => this._handleApplyTemplate(msg, ctx),
-        'submitTemplateVariables': (msg, ctx) => this._handleSubmitTemplateVariables(msg, ctx)
+        'runtimeTrackingReport': () => Promise.resolve(this.success())
     };
 
     // ============= HELPER: Get message handler =============
@@ -332,32 +325,6 @@ export class EditModeCommands extends SwitchBasedCommand {
                 context.emitBoardChanged(board, 'sort');
                 await context.onBoardUpdate();
             }
-        }
-        return this.success();
-    }
-
-    // ============= TEMPLATES =============
-
-    private async _handleGetTemplates(context: CommandContext): Promise<CommandResult> {
-        const messageHandler = this._getMessageHandler(context);
-        if (messageHandler?.handleGetTemplates) {
-            await messageHandler.handleGetTemplates();
-        }
-        return this.success();
-    }
-
-    private async _handleApplyTemplate(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        const messageHandler = this._getMessageHandler(context);
-        if (messageHandler?.handleApplyTemplate) {
-            await messageHandler.handleApplyTemplate(message);
-        }
-        return this.success();
-    }
-
-    private async _handleSubmitTemplateVariables(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        const messageHandler = this._getMessageHandler(context);
-        if (messageHandler?.handleSubmitTemplateVariables) {
-            await messageHandler.handleSubmitTemplateVariables(message);
         }
         return this.success();
     }
