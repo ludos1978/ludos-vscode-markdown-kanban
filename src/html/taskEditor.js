@@ -20,7 +20,8 @@ const TILDE_DEAD_CODES = new Set([
     'IntlBackslash',
     'Backquote',
     'Quote',
-    'IntlRo'
+    'IntlRo',
+    'KeyN'
 ]);
 
 function getMarkdownStyleKey(event) {
