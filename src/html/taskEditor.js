@@ -607,9 +607,7 @@ class TaskEditor {
         if (!styleKey) {
             return false;
         }
-        const shouldSuppressInput = event.key === 'Dead'
-            || event.altKey
-            || (event.getModifierState && event.getModifierState('AltGraph'));
+        const isDeadKey = event.key === 'Dead';
         const selectionStart = element.selectionStart ?? 0;
         const selectionEnd = element.selectionEnd ?? selectionStart;
         if (selectionEnd <= selectionStart) {
@@ -619,6 +617,14 @@ class TaskEditor {
         if (!style) {
             return false;
         }
+        if (isDeadKey) {
+            element._pendingDeadStyleWrap = {
+                start: selectionStart,
+                end: selectionEnd,
+                styleKey: styleKey
+            };
+            return true;
+        }
         event.preventDefault();
         const value = element.value;
         const before = value.slice(0, selectionStart);
@@ -627,13 +633,6 @@ class TaskEditor {
         element.value = before + style.start + selected + style.end + after;
         const cursorStart = selectionStart + style.start.length;
         const cursorEnd = cursorStart + selected.length;
-        if (shouldSuppressInput) {
-            element._suppressNextInput = {
-                value: element.value,
-                selectionStart: cursorStart,
-                selectionEnd: cursorEnd
-            };
-        }
         element.selectionStart = cursorStart;
         element.selectionEnd = cursorEnd;
         if (element.tagName === 'TEXTAREA' && this.autoResize) {
@@ -917,31 +916,44 @@ class TaskEditor {
         });
 
         editElement.addEventListener('beforeinput', (e) => {
-            if (!editElement._suppressNextInput) {
+            const pending = editElement._pendingDeadStyleWrap;
+            if (!pending) {
                 return;
             }
-            editElement._suppressNextInput = null;
+            const style = MARKDOWN_STYLE_PAIRS[pending.styleKey];
+            if (!style) {
+                editElement._pendingDeadStyleWrap = null;
+                return;
+            }
+            if (e.inputType && !e.inputType.startsWith('insert')) {
+                editElement._pendingDeadStyleWrap = null;
+                return;
+            }
+            if (e.data && e.data !== pending.styleKey) {
+                editElement._pendingDeadStyleWrap = null;
+                return;
+            }
             e.preventDefault();
             e.stopImmediatePropagation();
+            const value = editElement.value;
+            const before = value.slice(0, pending.start);
+            const selected = value.slice(pending.start, pending.end);
+            const after = value.slice(pending.end);
+            editElement.value = before + style.start + selected + style.end + after;
+            const cursorStart = pending.start + style.start.length;
+            const cursorEnd = cursorStart + selected.length;
+            editElement.selectionStart = cursorStart;
+            editElement.selectionEnd = cursorEnd;
+            if (editElement.tagName === 'TEXTAREA' && this.autoResize) {
+                this.autoResize(editElement);
+            }
+            if (typeof window.updateSpecialCharOverlay === 'function') {
+                window.updateSpecialCharOverlay(editElement);
+            }
+            editElement._pendingDeadStyleWrap = null;
         });
 
         editElement.oninput = () => {
-            if (editElement._suppressNextInput) {
-                const suppressedState = editElement._suppressNextInput;
-                editElement._suppressNextInput = null;
-                const prefix = suppressedState.value.slice(0, suppressedState.selectionStart);
-                const suffix = suppressedState.value.slice(suppressedState.selectionEnd);
-                const current = editElement.value;
-                if (current.startsWith(prefix) && current.endsWith(suffix)) {
-                    const middle = current.slice(prefix.length, current.length - suffix.length);
-                    const expectedMiddle = suppressedState.value.slice(suppressedState.selectionStart, suppressedState.selectionEnd);
-                    if (middle !== expectedMiddle) {
-                        editElement.value = suppressedState.value;
-                        editElement.selectionStart = suppressedState.selectionStart;
-                        editElement.selectionEnd = suppressedState.selectionEnd;
-                    }
-                }
-            }
             if (window.kanbanDebug?.enabled) {
                 const container = document.getElementById('kanban-container');
                 console.log('[ONINPUT-DEBUG] Input event fired!', {
