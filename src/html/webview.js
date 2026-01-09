@@ -2542,7 +2542,7 @@ if (!webviewEventListenersInitialized) {
                 : window.showSpecialCharacters;
             window.showSpecialCharacters = Boolean(specialCharsValue);
             updateSpecialCharToggleUI(window.showSpecialCharacters);
-            refreshSpecialCharacterMarkers();
+            updateActiveSpecialCharOverlay();
             window.cachedConfig.showSpecialCharacters = window.showSpecialCharacters;
             if (typeof pendingMarpOverride === 'boolean') {
                 window.pendingMarpSettingsOverride = undefined;

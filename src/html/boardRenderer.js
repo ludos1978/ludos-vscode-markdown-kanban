@@ -1501,8 +1501,8 @@ function renderBoard(options = null) {
 
     }, 20);
 
-    if (typeof window.refreshSpecialCharacterMarkers === 'function') {
-        window.refreshSpecialCharacterMarkers();
+    if (typeof window.updateActiveSpecialCharOverlay === 'function') {
+        window.updateActiveSpecialCharOverlay();
     }
 
     // Setup compact view detection for ALL columns
