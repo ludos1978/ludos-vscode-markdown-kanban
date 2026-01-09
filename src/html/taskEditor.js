@@ -9,6 +9,7 @@ const MARKDOWN_STYLE_PAIRS = {
     '_': { start: '_', end: '_' },
     '~': { start: '~', end: '~' },
     '^': { start: '^', end: '^' },
+    '`': { start: '`', end: '`' },
     '"': { start: '"', end: '"' },
     "'": { start: "'", end: "'" },
     '[': { start: '[', end: ']' },
@@ -37,10 +38,24 @@ const CIRCUMFLEX_DEAD_CODES = new Set([
     'Digit6',         // US International (Shift+6)
     'BracketLeft',    // German, some international
     'IntlBackslash',  // Some layouts
-    'Equal',          // Swiss/German
+    'Equal',          // Swiss/German (with Shift)
     'Digit9',         // French AZERTY
     'BracketRight',   // Some Nordic layouts
     'Backquote',      // Some layouts
+]);
+
+// Dead key codes that produce backtick (`) across various keyboard layouts
+const BACKTICK_DEAD_CODES = new Set([
+    'Equal',          // Swiss/German (without Shift)
+    'Backquote',      // Some layouts
+    'IntlBackslash',  // Some layouts
+]);
+
+// Codes where the same key can produce different style characters depending on keyboard layout/shift
+// These need deferred detection via compositionupdate since we can't reliably predict the character
+const AMBIGUOUS_DEAD_CODES = new Set([
+    'Equal',          // Swiss/German keyboard: can produce ^ or ` depending on Shift/layout
+    'Backquote',      // Can produce ` or ~ depending on layout
 ]);
 
 // Dead key codes that produce apostrophe/acute (') across various keyboard layouts
@@ -59,11 +74,18 @@ function getMarkdownStyleKey(event) {
         return key;
     }
     if (key === 'Dead' && event.code) {
+        // For ambiguous codes, return special marker - actual character will be detected via compositionupdate
+        if (AMBIGUOUS_DEAD_CODES.has(event.code)) {
+            return 'AMBIGUOUS_DEAD';
+        }
         if (TILDE_DEAD_CODES.has(event.code)) {
             return '~';
         }
         if (CIRCUMFLEX_DEAD_CODES.has(event.code)) {
             return '^';
+        }
+        if (BACKTICK_DEAD_CODES.has(event.code)) {
+            return '`';
         }
         if (APOSTROPHE_DEAD_CODES.has(event.code)) {
             return "'";
@@ -648,6 +670,17 @@ class TaskEditor {
         const selectionStart = element.selectionStart ?? 0;
         const selectionEnd = element.selectionEnd ?? selectionStart;
         if (selectionEnd <= selectionStart) {
+            return false;
+        }
+        // For ambiguous dead keys, save selection and defer wrap until compositionupdate reveals the character
+        if (styleKey === 'AMBIGUOUS_DEAD') {
+            console.log('[STYLE-DEBUG] Ambiguous dead key - deferring wrap until compositionupdate');
+            element._pendingAmbiguousWrap = {
+                selectionStart,
+                selectionEnd,
+                value: element.value
+            };
+            // Don't prevent default - let composition proceed, we'll handle it in compositionupdate
             return false;
         }
         const style = MARKDOWN_STYLE_PAIRS[styleKey];
