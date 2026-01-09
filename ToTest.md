@@ -38,3 +38,5 @@
 - [ ] With show-special-characters enabled, make sure the caret stays aligned with the visible characters/mapping glyphs (any padding/font differences should be copied from the edit field).
 - [ ] Select text, press *, _, ~, [, (, or { and confirm the editor adds the matching start/end characters around the selection while keeping it highlighted; with no selection the keys should just insert their character.
 - [ ] On keyboard layouts where ~ is a dead key (e.g., Alt+N then Space), confirm ~ inserts normally with no selection, wraps selected text when pressed with a selection, and does not insert an extra ~ afterward.
+- [ ] Open the debug overlay and confirm the main file path shown comes from the registry (matches the real file), and that Force Save All reports an error if no main file is registered.
+- [ ] Use Reload All Included Files and confirm include files reload from disk and the file list stays correct in the debug overlay.

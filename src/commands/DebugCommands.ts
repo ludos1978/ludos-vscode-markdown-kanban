@@ -169,6 +169,9 @@ export class DebugCommands extends SwitchBasedCommand {
             if (!fileRegistry?.forceWriteAll) {
                 throw new Error('File registry not available or forceWriteAll method not found');
             }
+            if (!fileRegistry.getMainFile()) {
+                throw new Error('No main file registered - cannot force write');
+            }
 
             const result = await fileRegistry.forceWriteAll();
 
@@ -318,15 +321,18 @@ export class DebugCommands extends SwitchBasedCommand {
         if (!panel) {
             return this.success();
         }
-        const panelAccess = panel as PanelCommandAccess;
 
         try {
-            const includeFileMap = panelAccess._includeFiles;
-            if (includeFileMap) {
-                includeFileMap.clear();
+            const fileRegistry = this.getFileRegistry();
+            if (fileRegistry) {
+                const includeFiles = fileRegistry.getIncludeFiles();
+                for (const file of includeFiles) {
+                    fileRegistry.unregister(file.getPath());
+                }
             }
 
             const document = context.fileManager.getDocument();
+            const panelAccess = panel as PanelCommandAccess;
             if (document && panelAccess.loadMarkdownFile) {
                 await panelAccess.loadMarkdownFile(document, false);
             }
@@ -357,12 +363,12 @@ export class DebugCommands extends SwitchBasedCommand {
         const fileRegistry = this.getFileRegistry();
         const mainFile = fileRegistry?.getMainFile();
 
-        const mainFilePath = context.fileManager.getFilePath() || document?.uri.fsPath || 'Unknown';
+        const mainFilePath = mainFile?.getPath() || 'Unknown';
 
         const mainFileInfo = {
             path: mainFilePath,
             lastModified: mainFile?.getLastModified()?.toISOString() || 'Unknown',
-            exists: mainFile?.exists() ?? (document ? true : false),
+            exists: mainFile?.exists() ?? false,
             watcherActive: true,
             hasInternalChanges: mainFile?.hasUnsavedChanges() ?? false,
             hasExternalChanges: mainFile?.hasExternalChanges() ?? false,

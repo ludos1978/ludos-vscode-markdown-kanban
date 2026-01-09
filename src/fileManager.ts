@@ -53,10 +53,16 @@ export class FileManager {
     private _isFileLocked: boolean = false;
     private _webview: vscode.Webview;
     private _extensionUri: vscode.Uri;
+    private _getMainFilePath?: () => string | undefined;
 
-    constructor(webview: vscode.Webview, extensionUri: vscode.Uri) {
+    constructor(
+        webview: vscode.Webview,
+        extensionUri: vscode.Uri,
+        getMainFilePath?: () => string | undefined
+    ) {
         this._webview = webview;
         this._extensionUri = extensionUri;
+        this._getMainFilePath = getMainFilePath;
     }
 
     public getExtensionUri(): vscode.Uri {
@@ -86,6 +92,13 @@ export class FileManager {
     }
 
     public getFilePath(): string | undefined {
+        const registryPath = this._getMainFilePath?.();
+        if (registryPath) {
+            return registryPath;
+        }
+        if (this._getMainFilePath) {
+            return undefined;
+        }
         // Return the preserved file path, which persists even when document is closed
         return this._filePath;
     }
@@ -106,11 +119,13 @@ export class FileManager {
     }
 
     public sendFileInfo() {
+        const mainFilePath = this.getFilePath();
+        const fallbackPath = this._getMainFilePath ? undefined : (this._document?.fileName || this._filePath);
+        const resolvedPath = mainFilePath || fallbackPath || '';
         const fileInfo: FileInfo = {
-            fileName: this._document ? path.basename(this._document.fileName) :
-                     (this._filePath ? path.basename(this._filePath) : 'No file loaded'),
-            filePath: this._document ? this._document.fileName : (this._filePath || ''),
-            documentPath: this._document ? this._document.uri.fsPath : (this._filePath || ''),
+            fileName: resolvedPath ? path.basename(resolvedPath) : 'No file loaded',
+            filePath: resolvedPath,
+            documentPath: resolvedPath,
             isLocked: this._isFileLocked
         };
 
@@ -355,7 +370,7 @@ export class FileManager {
         if (!isWorkspaceRelative) {
             // First: Check relative to current document directory
             // Use _filePath as fallback if document is not available (e.g., during webview message handling)
-            const documentPath = this._document?.uri.fsPath || this._filePath;
+            const documentPath = this.getFilePath();
 
             if (documentPath) {
                 const currentDir = path.dirname(documentPath);

@@ -241,7 +241,11 @@ export class KanbanWebviewPanel {
         logger.setDebugMode(initialDebugMode);
         eventBus.setDebugMode(initialDebugMode);
 
-        this._fileManager = new FileManager(this._panel.webview, extensionUri);
+        this._fileManager = new FileManager(
+            this._panel.webview,
+            extensionUri,
+            () => this._fileRegistry?.getMainFile()?.getPath()
+        );
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
         this._conflictResolver = this._context.conflictResolver;

@@ -131,7 +131,7 @@ export class IncludeCommands extends SwitchBasedCommand {
         return this.success();
     }
 
-    private async handleRegisterInlineInclude(filePath: string, content: string, context: CommandContext): Promise<CommandResult> {
+    private async handleRegisterInlineInclude(filePath: string, content: string | null, context: CommandContext): Promise<CommandResult> {
         const panel = context.getWebviewPanel();
         if (!panel || !hasIncludeFileMethods(panel)) {
             return this.success();
@@ -148,18 +148,27 @@ export class IncludeCommands extends SwitchBasedCommand {
 
         panelAccess.ensureIncludeFileRegistered(relativePath, 'regular');
 
-        const includeFile = panelAccess._includeFiles?.get(relativePath);
-        if (includeFile && content) {
-            includeFile.content = content;
-            includeFile.baseline = content;
-            includeFile.hasUnsavedChanges = false;
-            includeFile.lastModified = Date.now();
-
-            const currentDocument = context.fileManager.getDocument();
-            if (currentDocument) {
-                const basePath = path.dirname(currentDocument.uri.fsPath);
-                includeFile.absolutePath = PathResolver.resolve(basePath, filePath);
+        const fileRegistry = this.getFileRegistry();
+        const updateInclude = (): boolean => {
+            const includeFile = fileRegistry?.getByRelativePath(relativePath);
+            if (!includeFile || includeFile.getFileType() === 'main') {
+                return false;
             }
+
+            if (content !== null && content !== undefined) {
+                includeFile.setContent(content, true);
+                includeFile.setExists(true);
+            } else if (content === null) {
+                includeFile.setExists(false);
+            }
+
+            return true;
+        };
+
+        if (!updateInclude()) {
+            setTimeout(() => {
+                updateInclude();
+            }, 0);
         }
         return this.success();
     }
@@ -349,20 +358,14 @@ export class IncludeCommands extends SwitchBasedCommand {
         const panelAccess = panel as PanelCommandAccess;
 
         let reloadCount = 0;
-        const includeFileMap = panelAccess._includeFiles;
-        if (includeFileMap) {
-            for (const [relativePath] of includeFileMap) {
-                try {
-                    const freshContent = panelAccess._readFileContent
-                        ? await panelAccess._readFileContent(relativePath)
-                        : null;
-                    if (freshContent !== null && freshContent !== undefined && panelAccess.updateIncludeFileContent) {
-                        panelAccess.updateIncludeFileContent(relativePath, freshContent, true);
-                        reloadCount++;
-                    }
-                } catch (error) {
-                    console.warn(`[IncludeCommands] Failed to reload include file ${relativePath}:`, error);
-                }
+        const fileRegistry = this.getFileRegistry();
+        const includeFiles = fileRegistry?.getIncludeFiles() || [];
+        for (const includeFile of includeFiles) {
+            try {
+                await includeFile.reload();
+                reloadCount++;
+            } catch (error) {
+                console.warn(`[IncludeCommands] Failed to reload include file ${includeFile.getRelativePath()}:`, error);
             }
         }
 
