@@ -607,6 +607,7 @@ class TaskEditor {
         if (!styleKey) {
             return false;
         }
+        const isDeadKey = event.key === 'Dead';
         const selectionStart = element.selectionStart ?? 0;
         const selectionEnd = element.selectionEnd ?? selectionStart;
         if (selectionEnd <= selectionStart) {
@@ -622,6 +623,9 @@ class TaskEditor {
         const selected = value.slice(selectionStart, selectionEnd);
         const after = value.slice(selectionEnd);
         element.value = before + style.start + selected + style.end + after;
+        if (isDeadKey) {
+            element._suppressNextInput = style.end;
+        }
         const cursorStart = selectionStart + style.start.length;
         const cursorEnd = cursorStart + selected.length;
         element.selectionStart = cursorStart;
@@ -903,6 +907,18 @@ class TaskEditor {
                     relatedTarget: e.relatedTarget?.className || 'null',
                     newActiveElement: document.activeElement?.className
                 });
+            }
+        });
+
+        editElement.addEventListener('beforeinput', (e) => {
+            if (!editElement._suppressNextInput) {
+                return;
+            }
+            const expected = editElement._suppressNextInput;
+            editElement._suppressNextInput = null;
+            if (e.data === expected) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
             }
         });
 
