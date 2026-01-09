@@ -16,6 +16,25 @@ const MARKDOWN_STYLE_PAIRS = {
     '}': { start: '{', end: '}' }
 };
 
+const TILDE_DEAD_CODES = new Set([
+    'IntlBackslash',
+    'Backquote',
+    'Quote',
+    'IntlRo'
+]);
+
+function getMarkdownStyleKey(event) {
+    if (!event) { return null; }
+    const key = event.key;
+    if (key && MARKDOWN_STYLE_PAIRS[key]) {
+        return key;
+    }
+    if (key === 'Dead' && event.code && TILDE_DEAD_CODES.has(event.code)) {
+        return '~';
+    }
+    return null;
+}
+
 class TaskEditor {
     constructor() {
         this.currentEditor = null;
@@ -580,13 +599,20 @@ class TaskEditor {
     }
 
     _handleMarkdownStyleInsertion(event, element) {
-        if (!element) { return false; }
-        if (event.metaKey || event.ctrlKey || event.altKey) { return false; }
-        const style = MARKDOWN_STYLE_PAIRS[event.key];
-        if (!style) { return false; }
+        if (!element || !event) {
+            return false;
+        }
+        const styleKey = getMarkdownStyleKey(event);
+        if (!styleKey) {
+            return false;
+        }
         const selectionStart = element.selectionStart ?? 0;
         const selectionEnd = element.selectionEnd ?? selectionStart;
         if (selectionEnd <= selectionStart) {
+            return false;
+        }
+        const style = MARKDOWN_STYLE_PAIRS[styleKey];
+        if (!style) {
             return false;
         }
         event.preventDefault();
