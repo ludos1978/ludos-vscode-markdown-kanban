@@ -4,6 +4,18 @@
  * Used by: Column titles, task titles, task descriptions
  * Features: Tab transitions, auto-resize, save/cancel with keyboard
  */
+const MARKDOWN_STYLE_PAIRS = {
+    '*': { start: '*', end: '*' },
+    '_': { start: '_', end: '_' },
+    '~': { start: '~', end: '~' },
+    '[': { start: '[', end: ']' },
+    ']': { start: '[', end: ']' },
+    '(': { start: '(', end: ')' },
+    ')': { start: '(', end: ')' },
+    '{': { start: '{', end: '}' },
+    '}': { start: '{', end: '}' }
+};
+
 class TaskEditor {
     constructor() {
         this.currentEditor = null;
@@ -386,6 +398,10 @@ class TaskEditor {
                 return; // Let the system handle the shortcut
             }
 
+            if (this._handleMarkdownStyleInsertion(e, element)) {
+                return;
+            }
+
             if (e.key === 'Tab') {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -561,6 +577,35 @@ class TaskEditor {
         const lineEndIndex = value.indexOf('\n', end);
         const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
         return { lineStart, lineEnd };
+    }
+
+    _handleMarkdownStyleInsertion(event, element) {
+        if (!element) { return false; }
+        if (event.metaKey || event.ctrlKey || event.altKey) { return false; }
+        const style = MARKDOWN_STYLE_PAIRS[event.key];
+        if (!style) { return false; }
+        const selectionStart = element.selectionStart ?? 0;
+        const selectionEnd = element.selectionEnd ?? selectionStart;
+        if (selectionEnd <= selectionStart) {
+            return false;
+        }
+        event.preventDefault();
+        const value = element.value;
+        const before = value.slice(0, selectionStart);
+        const selected = value.slice(selectionStart, selectionEnd);
+        const after = value.slice(selectionEnd);
+        element.value = before + style.start + selected + style.end + after;
+        const cursorStart = selectionStart + style.start.length;
+        const cursorEnd = cursorStart + selected.length;
+        element.selectionStart = cursorStart;
+        element.selectionEnd = cursorEnd;
+        if (element.tagName === 'TEXTAREA' && this.autoResize) {
+            this.autoResize(element);
+        }
+        if (typeof window.updateSpecialCharOverlay === 'function') {
+            window.updateSpecialCharOverlay(element);
+        }
+        return true;
     }
 
     _indentSelection(element) {

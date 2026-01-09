@@ -36,3 +36,4 @@
 - [ ] With the special characters toggle enabled, confirm no markers are visible while viewing tasks normally, and that they appear only after entering edit mode (then disappear again when editing ends).
 - [ ] Enable the show-special-characters toggle while editing and verify the glyph overlay is limited to the currently active editor, not leaking onto other display-only text fields or other editors.
 - [ ] With show-special-characters enabled, make sure the caret stays aligned with the visible characters/mapping glyphs (any padding/font differences should be copied from the edit field).
+- [ ] Select text, press *, _, ~, [, (, or { and confirm the editor adds the matching start/end characters around the selection while keeping it highlighted; with no selection the keys should just insert their character.
