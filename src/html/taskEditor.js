@@ -603,11 +603,12 @@ class TaskEditor {
         if (!element || !event) {
             return false;
         }
+        console.log('[STYLE-DEBUG] keydown:', { key: event.key, code: event.code, altKey: event.altKey });
         const styleKey = getMarkdownStyleKey(event);
+        console.log('[STYLE-DEBUG] styleKey:', styleKey);
         if (!styleKey) {
             return false;
         }
-        const isDeadKey = event.key === 'Dead';
         const selectionStart = element.selectionStart ?? 0;
         const selectionEnd = element.selectionEnd ?? selectionStart;
         if (selectionEnd <= selectionStart) {
@@ -617,24 +618,33 @@ class TaskEditor {
         if (!style) {
             return false;
         }
-        if (isDeadKey) {
-            element._pendingDeadStyleWrap = {
-                start: selectionStart,
-                end: selectionEnd,
-                styleKey: styleKey
-            };
-            return true;
-        }
+        const isDeadKey = event.key === 'Dead';
+        console.log('[STYLE-DEBUG] Doing wrap, isDeadKey:', isDeadKey, 'value before:', element.value);
         event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         const value = element.value;
         const before = value.slice(0, selectionStart);
         const selected = value.slice(selectionStart, selectionEnd);
         const after = value.slice(selectionEnd);
         element.value = before + style.start + selected + style.end + after;
+        console.log('[STYLE-DEBUG] value after wrap:', element.value);
         const cursorStart = selectionStart + style.start.length;
         const cursorEnd = cursorStart + selected.length;
-        element.selectionStart = cursorStart;
-        element.selectionEnd = cursorEnd;
+        if (isDeadKey) {
+            // For dead keys, store expected state to restore after composition corrupts it
+            const cursorPos = cursorEnd + style.end.length;
+            element._expectedAfterDeadKey = {
+                value: element.value,
+                cursorPos: cursorPos
+            };
+            element.selectionStart = cursorPos;
+            element.selectionEnd = cursorPos;
+            console.log('[STYLE-DEBUG] Set _expectedAfterDeadKey, cursor at:', cursorPos);
+        } else {
+            element.selectionStart = cursorStart;
+            element.selectionEnd = cursorEnd;
+        }
         if (element.tagName === 'TEXTAREA' && this.autoResize) {
             this.autoResize(element);
         }
@@ -915,45 +925,33 @@ class TaskEditor {
             }
         });
 
+        editElement.addEventListener('compositionstart', (e) => {
+            console.log('[STYLE-DEBUG] compositionstart:', { data: e.data, value: editElement.value });
+        });
+        editElement.addEventListener('compositionupdate', (e) => {
+            console.log('[STYLE-DEBUG] compositionupdate:', { data: e.data, value: editElement.value });
+        });
+        editElement.addEventListener('compositionend', (e) => {
+            console.log('[STYLE-DEBUG] compositionend:', { data: e.data, value: editElement.value });
+        });
         editElement.addEventListener('beforeinput', (e) => {
-            const pending = editElement._pendingDeadStyleWrap;
-            if (!pending) {
-                return;
-            }
-            const style = MARKDOWN_STYLE_PAIRS[pending.styleKey];
-            if (!style) {
-                editElement._pendingDeadStyleWrap = null;
-                return;
-            }
-            if (e.inputType && !e.inputType.startsWith('insert')) {
-                editElement._pendingDeadStyleWrap = null;
-                return;
-            }
-            if (e.data && e.data !== pending.styleKey) {
-                editElement._pendingDeadStyleWrap = null;
-                return;
-            }
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            const value = editElement.value;
-            const before = value.slice(0, pending.start);
-            const selected = value.slice(pending.start, pending.end);
-            const after = value.slice(pending.end);
-            editElement.value = before + style.start + selected + style.end + after;
-            const cursorStart = pending.start + style.start.length;
-            const cursorEnd = cursorStart + selected.length;
-            editElement.selectionStart = cursorStart;
-            editElement.selectionEnd = cursorEnd;
-            if (editElement.tagName === 'TEXTAREA' && this.autoResize) {
-                this.autoResize(editElement);
-            }
-            if (typeof window.updateSpecialCharOverlay === 'function') {
-                window.updateSpecialCharOverlay(editElement);
-            }
-            editElement._pendingDeadStyleWrap = null;
+            console.log('[STYLE-DEBUG] beforeinput:', { data: e.data, inputType: e.inputType, hasExpected: !!editElement._expectedAfterDeadKey, value: editElement.value });
         });
 
         editElement.oninput = () => {
+            console.log('[STYLE-DEBUG] oninput fired, value:', editElement.value, 'hasExpected:', !!editElement._expectedAfterDeadKey);
+            // Restore value after dead key composition corrupted it
+            if (editElement._expectedAfterDeadKey) {
+                const expected = editElement._expectedAfterDeadKey;
+                editElement._expectedAfterDeadKey = null;
+                if (editElement.value !== expected.value) {
+                    console.log('[STYLE-DEBUG] Restoring value after composition corruption');
+                    editElement.value = expected.value;
+                    editElement.selectionStart = expected.cursorPos;
+                    editElement.selectionEnd = expected.cursorPos;
+                    return; // Skip normal oninput processing
+                }
+            }
             if (window.kanbanDebug?.enabled) {
                 const container = document.getElementById('kanban-container');
                 console.log('[ONINPUT-DEBUG] Input event fired!', {
