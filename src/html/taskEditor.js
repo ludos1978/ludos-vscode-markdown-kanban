@@ -6,6 +6,7 @@
  */
 const MARKDOWN_STYLE_PAIRS = {
     '*': { start: '*', end: '*' },
+    "-": { start: "-", end: "-" },
     '_': { start: '_', end: '_' },
     '~': { start: '~', end: '~' },
     '^': { start: '^', end: '^' },
@@ -995,13 +996,43 @@ class TaskEditor {
         });
 
         editElement.addEventListener('compositionstart', (e) => {
-            console.log('[STYLE-DEBUG] compositionstart:', { data: e.data, value: editElement.value });
+            console.log('[STYLE-DEBUG] compositionstart:', { data: e.data, hasPending: !!editElement._pendingAmbiguousWrap, value: editElement.value });
         });
         editElement.addEventListener('compositionupdate', (e) => {
-            console.log('[STYLE-DEBUG] compositionupdate:', { data: e.data, value: editElement.value });
+            console.log('[STYLE-DEBUG] compositionupdate:', { data: e.data, hasPending: !!editElement._pendingAmbiguousWrap, value: editElement.value });
+            // Handle deferred wrap for ambiguous dead keys
+            if (editElement._pendingAmbiguousWrap && e.data) {
+                const char = e.data;
+                const style = MARKDOWN_STYLE_PAIRS[char];
+                if (style) {
+                    console.log('[STYLE-DEBUG] Ambiguous dead key resolved to:', char);
+                    const pending = editElement._pendingAmbiguousWrap;
+                    editElement._pendingAmbiguousWrap = null;
+                    // Cancel composition by making element readonly temporarily
+                    editElement.readOnly = true;
+                    setTimeout(() => {
+                        editElement.readOnly = false;
+                        // Restore original value and apply wrap
+                        const before = pending.value.slice(0, pending.selectionStart);
+                        const selected = pending.value.slice(pending.selectionStart, pending.selectionEnd);
+                        const after = pending.value.slice(pending.selectionEnd);
+                        editElement.value = before + style.start + selected + style.end + after;
+                        const cursorPos = pending.selectionEnd + style.start.length + style.end.length;
+                        editElement.selectionStart = cursorPos;
+                        editElement.selectionEnd = cursorPos;
+                        editElement.focus();
+                        console.log('[STYLE-DEBUG] Ambiguous wrap applied:', { char, value: editElement.value });
+                    }, 0);
+                } else {
+                    // Not a style character, clear pending
+                    editElement._pendingAmbiguousWrap = null;
+                }
+            }
         });
         editElement.addEventListener('compositionend', (e) => {
             console.log('[STYLE-DEBUG] compositionend:', { data: e.data, value: editElement.value });
+            // Clear pending if composition ended without wrap
+            editElement._pendingAmbiguousWrap = null;
         });
         editElement.addEventListener('beforeinput', (e) => {
             console.log('[STYLE-DEBUG] beforeinput:', { data: e.data, inputType: e.inputType, hasExpected: !!editElement._expectedAfterDeadKey, value: editElement.value });
