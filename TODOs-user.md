@@ -1,3 +1,5 @@
+- [ ] can we change the image-path-overlay-container from div to span?
+
 - [ ] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
 
 - [ ] check the code for any timeout calls, i want to minimize usage of timeout!

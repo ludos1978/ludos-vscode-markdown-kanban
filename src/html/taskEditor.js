@@ -8,20 +8,48 @@ const MARKDOWN_STYLE_PAIRS = {
     '*': { start: '*', end: '*' },
     '_': { start: '_', end: '_' },
     '~': { start: '~', end: '~' },
+    '^': { start: '^', end: '^' },
+    '"': { start: '"', end: '"' },
+    "'": { start: "'", end: "'" },
     '[': { start: '[', end: ']' },
-    ']': { start: '[', end: ']' },
     '(': { start: '(', end: ')' },
-    ')': { start: '(', end: ')' },
     '{': { start: '{', end: '}' },
-    '}': { start: '{', end: '}' }
+    '<': { start: '<', end: '>' },
 };
+//    ')': { start: '(', end: ')' },
+//    ']': { start: '[', end: ']' },
+//    '}': { start: '{', end: '}' }
 
+// Dead key codes that produce tilde (~) across various keyboard layouts
 const TILDE_DEAD_CODES = new Set([
-    'IntlBackslash',
-    'Backquote',
-    'Quote',
-    'IntlRo',
-    'KeyN'
+    'IntlBackslash',  // Many international layouts
+    'Backquote',      // US International, UK
+    'Quote',          // Some layouts
+    'IntlRo',         // Japanese/Brazilian
+    'KeyN',           // macOS Option+N
+    'BracketRight',   // Spanish, Portuguese
+    'Digit4',         // French AZERTY (AltGr+4)
+]);
+
+// Dead key codes that produce circumflex (^) across various keyboard layouts
+const CIRCUMFLEX_DEAD_CODES = new Set([
+    'KeyI',           // macOS Option+I
+    'Digit6',         // US International (Shift+6)
+    'BracketLeft',    // German, some international
+    'IntlBackslash',  // Some layouts
+    'Equal',          // Swiss/German
+    'Digit9',         // French AZERTY
+    'BracketRight',   // Some Nordic layouts
+    'Backquote',      // Some layouts
+]);
+
+// Dead key codes that produce apostrophe/acute (') across various keyboard layouts
+const APOSTROPHE_DEAD_CODES = new Set([
+    'Quote',          // US International, many layouts
+    'KeyE',           // macOS Option+E (acute accent)
+    'BracketLeft',    // Some layouts
+    'Equal',          // Some layouts
+    'Minus',          // Some Nordic layouts
 ]);
 
 function getMarkdownStyleKey(event) {
@@ -30,8 +58,16 @@ function getMarkdownStyleKey(event) {
     if (key && MARKDOWN_STYLE_PAIRS[key]) {
         return key;
     }
-    if (key === 'Dead' && event.code && TILDE_DEAD_CODES.has(event.code)) {
-        return '~';
+    if (key === 'Dead' && event.code) {
+        if (TILDE_DEAD_CODES.has(event.code)) {
+            return '~';
+        }
+        if (CIRCUMFLEX_DEAD_CODES.has(event.code)) {
+            return '^';
+        }
+        if (APOSTROPHE_DEAD_CODES.has(event.code)) {
+            return "'";
+        }
     }
     return null;
 }
