@@ -43,4 +43,4 @@
 - [ ] Review docs/wysiwyg-mapping.md and confirm all markdown-it plugins/custom syntaxes are captured in the mapping plan.
 - [ ] Review the Token -> Node/Mark and Serializer mapping tables in docs/wysiwyg-mapping.md for completeness.
 - [ ] Review src/wysiwyg/spec.ts for schema coverage and token mapping alignment with markdown-it tokens.
-- [ ] Review src/wysiwyg/tokenParser.ts and src/wysiwyg/serializer.ts skeletons for correct wiring with spec mappings.
+- [ ] Review src/wysiwyg/tokenParser.ts token tree parsing for correct block/inline mapping (marks, containers, includes, tags, media, and html tokens).

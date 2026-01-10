@@ -70,7 +70,7 @@ Inline nodes:
 - date_tag { value, kind }
 - person_tag { value }
 - temporal_tag { value, kind }
-- media_inline { src, mediaType } (optional if needed)
+- media_inline { src, mediaType, alt, title } (optional if needed)
 
 Marks:
 - em
@@ -117,16 +117,17 @@ This table ties current markdown-it token names to editor nodes/marks and the re
 | em_open/close | em | Standard mark |
 | strong_open/close | strong | Standard mark |
 | s_open/close | strike | must track style (~~ vs --) |
-| underline | underline | markdown-it-underline |
-| mark | mark | markdown-it-mark |
-| sub | sub | markdown-it-sub |
-| sup | sup | markdown-it-sup |
-| ins | ins | markdown-it-ins |
+| em_open/close | underline | when markup is `_` (markdown-it-underline reuses em tokens) |
+| mark_open/mark_close | mark | markdown-it-mark |
+| sub_open/sub_close | sub | markdown-it-sub |
+| sup_open/sup_close | sup | markdown-it-sup |
+| ins_open/ins_close | ins | markdown-it-ins |
+| code_inline | code | inline code token |
 | link_open/close | link | href/title attrs |
 | image | image/media_inline | handles pdf/diagram special cases |
 | audio/video | media_inline | children contain <source> tokens |
 | footnote_* | footnote nodes | doc-level footnote store |
-| abbr | abbr mark | title from token.attrs |
+| abbr_open/abbr_close | abbr mark | title from token.attrs |
 
 ## Serializer Mapping (Draft)
 High-level rules for converting editor nodes/marks back to Markdown.

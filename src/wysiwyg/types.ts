@@ -22,6 +22,12 @@ export type MarkdownItToken = {
     content?: string;
     info?: string;
     markup?: string;
+    nesting?: number;
+    level?: number;
+    block?: boolean;
+    map?: number[];
     meta?: Record<string, unknown>;
     children?: MarkdownItToken[];
+    filePath?: string;
+    attrGet?: (name: string) => string | null;
 };

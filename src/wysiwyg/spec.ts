@@ -127,7 +127,12 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
             inline: true,
             group: 'inline',
             atom: true,
-            attrs: { src: { default: '' }, mediaType: { default: 'image' } }
+            attrs: {
+                src: { default: '' },
+                mediaType: { default: 'image' },
+                alt: { default: '' },
+                title: { default: '' }
+            }
         },
         text: { group: 'inline' }
     },
@@ -183,14 +188,15 @@ export const tokenMappings: TokenMapping[] = [
     { tokens: ['em_open', 'em_close'], mark: 'em' },
     { tokens: ['strong_open', 'strong_close'], mark: 'strong' },
     { tokens: ['s_open', 's_close'], mark: 'strike', attrs: ['style'] },
-    { tokens: ['underline'], mark: 'underline' },
-    { tokens: ['mark'], mark: 'mark' },
-    { tokens: ['sub'], mark: 'sub' },
-    { tokens: ['sup'], mark: 'sup' },
-    { tokens: ['ins'], mark: 'ins' },
+    { tokens: ['em_open', 'em_close'], mark: 'underline', notes: 'markdown-it-underline uses em tokens with markup "_" and <u> tag' },
+    { tokens: ['mark_open', 'mark_close'], mark: 'mark' },
+    { tokens: ['sub_open', 'sub_close'], mark: 'sub' },
+    { tokens: ['sup_open', 'sup_close'], mark: 'sup' },
+    { tokens: ['ins_open', 'ins_close'], mark: 'ins' },
+    { tokens: ['code_inline'], mark: 'code', notes: 'Inline leaf token' },
     { tokens: ['link_open', 'link_close'], mark: 'link', attrs: ['href', 'title'] },
-    { tokens: ['abbr'], mark: 'abbr', attrs: ['title'] },
-    { tokens: ['image', 'audio', 'video'], node: 'media_inline', attrs: ['src', 'mediaType'] },
+    { tokens: ['abbr_open', 'abbr_close'], mark: 'abbr', attrs: ['title'] },
+    { tokens: ['image', 'audio', 'video'], node: 'media_inline', attrs: ['src', 'mediaType', 'alt', 'title'] },
     { tokens: ['footnote_ref', 'footnote_block'], node: 'footnote', notes: 'Doc-level store required' }
 ];
 
