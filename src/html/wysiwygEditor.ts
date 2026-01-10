@@ -306,7 +306,7 @@ function createMediaView(node: any, isBlock: boolean): NodeView {
             mediaEl.setAttribute('data-original-src', src);
             mediaEl.contentEditable = 'false';
 
-            if (mediaType === 'video' && src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+            if ((mediaType === 'video' || mediaType === 'audio') && src && !src.startsWith('data:') && !src.startsWith('blob:')) {
                 const api = window as unknown as MediaPathHelpers;
                 mediaEl.addEventListener('error', () => {
                     if (typeof api.handleVideoNotFound === 'function') {

@@ -1982,16 +1982,38 @@ function renderMarkdown(text, includeContext) {
         md.renderer.rules.audio = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
 
-            // Process source children to dynamically resolve paths
-            updateSourceChildren(token, resolveMediaSourcePath);
+            // Get original source path before processing
+            const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
             // Use plugin renderer if available, otherwise use fallback that properly handles children
+            let audioHtml;
             if (originalAudioRenderer) {
-                return originalAudioRenderer(tokens, idx, options, env, renderer);
+                audioHtml = originalAudioRenderer(tokens, idx, options, env, renderer);
             } else {
                 // Fallback: manually render audio element with children (source tags)
-                return renderTokenWithChildren(token, renderer, options, env);
+                audioHtml = renderTokenWithChildren(token, renderer, options, env);
             }
+
+            // Skip wrapping for data URLs and blob URLs
+            if (!originalSrc || originalSrc.startsWith('data:') || originalSrc.startsWith('blob:')) {
+                return audioHtml;
+            }
+
+            // Escape the path for use in onclick handlers and error handler
+            const escapedPath = originalSrc.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
+
+            // Inject error handler into audio element
+            const audioWithError = audioHtml.replace(
+                /<audio([^>]*)>/,
+                `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+            );
+
+            // Wrap with overlay container for path conversion menu (same as video)
+            return `<div class="video-path-overlay-container" data-original-src="${escapeHtml(originalSrc)}">
+                ${audioWithError}
+                <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+            </div>`;
         };
 
         // Rest of the function remains the same...
