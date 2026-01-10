@@ -1793,6 +1793,8 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .ProseMirror {
+  display: flex;
+  flex-direction: column;
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
