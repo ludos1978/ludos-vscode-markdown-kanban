@@ -56,6 +56,7 @@ type MediaPathHelpers = {
     queuePDFSlideshow?: (id: string, filePath: string, includeDir?: string) => void;
     queueMermaidRender?: (id: string, code: string) => void;
     queuePlantUMLRender?: (id: string, code: string) => void;
+    processDiagramQueue?: () => void;
 };
 
 function resolveDisplaySrc(originalSrc: string): string {
@@ -194,14 +195,23 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     const includeDir = api.currentTaskIncludeContext?.includeDir;
     if (diagramInfo.mode === 'diagram' && diagramInfo.diagramType && typeof api.queueDiagramRender === 'function') {
         api.queueDiagramRender(placeholderId, diagramInfo.filePath, diagramInfo.diagramType, includeDir);
+        if (typeof api.processDiagramQueue === 'function') {
+            api.processDiagramQueue();
+        }
         return;
     }
     if (diagramInfo.mode === 'pdf-page' && typeof api.queuePDFPageRender === 'function') {
         api.queuePDFPageRender(placeholderId, diagramInfo.filePath, diagramInfo.pageNumber || 1, includeDir);
+        if (typeof api.processDiagramQueue === 'function') {
+            api.processDiagramQueue();
+        }
         return;
     }
     if (diagramInfo.mode === 'pdf-slideshow' && typeof api.queuePDFSlideshow === 'function') {
         api.queuePDFSlideshow(placeholderId, diagramInfo.filePath, includeDir);
+        if (typeof api.processDiagramQueue === 'function') {
+            api.processDiagramQueue();
+        }
     }
 }
 
