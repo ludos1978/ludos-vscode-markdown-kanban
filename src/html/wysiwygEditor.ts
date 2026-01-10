@@ -410,6 +410,7 @@ function createDiagramFenceView(node: any): NodeView {
     return {
         dom,
         contentDOM: code,
+        ignoreMutation: (mutation) => !code.contains(mutation.target as Node),
         update: (nextNode) => {
             if (nextNode.type !== node.type) {
                 return false;
