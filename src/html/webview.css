@@ -1779,7 +1779,7 @@ body.section-height-limited .task-section figure img {
 .task-description-wysiwyg {
   font-size: 13px;
   line-height: 1.5;
-  padding: 4px;
+  padding: 8px;
   width: 100%;
   min-height: 3em;
   background: var(--vscode-input-background);
@@ -1793,6 +1793,49 @@ body.section-height-limited .task-section figure img {
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+  word-wrap: break-word;
+  max-height: inherit;
+  max-width: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.task-description-wysiwyg .ProseMirror h1,
+.task-description-wysiwyg .ProseMirror h2,
+.task-description-wysiwyg .ProseMirror h3,
+.task-description-wysiwyg .ProseMirror h4,
+.task-description-wysiwyg .ProseMirror h5,
+.task-description-wysiwyg .ProseMirror h6 {
+  margin: 0.25em 0;
+}
+
+.task-description-wysiwyg .ProseMirror p {
+  margin: 0.5em 0;
+}
+
+.task-description-wysiwyg .ProseMirror ul,
+.task-description-wysiwyg .ProseMirror ol {
+  margin: 0.125em 0;
+  padding-left: 1.5em;
+}
+
+.task-description-wysiwyg .ProseMirror code {
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.task-description-wysiwyg .ProseMirror pre {
+  padding: 0.5em;
+  border-radius: 3px;
+  overflow-x: auto;
+  margin: 0.25em 0;
+}
+
+.task-description-wysiwyg .ProseMirror a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
 }
 
 .task-description-wysiwyg .wysiwyg-include-inline,
