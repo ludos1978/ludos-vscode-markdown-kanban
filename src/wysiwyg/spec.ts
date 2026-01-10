@@ -169,6 +169,7 @@ export type TokenMapping = {
 
 export const tokenMappings: TokenMapping[] = [
     { tokens: ['paragraph_open', 'paragraph_close'], node: 'paragraph' },
+    { tokens: ['figure_open', 'figure_close'], node: 'paragraph', notes: 'markdown-it-image-figures wraps image-only paragraphs as figure' },
     { tokens: ['heading_open', 'heading_close'], node: 'heading', attrs: ['level'] },
     { tokens: ['blockquote_open', 'blockquote_close'], node: 'blockquote' },
     { tokens: ['bullet_list_open', 'bullet_list_close'], node: 'bullet_list' },

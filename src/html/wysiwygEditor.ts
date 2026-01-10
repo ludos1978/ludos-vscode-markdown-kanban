@@ -3,7 +3,7 @@ import { EditorView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, setBlockType, toggleMark } from 'prosemirror-commands';
-import { inputRules, smartQuotes, ellipsis, emDash } from 'prosemirror-inputrules';
+import { inputRules, smartQuotes, ellipsis, emDash, InputRule } from 'prosemirror-inputrules';
 import { wrapInList } from 'prosemirror-schema-list';
 
 import { buildProseMirrorSchema } from '../wysiwyg/prosemirrorSchema';
@@ -161,6 +161,122 @@ function wrapSelectionWithText(view: EditorView, start: string, end: string): bo
     return true;
 }
 
+function inlineNodeToMarkdown(node: any, temporalPrefix: string): string | null {
+    if (!node || !node.type?.name) {
+        return null;
+    }
+    switch (node.type.name) {
+        case 'media_inline': {
+            const mediaType = node.attrs?.mediaType || 'image';
+            const src = node.attrs?.src || '';
+            if (!src) {
+                return null;
+            }
+            if (mediaType === 'image') {
+                const alt = node.attrs?.alt || '';
+                const title = node.attrs?.title ? ` "${node.attrs.title}"` : '';
+                return `![${alt}](${src}${title})`;
+            }
+            const tag = mediaType === 'audio' ? 'audio' : 'video';
+            return `<${tag} src="${src}" controls></${tag}>`;
+        }
+        case 'include_inline': {
+            const path = node.attrs?.path || '';
+            return path ? `!!!include(${path})!!!` : null;
+        }
+        case 'wiki_link': {
+            const document = node.attrs?.document || '';
+            const title = node.attrs?.title || '';
+            if (!document) {
+                return null;
+            }
+            return title && title !== document ? `[[${document}|${title}]]` : `[[${document}]]`;
+        }
+        case 'tag': {
+            const value = node.attrs?.value || '';
+            return value ? `#${value}` : null;
+        }
+        case 'date_tag': {
+            const value = node.attrs?.value || '';
+            return value ? `@${value}` : null;
+        }
+        case 'person_tag': {
+            const value = node.attrs?.value || '';
+            return value ? `@${value}` : null;
+        }
+        case 'temporal_tag': {
+            const value = node.attrs?.value || '';
+            return value ? `${temporalPrefix}${value}` : null;
+        }
+        case 'footnote': {
+            const id = node.attrs?.id || '';
+            return id ? `[^${id}]` : null;
+        }
+        default:
+            return null;
+    }
+}
+
+function buildMarkdownInputRules(schema: any): InputRule[] {
+    const rules: InputRule[] = [];
+
+    if (schema.nodes.media_inline) {
+        rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)$/, (state, match, start, end) => {
+            const alt = match[1] || '';
+            const src = match[2] || '';
+            const title = match[3] || '';
+            if (!src) {
+                return null;
+            }
+            const attrs: Record<string, unknown> = { src, mediaType: 'image' };
+            if (alt) {
+                attrs.alt = alt;
+            }
+            if (title) {
+                attrs.title = title;
+            }
+            return state.tr.replaceWith(start, end, schema.nodes.media_inline.create(attrs));
+        }));
+    }
+
+    if (schema.marks.link) {
+        rules.push(new InputRule(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)$/, (state, match, start, end) => {
+            const text = match[1] || '';
+            const href = match[2] || '';
+            const title = match[3] || '';
+            if (!text || !href) {
+                return null;
+            }
+            const mark = schema.marks.link.create({ href, title });
+            const textNode = schema.text(text, [mark]);
+            return state.tr.replaceWith(start, end, textNode);
+        }));
+    }
+
+    if (schema.nodes.include_inline) {
+        rules.push(new InputRule(/!!!include\(([^)]+)\)!!!$/, (state, match, start, end) => {
+            const path = match[1]?.trim() || '';
+            if (!path) {
+                return null;
+            }
+            return state.tr.replaceWith(start, end, schema.nodes.include_inline.create({ path, includeType: 'regular', missing: false }));
+        }));
+    }
+
+    if (schema.nodes.wiki_link) {
+        rules.push(new InputRule(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/, (state, match, start, end) => {
+            const document = match[1]?.trim() || '';
+            const title = match[2]?.trim() || '';
+            if (!document) {
+                return null;
+            }
+            return state.tr.replaceWith(start, end, schema.nodes.wiki_link.create({ document, title: title || document }));
+        }));
+    }
+
+    return rules;
+}
+
 export class WysiwygEditor {
     private view: EditorView;
     private lastMarkdown: string;
@@ -180,8 +296,30 @@ export class WysiwygEditor {
 
         const plugins = [
             history(),
-            inputRules({ rules: smartQuotes.concat(ellipsis, emDash) }),
+            inputRules({ rules: smartQuotes.concat(ellipsis, emDash, buildMarkdownInputRules(schema)) }),
             keymap({
+                Backspace: (state, dispatch) => {
+                    const selection = state.selection;
+                    if (!selection.empty) {
+                        return false;
+                    }
+                    const $from = selection.$from;
+                    const nodeBefore = $from.nodeBefore;
+                    if (!nodeBefore) {
+                        return false;
+                    }
+                    const markdown = inlineNodeToMarkdown(nodeBefore, this.temporalPrefix);
+                    if (!markdown) {
+                        return false;
+                    }
+                    const from = $from.pos - nodeBefore.nodeSize;
+                    const tr = state.tr.insertText(markdown, from, $from.pos);
+                    tr.setSelection(TextSelection.create(tr.doc, from + markdown.length));
+                    if (dispatch) {
+                        dispatch(tr);
+                    }
+                    return true;
+                },
                 'Mod-z': undo,
                 'Shift-Mod-z': redo,
                 'Mod-y': redo,
