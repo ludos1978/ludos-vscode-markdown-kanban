@@ -6,3 +6,4 @@ export * from './schemaBuilder';
 export * from './markdownItPlugins';
 export * from './markdownItFactory';
 export * from './markdownItAdapter';
+export * from './pipeline';
