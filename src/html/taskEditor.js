@@ -104,6 +104,7 @@ class TaskEditor {
         this.indentUnit = '  ';
         this._stackLayoutNeedsFullRecalc = false;
         this._stackLayoutPendingColumns = new Set();
+        this._wysiwygRecalcTimeout = null;
         this.setupGlobalHandlers();
     }
 
@@ -117,7 +118,9 @@ class TaskEditor {
             return null;
         }
 
-        const value = this.currentEditor.element.value || this.currentEditor.element.textContent;
+        const value = this.currentEditor.wysiwyg
+            ? this.currentEditor.wysiwyg.getMarkdown()
+            : (this.currentEditor.element.value || this.currentEditor.element.textContent);
 
         return {
             type: this.currentEditor.type,
@@ -174,7 +177,9 @@ class TaskEditor {
 
         // Update the original value to match what was just saved
         // This prevents the editor from thinking there are still changes
-        const currentValue = this.currentEditor.element.value || this.currentEditor.element.textContent;
+        const currentValue = this.currentEditor.wysiwyg
+            ? this.currentEditor.wysiwyg.getMarkdown()
+            : (this.currentEditor.element.value || this.currentEditor.element.textContent);
         this.currentEditor.originalValue = currentValue;
 
     }
@@ -830,9 +835,14 @@ class TaskEditor {
      * Show edit element and hide display element
      * @private
      */
-    _setupEditVisibility(displayElement, editElement) {
+    _setupEditVisibility(displayElement, editElement, wysiwygContainer = null) {
         if (displayElement) { displayElement.style.display = 'none'; }
-        editElement.style.display = 'block';
+        if (wysiwygContainer) {
+            editElement.style.display = 'none';
+            wysiwygContainer.style.display = 'block';
+        } else {
+            editElement.style.display = 'block';
+        }
 
         // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
         // The kanban-board is the actual scroll container when multi-row is active
@@ -843,7 +853,9 @@ class TaskEditor {
             kanbanBoard._editingMinHeight = currentHeight; // Store for later cleanup
         }
 
-        this.autoResize(editElement);
+        if (!wysiwygContainer) {
+            this.autoResize(editElement);
+        }
     }
 
     /**
@@ -863,7 +875,12 @@ class TaskEditor {
      * Position cursor in edit element
      * @private
      */
-    _positionCursor(editElement, type, preserveCursor) {
+    _positionCursor(editElement, type, preserveCursor, wysiwygEditor = null) {
+        if (wysiwygEditor) {
+            wysiwygEditor.focus();
+            return;
+        }
+
         editElement.focus();
 
         if (!preserveCursor) {
@@ -881,17 +898,19 @@ class TaskEditor {
      * Store current editor state
      * @private
      */
-    _storeEditorState(editElement, displayElement, type, taskId, columnId) {
+    _storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext = null) {
         this.currentEditor = {
             element: editElement,
             displayElement: displayElement,
             type: type,
             taskId: taskId || window.getTaskIdFromElement(editElement),
             columnId: columnId || window.getColumnIdFromElement(editElement),
-            originalValue: editElement.value
+            originalValue: editElement.value,
+            wysiwyg: wysiwygContext?.editor || null,
+            wysiwygContainer: wysiwygContext?.container || null
         };
 
-        if (typeof window.createSpecialCharOverlay === 'function') {
+        if (!wysiwygContext && typeof window.createSpecialCharOverlay === 'function') {
             window.createSpecialCharOverlay(editElement);
         }
     }
@@ -1217,6 +1236,95 @@ class TaskEditor {
         });
     }
 
+    _shouldUseWysiwyg(type) {
+        if (type !== 'task-description') {
+            return false;
+        }
+        if (typeof window.WysiwygEditor !== 'function') {
+            return false;
+        }
+        const configValue = window.configManager?.getConfig('wysiwygEnabled', true);
+        return configValue !== false;
+    }
+
+    _setupWysiwygEditor(editElement, containerElement) {
+        if (!containerElement || typeof window.WysiwygEditor !== 'function') {
+            return null;
+        }
+
+        let wysiwygContainer = containerElement.querySelector('.task-description-wysiwyg');
+        if (!wysiwygContainer) {
+            wysiwygContainer = document.createElement('div');
+            wysiwygContainer.className = 'task-description-wysiwyg task-description-edit';
+            wysiwygContainer.setAttribute('data-field', 'description');
+            containerElement.appendChild(wysiwygContainer);
+        }
+
+        wysiwygContainer.innerHTML = '';
+
+        const temporalPrefix = window.TAG_PREFIXES?.TEMPORAL || '!';
+        const editor = new window.WysiwygEditor(wysiwygContainer, {
+            markdown: editElement.value || '',
+            temporalPrefix,
+            onChange: (markdown) => {
+                editElement.value = markdown;
+                this._handleWysiwygInput(containerElement);
+            }
+        });
+
+        return { editor, container: wysiwygContainer };
+    }
+
+    _setupWysiwygHandlers(editor, wysiwygContainer, containerElement) {
+        const dom = editor.getViewDom();
+
+        dom.addEventListener('blur', () => {
+            if (this.isTransitioning) { return; }
+
+            setTimeout(() => {
+                if (document.activeElement !== dom &&
+                    !this.isTransitioning &&
+                    !document.hidden &&
+                    document.hasFocus()) {
+
+                    const activeElement = document.activeElement;
+                    const isEditingElsewhere = activeElement && (
+                        activeElement.classList.contains('task-title-edit') ||
+                        activeElement.classList.contains('task-description-edit') ||
+                        activeElement.classList.contains('column-title-edit') ||
+                        (activeElement.closest && activeElement.closest('.task-description-wysiwyg'))
+                    );
+                    if (!isEditingElsewhere) {
+                        this.save();
+                    }
+                }
+            }, 150);
+        });
+
+        this._setupMouseHandlers(dom);
+
+        if (wysiwygContainer) {
+            wysiwygContainer.addEventListener('mousedown', (e) => e.stopPropagation());
+        }
+
+        this._handleWysiwygInput(containerElement);
+    }
+
+    _handleWysiwygInput(containerElement) {
+        if (!containerElement) { return; }
+        if (this._wysiwygRecalcTimeout) {
+            clearTimeout(this._wysiwygRecalcTimeout);
+        }
+
+        this._wysiwygRecalcTimeout = setTimeout(() => {
+            const column = containerElement.closest('.kanban-full-height-column');
+            const columnId = column ? column.dataset.columnId : null;
+            this._requestStackLayoutRecalc(columnId);
+            this._flushStackLayoutRecalc();
+            this._wysiwygRecalcTimeout = null;
+        }, 150);
+    }
+
     // ============= MAIN startEdit METHOD =============
 
     /**
@@ -1267,8 +1375,15 @@ class TaskEditor {
             console.log('[START-EDIT] After init value', { scrollTop: container?.scrollTop });
         }
 
+        const useWysiwyg = this._shouldUseWysiwyg(type);
+        let wysiwygContext = null;
+
+        if (useWysiwyg) {
+            wysiwygContext = this._setupWysiwygEditor(editElement, containerElement);
+        }
+
         // Show edit element and setup visibility
-        this._setupEditVisibility(displayElement, editElement);
+        this._setupEditVisibility(displayElement, editElement, wysiwygContext?.container);
 
         if (window.kanbanDebug?.enabled) {
             console.log('[START-EDIT] After visibility', { scrollTop: container?.scrollTop });
@@ -1282,22 +1397,26 @@ class TaskEditor {
         }
 
         // Position cursor
-        this._positionCursor(editElement, type, preserveCursor);
+        this._positionCursor(editElement, type, preserveCursor, wysiwygContext?.editor);
 
         if (window.kanbanDebug?.enabled) {
             console.log('[START-EDIT] After cursor position', { scrollTop: container?.scrollTop });
         }
 
         // Store editor state
-        this._storeEditorState(editElement, displayElement, type, taskId, columnId);
+        this._storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext);
 
         // Notify backend
         this._notifyEditingStarted(type, taskId, columnId);
 
         // Setup event handlers
-        this._setupInputHandler(editElement, containerElement);
-        this._setupBlurHandler(editElement);
-        this._setupMouseHandlers(editElement);
+        if (wysiwygContext?.editor) {
+            this._setupWysiwygHandlers(wysiwygContext.editor, wysiwygContext.container, containerElement);
+        } else {
+            this._setupInputHandler(editElement, containerElement);
+            this._setupBlurHandler(editElement);
+            this._setupMouseHandlers(editElement);
+        }
     }
 
     /**
@@ -1361,7 +1480,11 @@ class TaskEditor {
         if (!this.currentEditor || this.isTransitioning) {return;}
         
         // Restore original value
-        this.currentEditor.element.value = this.currentEditor.originalValue;
+        if (this.currentEditor.wysiwyg) {
+            this.currentEditor.wysiwyg.setMarkdown(this.currentEditor.originalValue);
+        } else {
+            this.currentEditor.element.value = this.currentEditor.originalValue;
+        }
         this.closeEditor();
     }
 
@@ -1374,6 +1497,9 @@ class TaskEditor {
         if (!window.cachedBoard || !window.cachedBoard.columns) { return; }
 
         const { type } = this.currentEditor;
+        if (this.currentEditor.wysiwyg) {
+            this.currentEditor.element.value = this.currentEditor.wysiwyg.getMarkdown();
+        }
 
         switch (type) {
             case 'column-title':
@@ -1922,9 +2048,9 @@ class TaskEditor {
     closeEditor() {
         if (!this.currentEditor) {return;}
 
-        const { element, displayElement, type } = this.currentEditor;
+        const { element, displayElement, type, wysiwyg, wysiwygContainer } = this.currentEditor;
 
-        if (typeof window.removeSpecialCharOverlay === 'function') {
+        if (!wysiwyg && typeof window.removeSpecialCharOverlay === 'function') {
             window.removeSpecialCharOverlay(element);
         }
 
@@ -1933,8 +2059,17 @@ class TaskEditor {
         element.removeEventListener('mousedown', this._handleMouseDown);
         element.removeEventListener('dblclick', this._handleDblClick);
 
-        // Hide edit element
-        element.style.display = 'none';
+        if (wysiwyg) {
+            wysiwyg.destroy();
+            if (wysiwygContainer) {
+                wysiwygContainer.style.display = 'none';
+                wysiwygContainer.innerHTML = '';
+            }
+            element.style.display = 'none';
+        } else {
+            // Hide edit element
+            element.style.display = 'none';
+        }
 
         // Show display element
         if (displayElement) {

@@ -49,3 +49,5 @@
 - [ ] Run unit tests for `buildWysiwygSchemaSpec` and confirm text/doc node normalization in `WysiwygSchemaBuilder.test.ts`.
 - [ ] Run unit tests for markdown-it adapter (`WysiwygMarkdownItAdapter.test.ts`) covering tags, temporal prefix, wiki links, and include blocks.
 - [ ] Run unit tests for WYSIWYG pipeline (`WysiwygPipeline.test.ts`) and confirm round-trip output stays stable for tags + temporal prefix.
+- [ ] Enable WYSIWYG editing and confirm task descriptions open with the ProseMirror editor, save back to markdown, and keep include/tag/wiki link nodes visible.
+- [ ] Enable WYSIWYG editing and confirm the editor UI actually renders (no blank/hidden editor) and no missing `wysiwyg-editor.js` asset errors appear in the webview console.

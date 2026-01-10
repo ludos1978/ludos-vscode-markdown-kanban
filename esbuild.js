@@ -272,23 +272,25 @@ async function main() {
 		],
 	});
 
-	// Frontend bundle is DISABLED - loading individual scripts instead
-	// To re-enable, uncomment the frontendCtx and update watch/rebuild calls
-	// const frontendCtx = await esbuild.context({
-	// 	entryPoints: ['src/html/main.js'],
-	// 	bundle: true,
-	// 	format: 'iife',
-	// 	minify: production,
-	// 	sourcemap: !production,
-	// 	platform: 'browser',
-	// 	outfile: 'dist/src/html/bundle.js',
-	// });
+	// WYSIWYG frontend bundle (ProseMirror-based editor)
+	const wysiwygCtx = await esbuild.context({
+		entryPoints: ['src/html/wysiwygEditor.ts'],
+		bundle: true,
+		format: 'iife',
+		minify: production,
+		sourcemap: !production,
+		platform: 'browser',
+		outfile: 'dist/src/html/wysiwyg-editor.js',
+	});
 
 	if (watch) {
 		await backendCtx.watch();
+		await wysiwygCtx.watch();
 	} else {
 		await backendCtx.rebuild();
+		await wysiwygCtx.rebuild();
 		await backendCtx.dispose();
+		await wysiwygCtx.dispose();
 	}
 }
 

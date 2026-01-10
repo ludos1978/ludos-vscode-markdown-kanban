@@ -361,6 +361,7 @@ export class WebviewManager {
             'utils/dropIndicatorManager.js',
             'utils/rowLayoutManager.js',
             'markdownRenderer.js',
+            'wysiwyg-editor.js',
             'taskEditor.js',
             'boardRenderer.js',
             'dragDrop.js',

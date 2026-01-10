@@ -134,6 +134,12 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
                 title: { default: '' }
             }
         },
+        footnote: {
+            inline: true,
+            group: 'inline',
+            atom: true,
+            attrs: { id: { default: '' }, block: { default: false } }
+        },
         text: { group: 'inline' }
     },
     marks: {

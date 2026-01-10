@@ -7,3 +7,5 @@ export * from './markdownItPlugins';
 export * from './markdownItFactory';
 export * from './markdownItAdapter';
 export * from './pipeline';
+export * from './prosemirrorSchema';
+export * from './prosemirrorAdapter';

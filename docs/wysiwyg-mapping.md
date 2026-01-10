@@ -71,6 +71,7 @@ Inline nodes:
 - person_tag { value }
 - temporal_tag { value, kind }
 - media_inline { src, mediaType, alt, title } (optional if needed)
+- footnote { id, block } (inline atom)
 
 Marks:
 - em
