@@ -2063,7 +2063,16 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-preview {
-  margin: 4px 0;
+  margin: 0;
+}
+
+.task-description-wysiwyg .diagram-overlay-container,
+.task-description-wysiwyg .mermaid-diagram,
+.task-description-wysiwyg .plantuml-diagram,
+.task-description-wysiwyg .mermaid-placeholder,
+.task-description-wysiwyg .plantuml-placeholder,
+.task-description-wysiwyg .diagram-placeholder {
+  margin: 0;
 }
 
 .task-description-wysiwyg .wysiwyg-include-block {
