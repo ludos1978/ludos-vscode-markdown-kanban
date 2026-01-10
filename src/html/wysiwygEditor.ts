@@ -100,6 +100,40 @@ function focusDiagram(view: EditorView, nodePos: number): void {
     view.focus();
 }
 
+function addMulticolumnColumn(view: EditorView, node: any, nodePos: number): void {
+    if (!node || node.type?.name !== 'multicolumn') {
+        return;
+    }
+    const schema = view.state.schema;
+    const columnNode = schema.nodes.multicolumn_column.createAndFill({ growth: 1 });
+    if (!columnNode) {
+        return;
+    }
+    const insertPos = nodePos + node.nodeSize - 1;
+    view.dispatch(view.state.tr.insert(insertPos, columnNode));
+}
+
+function removeMulticolumnColumn(view: EditorView, node: any, nodePos: number): void {
+    if (!node || node.type?.name !== 'multicolumn') {
+        return;
+    }
+    if (node.childCount <= 1) {
+        return;
+    }
+    let lastOffset: number | null = null;
+    let lastSize = 0;
+    node.forEach((child: any, offset: number) => {
+        lastOffset = offset;
+        lastSize = child.nodeSize;
+    });
+    if (lastOffset === null) {
+        return;
+    }
+    const from = nodePos + 1 + lastOffset;
+    const to = from + lastSize;
+    view.dispatch(view.state.tr.delete(from, to));
+}
+
 function getStyleKey(event: KeyboardEvent): string | null {
     if (!event) {
         return null;
@@ -218,6 +252,18 @@ export class WysiwygEditor {
                 }
                 const button = target.closest?.('.wysiwyg-edit-btn') as HTMLElement | null;
                 if (!button) {
+                    const columnButton = target.closest?.('.wysiwyg-multicolumn-btn') as HTMLElement | null;
+                    if (columnButton && node?.type?.name === 'multicolumn') {
+                        const action = columnButton.dataset?.action || '';
+                        if (action === 'add') {
+                            addMulticolumnColumn(view, node, nodePos);
+                            return true;
+                        }
+                        if (action === 'remove') {
+                            removeMulticolumnColumn(view, node, nodePos);
+                            return true;
+                        }
+                    }
                     return false;
                 }
                 event.preventDefault();

@@ -45,9 +45,27 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
                 return ['td', attrs, 0];
             };
         case 'multicolumn':
-            return () => ['div', { class: 'wysiwyg-multicolumn' }, 0];
+            return () => [
+                'div',
+                { class: 'wysiwyg-multicolumn' },
+                [
+                    'div',
+                    { class: 'wysiwyg-multicolumn-toolbar' },
+                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'add', type: 'button', contenteditable: 'false' }, '+ Column'],
+                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'remove', type: 'button', contenteditable: 'false' }, '− Column']
+                ],
+                ['div', { class: 'wysiwyg-multicolumn-columns' }, 0]
+            ];
         case 'multicolumn_column':
-            return (node) => ['div', { class: 'wysiwyg-multicolumn-column', 'data-growth': node.attrs.growth }, 0];
+            return (node) => [
+                'div',
+                {
+                    class: 'wysiwyg-multicolumn-column',
+                    'data-growth': node.attrs.growth,
+                    style: `flex: ${node.attrs.growth || 1} 1 0%`
+                },
+                0
+            ];
         case 'container':
             return (node) => ['div', { class: `wysiwyg-container wysiwyg-container-${node.attrs.kind || 'note'}`, 'data-kind': node.attrs.kind || 'note' }, 0];
         case 'include_block':
