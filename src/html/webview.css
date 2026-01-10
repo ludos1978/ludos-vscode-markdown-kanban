@@ -1818,7 +1818,8 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .ProseMirror p {
-  margin: 0.5em 0;
+  margin: 0.5em 0 !important;
+  padding: 0;
 }
 
 .task-description-wysiwyg .ProseMirror ul,
