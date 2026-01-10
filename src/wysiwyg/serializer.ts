@@ -51,6 +51,8 @@ function serializeBlock(node: WysiwygNode, config: Required<WysiwygSerializerOpt
     switch (node.type) {
         case 'paragraph':
             return serializeInlineContent(node.content, config);
+        case 'media_block':
+            return serializeMediaInline(node);
         case 'heading': {
             const level = clampNumber(node.attrs?.level, 1, 6, 1);
             return `${'#'.repeat(level)} ${serializeInlineContent(node.content, config)}`.trimEnd();

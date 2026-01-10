@@ -131,6 +131,34 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
                         node.attrs.src || ''
                     ]
             );
+        case 'media_block':
+            return (node) => (
+                (node.attrs.mediaType || 'image') === 'image'
+                    ? [
+                        'div',
+                        {
+                            class: 'image-path-overlay-container wysiwyg-media wysiwyg-media-block',
+                            'data-image-path': node.attrs.src || '',
+                            'data-src': node.attrs.src || '',
+                            'data-type': node.attrs.mediaType || 'image'
+                        },
+                        ['img', {
+                            src: node.attrs.src || '',
+                            alt: node.attrs.alt || '',
+                            title: node.attrs.title || '',
+                            class: 'markdown-image',
+                            'data-original-src': node.attrs.src || '',
+                            contenteditable: 'false'
+                        }],
+                        ['button', { class: 'image-menu-btn', 'data-action': 'image-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰']
+                    ]
+                    : [
+                        'div',
+                        { class: 'video-path-overlay-container wysiwyg-media wysiwyg-media-block', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
+                        ['button', { class: 'video-menu-btn', 'data-action': 'video-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰'],
+                        node.attrs.src || ''
+                    ]
+            );
         case 'footnote':
             return (node) => ['span', { class: 'wysiwyg-footnote', 'data-id': node.attrs.id || '' }, `[^${node.attrs.id || ''}]`];
         case 'text':

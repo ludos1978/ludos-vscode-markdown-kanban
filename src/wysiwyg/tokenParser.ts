@@ -116,7 +116,7 @@ function createTextNode(text: string, marks: WysiwygMark[]): WysiwygNode {
     return node;
 }
 
-function createMediaInlineNode(token: MarkdownItToken): WysiwygNode {
+function createMediaNode(token: MarkdownItToken, nodeType: 'media_inline' | 'media_block'): WysiwygNode {
     const mediaType = token.type === 'video' ? 'video' : token.type === 'audio' ? 'audio' : 'image';
     const src = getTokenAttr(token, 'src') ?? getChildAttr(token, 'src') ?? '';
     const attrs: Record<string, unknown> = { src, mediaType };
@@ -131,7 +131,15 @@ function createMediaInlineNode(token: MarkdownItToken): WysiwygNode {
         }
     }
 
-    return { type: 'media_inline', attrs };
+    return { type: nodeType, attrs };
+}
+
+function createMediaInlineNode(token: MarkdownItToken): WysiwygNode {
+    return createMediaNode(token, 'media_inline');
+}
+
+function createMediaBlockNode(token: MarkdownItToken): WysiwygNode {
+    return createMediaNode(token, 'media_block');
 }
 
 function createIncludeInlineNode(token: MarkdownItToken): WysiwygNode {
@@ -419,6 +427,24 @@ function parseInlineTokens(tokens: MarkdownItToken[], activeMarks: WysiwygMark[]
     return nodes;
 }
 
+function extractMediaOnlyInlineTokens(tokens: MarkdownItToken[]): MarkdownItToken[] | null {
+    const mediaTokens: MarkdownItToken[] = [];
+    for (const token of tokens) {
+        if (token.type === 'image' || token.type === 'audio' || token.type === 'video') {
+            mediaTokens.push(token);
+            continue;
+        }
+        if (token.type === 'text' && (token.content || '').trim() === '') {
+            continue;
+        }
+        if (token.type === 'softbreak' || token.type === 'hardbreak') {
+            continue;
+        }
+        return null;
+    }
+    return mediaTokens.length > 0 ? mediaTokens : null;
+}
+
 function resolveBlockNodeType(token: MarkdownItToken): string | null {
     if (token.type.startsWith('container_')) {
         return 'container';
@@ -505,7 +531,7 @@ function createBlockLeafNode(token: MarkdownItToken): WysiwygNode | null {
         case 'image':
         case 'audio':
         case 'video':
-            return createMediaInlineNode(token);
+            return createMediaBlockNode(token);
         case 'footnote_block':
             return { type: 'footnote', attrs: { block: true } };
         default:
@@ -530,6 +556,9 @@ function closeNodeForToken(token: MarkdownItToken, stack: WysiwygNode[]): void {
     for (let i = stack.length - 1; i > 0; i -= 1) {
         if (stack[i].type === nodeType) {
             const node = stack.splice(i, 1)[0];
+            if ((node as WysiwygNode & { __skip?: boolean }).__skip) {
+                return;
+            }
             appendNode(stack[stack.length - 1], node);
             return;
         }
@@ -551,8 +580,19 @@ export function parseMarkdownItTokens(tokens: MarkdownItToken[]): WysiwygDoc {
         }
 
         if (token.type === 'inline' && token.children) {
+            const current = stack[stack.length - 1];
+            const parent = stack.length > 1 ? stack[stack.length - 2] : current;
+            const mediaOnly = current?.type === 'paragraph'
+                ? extractMediaOnlyInlineTokens(token.children)
+                : null;
+            if (mediaOnly && current?.type === 'paragraph') {
+                mediaOnly.forEach(mediaToken => appendNode(parent, createMediaBlockNode(mediaToken)));
+                (current as WysiwygNode & { __skip?: boolean }).__skip = true;
+                continue;
+            }
+
             const inlineNodes = parseInlineTokens(token.children);
-            inlineNodes.forEach(node => appendNode(stack[stack.length - 1], node));
+            inlineNodes.forEach(node => appendNode(current, node));
             continue;
         }
 

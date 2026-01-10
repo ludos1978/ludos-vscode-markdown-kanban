@@ -136,6 +136,16 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
                 title: { default: '' }
             }
         },
+        media_block: {
+            group: 'block',
+            atom: true,
+            attrs: {
+                src: { default: '' },
+                mediaType: { default: 'image' },
+                alt: { default: '' },
+                title: { default: '' }
+            }
+        },
         footnote: {
             inline: true,
             group: 'inline',
@@ -236,5 +246,6 @@ export const serializerRules: SerializerRule[] = [
     { mark: 'ins', strategy: '++ins++' },
     { mark: 'abbr', strategy: 'keep title in definition store' },
     { node: 'media_inline', strategy: 'markdown-it-media syntax where available' },
+    { node: 'media_block', strategy: 'markdown-it-media syntax where available' },
     { node: 'footnote', strategy: 'preserve ids and definition ordering' }
 ];

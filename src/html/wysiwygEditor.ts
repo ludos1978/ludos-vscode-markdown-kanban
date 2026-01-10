@@ -1,4 +1,5 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -40,6 +41,9 @@ const TILDE_DEAD_CODES = new Set([
     'BracketRight',
     'Digit4'
 ]);
+
+const DIAGRAM_PREVIEW_DEBOUNCE_MS = 200;
+const diagramPreviewTimers = new WeakMap<HTMLElement, number>();
 
 type MediaPathHelpers = {
     buildWebviewResourceUrl?: (pathValue: string, encodeSegments?: boolean) => string;
@@ -154,6 +158,11 @@ function renderDiagramPreview(preview: HTMLElement, lang: string, code: string):
     const isPlantUml = normalizedLang === 'plantuml' || normalizedLang === 'puml';
 
     if (!isMermaid && !isPlantUml) {
+        const existingTimer = diagramPreviewTimers.get(preview);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            diagramPreviewTimers.delete(preview);
+        }
         preview.innerHTML = '';
         preview.style.display = 'none';
         return;
@@ -168,13 +177,20 @@ function renderDiagramPreview(preview: HTMLElement, lang: string, code: string):
     placeholder.textContent = isMermaid ? 'Rendering Mermaid diagram...' : 'Rendering PlantUML diagram...';
     preview.appendChild(placeholder);
 
-    if (isMermaid && typeof api.queueMermaidRender === 'function') {
-        api.queueMermaidRender(previewId, code);
-        return;
+    const existingTimer = diagramPreviewTimers.get(preview);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
     }
-    if (isPlantUml && typeof api.queuePlantUMLRender === 'function') {
-        api.queuePlantUMLRender(previewId, code);
-    }
+    const timer = window.setTimeout(() => {
+        if (isMermaid && typeof api.queueMermaidRender === 'function') {
+            api.queueMermaidRender(previewId, code);
+            return;
+        }
+        if (isPlantUml && typeof api.queuePlantUMLRender === 'function') {
+            api.queuePlantUMLRender(previewId, code);
+        }
+    }, DIAGRAM_PREVIEW_DEBOUNCE_MS);
+    diagramPreviewTimers.set(preview, timer);
 }
 
 function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
@@ -229,21 +245,22 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     }
 }
 
-function createMediaInlineView(node: any): NodeView {
-    const dom = document.createElement('span');
+function createMediaView(node: any, isBlock: boolean): NodeView {
+    const dom = document.createElement(isBlock ? 'div' : 'span');
 
     const render = (currentNode: any) => {
         const mediaType = currentNode.attrs?.mediaType || 'image';
         const src = currentNode.attrs?.src || '';
         const alt = currentNode.attrs?.alt || '';
         const title = currentNode.attrs?.title || '';
+        const blockClass = isBlock ? ' wysiwyg-media-block' : '';
 
         dom.innerHTML = '';
         dom.className = mediaType === 'image'
-            ? 'image-path-overlay-container wysiwyg-media'
+            ? `image-path-overlay-container wysiwyg-media${blockClass}`
             : (mediaType === 'video' || mediaType === 'audio')
-                ? 'video-path-overlay-container wysiwyg-media'
-                : 'wysiwyg-media';
+                ? `video-path-overlay-container wysiwyg-media${blockClass}`
+                : `wysiwyg-media${blockClass}`;
         dom.dataset.type = mediaType;
 
         if (mediaType === 'image') {
@@ -349,6 +366,14 @@ function createMediaInlineView(node: any): NodeView {
     };
 }
 
+function createMediaInlineView(node: any): NodeView {
+    return createMediaView(node, false);
+}
+
+function createMediaBlockView(node: any): NodeView {
+    return createMediaView(node, true);
+}
+
 function createDiagramFenceView(node: any): NodeView {
     const dom = document.createElement('div');
     dom.className = 'wysiwyg-diagram-block';
@@ -435,6 +460,50 @@ function syncWysiwygImages(container: HTMLElement): void {
             };
         }
     });
+}
+
+function normalizeMediaBlocks(state: EditorState) {
+    const mediaInline = state.schema.nodes.media_inline;
+    const mediaBlock = state.schema.nodes.media_block;
+    if (!mediaInline || !mediaBlock) {
+        return null;
+    }
+
+    const targets: Array<{ pos: number; size: number; nodes: ProseMirrorNode[] }> = [];
+    state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'paragraph') {
+            return;
+        }
+        const mediaNodes: ProseMirrorNode[] = [];
+        let hasOther = false;
+        node.forEach((child) => {
+            if (child.type === mediaInline) {
+                mediaNodes.push(child);
+                return;
+            }
+            if (child.isText && (child.text || '').trim() === '') {
+                return;
+            }
+            hasOther = true;
+        });
+        if (hasOther || mediaNodes.length === 0) {
+            return;
+        }
+        const blockNodes = mediaNodes.map(child => mediaBlock.create({ ...child.attrs }));
+        targets.push({ pos, size: node.nodeSize, nodes: blockNodes });
+    });
+
+    if (targets.length === 0) {
+        return null;
+    }
+
+    let tr = state.tr;
+    for (let i = targets.length - 1; i >= 0; i -= 1) {
+        const target = targets[i];
+        tr = tr.replaceWith(target.pos, target.pos + target.size, target.nodes);
+    }
+
+    return tr;
 }
 
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
@@ -1000,6 +1069,7 @@ export class WysiwygEditor {
             }),
             nodeViews: {
                 media_inline: (node) => createMediaInlineView(node),
+                media_block: (node) => createMediaBlockView(node),
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
             handleKeyDown: (view, event) => {
@@ -1101,16 +1171,24 @@ export class WysiwygEditor {
                 return false;
             },
             dispatchTransaction: (transaction) => {
-                const newState = this.view.state.apply(transaction);
+                let newState = this.view.state.apply(transaction);
+                let normalized = null;
+                if (transaction.docChanged) {
+                    normalized = normalizeMediaBlocks(newState);
+                    if (normalized) {
+                        newState = newState.apply(normalized);
+                    }
+                }
+                const docChanged = transaction.docChanged || Boolean(normalized);
                 this.view.updateState(newState);
 
-                if (transaction.docChanged) {
+                if (docChanged) {
                     this.lastMarkdown = this.serializeState(newState);
                     if (this.onChange) {
                         this.onChange(this.lastMarkdown);
                     }
+                    syncWysiwygImages(this.view.dom);
                 }
-                syncWysiwygImages(this.view.dom);
             }
         });
 
