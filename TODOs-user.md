@@ -1,3 +1,8 @@
+wysiwyg errors:
+- pressing outside the edit field with the mouse should close the editor. it doesnt currently.
+- 
+
+
 - [x] can we change the image-path-overlay-container from div to span?
 
 - [x] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!

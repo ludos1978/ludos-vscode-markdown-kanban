@@ -1927,8 +1927,8 @@ body.section-height-limited .task-section figure img {
   background: var(--button-secondary-background);
   color: var(--button-secondary-foreground);
   border-radius: 3px;
-  padding: 0 4px;
-  margin: 0 2px;
+  padding: 0 0px;
+  margin: 0 0px;
   display: inline-block;
 }
 
