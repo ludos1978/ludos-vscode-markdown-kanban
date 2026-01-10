@@ -3,7 +3,7 @@ import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, setBlockType, toggleMark } from 'prosemirror-commands';
-import { inputRules, smartQuotes, ellipsis, emDash, InputRule } from 'prosemirror-inputrules';
+import { inputRules, smartQuotes, ellipsis, emDash, InputRule, wrappingInputRule, textblockTypeInputRule } from 'prosemirror-inputrules';
 import { wrapInList } from 'prosemirror-schema-list';
 
 import { buildProseMirrorSchema } from '../wysiwyg/prosemirrorSchema';
@@ -482,6 +482,38 @@ function getStyleKey(event: KeyboardEvent): string | null {
     return null;
 }
 
+function getTagFlavor(value: string): string {
+    if (value.startsWith('gather_')) {
+        return 'gather';
+    }
+    if (/^(\+\+|\+|\u00f8|\u00d8|--|-)$/u.test(value)) {
+        return 'polarity';
+    }
+    return 'tag';
+}
+
+function isDateLike(value: string): boolean {
+    if (!value) {
+        return false;
+    }
+    if (/[0-9]/.test(value)) {
+        return true;
+    }
+    return /^w\d+/i.test(value) || /[:/.-]/.test(value);
+}
+
+function replaceInlineWithNode(state: any, match: RegExpMatchArray, start: number, end: number, node: any): any {
+    const full = match[0] || '';
+    const hasLeadingSpace = full.length > 0 && /\s/.test(full[0]);
+    const hasTrailingSpace = full.length > 0 && /\s/.test(full[full.length - 1]);
+    const replaceStart = start + (hasLeadingSpace ? 1 : 0);
+    const replaceEnd = end - (hasTrailingSpace ? 1 : 0);
+    if (replaceEnd <= replaceStart) {
+        return null;
+    }
+    return state.tr.replaceWith(replaceStart, replaceEnd, node);
+}
+
 function wrapSelectionWithText(view: EditorView, start: string, end: string): boolean {
     const { from, to } = view.state.selection;
     if (from === to) {
@@ -555,6 +587,22 @@ function inlineNodeToMarkdown(node: any, temporalPrefix: string): string | null 
 function buildMarkdownInputRules(schema: any): InputRule[] {
     const rules: InputRule[] = [];
 
+    if (schema.nodes.bullet_list) {
+        rules.push(wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list));
+    }
+
+    if (schema.nodes.ordered_list) {
+        rules.push(wrappingInputRule(/^\s*(\d+)\.\s$/, schema.nodes.ordered_list, (match: RegExpMatchArray) => ({ order: Number.parseInt(match[1], 10) }), (match, node) => node.childCount + node.attrs.order === Number.parseInt(match[1], 10)));
+    }
+
+    if (schema.nodes.blockquote) {
+        rules.push(wrappingInputRule(/^\s*>\s$/, schema.nodes.blockquote));
+    }
+
+    if (schema.nodes.heading) {
+        rules.push(textblockTypeInputRule(/^(#{1,6})\s$/, schema.nodes.heading, (match: RegExpMatchArray) => ({ level: match[1].length })));
+    }
+
     if (schema.nodes.media_inline) {
         rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)$/, (state, match, start, end) => {
             const alt = match[1] || '';
@@ -572,6 +620,23 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             }
             return state.tr.replaceWith(start, end, schema.nodes.media_inline.create(attrs));
         }));
+
+        rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)\s$/, (state, match, start, end) => {
+            const alt = match[1] || '';
+            const src = match[2] || '';
+            const title = match[3] || '';
+            if (!src) {
+                return null;
+            }
+            const attrs: Record<string, unknown> = { src, mediaType: 'image' };
+            if (alt) {
+                attrs.alt = alt;
+            }
+            if (title) {
+                attrs.title = title;
+            }
+            return replaceInlineWithNode(state, match, start, end, schema.nodes.media_inline.create(attrs));
+        }));
     }
 
     if (schema.marks.link) {
@@ -586,6 +651,18 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             const textNode = schema.text(text, [mark]);
             return state.tr.replaceWith(start, end, textNode);
         }));
+
+        rules.push(new InputRule(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)\s$/, (state, match, start, end) => {
+            const text = match[1] || '';
+            const href = match[2] || '';
+            const title = match[3] || '';
+            if (!text || !href) {
+                return null;
+            }
+            const mark = schema.marks.link.create({ href, title });
+            const textNode = schema.text(text, [mark]);
+            return replaceInlineWithNode(state, match, start, end, textNode);
+        }));
     }
 
     if (schema.nodes.include_inline) {
@@ -595,6 +672,14 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
                 return null;
             }
             return state.tr.replaceWith(start, end, schema.nodes.include_inline.create({ path, includeType: 'regular', missing: false }));
+        }));
+
+        rules.push(new InputRule(/!!!include\(([^)]+)\)!!!\s$/, (state, match, start, end) => {
+            const path = match[1]?.trim() || '';
+            if (!path) {
+                return null;
+            }
+            return replaceInlineWithNode(state, match, start, end, schema.nodes.include_inline.create({ path, includeType: 'regular', missing: false }));
         }));
     }
 
@@ -606,6 +691,59 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
                 return null;
             }
             return state.tr.replaceWith(start, end, schema.nodes.wiki_link.create({ document, title: title || document }));
+        }));
+
+        rules.push(new InputRule(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]\s$/, (state, match, start, end) => {
+            const document = match[1]?.trim() || '';
+            const title = match[2]?.trim() || '';
+            if (!document) {
+                return null;
+            }
+            return replaceInlineWithNode(state, match, start, end, schema.nodes.wiki_link.create({ document, title: title || document }));
+        }));
+    }
+
+    if (schema.nodes.tag) {
+        rules.push(new InputRule(/(?:^|\s)(#([^\s#]+|(\+\+|\+|--|-|\u00f8|\u00d8)))\s$/, (state, match, start, end) => {
+            const raw = match[1] || '';
+            const value = raw.startsWith('#') ? raw.slice(1) : raw;
+            if (!value) {
+                return null;
+            }
+            const flavor = getTagFlavor(value);
+            return replaceInlineWithNode(state, match, start, end, schema.nodes.tag.create({ value, flavor }));
+        }));
+    }
+
+    if (schema.nodes.person_tag || schema.nodes.date_tag) {
+        rules.push(new InputRule(/(?:^|\s)(@([^\s@]+))\s$/, (state, match, start, end) => {
+            const raw = match[1] || '';
+            const value = raw.startsWith('@') ? raw.slice(1) : raw;
+            if (!value) {
+                return null;
+            }
+            const dateLike = isDateLike(value);
+            if (dateLike && schema.nodes.date_tag) {
+                return replaceInlineWithNode(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
+            }
+            if (schema.nodes.person_tag) {
+                return replaceInlineWithNode(state, match, start, end, schema.nodes.person_tag.create({ value }));
+            }
+            if (schema.nodes.date_tag) {
+                return replaceInlineWithNode(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
+            }
+            return null;
+        }));
+    }
+
+    if (schema.nodes.temporal_tag) {
+        rules.push(new InputRule(/(?:^|\s)(!([^\s!]+))\s$/, (state, match, start, end) => {
+            const raw = match[1] || '';
+            const value = raw.startsWith('!') ? raw.slice(1) : raw;
+            if (!value) {
+                return null;
+            }
+            return replaceInlineWithNode(state, match, start, end, schema.nodes.temporal_tag.create({ value, kind: 'generic' }));
         }));
     }
 

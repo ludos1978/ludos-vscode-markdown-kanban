@@ -65,6 +65,9 @@
 - [ ] In WYSIWYG, typing text before/after an inline image keeps the image rendered (no fallback to raw markdown).
 - [ ] In WYSIWYG, mermaid/plantuml fences render a preview alongside the editable code block.
 - [ ] In WYSIWYG, draw.io/excalidraw/pdf image references render the diagram preview (not just the raw filename).
+- [ ] In WYSIWYG, typing list markers ("- " or "1. ") converts to lists immediately, and headings convert on "# " input.
+- [ ] In WYSIWYG, typing #tag/@person/@2025-01-01/!temporal followed by space converts into tag chips immediately.
+- [ ] In WYSIWYG, typing markdown image/link/include/wiki syntax and then continuing to type still keeps the node rendered.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.
