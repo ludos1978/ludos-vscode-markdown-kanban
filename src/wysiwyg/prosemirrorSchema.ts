@@ -51,15 +51,30 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'container':
             return (node) => ['div', { class: `wysiwyg-container wysiwyg-container-${node.attrs.kind || 'note'}`, 'data-kind': node.attrs.kind || 'note' }, 0];
         case 'include_block':
-            return (node) => ['div', { class: 'wysiwyg-include-block', 'data-path': node.attrs.path || '' }, `!!!include(${node.attrs.path || ''})!!!`];
+            return (node) => [
+                'div',
+                { class: 'wysiwyg-include-block', 'data-path': node.attrs.path || '' },
+                ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'include', type: 'button', contenteditable: 'false' }, 'Edit'],
+                `!!!include(${node.attrs.path || ''})!!!`
+            ];
         case 'speaker_note':
             return () => ['div', { class: 'wysiwyg-speaker-note' }, 0];
         case 'html_block':
             return (node) => ['div', { class: 'wysiwyg-html-block', 'data-mode': node.attrs.mode || 'block' }, node.attrs.raw || ''];
         case 'diagram_fence':
-            return (node) => ['pre', { class: 'wysiwyg-diagram', 'data-lang': node.attrs.lang || '' }, ['code', 0]];
+            return (node) => [
+                'div',
+                { class: 'wysiwyg-diagram-block', 'data-lang': node.attrs.lang || '' },
+                ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'diagram', type: 'button', contenteditable: 'false' }, 'Edit'],
+                ['pre', { class: 'wysiwyg-diagram', 'data-lang': node.attrs.lang || '' }, ['code', 0]]
+            ];
         case 'include_inline':
-            return (node) => ['span', { class: 'wysiwyg-include-inline', 'data-path': node.attrs.path || '' }, `!!!include(${node.attrs.path || ''})!!!`];
+            return (node) => [
+                'span',
+                { class: 'wysiwyg-include-inline', 'data-path': node.attrs.path || '' },
+                ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'include', type: 'button', contenteditable: 'false' }, 'Edit'],
+                `!!!include(${node.attrs.path || ''})!!!`
+            ];
         case 'wiki_link':
             return (node) => ['span', { class: 'wysiwyg-wiki-link', 'data-document': node.attrs.document || '' }, node.attrs.title || node.attrs.document || ''];
         case 'tag':
@@ -71,7 +86,12 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'temporal_tag':
             return (node) => ['span', { class: 'wysiwyg-temporal-tag', 'data-value': node.attrs.value || '' }, `!${node.attrs.value || ''}`];
         case 'media_inline':
-            return (node) => ['span', { class: 'wysiwyg-media', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' }, node.attrs.src || ''];
+            return (node) => [
+                'span',
+                { class: 'wysiwyg-media', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
+                ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'media', type: 'button', contenteditable: 'false' }, 'Edit'],
+                node.attrs.src || ''
+            ];
         case 'footnote':
             return (node) => ['span', { class: 'wysiwyg-footnote', 'data-id': node.attrs.id || '' }, `[^${node.attrs.id || ''}]`];
         case 'text':

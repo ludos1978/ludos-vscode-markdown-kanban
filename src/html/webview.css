@@ -1840,6 +1840,10 @@ body.section-height-limited .task-section figure img {
   border: 1px solid var(--vscode-panel-border);
 }
 
+.task-description-wysiwyg .wysiwyg-diagram-block .wysiwyg-edit-btn {
+  align-self: flex-start;
+}
+
 .task-description-wysiwyg .wysiwyg-diagram code {
   font-family: var(--vscode-editor-font-family);
 }
@@ -1866,10 +1870,37 @@ body.section-height-limited .task-section figure img {
   display: inline-block;
 }
 
+.task-description-wysiwyg .wysiwyg-edit-btn {
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 3px;
+  font-size: 0.75em;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.task-description-wysiwyg .wysiwyg-edit-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
 .task-description-wysiwyg .wysiwyg-include-block,
 .task-description-wysiwyg .wysiwyg-media {
   display: inline-flex;
   align-items: center;
+}
+
+.task-description-wysiwyg .wysiwyg-include-block {
+  display: flex;
+  gap: 6px;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .task-description-wysiwyg .wysiwyg-media::before {

@@ -93,6 +93,13 @@ function openMediaEditor(view: EditorView, node: { attrs?: Record<string, unknow
     }
 }
 
+function focusDiagram(view: EditorView, nodePos: number): void {
+    const start = Math.min(nodePos + 1, view.state.doc.content.size);
+    const selection = TextSelection.create(view.state.doc, start);
+    view.dispatch(view.state.tr.setSelection(selection));
+    view.focus();
+}
+
 function getStyleKey(event: KeyboardEvent): string | null {
     if (!event) {
         return null;
@@ -188,6 +195,32 @@ export class WysiwygEditor {
                 }
                 if (node.type.name === 'include_inline' || node.type.name === 'include_block') {
                     openPathEditor(view, node, nodePos);
+                    return true;
+                }
+                return false;
+            },
+            handleClickOn: (view, pos, node, nodePos, event) => {
+                const target = event?.target as HTMLElement | null;
+                if (!target) {
+                    return false;
+                }
+                const button = target.closest?.('.wysiwyg-edit-btn') as HTMLElement | null;
+                if (!button) {
+                    return false;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                const action = button.dataset?.action || '';
+                if (action === 'media' && node?.type?.name === 'media_inline') {
+                    openMediaEditor(view, node, nodePos);
+                    return true;
+                }
+                if (action === 'include' && (node?.type?.name === 'include_inline' || node?.type?.name === 'include_block')) {
+                    openPathEditor(view, node, nodePos);
+                    return true;
+                }
+                if (action === 'diagram' && node?.type?.name === 'diagram_fence') {
+                    focusDiagram(view, nodePos);
                     return true;
                 }
                 return false;

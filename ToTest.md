@@ -56,3 +56,4 @@
 - [ ] Compare rendered vs WYSIWYG task descriptions and confirm line spacing, list indentation, and padding align closely with the rendered view.
 - [ ] In WYSIWYG, double-click an image/audio/video placeholder and confirm the source path can be edited and saves back to markdown.
 - [ ] In WYSIWYG, edit a diagram/mermaid code block directly and confirm updates persist on save.
+- [ ] In WYSIWYG, click the Edit button on include/media/diagram nodes and confirm the correct edit UI opens or focus moves into the code block.
