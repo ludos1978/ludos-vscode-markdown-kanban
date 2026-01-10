@@ -47,3 +47,4 @@
 - [ ] Review src/wysiwyg/serializer.ts output for headings, lists, tables, includes, containers, and marks (em/strong/underline/strike/mark/sub/sup/ins/link/abbr).
 - [ ] Run unit tests for Wysiwyg parser/serializer (`WysiwygParserSerializer.test.ts`) and confirm outputs match expected markdown.
 - [ ] Run unit tests for `buildWysiwygSchemaSpec` and confirm text/doc node normalization in `WysiwygSchemaBuilder.test.ts`.
+- [ ] Run unit tests for markdown-it adapter (`WysiwygMarkdownItAdapter.test.ts`) covering tags, temporal prefix, wiki links, and include blocks.

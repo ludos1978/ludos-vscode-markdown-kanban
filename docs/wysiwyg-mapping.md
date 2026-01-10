@@ -38,7 +38,7 @@ Plugins:
 - Wiki links ([[file|title]])
 - Tags (#tag, #gather_*, #++/#--/#ø)
 - Date/person tags (@2025-01-28, @W12, @name)
-- Temporal tags (.2025.12.05, .w49, .mon, .15:30, .09:00-17:00)
+- Temporal tags (!2025.12.05, !w49, !mon, !15:30, !09:00-17:00)
 - Speaker notes (;; lines)
 - HTML comments + HTML blocks (configurable show/hide)
 - Diagram fences (```plantuml, ```mermaid)
@@ -183,7 +183,7 @@ High-level rules for converting editor nodes/marks back to Markdown.
   - Serialize as [[doc|title]] or [[doc]]
 
 - Tags / Dates / Temporal:
-  - Serialize with exact prefix (#, @, .) and original content
+  - Serialize with exact prefix (#, @, !) and original content
 
 - Speaker notes:
   - Serialize with ;; prefix per line

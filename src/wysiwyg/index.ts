@@ -3,3 +3,6 @@ export * from './types';
 export * from './tokenParser';
 export * from './serializer';
 export * from './schemaBuilder';
+export * from './markdownItPlugins';
+export * from './markdownItFactory';
+export * from './markdownItAdapter';

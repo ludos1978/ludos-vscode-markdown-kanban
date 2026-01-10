@@ -162,7 +162,7 @@ describe('WYSIWYG markdown serializer', () => {
             '::: note\nNote body\n:::',
             '---: 1\nLeft\n:--: 2\nRight\n:---',
             '!!!include(./file.md)!!!',
-            'See !!!include(inline.md)!!! plus [[Doc|Doc Title]] #todo @2025-01-28 .w12',
+            'See !!!include(inline.md)!!! plus [[Doc|Doc Title]] #todo @2025-01-28 !w12',
             ';;line1\n;;line2',
             '<div>Raw</div>',
             '<!--comment-->'

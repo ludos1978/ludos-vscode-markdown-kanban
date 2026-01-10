@@ -1,5 +1,9 @@
 import { WysiwygDoc, WysiwygMark, WysiwygNode } from './types';
 
+export type WysiwygSerializerOptions = {
+    temporalPrefix?: string;
+};
+
 const inlineNodeTypes = new Set([
     'text',
     'include_inline',
@@ -27,34 +31,38 @@ const markOrder = new Map<string, number>([
     ['link', 10]
 ]);
 
-export function serializeWysiwygDoc(doc: WysiwygDoc): string {
+export function serializeWysiwygDoc(doc: WysiwygDoc, options: WysiwygSerializerOptions = {}): string {
     if (!doc || !doc.content || doc.content.length === 0) {
         return '';
     }
 
+    const config = {
+        temporalPrefix: options.temporalPrefix ?? '!'
+    };
+
     const blocks = doc.content
-        .map(node => serializeBlock(node))
+        .map(node => serializeBlock(node, config))
         .filter(Boolean);
 
     return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n');
 }
 
-function serializeBlock(node: WysiwygNode): string {
+function serializeBlock(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     switch (node.type) {
         case 'paragraph':
-            return serializeInlineContent(node.content);
+            return serializeInlineContent(node.content, config);
         case 'heading': {
             const level = clampNumber(node.attrs?.level, 1, 6, 1);
-            return `${'#'.repeat(level)} ${serializeInlineContent(node.content)}`.trimEnd();
+            return `${'#'.repeat(level)} ${serializeInlineContent(node.content, config)}`.trimEnd();
         }
         case 'blockquote': {
-            const content = serializeBlocks(node.content);
+            const content = serializeBlocks(node.content, config);
             return prefixLines(content, '> ');
         }
         case 'bullet_list':
-            return serializeList(node, false);
+            return serializeList(node, false, config);
         case 'ordered_list':
-            return serializeList(node, true);
+            return serializeList(node, true, config);
         case 'code_block':
             return serializeCodeBlock(node);
         case 'diagram_fence':
@@ -62,11 +70,11 @@ function serializeBlock(node: WysiwygNode): string {
         case 'horizontal_rule':
             return '---';
         case 'table':
-            return serializeTable(node);
+            return serializeTable(node, config);
         case 'multicolumn':
-            return serializeMulticolumn(node);
+            return serializeMulticolumn(node, config);
         case 'container':
-            return serializeContainer(node);
+            return serializeContainer(node, config);
         case 'include_block':
             return serializeIncludeBlock(node);
         case 'speaker_note':
@@ -74,38 +82,38 @@ function serializeBlock(node: WysiwygNode): string {
         case 'html_block':
             return serializeHtmlNode(node);
         case 'list_item':
-            return serializeBlocks(node.content);
+            return serializeBlocks(node.content, config);
         default:
             if (inlineNodeTypes.has(node.type)) {
-                return serializeInlineNode(node);
+                return serializeInlineNode(node, config);
             }
             if (node.content && node.content.length > 0) {
-                return serializeBlocks(node.content);
+                return serializeBlocks(node.content, config);
             }
             return node.text || '';
     }
 }
 
-function serializeBlocks(nodes?: WysiwygNode[]): string {
+function serializeBlocks(nodes: WysiwygNode[] | undefined, config: Required<WysiwygSerializerOptions>): string {
     if (!nodes || nodes.length === 0) {
         return '';
     }
 
     return nodes
-        .map(child => serializeBlock(child))
+        .map(child => serializeBlock(child, config))
         .filter(Boolean)
         .join('\n\n');
 }
 
-function serializeInlineContent(nodes?: WysiwygNode[]): string {
+function serializeInlineContent(nodes: WysiwygNode[] | undefined, config: Required<WysiwygSerializerOptions>): string {
     if (!nodes || nodes.length === 0) {
         return '';
     }
 
-    return nodes.map(node => serializeInlineNode(node)).join('');
+    return nodes.map(node => serializeInlineNode(node, config)).join('');
 }
 
-function serializeInlineNode(node: WysiwygNode): string {
+function serializeInlineNode(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     const raw = (() => {
         switch (node.type) {
             case 'text':
@@ -121,7 +129,7 @@ function serializeInlineNode(node: WysiwygNode): string {
             case 'person_tag':
                 return `@${node.attrs?.value ?? ''}`;
             case 'temporal_tag':
-                return `.${node.attrs?.value ?? ''}`;
+                return `${config.temporalPrefix}${node.attrs?.value ?? ''}`;
             case 'media_inline':
                 return serializeMediaInline(node);
             case 'html_block':
@@ -130,7 +138,7 @@ function serializeInlineNode(node: WysiwygNode): string {
                 return serializeFootnote(node);
             default:
                 if (node.content && node.content.length > 0) {
-                    return serializeInlineContent(node.content);
+                    return serializeInlineContent(node.content, config);
                 }
                 return node.text || '';
         }
@@ -143,26 +151,26 @@ function serializeInlineNode(node: WysiwygNode): string {
     return raw;
 }
 
-function serializeList(node: WysiwygNode, ordered: boolean): string {
+function serializeList(node: WysiwygNode, ordered: boolean, config: Required<WysiwygSerializerOptions>): string {
     const items = (node.content || []).filter(child => child.type === 'list_item');
     const start = ordered ? clampNumber(node.attrs?.order, 1, 1000000, 1) : 1;
 
     return items
         .map((item, index) => {
             const prefix = ordered ? `${start + index}. ` : '- ';
-            const content = serializeListItem(item);
+            const content = serializeListItem(item, config);
             const indented = indentLines(content, '  ');
             return `${prefix}${indented}`.trimEnd();
         })
         .join('\n');
 }
 
-function serializeListItem(node: WysiwygNode): string {
+function serializeListItem(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     if (!node.content || node.content.length === 0) {
         return '';
     }
 
-    const content = serializeBlocks(node.content).trimEnd();
+    const content = serializeBlocks(node.content, config).trimEnd();
     return content || '';
 }
 
@@ -212,9 +220,9 @@ function serializeMediaInline(node: WysiwygNode): string {
     return `<${tag} src="${escapeAttribute(src)}" controls></${tag}>`;
 }
 
-function serializeContainer(node: WysiwygNode): string {
+function serializeContainer(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     const kind = typeof node.attrs?.kind === 'string' ? node.attrs.kind : 'note';
-    const content = serializeBlocks(node.content);
+    const content = serializeBlocks(node.content, config);
     return [`::: ${kind}`, content, ':::'].join('\n').trimEnd();
 }
 
@@ -240,7 +248,7 @@ function serializeHtmlNode(node: WysiwygNode): string {
     return raw;
 }
 
-function serializeTable(node: WysiwygNode): string {
+function serializeTable(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     const rows = (node.content || []).filter(child => child.type === 'table_row');
     if (rows.length === 0) {
         return '';
@@ -248,15 +256,15 @@ function serializeTable(node: WysiwygNode): string {
 
     const cellTexts = rows.map(row => (row.content || []).filter(cell => cell.type === 'table_cell'));
     const headerCells = cellTexts[0] || [];
-    const headerRow = `| ${headerCells.map(cell => serializeTableCell(cell)).join(' | ')} |`;
+    const headerRow = `| ${headerCells.map(cell => serializeTableCell(cell, config)).join(' | ')} |`;
     const alignRow = `| ${headerCells.map(cell => serializeAlignment(cell)).join(' | ')} |`;
-    const bodyRows = cellTexts.slice(1).map(cells => `| ${cells.map(cell => serializeTableCell(cell)).join(' | ')} |`);
+    const bodyRows = cellTexts.slice(1).map(cells => `| ${cells.map(cell => serializeTableCell(cell, config)).join(' | ')} |`);
 
     return [headerRow, alignRow, ...bodyRows].join('\n');
 }
 
-function serializeTableCell(node: WysiwygNode): string {
-    const content = serializeBlocks(node.content).replace(/\n+/g, '<br>');
+function serializeTableCell(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
+    const content = serializeBlocks(node.content, config).replace(/\n+/g, '<br>');
     return content.trim();
 }
 
@@ -274,7 +282,7 @@ function serializeAlignment(node: WysiwygNode): string {
     }
 }
 
-function serializeMulticolumn(node: WysiwygNode): string {
+function serializeMulticolumn(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {
     const columns = (node.content || []).filter(child => child.type === 'multicolumn_column');
     if (columns.length === 0) {
         return '';
@@ -285,7 +293,7 @@ function serializeMulticolumn(node: WysiwygNode): string {
         const growth = clampNumber(column.attrs?.growth, 1, 100, 1);
         const marker = index === 0 ? '---:' : ':--:';
         lines.push(`${marker} ${growth}`.trimEnd());
-        const content = serializeBlocks(column.content);
+        const content = serializeBlocks(column.content, config);
         if (content) {
             lines.push(content);
         }
