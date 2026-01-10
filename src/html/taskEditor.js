@@ -616,7 +616,7 @@ class TaskEditor {
             displayElement = containerElement.querySelector('.task-title-display');
             editElement = containerElement.querySelector('.task-title-edit');
         } else if (type === 'task-description') {
-            containerElement = element.closest('.task-item') || element;
+            containerElement = element.closest('.task-description-container') || element;
             displayElement = containerElement.querySelector('.task-description-display');
             editElement = containerElement.querySelector('.task-description-edit');
         } else if (type === 'column-title') {
@@ -1252,12 +1252,13 @@ class TaskEditor {
             return null;
         }
 
-        let wysiwygContainer = containerElement.querySelector('.task-description-wysiwyg');
+        const descriptionContainer = editElement?.closest?.('.task-description-container') || containerElement;
+        let wysiwygContainer = descriptionContainer.querySelector('.task-description-wysiwyg');
         if (!wysiwygContainer) {
             wysiwygContainer = document.createElement('div');
             wysiwygContainer.className = 'task-description-wysiwyg task-description-edit';
             wysiwygContainer.setAttribute('data-field', 'description');
-            containerElement.appendChild(wysiwygContainer);
+            descriptionContainer.appendChild(wysiwygContainer);
         }
 
         wysiwygContainer.innerHTML = '';
