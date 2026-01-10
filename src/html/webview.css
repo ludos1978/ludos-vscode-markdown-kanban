@@ -1799,8 +1799,7 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .ProseMirror {
-  display: flex;
-  flex-direction: column;
+  display: block;
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1879,7 +1878,8 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-diagram-file {
   display: block;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-file .diagram-placeholder,
@@ -1897,13 +1897,14 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-media-block {
   display: block;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   margin: 0;
 }
 
 .task-description-wysiwyg .image-path-overlay-container.wysiwyg-media-block {
   display: block;
-  width: 100%;
+  width: fit-content;
   max-width: 100%;
 }
 
