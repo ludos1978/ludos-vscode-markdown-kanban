@@ -1352,6 +1352,52 @@ class TaskEditor {
         }, 150);
     }
 
+    _captureScrollPositions(baseElement) {
+        const positions = [];
+        const seen = new Set();
+
+        const add = (element) => {
+            if (!element || seen.has(element)) { return; }
+            seen.add(element);
+            positions.push({
+                element,
+                top: element.scrollTop || 0,
+                left: element.scrollLeft || 0
+            });
+        };
+
+        let current = baseElement instanceof HTMLElement ? baseElement : null;
+        while (current) {
+            const style = window.getComputedStyle(current);
+            const overflowY = style.overflowY;
+            const overflowX = style.overflowX;
+            if (overflowY === 'auto' || overflowY === 'scroll' || overflowX === 'auto' || overflowX === 'scroll') {
+                add(current);
+            }
+            current = current.parentElement;
+        }
+
+        add(document.getElementById('kanban-container'));
+        add(document.getElementById('kanban-board'));
+
+        return positions;
+    }
+
+    _restoreScrollPositions(positions) {
+        if (!positions || positions.length === 0) { return; }
+        positions.forEach(({ element, top, left }) => {
+            if (!element) { return; }
+            element.scrollTop = top;
+            element.scrollLeft = left;
+        });
+    }
+
+    _scheduleScrollRestore(positions) {
+        const restore = () => this._restoreScrollPositions(positions);
+        requestAnimationFrame(restore);
+        setTimeout(restore, 60);
+    }
+
     // ============= MAIN startEdit METHOD =============
 
     /**
@@ -1380,6 +1426,7 @@ class TaskEditor {
         // Get the appropriate elements based on type
         const { displayElement, editElement, containerElement } = this._getEditElements(element, type);
         if (!editElement) { return; }
+        const scrollPositions = this._captureScrollPositions(containerElement || editElement || element);
 
         // Check if we're already editing this exact element
         const isAlreadyEditing = this.currentEditor &&
@@ -1440,19 +1487,13 @@ class TaskEditor {
         // Setup event handlers
         if (wysiwygContext?.editor) {
             this._setupWysiwygHandlers(wysiwygContext.editor, wysiwygContext.container, containerElement);
-            if (container) {
-                const restoreScroll = () => {
-                    container.scrollTop = scrollAtStart;
-                    container.scrollLeft = scrollLeftAtStart;
-                };
-                requestAnimationFrame(restoreScroll);
-                setTimeout(restoreScroll, 50);
-            }
         } else {
             this._setupInputHandler(editElement, containerElement);
             this._setupBlurHandler(editElement);
             this._setupMouseHandlers(editElement);
         }
+
+        this._scheduleScrollRestore(scrollPositions);
     }
 
     /**
