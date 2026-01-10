@@ -193,25 +193,29 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     dom.appendChild(placeholder);
 
     const includeDir = api.currentTaskIncludeContext?.includeDir;
+    const scheduleProcess = () => {
+        if (typeof api.processDiagramQueue !== 'function') {
+            return;
+        }
+        requestAnimationFrame(() => {
+            api.processDiagramQueue?.();
+            setTimeout(() => api.processDiagramQueue?.(), 50);
+        });
+    };
+
     if (diagramInfo.mode === 'diagram' && diagramInfo.diagramType && typeof api.queueDiagramRender === 'function') {
         api.queueDiagramRender(placeholderId, diagramInfo.filePath, diagramInfo.diagramType, includeDir);
-        if (typeof api.processDiagramQueue === 'function') {
-            api.processDiagramQueue();
-        }
+        scheduleProcess();
         return;
     }
     if (diagramInfo.mode === 'pdf-page' && typeof api.queuePDFPageRender === 'function') {
         api.queuePDFPageRender(placeholderId, diagramInfo.filePath, diagramInfo.pageNumber || 1, includeDir);
-        if (typeof api.processDiagramQueue === 'function') {
-            api.processDiagramQueue();
-        }
+        scheduleProcess();
         return;
     }
     if (diagramInfo.mode === 'pdf-slideshow' && typeof api.queuePDFSlideshow === 'function') {
         api.queuePDFSlideshow(placeholderId, diagramInfo.filePath, includeDir);
-        if (typeof api.processDiagramQueue === 'function') {
-            api.processDiagramQueue();
-        }
+        scheduleProcess();
     }
 }
 

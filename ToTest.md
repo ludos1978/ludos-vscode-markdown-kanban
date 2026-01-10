@@ -71,6 +71,7 @@
 - [ ] In WYSIWYG, typing an image/link/include/wiki tag and then a space should not leave stray ")" characters in the text.
 - [ ] In WYSIWYG, draw.io/excalidraw embeds render as image previews with the same burger menu/behavior as normal images.
 - [ ] In WYSIWYG, draw.io/excalidraw placeholders render immediately (no stuck gray boxes).
+- [ ] In WYSIWYG, draw.io/excalidraw placeholders resolve after a short delay (render queue kicks in reliably).
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).

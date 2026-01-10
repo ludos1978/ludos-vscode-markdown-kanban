@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.97.41",
+  "version": "0.97.42",
   "engines": {
     "vscode": "^1.74.0"
   },
