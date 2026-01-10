@@ -1620,6 +1620,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   padding-left: 8px;
   padding-right: 8px;
   min-height: 20px;
+  line-height: 1.4;
   overflow-wrap: break-word;
   max-height: inherit;
 }
@@ -1770,7 +1771,7 @@ body.section-height-limited .task-section figure img {
 
 .task-description-edit {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
   padding: 4px;
   width: 100%;
   min-height: 3em;
@@ -1780,7 +1781,7 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
   padding: 0 8px;
   width: 100%;
   min-height: 20px;

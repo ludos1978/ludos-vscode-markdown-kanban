@@ -54,6 +54,7 @@
 - [ ] Enable WYSIWYG editing and confirm the editor UI actually renders (no blank/hidden editor) and no missing `wysiwyg-editor.js` asset errors appear in the webview console.
 - [ ] With WYSIWYG editing active, verify arrow keys, Enter, and Tab behave normally inside the editor and are not intercepted by the textarea handlers.
 - [ ] Compare rendered vs WYSIWYG task descriptions and confirm line spacing, list indentation, and padding align closely with the rendered view.
+- [ ] Compare task description display vs edit/WYSIWYG line-height for plain text and multiline content (no visible jump when toggling edit).
 - [ ] Toggle small-card-fonts (layout preset) and confirm task description display + edit/WYSIWYG font styling (size/ligatures) match.
 - [ ] In WYSIWYG, double-click an image/audio/video placeholder and confirm the source path can be edited and saves back to markdown.
 - [ ] In WYSIWYG, edit a diagram/mermaid code block directly and confirm updates persist on save.
