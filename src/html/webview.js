@@ -1238,6 +1238,43 @@ function toggleSpecialCharacterDisplay() {
 }
 
 window.toggleSpecialCharacterDisplay = toggleSpecialCharacterDisplay;
+
+function updateWysiwygToggleUI(isEnabled) {
+    const toggleButton = document.getElementById('wysiwyg-toggle');
+    if (!toggleButton) { return; }
+    toggleButton.classList.toggle('selected', isEnabled);
+    const checkmark = toggleButton.querySelector('.menu-checkmark');
+    if (checkmark) {
+        checkmark.textContent = isEnabled ? '✓' : '';
+    }
+}
+
+function toggleWysiwygEditor() {
+    const nextState = !(window.wysiwygEnabled ?? true);
+    window.wysiwygEnabled = nextState;
+    if (window.configManager) {
+        window.configManager.setPreference('wysiwygEnabled', nextState);
+    } else {
+        vscode.postMessage({ type: 'setPreference', key: 'wysiwygEnabled', value: nextState });
+    }
+    if (window.cachedConfig) {
+        window.cachedConfig.wysiwygEnabled = nextState;
+    }
+    updateWysiwygToggleUI(nextState);
+
+    const activeEditor = window.taskEditor?.currentEditor;
+    if (activeEditor?.type === 'task-description') {
+        const displayElement = activeEditor.displayElement;
+        const taskId = activeEditor.taskId;
+        const columnId = activeEditor.columnId;
+        window.taskEditor.save();
+        if (displayElement) {
+            window.taskEditor.startEdit(displayElement, 'task-description', taskId, columnId, true);
+        }
+    }
+}
+
+window.toggleWysiwygEditor = toggleWysiwygEditor;
 window.createSpecialCharOverlay = createSpecialCharOverlay;
 window.updateSpecialCharOverlay = updateSpecialCharOverlay;
 window.removeSpecialCharOverlay = removeSpecialCharOverlay;
@@ -2547,6 +2584,11 @@ if (!webviewEventListenersInitialized) {
             updateSpecialCharToggleUI(window.showSpecialCharacters);
             updateActiveSpecialCharOverlay();
             window.cachedConfig.showSpecialCharacters = window.showSpecialCharacters;
+            const wysiwygValue = typeof configData.wysiwygEnabled === 'boolean'
+                ? configData.wysiwygEnabled
+                : (typeof window.wysiwygEnabled === 'boolean' ? window.wysiwygEnabled : true);
+            window.wysiwygEnabled = Boolean(wysiwygValue);
+            updateWysiwygToggleUI(window.wysiwygEnabled);
             if (typeof pendingMarpOverride === 'boolean') {
                 window.pendingMarpSettingsOverride = undefined;
             }

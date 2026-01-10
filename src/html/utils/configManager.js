@@ -38,7 +38,8 @@ class ConfigManager {
             htmlCommentRenderMode: 'hidden',
             htmlContentRenderMode: 'html',
             showMarpSettings: true,
-            showSpecialCharacters: false
+            showSpecialCharacters: false,
+            wysiwygEnabled: true
         };
     }
 

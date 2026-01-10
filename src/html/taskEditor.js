@@ -1263,6 +1263,9 @@ class TaskEditor {
         if (typeof window.WysiwygEditor !== 'function') {
             return false;
         }
+        if (typeof window.wysiwygEnabled === 'boolean') {
+            return window.wysiwygEnabled;
+        }
         const configValue = window.configManager?.getConfig('wysiwygEnabled', true);
         return configValue !== false;
     }

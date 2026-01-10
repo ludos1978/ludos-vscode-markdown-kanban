@@ -77,6 +77,7 @@
 - [ ] In WYSIWYG, media-only lines (image/video/audio) render as block embeds matching display mode while inline images stay inline within text.
 - [ ] In WYSIWYG, diagram previews update while typing without excessive re-rendering (debounce works).
 - [ ] In display mode, audio embeds show the same path menu behavior as videos and handle missing files with a placeholder.
+- [ ] Right burger menu: toggling “Enable WYSIWYG editor” switches between WYSIWYG and plain textarea for the current description.
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
