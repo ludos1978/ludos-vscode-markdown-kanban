@@ -1,5 +1,5 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
+import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, setBlockType, toggleMark } from 'prosemirror-commands';
@@ -51,6 +51,11 @@ type MediaPathHelpers = {
     currentFilePath?: string;
     currentTaskIncludeContext?: { includeDir?: string };
     handleImageNotFound?: (img: HTMLImageElement, originalSrc: string) => void;
+    queueDiagramRender?: (id: string, filePath: string, diagramType: string, includeDir?: string) => void;
+    queuePDFPageRender?: (id: string, filePath: string, pageNumber: number, includeDir?: string) => void;
+    queuePDFSlideshow?: (id: string, filePath: string, includeDir?: string) => void;
+    queueMermaidRender?: (id: string, code: string) => void;
+    queuePlantUMLRender?: (id: string, code: string) => void;
 };
 
 function resolveDisplaySrc(originalSrc: string): string {
@@ -113,6 +118,226 @@ function resolveDisplaySrc(originalSrc: string): string {
     return originalSrc;
 }
 
+function makePreviewId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getDiagramFileInfo(src: string): { mode: 'diagram' | 'pdf-page' | 'pdf-slideshow'; filePath: string; diagramType?: string; pageNumber?: number } | null {
+    if (!src) {
+        return null;
+    }
+    const pdfPageMatch = src.match(/^(.+\.pdf)#(\d+)$/i);
+    if (pdfPageMatch) {
+        return { mode: 'pdf-page', filePath: pdfPageMatch[1], pageNumber: Number.parseInt(pdfPageMatch[2], 10) };
+    }
+    if (/\.pdf$/i.test(src)) {
+        return { mode: 'pdf-slideshow', filePath: src };
+    }
+    if (/\.(drawio|dio)$/i.test(src)) {
+        return { mode: 'diagram', filePath: src, diagramType: 'drawio' };
+    }
+    if (/\.(excalidraw|excalidraw\.json|excalidraw\.svg)$/i.test(src)) {
+        return { mode: 'diagram', filePath: src, diagramType: 'excalidraw' };
+    }
+    return null;
+}
+
+function renderDiagramPreview(preview: HTMLElement, lang: string, code: string): void {
+    if (!preview) {
+        return;
+    }
+    const api = window as unknown as MediaPathHelpers;
+    const normalizedLang = (lang || '').toLowerCase();
+    const isMermaid = normalizedLang === 'mermaid';
+    const isPlantUml = normalizedLang === 'plantuml' || normalizedLang === 'puml';
+
+    if (!isMermaid && !isPlantUml) {
+        preview.innerHTML = '';
+        preview.style.display = 'none';
+        return;
+    }
+
+    preview.style.display = '';
+    preview.innerHTML = '';
+    const placeholder = document.createElement('div');
+    const previewId = makePreviewId('wysiwyg-diagram');
+    placeholder.id = previewId;
+    placeholder.className = isMermaid ? 'mermaid-placeholder' : 'plantuml-placeholder';
+    placeholder.textContent = isMermaid ? 'Rendering Mermaid diagram...' : 'Rendering PlantUML diagram...';
+    preview.appendChild(placeholder);
+
+    if (isMermaid && typeof api.queueMermaidRender === 'function') {
+        api.queueMermaidRender(previewId, code);
+        return;
+    }
+    if (isPlantUml && typeof api.queuePlantUMLRender === 'function') {
+        api.queuePlantUMLRender(previewId, code);
+    }
+}
+
+function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
+    const api = window as unknown as MediaPathHelpers;
+    const diagramInfo = getDiagramFileInfo(originalSrc);
+    if (!diagramInfo) {
+        return;
+    }
+
+    dom.dataset.wysiwygDiagram = 'true';
+    const placeholderId = makePreviewId('wysiwyg-media');
+    const placeholder = document.createElement('div');
+    placeholder.id = placeholderId;
+    placeholder.className = 'diagram-placeholder';
+    dom.innerHTML = '';
+    dom.appendChild(placeholder);
+
+    const includeDir = api.currentTaskIncludeContext?.includeDir;
+    if (diagramInfo.mode === 'diagram' && diagramInfo.diagramType && typeof api.queueDiagramRender === 'function') {
+        api.queueDiagramRender(placeholderId, diagramInfo.filePath, diagramInfo.diagramType, includeDir);
+        return;
+    }
+    if (diagramInfo.mode === 'pdf-page' && typeof api.queuePDFPageRender === 'function') {
+        api.queuePDFPageRender(placeholderId, diagramInfo.filePath, diagramInfo.pageNumber || 1, includeDir);
+        return;
+    }
+    if (diagramInfo.mode === 'pdf-slideshow' && typeof api.queuePDFSlideshow === 'function') {
+        api.queuePDFSlideshow(placeholderId, diagramInfo.filePath, includeDir);
+    }
+}
+
+function createMediaInlineView(node: any): NodeView {
+    const dom = document.createElement('span');
+
+    const render = (currentNode: any) => {
+        const mediaType = currentNode.attrs?.mediaType || 'image';
+        const src = currentNode.attrs?.src || '';
+        const alt = currentNode.attrs?.alt || '';
+        const title = currentNode.attrs?.title || '';
+
+        dom.innerHTML = '';
+        dom.className = mediaType === 'image' ? 'image-path-overlay-container wysiwyg-media' : 'wysiwyg-media';
+        dom.dataset.type = mediaType;
+
+        if (mediaType === 'image') {
+            dom.dataset.imagePath = src;
+            dom.dataset.src = src;
+
+            const diagramInfo = getDiagramFileInfo(src);
+            if (diagramInfo) {
+                syncWysiwygDiagramFile(dom, src);
+                return;
+            }
+
+            const img = document.createElement('img');
+            img.className = 'markdown-image';
+            img.alt = alt;
+            img.title = title;
+            img.dataset.originalSrc = src;
+            img.setAttribute('data-original-src', src);
+            img.src = resolveDisplaySrc(src);
+            img.contentEditable = 'false';
+
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'image-menu-btn';
+            menuBtn.type = 'button';
+            menuBtn.title = 'Path options';
+            menuBtn.textContent = '☰';
+            menuBtn.setAttribute('data-action', 'image-menu');
+            menuBtn.contentEditable = 'false';
+
+            dom.appendChild(img);
+            dom.appendChild(menuBtn);
+            return;
+        }
+
+        dom.dataset.src = src;
+        const button = document.createElement('button');
+        button.className = 'wysiwyg-edit-btn';
+        button.type = 'button';
+        button.setAttribute('data-action', 'media');
+        button.textContent = 'Edit';
+        button.contentEditable = 'false';
+        dom.appendChild(button);
+        if (src) {
+            dom.appendChild(document.createTextNode(src));
+        }
+    };
+
+    render(node);
+
+    return {
+        dom,
+        update: (nextNode) => {
+            if (nextNode.type !== node.type) {
+                return false;
+            }
+            const nextSrc = nextNode.attrs?.src || '';
+            const nextType = nextNode.attrs?.mediaType || 'image';
+            const nextAlt = nextNode.attrs?.alt || '';
+            const nextTitle = nextNode.attrs?.title || '';
+            const needsUpdate = nextSrc !== node.attrs?.src ||
+                nextType !== node.attrs?.mediaType ||
+                nextAlt !== node.attrs?.alt ||
+                nextTitle !== node.attrs?.title;
+            node = nextNode;
+            if (needsUpdate) {
+                render(nextNode);
+            }
+            return true;
+        }
+    };
+}
+
+function createDiagramFenceView(node: any): NodeView {
+    const dom = document.createElement('div');
+    dom.className = 'wysiwyg-diagram-block';
+
+    const preview = document.createElement('div');
+    preview.className = 'wysiwyg-diagram-preview';
+    preview.contentEditable = 'false';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'wysiwyg-edit-btn';
+    editBtn.type = 'button';
+    editBtn.textContent = 'Edit';
+    editBtn.setAttribute('data-action', 'diagram');
+    editBtn.contentEditable = 'false';
+
+    const pre = document.createElement('pre');
+    pre.className = 'wysiwyg-diagram';
+    const code = document.createElement('code');
+    pre.appendChild(code);
+
+    dom.appendChild(preview);
+    dom.appendChild(editBtn);
+    dom.appendChild(pre);
+
+    const render = (currentNode: any) => {
+        const lang = currentNode.attrs?.lang || '';
+        dom.dataset.lang = lang;
+        pre.dataset.lang = lang;
+        renderDiagramPreview(preview, lang, currentNode.textContent || '');
+    };
+
+    render(node);
+
+    return {
+        dom,
+        contentDOM: code,
+        update: (nextNode) => {
+            if (nextNode.type !== node.type) {
+                return false;
+            }
+            const langChanged = nextNode.attrs?.lang !== node.attrs?.lang;
+            const codeChanged = nextNode.textContent !== node.textContent;
+            node = nextNode;
+            if (langChanged || codeChanged) {
+                render(nextNode);
+            }
+            return true;
+        }
+    };
+}
+
 function syncWysiwygImages(container: HTMLElement): void {
     if (!container) {
         return;
@@ -121,6 +346,10 @@ function syncWysiwygImages(container: HTMLElement): void {
     const images = container.querySelectorAll<HTMLImageElement>('.image-path-overlay-container img');
     images.forEach((img) => {
         const overlay = img.closest('.image-path-overlay-container') as HTMLElement | null;
+        const diagramHost = overlay?.closest?.('[data-wysiwyg-diagram="true"]') as HTMLElement | null;
+        if (img.classList.contains('diagram-rendered') || diagramHost) {
+            return;
+        }
         const originalSrc = overlay?.dataset?.imagePath || img.dataset.originalSrc || img.getAttribute('data-original-src') || img.getAttribute('src') || '';
         if (!originalSrc) {
             return;
@@ -552,6 +781,10 @@ export class WysiwygEditor {
                 doc: pmDoc,
                 plugins
             }),
+            nodeViews: {
+                media_inline: (node) => createMediaInlineView(node),
+                diagram_fence: (node) => createDiagramFenceView(node)
+            },
             handleKeyDown: (view, event) => {
                 const styleKey = getStyleKey(event);
                 if (!styleKey) {
@@ -588,12 +821,15 @@ export class WysiwygEditor {
                 }
                 const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
                 if (imageMenuButton) {
-                    event.preventDefault();
-                    event.stopPropagation();
                     const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
-                    const imagePath = container?.dataset?.imagePath;
+                    const imagePath = container?.dataset?.imagePath ||
+                        container?.querySelector('img')?.getAttribute('data-original-src') ||
+                        container?.querySelector('img')?.getAttribute('data-image-path') ||
+                        container?.querySelector('img')?.getAttribute('src');
                     const menuApi = window as unknown as { toggleImagePathMenu?: (container: HTMLElement, imagePath: string) => void };
                     if (container && imagePath && typeof menuApi.toggleImagePathMenu === 'function') {
+                        event.preventDefault();
+                        event.stopPropagation();
                         menuApi.toggleImagePathMenu(container, imagePath);
                         return true;
                     }
