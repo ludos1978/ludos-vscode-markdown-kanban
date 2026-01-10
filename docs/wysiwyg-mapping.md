@@ -85,6 +85,67 @@ Marks:
 - link { href, title }
 - abbr { title }
 
+## Token -> Node/Mark Mapping (Draft)
+This table ties current markdown-it token names to editor nodes/marks and the required attrs.
+
+| Token(s) | Node/Mark | Notes |
+| --- | --- | --- |
+| paragraph_open/close | paragraph | Standard block |
+| heading_open/close | heading { level } | level from token.tag |
+| blockquote_open/close | blockquote | Standard block |
+| bullet_list_open/close | bullet_list | Standard block |
+| ordered_list_open/close | ordered_list | order/start attrs |
+| list_item_open/close | list_item | Standard block |
+| fence | diagram_fence or code_block | lang decides (plantuml/mermaid -> diagram_fence) |
+| code_block | code_block | Standard block |
+| hr | horizontal_rule | Standard block |
+| table_* | table/table_row/table_cell | align from token.attrs |
+| multicolumn_open/close | multicolumn | container block |
+| multicolumn_block_open/close | multicolumn_column | growth from token.meta |
+| container_* | container { kind } | kind from token.info |
+| include_block | include_block | path from token.filePath |
+| include_content | include_inline | path from token.attr data-include-file |
+| include_placeholder | include_inline | keep path + missing flag |
+| html_block | html_block | raw content |
+| html_inline | html_inline | inline node or mark with raw html |
+| html_comment | html_comment | inline node or mark |
+| speaker_note | speaker_note | raw content |
+| wiki_link_open/close + text | wiki_link | document from data-document, title from text |
+| tag | tag | value from token.content |
+| date_person_tag | date_tag/person_tag | type from token.meta.type |
+| temporal_tag | temporal_tag | type from token.meta.type |
+| em_open/close | em | Standard mark |
+| strong_open/close | strong | Standard mark |
+| s_open/close | strike | must track style (~~ vs --) |
+| underline | underline | markdown-it-underline |
+| mark | mark | markdown-it-mark |
+| sub | sub | markdown-it-sub |
+| sup | sup | markdown-it-sup |
+| ins | ins | markdown-it-ins |
+| link_open/close | link | href/title attrs |
+| image | image/media_inline | handles pdf/diagram special cases |
+| audio/video | media_inline | children contain <source> tokens |
+| footnote_* | footnote nodes | doc-level footnote store |
+| abbr | abbr mark | title from token.attrs |
+
+## Serializer Mapping (Draft)
+High-level rules for converting editor nodes/marks back to Markdown.
+
+- diagram_fence: serialize as ```lang\\ncode\\n```\n
+- multicolumn: emit ---: <growth> blocks, :--: separators, :--- end marker.\n
+- include_block: !!!include(path)!!! on its own line.\n
+- include_inline: !!!include(path)!!! in text.\n
+- html_block/html_inline/html_comment: preserve raw content.\n
+- speaker_note: prefix each line with ;;.\n
+- wiki_link: [[doc|title]] or [[doc]] if title equals doc.\n
+- tag/date/person/temporal: serialize with #, @, . prefixes and original content.\n
+- strike: preserve delimiter style (~~ or --).\n
+- underline: serialize with _underline_ (not emphasis).\n
+- mark/sub/sup/ins: use ==, ~, ^, ++.\n
+- media_inline: emit original markdown-it-media syntax where available.\n
+- image figures: keep title attribute as figcaption source.\n
+- footnotes: preserve ids and order with doc-level definitions.\n
+
 ## Plugin Round-Trip Rules
 
 - Emoji:

@@ -41,3 +41,4 @@
 - [ ] Open the debug overlay and confirm the main file path shown comes from the registry (matches the real file), and that Force Save All reports an error if no main file is registered.
 - [ ] Use Reload All Included Files and confirm include files reload from disk and the file list stays correct in the debug overlay.
 - [ ] Review docs/wysiwyg-mapping.md and confirm all markdown-it plugins/custom syntaxes are captured in the mapping plan.
+- [ ] Review the Token -> Node/Mark and Serializer mapping tables in docs/wysiwyg-mapping.md for completeness.
