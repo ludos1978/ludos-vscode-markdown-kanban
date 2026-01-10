@@ -51,3 +51,4 @@
 - [ ] Run unit tests for WYSIWYG pipeline (`WysiwygPipeline.test.ts`) and confirm round-trip output stays stable for tags + temporal prefix.
 - [ ] Enable WYSIWYG editing and confirm task descriptions open with the ProseMirror editor, save back to markdown, and keep include/tag/wiki link nodes visible.
 - [ ] Enable WYSIWYG editing and confirm the editor UI actually renders (no blank/hidden editor) and no missing `wysiwyg-editor.js` asset errors appear in the webview console.
+- [ ] With WYSIWYG editing active, verify arrow keys, Enter, and Tab behave normally inside the editor and are not intercepted by the textarea handlers.

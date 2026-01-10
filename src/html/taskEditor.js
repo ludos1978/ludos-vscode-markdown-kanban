@@ -377,6 +377,17 @@ class TaskEditor {
             if (!this.currentEditor) {return;}
 
             const element = this.currentEditor.element;
+            if (this.currentEditor.wysiwyg) {
+                const viewDom = this.currentEditor.wysiwyg.getViewDom?.();
+                const isInsideWysiwyg = viewDom && (e.target === viewDom || viewDom.contains(e.target));
+                if (isInsideWysiwyg) {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.save();
+                    }
+                    return;
+                }
+            }
 
             // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
             if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
