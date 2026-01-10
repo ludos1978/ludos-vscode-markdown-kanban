@@ -926,7 +926,9 @@ body.small-card-fonts .task-item {
 }
 
 body.small-card-fonts .task-title-display,
-body.small-card-fonts .task-description-display {
+body.small-card-fonts .task-description-display,
+body.small-card-fonts .task-description-edit,
+body.small-card-fonts .task-description-wysiwyg {
   font-size: 0.85em;
   line-height: 1.3;
 }
@@ -1799,6 +1801,8 @@ body.section-height-limited .task-section figure img {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+  font-variant-ligatures: normal;
+  font-feature-settings: normal;
   margin: 0;
   padding: 0;
 }
