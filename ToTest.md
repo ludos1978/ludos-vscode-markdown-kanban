@@ -79,6 +79,8 @@
 - [ ] In display mode, audio embeds show the same path menu behavior as videos and handle missing files with a placeholder.
 - [ ] Right burger menu: toggling “Enable WYSIWYG editor” switches between WYSIWYG and plain textarea for the current description.
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
+- [ ] In WYSIWYG multicolumn blocks, the +/- overlays stay above images (no overlap/behind) and do not clip.
+- [ ] In WYSIWYG multicolumn blocks, image sizing (width/height) matches the display-mode columns for the same content.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.

@@ -1966,27 +1966,30 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .wysiwyg-multicolumn {
-  border: 1px dashed var(--vscode-panel-border);
-  border-radius: 4px;
-  padding: 6px;
-  margin: 6px 0;
-  background: color-mix(in srgb, var(--vscode-editor-background) 85%, transparent);
   position: relative;
+  margin: 10px 0;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  outline: 1px dashed color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+  outline-offset: 2px;
+  overflow: visible;
 }
 
 .task-description-wysiwyg .wysiwyg-multicolumn-toolbar {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  right: 2px;
+  top: -8px;
+  left: -8px;
+  right: -8px;
   display: flex;
   justify-content: space-between;
   pointer-events: none;
+  z-index: 20;
 }
 
 .task-description-wysiwyg .wysiwyg-multicolumn-btn {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: 1px solid var(--vscode-panel-border);
   background: var(--vscode-button-secondaryBackground);
@@ -2007,18 +2010,18 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-multicolumn-columns {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 .task-description-wysiwyg .wysiwyg-multicolumn-column {
+  flex: 1 1 0;
   min-width: 0;
-  padding-left: 10px;
-  border-left: 1px solid var(--vscode-panel-border);
+  padding: 10px;
+  border-left: none;
 }
 
-.task-description-wysiwyg .wysiwyg-multicolumn-column:first-child {
-  padding-left: 0;
-  border-left: none;
+.task-description-wysiwyg .wysiwyg-multicolumn-column + .wysiwyg-multicolumn-column {
+  border-left: 1px solid var(--vscode-panel-border);
 }
 
 .task-description-wysiwyg .wysiwyg-media[data-type]:not([data-type="image"])::before {
