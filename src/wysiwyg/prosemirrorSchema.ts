@@ -57,7 +57,7 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'html_block':
             return (node) => ['div', { class: 'wysiwyg-html-block', 'data-mode': node.attrs.mode || 'block' }, node.attrs.raw || ''];
         case 'diagram_fence':
-            return (node) => ['pre', { class: 'wysiwyg-diagram', 'data-lang': node.attrs.lang || '' }, ['code', node.attrs.code || '']];
+            return (node) => ['pre', { class: 'wysiwyg-diagram', 'data-lang': node.attrs.lang || '' }, ['code', 0]];
         case 'include_inline':
             return (node) => ['span', { class: 'wysiwyg-include-inline', 'data-path': node.attrs.path || '' }, `!!!include(${node.attrs.path || ''})!!!`];
         case 'wiki_link':

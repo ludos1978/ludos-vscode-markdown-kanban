@@ -84,8 +84,10 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
         },
         diagram_fence: {
             group: 'block',
-            atom: true,
-            attrs: { lang: { default: '' }, code: { default: '' } }
+            content: 'text*',
+            code: true,
+            marks: '',
+            attrs: { lang: { default: '' } }
         },
         include_inline: {
             inline: true,

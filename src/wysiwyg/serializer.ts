@@ -182,7 +182,8 @@ function serializeCodeBlock(node: WysiwygNode): string {
 
 function serializeDiagramFence(node: WysiwygNode): string {
     const lang = typeof node.attrs?.lang === 'string' ? node.attrs.lang : '';
-    const code = typeof node.attrs?.code === 'string' ? node.attrs.code : extractText(node);
+    const codeFromContent = extractText(node);
+    const code = codeFromContent || (typeof node.attrs?.code === 'string' ? node.attrs.code : '');
     return ['```' + lang, code, '```'].join('\n').trimEnd();
 }
 

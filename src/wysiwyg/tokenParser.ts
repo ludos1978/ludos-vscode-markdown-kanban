@@ -456,7 +456,11 @@ function createBlockLeafNode(token: MarkdownItToken): WysiwygNode | null {
             const lang = info.split(/\s+/)[0] || '';
             const code = token.content || '';
             if (lang && diagramLangs.has(lang.toLowerCase())) {
-                return { type: 'diagram_fence', attrs: { lang, code } };
+                return {
+                    type: 'diagram_fence',
+                    attrs: { lang },
+                    content: code ? [{ type: 'text', text: code }] : []
+                };
             }
             return {
                 type: 'code_block',

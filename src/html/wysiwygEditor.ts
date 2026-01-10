@@ -40,6 +40,59 @@ const TILDE_DEAD_CODES = new Set([
     'Digit4'
 ]);
 
+function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
+    const tr = view.state.tr.setNodeMarkup(pos, undefined, attrs);
+    view.dispatch(tr);
+}
+
+function getModalApi(): { showInputModal?: (...args: unknown[]) => void } {
+    return window as unknown as { showInputModal?: (...args: unknown[]) => void };
+}
+
+function openPathEditor(view: EditorView, node: { attrs?: Record<string, unknown> }, pos: number): void {
+    const currentPath = typeof node.attrs?.path === 'string' ? node.attrs.path : '';
+    const modalApi = getModalApi();
+    if (typeof modalApi.showInputModal === 'function') {
+        modalApi.showInputModal(
+            'Edit include path',
+            'Update include path',
+            'Path',
+            (value: string) => {
+                updateNodeAttrs(view, pos, { ...node.attrs, path: value });
+            },
+            null,
+            { defaultValue: currentPath }
+        );
+        return;
+    }
+    const nextValue = window.prompt('Include path', currentPath);
+    if (nextValue !== null) {
+        updateNodeAttrs(view, pos, { ...node.attrs, path: nextValue });
+    }
+}
+
+function openMediaEditor(view: EditorView, node: { attrs?: Record<string, unknown> }, pos: number): void {
+    const currentSrc = typeof node.attrs?.src === 'string' ? node.attrs.src : '';
+    const modalApi = getModalApi();
+    if (typeof modalApi.showInputModal === 'function') {
+        modalApi.showInputModal(
+            'Edit media source',
+            'Update media source URL/path',
+            'Source',
+            (value: string) => {
+                updateNodeAttrs(view, pos, { ...node.attrs, src: value });
+            },
+            null,
+            { defaultValue: currentSrc }
+        );
+        return;
+    }
+    const nextValue = window.prompt('Media source', currentSrc);
+    if (nextValue !== null) {
+        updateNodeAttrs(view, pos, { ...node.attrs, src: nextValue });
+    }
+}
+
 function getStyleKey(event: KeyboardEvent): string | null {
     if (!event) {
         return null;
@@ -124,6 +177,20 @@ export class WysiwygEditor {
                     event.preventDefault();
                 }
                 return handled;
+            },
+            handleDoubleClickOn: (view, pos, node, nodePos) => {
+                if (!node) {
+                    return false;
+                }
+                if (node.type.name === 'media_inline') {
+                    openMediaEditor(view, node, nodePos);
+                    return true;
+                }
+                if (node.type.name === 'include_inline' || node.type.name === 'include_block') {
+                    openPathEditor(view, node, nodePos);
+                    return true;
+                }
+                return false;
             },
             dispatchTransaction: (transaction) => {
                 const newState = this.view.state.apply(transaction);
