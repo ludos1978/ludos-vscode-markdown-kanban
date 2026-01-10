@@ -69,6 +69,7 @@
 - [ ] In WYSIWYG, typing #tag/@person/@2025-01-01/!temporal followed by space converts into tag chips immediately.
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki syntax and then continuing to type still keeps the node rendered.
 - [ ] In WYSIWYG, typing an image/link/include/wiki tag and then a space should not leave stray ")" characters in the text.
+- [ ] In WYSIWYG, typing space or text right after a selected image keeps the image (does not replace it).
 - [ ] In WYSIWYG, draw.io/excalidraw embeds render as image previews with the same burger menu/behavior as normal images.
 - [ ] In WYSIWYG, draw.io/excalidraw placeholders render immediately (no stuck gray boxes).
 - [ ] In WYSIWYG, draw.io/excalidraw placeholders resolve after a short delay (render queue kicks in reliably).
