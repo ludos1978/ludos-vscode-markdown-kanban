@@ -42,3 +42,4 @@
 - [ ] Use Reload All Included Files and confirm include files reload from disk and the file list stays correct in the debug overlay.
 - [ ] Review docs/wysiwyg-mapping.md and confirm all markdown-it plugins/custom syntaxes are captured in the mapping plan.
 - [ ] Review the Token -> Node/Mark and Serializer mapping tables in docs/wysiwyg-mapping.md for completeness.
+- [ ] Review src/wysiwyg/spec.ts for schema coverage and token mapping alignment with markdown-it tokens.
