@@ -211,3 +211,4 @@ High-level rules for converting editor nodes/marks back to Markdown.
 3) Implement NodeViews for includes, diagrams, media, and tags.
 4) Add test fixtures for every plugin syntax to validate round-trip.
 5) Draft spec artifacts in src/wysiwyg/spec.ts to anchor schema and mapping.
+6) Add initial parser/serializer stubs in src/wysiwyg to validate mapping coverage.
