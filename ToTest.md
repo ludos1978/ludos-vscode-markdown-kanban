@@ -45,3 +45,4 @@
 - [ ] Review src/wysiwyg/spec.ts for schema coverage and token mapping alignment with markdown-it tokens.
 - [ ] Review src/wysiwyg/tokenParser.ts token tree parsing for correct block/inline mapping (marks, containers, includes, tags, media, and html tokens).
 - [ ] Review src/wysiwyg/serializer.ts output for headings, lists, tables, includes, containers, and marks (em/strong/underline/strike/mark/sub/sup/ins/link/abbr).
+- [ ] Run unit tests for Wysiwyg parser/serializer (`WysiwygParserSerializer.test.ts`) and confirm outputs match expected markdown.
