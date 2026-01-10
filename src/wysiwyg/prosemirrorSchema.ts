@@ -86,12 +86,33 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'temporal_tag':
             return (node) => ['span', { class: 'wysiwyg-temporal-tag', 'data-value': node.attrs.value || '' }, `!${node.attrs.value || ''}`];
         case 'media_inline':
-            return (node) => [
-                'span',
-                { class: 'wysiwyg-media', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
-                ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'media', type: 'button', contenteditable: 'false' }, 'Edit'],
-                node.attrs.src || ''
-            ];
+            return (node) => (
+                (node.attrs.mediaType || 'image') === 'image'
+                    ? [
+                        'span',
+                        {
+                            class: 'image-path-overlay-container wysiwyg-media',
+                            'data-image-path': node.attrs.src || '',
+                            'data-src': node.attrs.src || '',
+                            'data-type': node.attrs.mediaType || 'image'
+                        },
+                        ['img', {
+                            src: node.attrs.src || '',
+                            alt: node.attrs.alt || '',
+                            title: node.attrs.title || '',
+                            class: 'markdown-image',
+                            'data-original-src': node.attrs.src || '',
+                            contenteditable: 'false'
+                        }],
+                        ['button', { class: 'image-menu-btn', 'data-action': 'image-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰']
+                    ]
+                    : [
+                        'span',
+                        { class: 'wysiwyg-media', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
+                        ['button', { class: 'wysiwyg-edit-btn', 'data-action': 'media', type: 'button', contenteditable: 'false' }, 'Edit'],
+                        node.attrs.src || ''
+                    ]
+            );
         case 'footnote':
             return (node) => ['span', { class: 'wysiwyg-footnote', 'data-id': node.attrs.id || '' }, `[^${node.attrs.id || ''}]`];
         case 'text':

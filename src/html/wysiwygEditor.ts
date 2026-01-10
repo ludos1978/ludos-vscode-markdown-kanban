@@ -204,6 +204,18 @@ export class WysiwygEditor {
                 if (!target) {
                     return false;
                 }
+                const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
+                if (imageMenuButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
+                    const imagePath = container?.dataset?.imagePath;
+                    const menuApi = window as unknown as { toggleImagePathMenu?: (container: HTMLElement, imagePath: string) => void };
+                    if (container && imagePath && typeof menuApi.toggleImagePathMenu === 'function') {
+                        menuApi.toggleImagePathMenu(container, imagePath);
+                        return true;
+                    }
+                }
                 const button = target.closest?.('.wysiwyg-edit-btn') as HTMLElement | null;
                 if (!button) {
                     return false;

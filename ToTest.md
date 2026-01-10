@@ -57,3 +57,4 @@
 - [ ] In WYSIWYG, double-click an image/audio/video placeholder and confirm the source path can be edited and saves back to markdown.
 - [ ] In WYSIWYG, edit a diagram/mermaid code block directly and confirm updates persist on save.
 - [ ] In WYSIWYG, click the Edit button on include/media/diagram nodes and confirm the correct edit UI opens or focus moves into the code block.
+- [ ] In WYSIWYG, images render with the same burger menu as the display view and the menu actions work (open, reveal, convert path, delete).

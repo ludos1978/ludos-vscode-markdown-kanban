@@ -1853,6 +1853,16 @@ body.section-height-limited .task-section figure img {
   text-decoration: none;
 }
 
+.task-description-wysiwyg img {
+  max-width: 100%;
+  max-height: 400px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  display: block;
+  object-fit: contain;
+}
+
 .task-description-wysiwyg .wysiwyg-include-inline,
 .task-description-wysiwyg .wysiwyg-include-block,
 .task-description-wysiwyg .wysiwyg-media,
