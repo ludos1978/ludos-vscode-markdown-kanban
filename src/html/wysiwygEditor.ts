@@ -1176,6 +1176,16 @@ export class WysiwygEditor {
                     return true;
                 }
                 if (action === 'diagram' && node?.type?.name === 'diagram_fence') {
+                    const block = target.closest?.('.wysiwyg-diagram-block') as HTMLElement | null;
+                    if (block) {
+                        const isEditing = block.classList.toggle('is-editing');
+                        if (!isEditing) {
+                            const after = nodePos + node.nodeSize;
+                            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, after)));
+                            view.focus();
+                            return true;
+                        }
+                    }
                     focusDiagram(view, nodePos);
                     return true;
                 }

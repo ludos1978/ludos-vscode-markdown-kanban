@@ -77,6 +77,7 @@
 - [ ] In WYSIWYG, video/audio embeds render as media elements with the same path menu behavior as the display view.
 - [ ] In WYSIWYG, media-only lines (image/video/audio) render as block embeds matching display mode while inline images stay inline within text.
 - [ ] In WYSIWYG, diagram previews update while typing without excessive re-rendering (debounce works).
+- [ ] In WYSIWYG, diagram fences default to preview-only (no code block), and the Edit button toggles the code block without changing the preview sizing.
 - [ ] In display mode, audio embeds show the same path menu behavior as videos and handle missing files with a placeholder.
 - [ ] Right burger menu: toggling “Enable WYSIWYG editor” switches between WYSIWYG and plain textarea for the current description.
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
