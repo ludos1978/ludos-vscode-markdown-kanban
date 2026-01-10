@@ -3901,7 +3901,9 @@ document.addEventListener('keydown', (e) => {
         activeElement.tagName === 'TEXTAREA' || 
         activeElement.classList.contains('column-title-edit') ||
         activeElement.classList.contains('task-title-edit') ||
-        activeElement.classList.contains('task-description-edit')
+        activeElement.classList.contains('task-description-edit') ||
+        activeElement.classList.contains('ProseMirror') ||
+        (activeElement.closest && activeElement.closest('.task-description-wysiwyg'))
     );
     
     

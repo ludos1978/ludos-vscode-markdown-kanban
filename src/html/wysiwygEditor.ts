@@ -1,4 +1,4 @@
-import { EditorState } from 'prosemirror-state';
+import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -15,6 +15,57 @@ export type WysiwygEditorOptions = {
     temporalPrefix?: string;
     onChange?: (markdown: string) => void;
 };
+
+const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
+    '*': { start: '*', end: '*' },
+    '_': { start: '_', end: '_' },
+    '~': { start: '~', end: '~' },
+    '^': { start: '^', end: '^' },
+    '`': { start: '`', end: '`' },
+    '"': { start: '"', end: '"' },
+    "'": { start: "'", end: "'" },
+    '[': { start: '[', end: ']' },
+    '(': { start: '(', end: ')' },
+    '{': { start: '{', end: '}' },
+    '<': { start: '<', end: '>' }
+};
+
+const TILDE_DEAD_CODES = new Set([
+    'IntlBackslash',
+    'Backquote',
+    'Quote',
+    'IntlRo',
+    'KeyN',
+    'BracketRight',
+    'Digit4'
+]);
+
+function getStyleKey(event: KeyboardEvent): string | null {
+    if (!event) {
+        return null;
+    }
+    if (event.key && STYLE_PAIRS[event.key]) {
+        return event.key;
+    }
+    if (event.key === 'Dead' && event.code && TILDE_DEAD_CODES.has(event.code)) {
+        return '~';
+    }
+    return null;
+}
+
+function wrapSelectionWithText(view: EditorView, start: string, end: string): boolean {
+    const { from, to } = view.state.selection;
+    if (from === to) {
+        return false;
+    }
+
+    const tr = view.state.tr;
+    tr.insertText(end, to, to);
+    tr.insertText(start, from, from);
+    tr.setSelection(TextSelection.create(tr.doc, from + start.length, to + start.length));
+    view.dispatch(tr);
+    return true;
+}
 
 export class WysiwygEditor {
     private view: EditorView;
@@ -59,6 +110,21 @@ export class WysiwygEditor {
                 doc: pmDoc,
                 plugins
             }),
+            handleKeyDown: (view, event) => {
+                const styleKey = getStyleKey(event);
+                if (!styleKey) {
+                    return false;
+                }
+                const pair = STYLE_PAIRS[styleKey];
+                if (!pair) {
+                    return false;
+                }
+                const handled = wrapSelectionWithText(view, pair.start, pair.end);
+                if (handled) {
+                    event.preventDefault();
+                }
+                return handled;
+            },
             dispatchTransaction: (transaction) => {
                 const newState = this.view.state.apply(transaction);
                 this.view.updateState(newState);
