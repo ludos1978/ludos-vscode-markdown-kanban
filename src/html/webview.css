@@ -1779,9 +1779,9 @@ body.section-height-limited .task-section figure img {
 .task-description-wysiwyg {
   font-size: 13px;
   line-height: 1.5;
-  padding: 8px;
+  padding: 0 8px;
   width: 100%;
-  min-height: 3em;
+  min-height: 20px;
   background: var(--vscode-input-background);
   color: var(--vscode-foreground);
   border: 1px solid var(--vscode-focusBorder);
@@ -1799,6 +1799,8 @@ body.section-height-limited .task-section figure img {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+  margin: 0;
+  padding: 0;
 }
 
 .task-description-wysiwyg .ProseMirror h1,
