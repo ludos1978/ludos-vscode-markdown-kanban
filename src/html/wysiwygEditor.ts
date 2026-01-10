@@ -51,6 +51,7 @@ type MediaPathHelpers = {
     currentFilePath?: string;
     currentTaskIncludeContext?: { includeDir?: string };
     handleImageNotFound?: (img: HTMLImageElement, originalSrc: string) => void;
+    handleVideoNotFound?: (video: HTMLVideoElement, originalSrc: string) => void;
     queueDiagramRender?: (id: string, filePath: string, diagramType: string, includeDir?: string) => void;
     queuePDFPageRender?: (id: string, filePath: string, pageNumber: number, includeDir?: string) => void;
     queuePDFSlideshow?: (id: string, filePath: string, includeDir?: string) => void;
@@ -185,7 +186,6 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
 
     dom.dataset.wysiwygDiagram = 'true';
     dom.classList.add('wysiwyg-diagram-file');
-    dom.classList.add('wysiwyg-diagram-file');
     const placeholderId = makePreviewId('wysiwyg-media');
     const placeholder = document.createElement('span');
     placeholder.id = placeholderId;
@@ -193,6 +193,14 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     placeholder.dataset.wysiwygHost = 'true';
     dom.innerHTML = '';
     dom.appendChild(placeholder);
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'image-menu-btn';
+    menuBtn.type = 'button';
+    menuBtn.title = 'Path options';
+    menuBtn.textContent = '☰';
+    menuBtn.setAttribute('data-action', 'image-menu');
+    menuBtn.contentEditable = 'false';
+    dom.appendChild(menuBtn);
 
     const includeDir = api.currentTaskIncludeContext?.includeDir;
     const scheduleProcess = () => {
@@ -231,7 +239,11 @@ function createMediaInlineView(node: any): NodeView {
         const title = currentNode.attrs?.title || '';
 
         dom.innerHTML = '';
-        dom.className = mediaType === 'image' ? 'image-path-overlay-container wysiwyg-media' : 'wysiwyg-media';
+        dom.className = mediaType === 'image'
+            ? 'image-path-overlay-container wysiwyg-media'
+            : (mediaType === 'video' || mediaType === 'audio')
+                ? 'video-path-overlay-container wysiwyg-media'
+                : 'wysiwyg-media';
         dom.dataset.type = mediaType;
 
         if (mediaType === 'image') {
@@ -262,6 +274,39 @@ function createMediaInlineView(node: any): NodeView {
             menuBtn.contentEditable = 'false';
 
             dom.appendChild(img);
+            dom.appendChild(menuBtn);
+            return;
+        }
+
+        if (mediaType === 'video' || mediaType === 'audio') {
+            dom.dataset.src = src;
+            dom.dataset.videoPath = src;
+
+            const mediaEl = document.createElement(mediaType === 'audio' ? 'audio' : 'video');
+            mediaEl.controls = true;
+            mediaEl.src = resolveDisplaySrc(src);
+            mediaEl.dataset.originalSrc = src;
+            mediaEl.setAttribute('data-original-src', src);
+            mediaEl.contentEditable = 'false';
+
+            if (mediaType === 'video' && src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+                const api = window as unknown as MediaPathHelpers;
+                mediaEl.addEventListener('error', () => {
+                    if (typeof api.handleVideoNotFound === 'function') {
+                        api.handleVideoNotFound(mediaEl as HTMLVideoElement, src);
+                    }
+                });
+            }
+
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'video-menu-btn';
+            menuBtn.type = 'button';
+            menuBtn.title = 'Path options';
+            menuBtn.textContent = '☰';
+            menuBtn.setAttribute('data-action', 'video-menu');
+            menuBtn.contentEditable = 'false';
+
+            dom.appendChild(mediaEl);
             dom.appendChild(menuBtn);
             return;
         }
@@ -1003,6 +1048,22 @@ export class WysiwygEditor {
                         event.preventDefault();
                         event.stopPropagation();
                         menuApi.toggleImagePathMenu(container, imagePath);
+                        return true;
+                    }
+                }
+                const videoMenuButton = target.closest?.('.video-menu-btn') as HTMLElement | null;
+                if (videoMenuButton) {
+                    const container = videoMenuButton.closest('.video-path-overlay-container') as HTMLElement | null;
+                    const videoPath = container?.dataset?.videoPath ||
+                        container?.querySelector('video')?.getAttribute('data-original-src') ||
+                        container?.querySelector('audio')?.getAttribute('data-original-src') ||
+                        container?.querySelector('video')?.getAttribute('src') ||
+                        container?.querySelector('audio')?.getAttribute('src');
+                    const menuApi = window as unknown as { toggleVideoPathMenu?: (container: HTMLElement, videoPath: string) => void };
+                    if (container && videoPath && typeof menuApi.toggleVideoPathMenu === 'function') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        menuApi.toggleVideoPathMenu(container, videoPath);
                         return true;
                     }
                 }

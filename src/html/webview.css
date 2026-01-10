@@ -1890,6 +1890,19 @@ body.section-height-limited .task-section figure img {
   object-fit: contain;
 }
 
+.task-description-wysiwyg .video-path-overlay-container {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.task-description-wysiwyg .video-path-overlay-container video,
+.task-description-wysiwyg .video-path-overlay-container audio {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .task-description-wysiwyg .wysiwyg-include-inline,
 .task-description-wysiwyg .wysiwyg-include-block,
 .task-description-wysiwyg .wysiwyg-media,
