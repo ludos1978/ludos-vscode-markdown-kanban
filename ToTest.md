@@ -68,6 +68,7 @@
 - [ ] In WYSIWYG, typing list markers ("- " or "1. ") converts to lists immediately, and headings convert on "# " input.
 - [ ] In WYSIWYG, typing #tag/@person/@2025-01-01/!temporal followed by space converts into tag chips immediately.
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki syntax and then continuing to type still keeps the node rendered.
+- [ ] In WYSIWYG, typing an image/link/include/wiki tag and then a space should not leave stray ")" characters in the text.
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).

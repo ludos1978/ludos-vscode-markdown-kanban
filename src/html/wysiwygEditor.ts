@@ -514,6 +514,23 @@ function replaceInlineWithNode(state: any, match: RegExpMatchArray, start: numbe
     return state.tr.replaceWith(replaceStart, replaceEnd, node);
 }
 
+function replaceInlineWithNodePreserveSpace(state: any, match: RegExpMatchArray, start: number, end: number, node: any): any {
+    const full = match[0] || '';
+    const leadingSpace = full.length > 0 && /\s/.test(full[0]) ? full[0] : '';
+    const trailingSpace = full.length > 0 && /\s/.test(full[full.length - 1]) ? full[full.length - 1] : '';
+    const replaceStart = start + (leadingSpace ? 1 : 0);
+    const replaceEnd = end;
+    if (replaceEnd <= replaceStart) {
+        return null;
+    }
+    let tr = state.tr.replaceWith(replaceStart, replaceEnd, node);
+    if (trailingSpace) {
+        const insertPos = tr.mapping.map(replaceStart) + node.nodeSize;
+        tr = tr.insertText(trailingSpace, insertPos, insertPos);
+    }
+    return tr;
+}
+
 function wrapSelectionWithText(view: EditorView, start: string, end: string): boolean {
     const { from, to } = view.state.selection;
     if (from === to) {
@@ -635,7 +652,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (title) {
                 attrs.title = title;
             }
-            return replaceInlineWithNode(state, match, start, end, schema.nodes.media_inline.create(attrs));
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.media_inline.create(attrs));
         }));
     }
 
@@ -661,7 +678,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             }
             const mark = schema.marks.link.create({ href, title });
             const textNode = schema.text(text, [mark]);
-            return replaceInlineWithNode(state, match, start, end, textNode);
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, textNode);
         }));
     }
 
@@ -679,7 +696,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (!path) {
                 return null;
             }
-            return replaceInlineWithNode(state, match, start, end, schema.nodes.include_inline.create({ path, includeType: 'regular', missing: false }));
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.include_inline.create({ path, includeType: 'regular', missing: false }));
         }));
     }
 
@@ -699,7 +716,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (!document) {
                 return null;
             }
-            return replaceInlineWithNode(state, match, start, end, schema.nodes.wiki_link.create({ document, title: title || document }));
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.wiki_link.create({ document, title: title || document }));
         }));
     }
 
@@ -711,7 +728,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
                 return null;
             }
             const flavor = getTagFlavor(value);
-            return replaceInlineWithNode(state, match, start, end, schema.nodes.tag.create({ value, flavor }));
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.tag.create({ value, flavor }));
         }));
     }
 
@@ -724,13 +741,13 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             }
             const dateLike = isDateLike(value);
             if (dateLike && schema.nodes.date_tag) {
-                return replaceInlineWithNode(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
+                return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
             }
             if (schema.nodes.person_tag) {
-                return replaceInlineWithNode(state, match, start, end, schema.nodes.person_tag.create({ value }));
+                return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.person_tag.create({ value }));
             }
             if (schema.nodes.date_tag) {
-                return replaceInlineWithNode(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
+                return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.date_tag.create({ value, kind: 'date' }));
             }
             return null;
         }));
@@ -743,7 +760,7 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (!value) {
                 return null;
             }
-            return replaceInlineWithNode(state, match, start, end, schema.nodes.temporal_tag.create({ value, kind: 'generic' }));
+            return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.temporal_tag.create({ value, kind: 'generic' }));
         }));
     }
 
