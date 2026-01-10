@@ -1281,6 +1281,9 @@ class TaskEditor {
             onChange: (markdown) => {
                 editElement.value = markdown;
                 this._handleWysiwygInput(containerElement);
+            },
+            onSubmit: () => {
+                this.save();
             }
         });
 

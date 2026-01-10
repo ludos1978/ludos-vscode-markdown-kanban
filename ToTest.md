@@ -61,3 +61,4 @@
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.
+- [ ] In WYSIWYG, Tab inserts two spaces (and indents all selected lines), Shift+Tab unindents selected lines or removes spaces before the cursor, and Alt+Enter saves the edit without Tab ending editing.

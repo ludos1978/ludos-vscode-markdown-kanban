@@ -14,6 +14,7 @@ export type WysiwygEditorOptions = {
     markdown: string;
     temporalPrefix?: string;
     onChange?: (markdown: string) => void;
+    onSubmit?: () => void;
 };
 
 const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
@@ -282,10 +283,12 @@ export class WysiwygEditor {
     private lastMarkdown: string;
     private temporalPrefix: string;
     private onChange?: (markdown: string) => void;
+    private onSubmit?: () => void;
 
     constructor(container: HTMLElement, options: WysiwygEditorOptions) {
         this.temporalPrefix = options.temporalPrefix || '!';
         this.onChange = options.onChange;
+        this.onSubmit = options.onSubmit;
 
         const schema = buildProseMirrorSchema();
         const initialDoc = markdownToWysiwygDoc(options.markdown || '', {
@@ -298,6 +301,108 @@ export class WysiwygEditor {
             history(),
             inputRules({ rules: smartQuotes.concat(ellipsis, emDash, buildMarkdownInputRules(schema)) }),
             keymap({
+                Tab: (state, dispatch) => {
+                    const indent = '  ';
+                    const selection = state.selection;
+                    if (selection.empty) {
+                        if (!dispatch) {
+                            return true;
+                        }
+                        const tr = state.tr.insertText(indent, selection.from, selection.to);
+                        tr.setSelection(TextSelection.create(tr.doc, selection.from + indent.length));
+                        dispatch(tr);
+                        return true;
+                    }
+
+                    const positions: number[] = [];
+                    state.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+                        if (node.isTextblock) {
+                            const start = pos + 1;
+                            if (!positions.includes(start)) {
+                                positions.push(start);
+                            }
+                        }
+                    });
+
+                    if (positions.length === 0) {
+                        if (!dispatch) {
+                            return true;
+                        }
+                        const tr = state.tr.insertText(indent, selection.from, selection.to);
+                        dispatch(tr);
+                        return true;
+                    }
+
+                    if (!dispatch) {
+                        return true;
+                    }
+                    let tr = state.tr;
+                    positions.sort((a, b) => a - b).forEach((pos) => {
+                        const mapped = tr.mapping.map(pos);
+                        tr = tr.insertText(indent, mapped, mapped);
+                    });
+                    dispatch(tr);
+                    return true;
+                },
+                'Shift-Tab': (state, dispatch) => {
+                    const indent = '  ';
+                    const selection = state.selection;
+                    if (selection.empty) {
+                        const from = selection.from;
+                        const start = Math.max(0, from - indent.length);
+                        const text = state.doc.textBetween(start, from, '\n', '\n');
+                        if (!text) {
+                            return false;
+                        }
+                        const removeLength = text.endsWith('\t') ? 1 : (text.endsWith(indent) ? indent.length : 0);
+                        if (!removeLength) {
+                            return false;
+                        }
+                        if (!dispatch) {
+                            return true;
+                        }
+                        const tr = state.tr.delete(from - removeLength, from);
+                        dispatch(tr);
+                        return true;
+                    }
+
+                    const positions: number[] = [];
+                    state.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+                        if (node.isTextblock) {
+                            const start = pos + 1;
+                            if (!positions.includes(start)) {
+                                positions.push(start);
+                            }
+                        }
+                    });
+                    if (positions.length === 0) {
+                        return false;
+                    }
+                    if (!dispatch) {
+                        return true;
+                    }
+                    let tr = state.tr;
+                    positions.sort((a, b) => a - b).forEach((pos) => {
+                        const mapped = tr.mapping.map(pos);
+                        const prefix = tr.doc.textBetween(mapped, mapped + indent.length, '\n', '\n');
+                        if (prefix.startsWith(indent)) {
+                            tr = tr.delete(mapped, mapped + indent.length);
+                            return;
+                        }
+                        if (prefix.startsWith('\t')) {
+                            tr = tr.delete(mapped, mapped + 1);
+                        }
+                    });
+                    dispatch(tr);
+                    return true;
+                },
+                'Alt-Enter': () => {
+                    if (this.onSubmit) {
+                        this.onSubmit();
+                        return true;
+                    }
+                    return false;
+                },
                 Backspace: (state, dispatch) => {
                     const selection = state.selection;
                     if (!selection.empty) {
