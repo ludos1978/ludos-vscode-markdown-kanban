@@ -41,6 +41,111 @@ const TILDE_DEAD_CODES = new Set([
     'Digit4'
 ]);
 
+type MediaPathHelpers = {
+    buildWebviewResourceUrl?: (pathValue: string, encodeSegments?: boolean) => string;
+    isRelativeResourcePath?: (value: string) => boolean;
+    isWindowsAbsolutePath?: (value: string) => boolean;
+    normalizeWindowsAbsolutePath?: (value: string, shouldDecode?: boolean) => string;
+    safeDecodePath?: (value: string) => string;
+    resolveRelativePath?: (baseDir: string, relativePath: string) => string;
+    currentFilePath?: string;
+    currentTaskIncludeContext?: { includeDir?: string };
+    handleImageNotFound?: (img: HTMLImageElement, originalSrc: string) => void;
+};
+
+function resolveDisplaySrc(originalSrc: string): string {
+    if (!originalSrc) {
+        return '';
+    }
+    if (
+        originalSrc.startsWith('data:') ||
+        originalSrc.startsWith('blob:') ||
+        originalSrc.startsWith('http://') ||
+        originalSrc.startsWith('https://') ||
+        originalSrc.startsWith('vscode-webview://')
+    ) {
+        return originalSrc;
+    }
+
+    const api = window as unknown as MediaPathHelpers;
+    const safeDecode = typeof api.safeDecodePath === 'function' ? api.safeDecodePath : (value: string) => value;
+    const resolveRelative = typeof api.resolveRelativePath === 'function'
+        ? api.resolveRelativePath
+        : (baseDir: string, relativePath: string) => `${baseDir.replace(/\/$/, '')}/${relativePath.replace(/^\//, '')}`;
+    const isWindowsAbsolute = typeof api.isWindowsAbsolutePath === 'function'
+        ? api.isWindowsAbsolutePath
+        : (value: string) => /^[A-Za-z]:[\\/]/.test(value);
+    const isRelative = typeof api.isRelativeResourcePath === 'function'
+        ? api.isRelativeResourcePath
+        : (value: string) => !value.startsWith('/') && !isWindowsAbsolute(value) && !/^https?:\/\//.test(value) && !value.startsWith('vscode-webview://');
+    const buildUrl = typeof api.buildWebviewResourceUrl === 'function' ? api.buildWebviewResourceUrl : null;
+    const normalizeWindows = typeof api.normalizeWindowsAbsolutePath === 'function'
+        ? api.normalizeWindowsAbsolutePath
+        : (value: string) => value.replace(/\\/g, '/');
+
+    if (!buildUrl) {
+        return originalSrc;
+    }
+
+    const includeDir = api.currentTaskIncludeContext?.includeDir;
+    if (includeDir && isRelative(originalSrc)) {
+        const resolvedPath = resolveRelative(safeDecode(includeDir), safeDecode(originalSrc));
+        return buildUrl(resolvedPath, true);
+    }
+
+    if (isRelative(originalSrc) && api.currentFilePath) {
+        const docPath = api.currentFilePath.replace(/\\/g, '/');
+        const lastSlash = docPath.lastIndexOf('/');
+        const docDir = lastSlash > 0 ? docPath.substring(0, lastSlash) : '';
+        const resolvedPath = resolveRelative(docDir, safeDecode(originalSrc));
+        return buildUrl(resolvedPath, true);
+    }
+
+    if (isWindowsAbsolute(originalSrc)) {
+        const normalized = normalizeWindows(originalSrc, true);
+        return buildUrl(normalized, true);
+    }
+
+    if (originalSrc.startsWith('/')) {
+        return buildUrl(safeDecode(originalSrc), true);
+    }
+
+    return originalSrc;
+}
+
+function syncWysiwygImages(container: HTMLElement): void {
+    if (!container) {
+        return;
+    }
+    const api = window as unknown as MediaPathHelpers;
+    const images = container.querySelectorAll<HTMLImageElement>('.image-path-overlay-container img');
+    images.forEach((img) => {
+        const overlay = img.closest('.image-path-overlay-container') as HTMLElement | null;
+        const originalSrc = overlay?.dataset?.imagePath || img.dataset.originalSrc || img.getAttribute('data-original-src') || img.getAttribute('src') || '';
+        if (!originalSrc) {
+            return;
+        }
+        const displaySrc = resolveDisplaySrc(originalSrc);
+        if (displaySrc && img.getAttribute('src') !== displaySrc) {
+            img.setAttribute('src', displaySrc);
+        }
+        if (!img.dataset.originalSrc) {
+            img.dataset.originalSrc = originalSrc;
+        }
+        if (overlay && !overlay.dataset.imagePath) {
+            overlay.dataset.imagePath = originalSrc;
+        }
+        if (!(img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler) {
+            (img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler = true;
+            img.onerror = () => {
+                if (typeof api.handleImageNotFound === 'function') {
+                    api.handleImageNotFound(img, originalSrc);
+                }
+            };
+        }
+    });
+}
+
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
     const tr = view.state.tr.setNodeMarkup(pos, undefined, attrs);
     view.dispatch(tr);
@@ -536,10 +641,12 @@ export class WysiwygEditor {
                         this.onChange(this.lastMarkdown);
                     }
                 }
+                syncWysiwygImages(this.view.dom);
             }
         });
 
         this.lastMarkdown = this.serializeState(this.view.state);
+        syncWysiwygImages(this.view.dom);
     }
 
     focus(): void {
@@ -568,6 +675,7 @@ export class WysiwygEditor {
         });
         this.view.updateState(newState);
         this.lastMarkdown = this.serializeState(this.view.state);
+        syncWysiwygImages(this.view.dom);
     }
 
     getViewDom(): HTMLElement {

@@ -61,6 +61,7 @@
 - [ ] In WYSIWYG, edit a diagram/mermaid code block directly and confirm updates persist on save.
 - [ ] In WYSIWYG, click the Edit button on include/media/diagram nodes and confirm the correct edit UI opens or focus moves into the code block.
 - [ ] In WYSIWYG, images render with the same burger menu as the display view and the menu actions work (open, reveal, convert path, delete).
+- [ ] In WYSIWYG, images with relative paths display correctly (resolved against the main file/include dir) and still open the path menu using the original path.
 - [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
 - [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.
