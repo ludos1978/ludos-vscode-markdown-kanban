@@ -184,9 +184,10 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
 
     dom.dataset.wysiwygDiagram = 'true';
     const placeholderId = makePreviewId('wysiwyg-media');
-    const placeholder = document.createElement('div');
+    const placeholder = document.createElement('span');
     placeholder.id = placeholderId;
     placeholder.className = 'diagram-placeholder';
+    placeholder.dataset.wysiwygHost = 'true';
     dom.innerHTML = '';
     dom.appendChild(placeholder);
 

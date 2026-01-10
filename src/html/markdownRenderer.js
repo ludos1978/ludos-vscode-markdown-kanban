@@ -1349,10 +1349,37 @@ async function processDiagramQueue() {
                 // If decoding fails, use original path
             }
             const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-            element.innerHTML = `<span class="image-path-overlay-container">
-                <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath}" />
-                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
-            </span>`;
+            if (element.dataset && element.dataset.wysiwygHost === 'true') {
+                element.classList.remove('diagram-placeholder');
+                const img = document.createElement('img');
+                img.src = imageDataUrl;
+                img.alt = displayLabel;
+                img.className = 'diagram-rendered';
+                img.dataset.originalSrc = decodedPath;
+                img.setAttribute('data-original-src', decodedPath);
+                img.setAttribute('contenteditable', 'false');
+
+                const menuBtn = document.createElement('button');
+                menuBtn.className = 'image-menu-btn';
+                menuBtn.title = 'Path options';
+                menuBtn.textContent = '☰';
+                menuBtn.setAttribute('data-action', 'image-menu');
+                menuBtn.setAttribute('contenteditable', 'false');
+                menuBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const host = element.closest('.image-path-overlay-container') || element;
+                    toggleImagePathMenu(host, escapedPath);
+                };
+
+                element.innerHTML = '';
+                element.appendChild(img);
+                element.appendChild(menuBtn);
+            } else {
+                element.innerHTML = `<span class="image-path-overlay-container">
+                    <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath}" />
+                    <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+                </span>`;
+            }
 
             // Trigger height recalculation after image loads
             // Data URLs load synchronously but we still need to trigger recalc
