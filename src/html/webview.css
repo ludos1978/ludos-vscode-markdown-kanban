@@ -1790,6 +1790,7 @@ body.section-height-limited .task-section figure img {
   border: 1px solid var(--vscode-focusBorder);
   border-radius: 3px;
   box-sizing: border-box;
+  overflow-anchor: none;
 }
 
 .task-description-wysiwyg .ProseMirror {
@@ -1868,6 +1869,24 @@ body.section-height-limited .task-section figure img {
   height: auto;
   margin: 0;
   display: block;
+  object-fit: contain;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-file {
+  display: block;
+  width: 100%;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-file .diagram-placeholder,
+.task-description-wysiwyg .wysiwyg-diagram-file .diagram-rendered {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-file .diagram-rendered {
+  height: auto;
+  max-height: 400px;
   object-fit: contain;
 }
 

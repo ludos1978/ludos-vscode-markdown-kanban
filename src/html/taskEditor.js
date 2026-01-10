@@ -847,6 +847,10 @@ class TaskEditor {
      * @private
      */
     _setupEditVisibility(displayElement, editElement, wysiwygContainer = null) {
+        const container = document.getElementById('kanban-container');
+        const scrollTop = container?.scrollTop || 0;
+        const scrollLeft = container?.scrollLeft || 0;
+
         if (displayElement) { displayElement.style.display = 'none'; }
         if (wysiwygContainer) {
             editElement.style.display = 'none';
@@ -866,6 +870,11 @@ class TaskEditor {
 
         if (!wysiwygContainer) {
             this.autoResize(editElement);
+        }
+
+        if (container) {
+            container.scrollTop = scrollTop;
+            container.scrollLeft = scrollLeft;
         }
     }
 
@@ -1358,6 +1367,7 @@ class TaskEditor {
 
         const container = document.getElementById('kanban-container');
         const scrollAtStart = container?.scrollTop || 0;
+        const scrollLeftAtStart = container?.scrollLeft || 0;
 
         // DEBUG: Track scroll position through edit initialization
         if (window.kanbanDebug?.enabled) {
@@ -1427,6 +1437,14 @@ class TaskEditor {
         // Setup event handlers
         if (wysiwygContext?.editor) {
             this._setupWysiwygHandlers(wysiwygContext.editor, wysiwygContext.container, containerElement);
+            if (container) {
+                const restoreScroll = () => {
+                    container.scrollTop = scrollAtStart;
+                    container.scrollLeft = scrollLeftAtStart;
+                };
+                requestAnimationFrame(restoreScroll);
+                setTimeout(restoreScroll, 50);
+            }
         } else {
             this._setupInputHandler(editElement, containerElement);
             this._setupBlurHandler(editElement);
