@@ -51,8 +51,8 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
                 [
                     'div',
                     { class: 'wysiwyg-multicolumn-toolbar' },
-                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'add', type: 'button', contenteditable: 'false' }, '+ Column'],
-                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'remove', type: 'button', contenteditable: 'false' }, '− Column']
+                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'remove', type: 'button', contenteditable: 'false', title: 'Remove column' }, '−'],
+                    ['button', { class: 'wysiwyg-multicolumn-btn', 'data-action': 'add', type: 'button', contenteditable: 'false', title: 'Add column' }, '+']
                 ],
                 ['div', { class: 'wysiwyg-multicolumn-columns' }, 0]
             ];
