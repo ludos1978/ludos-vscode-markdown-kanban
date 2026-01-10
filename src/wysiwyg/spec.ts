@@ -129,6 +129,7 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
             inline: true,
             group: 'inline',
             atom: true,
+            selectable: false,
             attrs: {
                 src: { default: '' },
                 mediaType: { default: 'image' },
@@ -139,6 +140,7 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
         media_block: {
             group: 'block',
             atom: true,
+            selectable: false,
             attrs: {
                 src: { default: '' },
                 mediaType: { default: 'image' },

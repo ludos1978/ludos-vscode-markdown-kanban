@@ -1,4 +1,4 @@
-import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state';
+import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
@@ -1072,39 +1072,6 @@ export class WysiwygEditor {
                 media_block: (node) => createMediaBlockView(node),
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
-            handleTextInput: (view, _from, _to, text) => {
-                const selection = view.state.selection;
-                if (!(selection instanceof NodeSelection)) {
-                    return false;
-                }
-                const node = selection.node;
-                if (!node || (node.type.name !== 'media_inline' && node.type.name !== 'media_block')) {
-                    return false;
-                }
-                const insertPos = selection.to;
-                let tr = view.state.tr;
-                const $after = tr.doc.resolve(insertPos);
-                if ($after.parent && $after.parent.isTextblock) {
-                    tr = tr.insertText(text, insertPos, insertPos);
-                    tr.setSelection(TextSelection.create(tr.doc, insertPos + text.length));
-                    view.dispatch(tr);
-                    return true;
-                }
-                const paragraph = view.state.schema.nodes.paragraph;
-                if (!paragraph) {
-                    return false;
-                }
-                const paragraphNode = paragraph.createAndFill();
-                if (!paragraphNode) {
-                    return false;
-                }
-                tr = tr.insert(insertPos, paragraphNode);
-                const textPos = insertPos + 1;
-                tr = tr.insertText(text, textPos, textPos);
-                tr.setSelection(TextSelection.create(tr.doc, textPos + text.length));
-                view.dispatch(tr);
-                return true;
-            },
             handleKeyDown: (view, event) => {
                 const styleKey = getStyleKey(event);
                 if (!styleKey) {
@@ -1169,6 +1136,17 @@ export class WysiwygEditor {
                         menuApi.toggleVideoPathMenu(container, videoPath);
                         return true;
                     }
+                }
+                if (node?.type?.name === 'media_inline') {
+                    const host = target.closest?.('.wysiwyg-media') as HTMLElement | null;
+                    const rect = (host || target).getBoundingClientRect();
+                    const clickX = event?.clientX ?? rect.left;
+                    const placeAfter = clickX >= rect.left + rect.width / 2;
+                    const selectionPos = placeAfter ? nodePos + node.nodeSize : nodePos;
+                    const selection = TextSelection.create(view.state.doc, selectionPos);
+                    view.dispatch(view.state.tr.setSelection(selection));
+                    view.focus();
+                    return true;
                 }
                 const button = target.closest?.('.wysiwyg-edit-btn') as HTMLElement | null;
                 if (!button) {
