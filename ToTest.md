@@ -3,7 +3,7 @@
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
 - [ ] Verify tag menus still list active tags correctly for columns and tasks, including custom groups and active-tag overrides.
 - [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
-- [ ] While scrolled in multi-row mode, click a task description to edit and confirm the board does not jump to the top (no large scroll debug spikes).
+- [ ] While scrolled in multi-row mode, enter and exit a task description edit and confirm the board does not jump to the top (no large scroll debug spikes).
 - [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
 - [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).
 - [ ] Attempt to save when the board has no columns and confirm a single error message appears without repeated save failures in logs.

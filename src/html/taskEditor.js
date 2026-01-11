@@ -1419,9 +1419,15 @@ class TaskEditor {
     }
 
     _scheduleScrollRestore(positions) {
+        if (!positions || positions.length === 0) { return; }
         const restore = () => this._restoreScrollPositions(positions);
-        requestAnimationFrame(restore);
-        setTimeout(restore, 60);
+        if (typeof window.queueFocusAfterRender === 'function') {
+            window.queueFocusAfterRender(restore);
+            return;
+        }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(restore);
+        });
     }
 
     // ============= MAIN startEdit METHOD =============

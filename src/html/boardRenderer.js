@@ -1200,6 +1200,12 @@ function renderBoard(options = null) {
         window.cachedBoard.columns = [];
     }
     
+    const boardScrollTop = boardElement.scrollTop || 0;
+    const boardScrollLeft = boardElement.scrollLeft || 0;
+    const containerElement = document.getElementById('kanban-container');
+    const containerScrollTop = containerElement?.scrollTop || 0;
+    const containerScrollLeft = containerElement?.scrollLeft || 0;
+
     // Save current scroll positions - scope to board element for performance
     boardElement.querySelectorAll('.column-content').forEach(container => {
         const columnId = container.id.replace('tasks-', '');
@@ -1408,6 +1414,15 @@ function renderBoard(options = null) {
             window.applyRowHeight(window.currentRowHeight);
         }
         // For 'auto' mode, CSS handles the layout naturally without any JS intervention
+
+        if (boardElement) {
+            boardElement.scrollTop = boardScrollTop;
+            boardElement.scrollLeft = boardScrollLeft;
+        }
+        if (containerElement) {
+            containerElement.scrollTop = containerScrollTop;
+            containerElement.scrollLeft = containerScrollLeft;
+        }
 
         // Restore scroll positions
         scrollPositions.forEach((scrollTop, columnId) => {
