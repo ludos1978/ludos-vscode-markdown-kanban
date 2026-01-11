@@ -8,6 +8,7 @@
 - [ ] Enter/exit edit while scrolled near the bottom and confirm the board height lock prevents any temporary jump (no clamp to near-top).
 - [ ] With a long board, enter edit and confirm the scroll position stays stable immediately (no transient jump before restore).
 - [ ] Enter/exit edit and confirm scroll lock keeps the board stable even during layout/visibility changes (no instant drop before restore).
+- [ ] Enter edit on a very tall description and confirm the description container preserves its height (no board scroll clamp).
 - [ ] With debug enabled, reproduce the edit scroll issue and confirm `[SCROLL-EVENT]`, `[SCROLL-RESTORE]`, or `[FOCUS-SCROLL]` logs show which element moved (including stack traces).
 - [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
 - [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).

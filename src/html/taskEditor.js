@@ -846,7 +846,7 @@ class TaskEditor {
      * Show edit element and hide display element
      * @private
      */
-    _setupEditVisibility(displayElement, editElement, wysiwygContainer = null) {
+    _setupEditVisibility(displayElement, editElement, wysiwygContainer = null, containerElement = null) {
         const container = document.getElementById('kanban-container');
         const board = document.getElementById('kanban-board');
         const scrollTop = container?.scrollTop || 0;
@@ -854,6 +854,16 @@ class TaskEditor {
         const boardScrollTop = board?.scrollTop || 0;
         const boardScrollLeft = board?.scrollLeft || 0;
         const boardScrollHeight = board?.scrollHeight || 0;
+
+        const heightContainer = containerElement || displayElement?.parentElement || editElement?.parentElement;
+        if (displayElement && heightContainer && !heightContainer._editingMinHeight) {
+            const displayHeight = displayElement.offsetHeight || 0;
+            heightContainer._editingPrevMinHeight = heightContainer.style.minHeight || '';
+            heightContainer._editingMinHeight = displayHeight;
+            if (displayHeight > 0) {
+                heightContainer.style.minHeight = `${displayHeight}px`;
+            }
+        }
 
         // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
         // The kanban-board is the actual scroll container when multi-row is active
@@ -975,7 +985,7 @@ class TaskEditor {
      * Store current editor state
      * @private
      */
-    _storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext = null) {
+    _storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext = null, containerElement = null) {
         this.currentEditor = {
             element: editElement,
             displayElement: displayElement,
@@ -983,6 +993,7 @@ class TaskEditor {
             taskId: taskId || window.getTaskIdFromElement(editElement),
             columnId: columnId || window.getColumnIdFromElement(editElement),
             originalValue: editElement.value,
+            containerElement: containerElement,
             wysiwyg: wysiwygContext?.editor || null,
             wysiwygContainer: wysiwygContext?.container || null
         };
@@ -1655,7 +1666,7 @@ class TaskEditor {
         }
 
         // Show edit element and setup visibility
-        this._setupEditVisibility(displayElement, editElement, wysiwygContext?.container);
+        this._setupEditVisibility(displayElement, editElement, wysiwygContext?.container, containerElement);
 
         if (window.kanbanDebug?.enabled) {
             const board = document.getElementById('kanban-board');
@@ -1690,7 +1701,7 @@ class TaskEditor {
         }
 
         // Store editor state
-        this._storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext);
+        this._storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext, containerElement);
 
         // Notify backend
         this._notifyEditingStarted(type, taskId, columnId);
@@ -2363,6 +2374,17 @@ class TaskEditor {
         // Show display element
         if (displayElement) {
             displayElement.style.removeProperty('display');
+        }
+
+        const editContainer = this.currentEditor.containerElement;
+        if (editContainer && editContainer._editingMinHeight !== undefined) {
+            if (editContainer._editingPrevMinHeight) {
+                editContainer.style.minHeight = editContainer._editingPrevMinHeight;
+            } else {
+                editContainer.style.removeProperty('min-height');
+            }
+            delete editContainer._editingMinHeight;
+            delete editContainer._editingPrevMinHeight;
         }
 
         // Release the fixed view height after layout stabilizes to avoid scroll jumps
