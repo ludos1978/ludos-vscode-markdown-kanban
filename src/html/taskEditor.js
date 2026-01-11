@@ -865,26 +865,24 @@ class TaskEditor {
             }
         }
 
-        // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
-        // The kanban-board is the actual scroll container when multi-row is active
-        const kanbanBoard = document.querySelector('.kanban-board');
-        if (kanbanBoard && !kanbanBoard._editingMinHeight) {
-            const currentHeight = kanbanBoard.scrollHeight;
-            kanbanBoard.style.minHeight = currentHeight + 'px';
-            kanbanBoard._editingMinHeight = currentHeight; // Store for later cleanup
-        }
-
+        // CRITICAL: Add spacer BEFORE visibility changes to maintain scroll capacity
+        // The spacer adds content height, keeping scrollHeight high enough to preserve scroll position
         if (board) {
             board._editingScrollHeight = boardScrollHeight;
             if (!board._editScrollSpacer) {
                 const spacer = document.createElement('div');
                 spacer.className = 'kanban-edit-scroll-spacer';
-                spacer.style.height = '0px';
+                spacer.style.height = `${boardScrollHeight}px`;
+                spacer.style.flexShrink = '0';  // Prevent flex from collapsing it
                 board.appendChild(spacer);
                 board._editScrollSpacer = spacer;
+            } else {
+                board._editScrollSpacer.style.height = `${boardScrollHeight}px`;
             }
+            void board.offsetHeight;  // Force reflow to apply spacer
         }
 
+        // Change visibility - scroll should be preserved because spacer maintains scrollHeight
         if (displayElement) { displayElement.style.display = 'none'; }
         if (wysiwygContainer) {
             editElement.style.display = 'none';
@@ -897,23 +895,18 @@ class TaskEditor {
             this.autoResize(editElement);
         }
 
-        if (board && board._editScrollSpacer) {
-            const targetHeight = board._editingScrollHeight || board.scrollHeight || 0;
-            const currentHeight = board.scrollHeight;
-            const diff = Math.max(0, targetHeight - currentHeight);
-            board._editScrollSpacer.style.height = diff ? `${diff}px` : '0px';
-        }
-
+        // Restore scroll positions immediately and lock them
         if (container) {
             container.scrollTop = scrollTop;
             container.scrollLeft = scrollLeft;
-            this._lockScrollForFrames(container, scrollTop, scrollLeft);
         }
         if (board) {
             board.scrollTop = boardScrollTop;
             board.scrollLeft = boardScrollLeft;
-            this._lockScrollForFrames(board, boardScrollTop, boardScrollLeft);
         }
+        // Use aggressive locking to prevent any subsequent scroll changes
+        this._lockScrollForFrames(container, scrollTop, scrollLeft, 10);
+        this._lockScrollForFrames(board, boardScrollTop, boardScrollLeft, 10);
     }
 
     /**
@@ -2387,46 +2380,20 @@ class TaskEditor {
             delete editContainer._editingPrevMinHeight;
         }
 
-        // Release the fixed view height after layout stabilizes to avoid scroll jumps
-        const kanbanBoard = document.querySelector('.kanban-board');
-        if (kanbanBoard && kanbanBoard._editingMinHeight) {
-            const minHeight = kanbanBoard._editingMinHeight;
-            let attempts = 0;
-            const tryRelease = () => {
-                attempts += 1;
-                if (kanbanBoard.scrollHeight >= minHeight) {
-                    kanbanBoard.style.removeProperty('min-height');
-                    delete kanbanBoard._editingMinHeight;
-                    return;
-                }
-                if (attempts < 6) {
-                    requestAnimationFrame(tryRelease);
-                    return;
-                }
-                if (window.kanbanDebug?.enabled) {
-                    console.log('[EDIT-MIN-HEIGHT] Keeping min-height to avoid scroll jump', {
-                        current: kanbanBoard.scrollHeight,
-                        minHeight
-                    });
-                }
-            };
-            requestAnimationFrame(tryRelease);
-        }
-
-        if (kanbanBoard && kanbanBoard._editScrollSpacer) {
-            const targetHeight = kanbanBoard._editingScrollHeight || kanbanBoard.scrollHeight || 0;
+        // Clean up spacer (set by _setupEditVisibility on #kanban-board)
+        const board = document.getElementById('kanban-board');
+        if (board && board._editScrollSpacer) {
+            const targetHeight = board._editingScrollHeight || 0;
             let attempts = 0;
             const tryReleaseSpacer = () => {
                 attempts += 1;
-                const currentHeight = kanbanBoard.scrollHeight;
-                if (currentHeight >= targetHeight || attempts >= 6) {
-                    kanbanBoard._editScrollSpacer.remove();
-                    delete kanbanBoard._editScrollSpacer;
-                    delete kanbanBoard._editingScrollHeight;
+                // Remove spacer once content is restored or after max attempts
+                if (board.scrollHeight >= targetHeight || attempts >= 6) {
+                    board._editScrollSpacer.remove();
+                    delete board._editScrollSpacer;
+                    delete board._editingScrollHeight;
                     return;
                 }
-                const diff = Math.max(0, targetHeight - currentHeight);
-                kanbanBoard._editScrollSpacer.style.height = diff ? `${diff}px` : '0px';
                 requestAnimationFrame(tryReleaseSpacer);
             };
             requestAnimationFrame(tryReleaseSpacer);
