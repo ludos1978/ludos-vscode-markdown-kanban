@@ -2675,6 +2675,9 @@ function saveCachedBoard() {
         return;
     }
 
+    if (window.boardSaveInProgress) {
+        return;
+    }
 
     // Log each column's includeMode status
     if (window.cachedBoard.columns) {
@@ -2693,6 +2696,25 @@ function saveCachedBoard() {
         }
     }
 
+
+    const columnCount = boardToSave?.columns?.length ?? 0;
+    if (columnCount === 0) {
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Cannot save: board must have at least one column.',
+            messageType: 'error'
+        });
+        return;
+    }
+
+    window.boardSaveInProgress = true;
+    if (window.boardSaveInProgressTimeout) {
+        clearTimeout(window.boardSaveInProgressTimeout);
+    }
+    window.boardSaveInProgressTimeout = setTimeout(() => {
+        window.boardSaveInProgress = false;
+        window.boardSaveInProgressTimeout = null;
+    }, 8000);
 
     // Send the complete board state to VS Code using a simple message
     // This avoids complex sequential processing that might cause issues

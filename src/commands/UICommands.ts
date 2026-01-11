@@ -254,6 +254,16 @@ export class UICommands extends SwitchBasedCommand {
             return this.success();
         }
 
+        if (!board.valid) {
+            notifyError('Cannot save: board data is invalid.');
+            return this.success();
+        }
+
+        if (!board.columns || board.columns.length === 0) {
+            notifyError('Cannot save: board must have at least one column.');
+            return this.success();
+        }
+
         // NOTE: Do not save undo state here - individual operations already saved their undo states
         // before making changes. Saving here would create duplicate/grouped undo states.
 

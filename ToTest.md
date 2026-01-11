@@ -5,6 +5,8 @@
 - [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
 - [ ] While scrolled in multi-row mode, click a task description to edit and confirm the board does not jump to the top (no large scroll debug spikes).
 - [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
+- [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).
+- [ ] Attempt to save when the board has no columns and confirm a single error message appears without repeated save failures in logs.
 - [ ] Toggle the debug button (version menu) and confirm regular logs stop when debug is disabled while `WebviewBridge` warnings and errors still appear in the console when debug mode is on.
 - [ ] Verify task menu actions still execute (move top/up/down/bottom, move to column list, and sort options).
 - [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
