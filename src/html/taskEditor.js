@@ -2382,19 +2382,25 @@ class TaskEditor {
             delete editContainer._editingPrevMinHeight;
         }
 
-        // Clean up spacer (set by _setupEditVisibility on #kanban-board)
-        const board = document.getElementById('kanban-board');
-        if (board && board._editScrollSpacer) {
-            // Remove spacer immediately - content is being restored
-            board._editScrollSpacer.remove();
-            delete board._editScrollSpacer;
-            delete board._editingDisplayHeight;
-        }
-
         const col = element.closest('.kanban-full-height-column');
         const closeColumnId = col ? col.dataset.columnId || null : null;
         this._requestStackLayoutRecalc(closeColumnId);
         this._flushStackLayoutRecalc();
+
+        // Clean up spacer AFTER layout recalc to prevent scroll jump
+        const board = document.getElementById('kanban-board');
+        if (board && board._editScrollSpacer) {
+            // Wait for layout to stabilize before removing spacer
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (board._editScrollSpacer) {
+                        board._editScrollSpacer.remove();
+                        delete board._editScrollSpacer;
+                        delete board._editingDisplayHeight;
+                    }
+                });
+            });
+        }
 
         if (window.kanbanDebug?.enabled) {
             this._logScrollSnapshot('closeEditor.afterLayout', element);
