@@ -69,6 +69,7 @@ export class KanbanFileService {
 
     // Flag to skip undo detection when we are saving the document ourselves
     private _isSavingDocument = false;
+    private _saveToMarkdownInFlight: Promise<void> | null = null;
 
     constructor(
         private fileManager: FileManager,
@@ -312,74 +313,87 @@ export class KanbanFileService {
      * Save board to markdown file using unified FileSaveService
      */
     public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true): Promise<void> {
-
-        // Check for main file and valid board (document is NOT required - panel can stay open without it)
-        const mainFile = this.fileRegistry.getMainFile();
-        if (!mainFile || !this.board() || !this.board()!.valid) {
-            console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - mainFile: ${!!mainFile}, board: ${!!this.board()}, valid: ${this.board()?.valid}`);
-            return;
+        if (this._saveToMarkdownInFlight) {
+            return this._saveToMarkdownInFlight;
         }
 
-        // Set flag to skip undo detection during save (prevents false "undo" detection)
-        this._isSavingDocument = true;
-
-        // Generate markdown content
-        const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
-
-        try {
-            // Use FileSaveService for unified save handling
-            await this._fileSaveService.saveFile(mainFile, markdown);
-        } finally {
-            // Reset flag after save completes
-            // The flag prevents false "undo" detection during our own save operation
-            this._isSavingDocument = false;
-        }
-
-        // Save include files that have unsaved changes
-        // NOTE: Only save files that exist() - don't save broken includes (would create the file/folder)
-        const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges()
-            .filter(f => f.getFileType() !== 'main')
-            .filter(f => f.exists());
-        if (unsavedIncludes.length > 0) {
-            // Save each include file individually, handling validation errors gracefully
-            const saveResults = await Promise.allSettled(
-                unsavedIncludes.map(f => this._fileSaveService.saveFile(f))
-            );
-
-            // Log any files that failed to save due to validation
-            const failures = saveResults
-                .map((result, index) => ({ result, file: unsavedIncludes[index] }))
-                .filter(({ result }) => result.status === 'rejected');
-
-            if (failures.length > 0) {
-                failures.forEach(({ result, file }) => {
-                    const error = (result as PromiseRejectedResult).reason;
-                    console.warn(`[KanbanFileService] Skipping save for ${file.getPath()}: ${error.message || error}`);
-                });
+        const savePromise = (async () => {
+            // Check for main file and valid board (document is NOT required - panel can stay open without it)
+            const mainFile = this.fileRegistry.getMainFile();
+            const board = this.board();
+            if (!mainFile || !board || !board.valid) {
+                console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - mainFile: ${!!mainFile}, board: ${!!board}, valid: ${board?.valid}`);
+                return;
             }
-        }
 
-        // Update state after successful save (reuse mainFile from line 482)
-        const currentBoard = this.board();
-        if (currentBoard) {
-            // CRITICAL: Pass updateBaseline=true since we just saved to disk
-            mainFile.updateFromBoard(currentBoard, true, true);
-            // NOTE: No need for second setContent call - updateFromBoard already updated baseline
-        }
+            // Set flag to skip undo detection during save (prevents false "undo" detection)
+            this._isSavingDocument = true;
 
-        // Notify frontend that save is complete (may fail if webview is disposed during close)
-        const panelInstance = this.panel();
-        if (panelInstance) {
+            // Generate markdown content
+            const markdown = MarkdownKanbanParser.generateMarkdown(board);
+
             try {
-                panelInstance.webview.postMessage({
-                    type: 'saveCompleted',
-                    success: true
-                });
-            } catch (e) {
-                // Webview may be disposed during panel close - save already succeeded
+                // Use FileSaveService for unified save handling
+                await this._fileSaveService.saveFile(mainFile, markdown);
+            } finally {
+                // Reset flag after save completes
+                // The flag prevents false "undo" detection during our own save operation
+                this._isSavingDocument = false;
+            }
+            // Save include files that have unsaved changes
+            // NOTE: Only save files that exist() - don't save broken includes (would create the file/folder)
+            const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges()
+                .filter(f => f.getFileType() !== 'main')
+                .filter(f => f.exists());
+            if (unsavedIncludes.length > 0) {
+                // Save each include file individually, handling validation errors gracefully
+                const saveResults = await Promise.allSettled(
+                    unsavedIncludes.map(f => this._fileSaveService.saveFile(f))
+                );
+
+                // Log any files that failed to save due to validation
+                const failures = saveResults
+                    .map((result, index) => ({ result, file: unsavedIncludes[index] }))
+                    .filter(({ result }) => result.status === 'rejected');
+
+                if (failures.length > 0) {
+                    failures.forEach(({ result, file }) => {
+                        const error = (result as PromiseRejectedResult).reason;
+                        console.warn(`[KanbanFileService] Skipping save for ${file.getPath()}: ${error.message || error}`);
+                    });
+                }
+            }
+
+            // Update state after successful save (reuse mainFile from line 482)
+            const latestBoard = this.board();
+            if (latestBoard) {
+                // CRITICAL: Pass updateBaseline=true since we just saved to disk
+                mainFile.updateFromBoard(latestBoard, true, true);
+                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
+            }
+
+            // Notify frontend that save is complete (may fail if webview is disposed during close)
+            const panelInstance = this.panel();
+            if (panelInstance) {
+                try {
+                    panelInstance.webview.postMessage({
+                        type: 'saveCompleted',
+                        success: true
+                    });
+                } catch (e) {
+                    // Webview may be disposed during panel close - save already succeeded
+                }
+            }
+        })();
+
+        this._saveToMarkdownInFlight = savePromise;
+        try {
+            await savePromise;
+        } finally {
+            if (this._saveToMarkdownInFlight === savePromise) {
+                this._saveToMarkdownInFlight = null;
             }
         }
-
     }
 
 

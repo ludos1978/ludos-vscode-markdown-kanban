@@ -2553,11 +2553,6 @@ if (!webviewEventListenersInitialized) {
             if (typeof markSavedChanges === 'function') {
                 markSavedChanges();
             }
-            window.boardSaveInProgress = false;
-            if (window.boardSaveInProgressTimeout) {
-                clearTimeout(window.boardSaveInProgressTimeout);
-                window.boardSaveInProgressTimeout = null;
-            }
             break;
         case 'undoRedoStatus':
             canUndo = message.canUndo;
@@ -2572,11 +2567,6 @@ if (!webviewEventListenersInitialized) {
                 handleSaveError(message.error);
             } else {
                 console.error('❌ handleSaveError function not available:', message.error);
-            }
-            window.boardSaveInProgress = false;
-            if (window.boardSaveInProgressTimeout) {
-                clearTimeout(window.boardSaveInProgressTimeout);
-                window.boardSaveInProgressTimeout = null;
             }
             break;
         case 'checkUnsavedChanges':
@@ -4103,9 +4093,6 @@ document.addEventListener('keydown', (e) => {
         // Meta+S or Ctrl+S to save cached board to file
         else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
-            if (e.repeat) {
-                return;
-            }
             if (typeof saveCachedBoard === 'function') {
                 saveCachedBoard();
             }
