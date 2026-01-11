@@ -1173,9 +1173,12 @@ function renderBoard(options = null) {
     }
 
     // Full board render (default behavior)
+    window.isBoardRendering = true;
+    window.boardRenderNonce = (window.boardRenderNonce || 0) + 1;
 
     const boardElement = getBoardElement();
     if (!boardElement) {
+        window.isBoardRendering = false;
         console.error('Board element not found');
         return;
     }
@@ -1424,6 +1427,7 @@ function renderBoard(options = null) {
         updateImageSources();
 
         // Notify that rendering is complete (for focus functionality)
+        window.isBoardRendering = false;
         if (window.onBoardRenderingComplete) {
             window.onBoardRenderingComplete();
         }

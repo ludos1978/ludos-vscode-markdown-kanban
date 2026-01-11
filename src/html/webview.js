@@ -1932,6 +1932,41 @@ function isCurrentlyEditing() {
            window.taskEditor.currentEditor.element.style.display !== 'none';
 }
 
+// Queue focus actions until after render completes (avoids focusing on stale DOM)
+if (!window.postRenderFocusQueue) {
+    window.postRenderFocusQueue = [];
+}
+
+window.queueFocusAfterRender = function(callback) {
+    if (typeof callback !== 'function') { return; }
+
+    const run = () => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(callback);
+        });
+    };
+
+    if (window.isBoardRendering) {
+        window.postRenderFocusQueue.push(run);
+        return;
+    }
+
+    run();
+};
+
+window.flushPostRenderFocusQueue = function() {
+    if (!window.postRenderFocusQueue || window.postRenderFocusQueue.length === 0) { return; }
+    const queue = window.postRenderFocusQueue.slice();
+    window.postRenderFocusQueue.length = 0;
+    queue.forEach((fn) => {
+        try {
+            fn();
+        } catch (error) {
+            console.warn('[postRenderFocus] Failed to run focus callback:', error);
+        }
+    });
+};
+
 // Callback for when board rendering is complete
 window.onBoardRenderingComplete = function() {
     if (window.pendingFocusTargets && window.pendingFocusTargets.length > 0) {
@@ -1953,6 +1988,10 @@ window.onBoardRenderingComplete = function() {
             window.pendingFocusTargets = null;
         }
         // If element not found, keep targets for next render completion
+    }
+
+    if (typeof window.flushPostRenderFocusQueue === 'function') {
+        window.flushPostRenderFocusQueue();
     }
 };
 

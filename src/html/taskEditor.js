@@ -899,18 +899,18 @@ class TaskEditor {
         if (wysiwygEditor) {
             const viewDom = wysiwygEditor.getViewDom?.();
             if (viewDom) {
-                this._focusElement(viewDom);
+                this._focusElementAfterRender(viewDom);
             } else {
                 try {
                     wysiwygEditor.focus();
                 } catch (error) {
-                    this._focusElement(editElement);
+                    this._focusElementAfterRender(editElement);
                 }
             }
             return;
         }
 
-        this._focusElement(editElement);
+        this._focusElementAfterRender(editElement);
 
         if (!preserveCursor) {
             // Default behavior: move cursor to end
@@ -1368,6 +1368,14 @@ class TaskEditor {
         } catch (error) {
             element.focus();
         }
+    }
+
+    _focusElementAfterRender(element) {
+        if (typeof window.queueFocusAfterRender === 'function') {
+            window.queueFocusAfterRender(() => this._focusElement(element));
+            return;
+        }
+        this._focusElement(element);
     }
 
     _captureScrollPositions(baseElement) {
