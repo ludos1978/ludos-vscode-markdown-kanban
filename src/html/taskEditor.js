@@ -853,6 +853,7 @@ class TaskEditor {
         const scrollLeft = container?.scrollLeft || 0;
         const boardScrollTop = board?.scrollTop || 0;
         const boardScrollLeft = board?.scrollLeft || 0;
+        const boardScrollHeight = board?.scrollHeight || 0;
 
         // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
         // The kanban-board is the actual scroll container when multi-row is active
@@ -861,6 +862,17 @@ class TaskEditor {
             const currentHeight = kanbanBoard.scrollHeight;
             kanbanBoard.style.minHeight = currentHeight + 'px';
             kanbanBoard._editingMinHeight = currentHeight; // Store for later cleanup
+        }
+
+        if (board) {
+            board._editingScrollHeight = boardScrollHeight;
+            if (!board._editScrollSpacer) {
+                const spacer = document.createElement('div');
+                spacer.className = 'kanban-edit-scroll-spacer';
+                spacer.style.height = '0px';
+                board.appendChild(spacer);
+                board._editScrollSpacer = spacer;
+            }
         }
 
         if (displayElement) { displayElement.style.display = 'none'; }
@@ -873,6 +885,13 @@ class TaskEditor {
 
         if (!wysiwygContainer) {
             this.autoResize(editElement);
+        }
+
+        if (board && board._editScrollSpacer) {
+            const targetHeight = board._editingScrollHeight || board.scrollHeight || 0;
+            const currentHeight = board.scrollHeight;
+            const diff = Math.max(0, targetHeight - currentHeight);
+            board._editScrollSpacer.style.height = diff ? `${diff}px` : '0px';
         }
 
         if (container) {
@@ -2346,6 +2365,25 @@ class TaskEditor {
                 }
             };
             requestAnimationFrame(tryRelease);
+        }
+
+        if (kanbanBoard && kanbanBoard._editScrollSpacer) {
+            const targetHeight = kanbanBoard._editingScrollHeight || kanbanBoard.scrollHeight || 0;
+            let attempts = 0;
+            const tryReleaseSpacer = () => {
+                attempts += 1;
+                const currentHeight = kanbanBoard.scrollHeight;
+                if (currentHeight >= targetHeight || attempts >= 6) {
+                    kanbanBoard._editScrollSpacer.remove();
+                    delete kanbanBoard._editScrollSpacer;
+                    delete kanbanBoard._editingScrollHeight;
+                    return;
+                }
+                const diff = Math.max(0, targetHeight - currentHeight);
+                kanbanBoard._editScrollSpacer.style.height = diff ? `${diff}px` : '0px';
+                requestAnimationFrame(tryReleaseSpacer);
+            };
+            requestAnimationFrame(tryReleaseSpacer);
         }
 
         const col = element.closest('.kanban-full-height-column');

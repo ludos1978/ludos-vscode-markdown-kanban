@@ -1054,6 +1054,12 @@ body.small-card-fonts .task-title-container .markdown-content img {
   overflow-anchor: none;
 }
 
+.kanban-edit-scroll-spacer {
+  width: 1px;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
 /* Kanban columns - Full height wrapper for sticky positioning */
 .kanban-full-height-column {
   /* Transparent wrapper that provides full height for sticky positioning */
