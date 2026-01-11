@@ -2109,9 +2109,6 @@ function setupColumnResizeObserver() {
                 affectedStacks.forEach(stack => {
                     updateStackLayout(stack);
                 });
-                if (typeof window.updateStackBottomDropZones === 'function') {
-                    window.updateStackBottomDropZones();
-                }
                 requestAnimationFrame(() => {
                     isRecalculatingHeights = false;
                     if (pendingRecalcNeeded) {
@@ -2119,9 +2116,6 @@ function setupColumnResizeObserver() {
                         document.querySelectorAll('.kanban-column-stack').forEach(stack => {
                             updateStackLayout(stack);
                         });
-                        if (typeof window.updateStackBottomDropZones === 'function') {
-                            window.updateStackBottomDropZones();
-                        }
                     }
                 });
             });

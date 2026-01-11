@@ -185,11 +185,6 @@ function applyStackedColumnStyles(columnId = null) {
     enforceFoldModesForStacks(targetStack);
     updateStackLayoutCore(targetStack);
 
-    // Update bottom drop zones after layout changes
-    if (typeof window.updateStackBottomDropZones === 'function') {
-        window.updateStackBottomDropZones();
-    }
-
     const restoreScroll = () => {
         scrollPositions.forEach(({ element, left, top }) => {
             if (typeof window.logViewMovement === 'function') {
@@ -204,7 +199,8 @@ function applyStackedColumnStyles(columnId = null) {
         });
     };
 
-    setTimeout(restoreScroll, 0);
+    // Restore after the layout pass settles to avoid scroll jumps.
+    requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
 }
 
 // ============================================================================
@@ -422,6 +418,9 @@ function updateStackLayoutCore(stackElement = null) {
         if (allVerticalFolded) {
             // All columns vertically folded - display horizontally
             stack.classList.add('all-vertical-folded');
+            if (typeof window.updateStackBottomDropZones === 'function') {
+                requestAnimationFrame(() => window.updateStackBottomDropZones());
+            }
         } else {
             // At least one column is expanded or horizontally folded - display vertically
             stack.classList.remove('all-vertical-folded');
@@ -576,97 +575,86 @@ function updateStackLayoutCore(stackElement = null) {
                 cumulativePadding += pos.totalHeight + pos.marginHeight;
             });
 
-            // OPTIMIZATION: Batch all DOM writes in requestAnimationFrame to prevent visual flicker
-            // This ensures all style changes happen in a single rendering frame
+            // OPTIMIZATION: Split DOM writes and reads into separate frames to avoid forced reflow.
+            // Frame 1: apply styles only. Frame 2: read layout + update derived data.
             requestAnimationFrame(() => {
                 // Apply all calculated positions
                 positions.forEach(({ col, columnHeader, header, footer, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, isColumnSticky }) => {
-                // Recalculate mode flags from stored values
-                const isFullMode = isColumnSticky && globalStickyMode === 'full';
-                const isNoneMode = !isColumnSticky;
+                    // Recalculate mode flags from stored values
+                    const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                    const isNoneMode = !isColumnSticky;
 
-                col.dataset.columnHeaderTop = columnHeaderTop;
-                col.dataset.headerTop = headerTop;
-                col.dataset.footerTop = footerTop;
-                col.dataset.columnHeaderBottom = columnHeaderBottom;
-                col.dataset.headerBottom = headerBottom;
-                col.dataset.footerBottom = footerBottom;
-                col.dataset.zIndex = zIndex;
+                    col.dataset.columnHeaderTop = columnHeaderTop;
+                    col.dataset.headerTop = headerTop;
+                    col.dataset.footerTop = footerTop;
+                    col.dataset.columnHeaderBottom = columnHeaderBottom;
+                    col.dataset.headerBottom = headerBottom;
+                    col.dataset.footerBottom = footerBottom;
+                    col.dataset.zIndex = zIndex;
 
-                // Store content area boundaries (absolute positions from top of page)
-                // Content starts at bottom of header, ends at top of footer
-                if (header && footer) {
-                    const headerRect = header.getBoundingClientRect();
-                    const footerRect = footer.getBoundingClientRect();
-                    const scrollY = window.scrollY || window.pageYOffset;
+                    // Apply inline styles only for elements that will be sticky
+                    // - isNoneMode (no #sticky): No inline styles
+                    // - isFullMode (#sticky + full): Margin, header, title, footer get inline styles
+                    // - Title-only (#sticky + titleonly): Only title gets inline styles
 
-                    col.dataset.contentAreaTop = scrollY + headerRect.bottom;
-                    col.dataset.contentAreaBottom = scrollY + footerRect.top;
-                }
-
-                // Apply inline styles only for elements that will be sticky
-                // - isNoneMode (no #sticky): No inline styles
-                // - isFullMode (#sticky + full): Margin, header, title, footer get inline styles
-                // - Title-only (#sticky + titleonly): Only title gets inline styles
-
-                // Column margin: only in full mode
-                const columnMargin = col.querySelector('.column-margin');
-                if (columnMargin) {
-                    if (isFullMode) {
-                        columnMargin.style.top = `${marginTop}px`;
-                        columnMargin.style.bottom = `${marginBottom}px`;
-                        columnMargin.style.zIndex = zIndex;
-                    } else {
-                        columnMargin.style.top = '';
-                        columnMargin.style.bottom = '';
-                        columnMargin.style.zIndex = '';
+                    // Column margin: only in full mode
+                    const columnMargin = col.querySelector('.column-margin');
+                    if (columnMargin) {
+                        if (isFullMode) {
+                            columnMargin.style.top = `${marginTop}px`;
+                            columnMargin.style.bottom = `${marginBottom}px`;
+                            columnMargin.style.zIndex = zIndex;
+                        } else {
+                            columnMargin.style.top = '';
+                            columnMargin.style.bottom = '';
+                            columnMargin.style.zIndex = '';
+                        }
                     }
-                }
 
-                // Column header: only in full mode
-                if (columnHeader) {
-                    if (isFullMode) {
-                        columnHeader.style.top = `${columnHeaderTop}px`;
-                        columnHeader.style.bottom = `${columnHeaderBottom}px`;
-                        columnHeader.style.zIndex = zIndex + 1;
-                    } else {
-                        columnHeader.style.top = '';
-                        columnHeader.style.bottom = '';
-                        columnHeader.style.zIndex = '';
+                    // Column header: only in full mode
+                    if (columnHeader) {
+                        if (isFullMode) {
+                            columnHeader.style.top = `${columnHeaderTop}px`;
+                            columnHeader.style.bottom = `${columnHeaderBottom}px`;
+                            columnHeader.style.zIndex = zIndex + 1;
+                        } else {
+                            columnHeader.style.top = '';
+                            columnHeader.style.bottom = '';
+                            columnHeader.style.zIndex = '';
+                        }
                     }
-                }
 
-                // Column title: in both full and title-only modes (not in none mode)
-                if (header) {
-                    if (!isNoneMode) {
-                        header.style.top = `${headerTop}px`;
-                        header.style.bottom = `${headerBottom}px`;
-                        header.style.zIndex = zIndex;
-                    } else {
-                        header.style.top = '';
-                        header.style.bottom = '';
-                        header.style.zIndex = '';
+                    // Column title: in both full and title-only modes (not in none mode)
+                    if (header) {
+                        if (!isNoneMode) {
+                            header.style.top = `${headerTop}px`;
+                            header.style.bottom = `${headerBottom}px`;
+                            header.style.zIndex = zIndex;
+                        } else {
+                            header.style.top = '';
+                            header.style.bottom = '';
+                            header.style.zIndex = '';
+                        }
                     }
-                }
 
-                // Column footer: only in full mode
-                if (footer) {
-                    if (isFullMode) {
-                        footer.style.top = `${footerTop}px`;
-                        footer.style.bottom = `${footerBottom}px`;
-                        footer.style.zIndex = zIndex;
-                    } else {
-                        footer.style.top = '';
-                        footer.style.bottom = '';
-                        footer.style.zIndex = '';
+                    // Column footer: only in full mode
+                    if (footer) {
+                        if (isFullMode) {
+                            footer.style.top = `${footerTop}px`;
+                            footer.style.bottom = `${footerBottom}px`;
+                            footer.style.zIndex = zIndex;
+                        } else {
+                            footer.style.top = '';
+                            footer.style.bottom = '';
+                            footer.style.zIndex = '';
+                        }
                     }
-                }
 
-                // Column offset: always calculated for proper spacing
-                const columnOffset = col.querySelector('.column-offset');
-                if (columnOffset) {
-                    columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
-                }
+                    // Column offset: always calculated for proper spacing
+                    const columnOffset = col.querySelector('.column-offset');
+                    if (columnOffset) {
+                        columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
+                    }
                 });
 
                 // Update scroll handler data with all columns (including horizontally folded)
@@ -677,10 +665,26 @@ function updateStackLayoutCore(stackElement = null) {
                     totalHeight: pos.totalHeight
                 }));
 
-                // Update drop zones AFTER column positions are applied
-                if (typeof window.updateStackBottomDropZones === 'function') {
-                    window.updateStackBottomDropZones();
-                }
+                requestAnimationFrame(() => {
+                    const scrollY = window.scrollY || window.pageYOffset;
+
+                    // Store content area boundaries (absolute positions from top of page)
+                    // Content starts at bottom of header, ends at top of footer
+                    positions.forEach(({ col, header, footer }) => {
+                        if (!header || !footer) return;
+
+                        const headerRect = header.getBoundingClientRect();
+                        const footerRect = footer.getBoundingClientRect();
+
+                        col.dataset.contentAreaTop = scrollY + headerRect.bottom;
+                        col.dataset.contentAreaBottom = scrollY + footerRect.top;
+                    });
+
+                    // Update drop zones AFTER column positions are applied
+                    if (typeof window.updateStackBottomDropZones === 'function') {
+                        window.updateStackBottomDropZones();
+                    }
+                });
             }); // End requestAnimationFrame
         }
     });
