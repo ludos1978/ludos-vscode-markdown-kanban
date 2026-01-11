@@ -1673,27 +1673,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // DEBUG: Global scroll listener to catch all scroll events (respects debug mode)
     (function setupScrollDebug() {
         const container = document.getElementById('kanban-container');
-        if (!container) return;
+        const board = document.getElementById('kanban-board');
+        const targets = [
+            { element: container, label: 'kanban-container' },
+            { element: board, label: 'kanban-board' }
+        ].filter(entry => entry.element);
+        if (targets.length === 0) { return; }
 
-        let lastScrollTop = container.scrollTop;
+        targets.forEach(({ element, label }) => {
+            let lastScrollTop = element.scrollTop;
+            let lastScrollLeft = element.scrollLeft;
 
-        container.addEventListener('scroll', () => {
-            if (!window.kanbanDebug?.enabled) {
-                lastScrollTop = container.scrollTop;
-                return;
-            }
-            const delta = container.scrollTop - lastScrollTop;
-            if (Math.abs(delta) > 20) {
-                console.log('[SCROLL-EVENT] Large scroll detected:', {
-                    from: lastScrollTop,
-                    to: container.scrollTop,
-                    delta,
-                    timestamp: performance.now(),
-                    stack: new Error().stack.split('\n').slice(0, 8).join('\n')
-                });
-            }
-            lastScrollTop = container.scrollTop;
-        }, { passive: true });
+            element.addEventListener('scroll', () => {
+                if (!window.kanbanDebug?.enabled) {
+                    lastScrollTop = element.scrollTop;
+                    lastScrollLeft = element.scrollLeft;
+                    return;
+                }
+                const deltaTop = element.scrollTop - lastScrollTop;
+                const deltaLeft = element.scrollLeft - lastScrollLeft;
+                if (Math.abs(deltaTop) > 20 || Math.abs(deltaLeft) > 20) {
+                    console.log('[SCROLL-EVENT] Large scroll detected:', {
+                        element: label,
+                        fromTop: lastScrollTop,
+                        toTop: element.scrollTop,
+                        deltaTop,
+                        fromLeft: lastScrollLeft,
+                        toLeft: element.scrollLeft,
+                        deltaLeft,
+                        timestamp: performance.now(),
+                        stack: new Error().stack.split('\n').slice(0, 8).join('\n')
+                    });
+                }
+                lastScrollTop = element.scrollTop;
+                lastScrollLeft = element.scrollLeft;
+            }, { passive: true });
+        });
 
         if (window.kanbanDebug?.enabled) {
             console.log('[SCROLL-DEBUG] Scroll listener installed');

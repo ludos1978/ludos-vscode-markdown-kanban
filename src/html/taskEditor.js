@@ -1383,10 +1383,43 @@ class TaskEditor {
 
     _focusElement(element) {
         if (!element || typeof element.focus !== 'function') { return; }
+        let before = null;
+        if (window.kanbanDebug?.enabled) {
+            const container = document.getElementById('kanban-container');
+            const board = document.getElementById('kanban-board');
+            before = {
+                containerScrollTop: container?.scrollTop,
+                containerScrollLeft: container?.scrollLeft,
+                boardScrollTop: board?.scrollTop,
+                boardScrollLeft: board?.scrollLeft
+            };
+        }
         try {
             element.focus({ preventScroll: true });
         } catch (error) {
             element.focus();
+        }
+        if (window.kanbanDebug?.enabled && before) {
+            const container = document.getElementById('kanban-container');
+            const board = document.getElementById('kanban-board');
+            const after = {
+                containerScrollTop: container?.scrollTop,
+                containerScrollLeft: container?.scrollLeft,
+                boardScrollTop: board?.scrollTop,
+                boardScrollLeft: board?.scrollLeft
+            };
+            if (after.containerScrollTop !== before.containerScrollTop ||
+                after.containerScrollLeft !== before.containerScrollLeft ||
+                after.boardScrollTop !== before.boardScrollTop ||
+                after.boardScrollLeft !== before.boardScrollLeft) {
+                console.log('[FOCUS-SCROLL]', {
+                    element: element.className || element.id || element.tagName,
+                    before,
+                    after,
+                    timestamp: performance.now(),
+                    stack: new Error().stack.split('\n').slice(0, 8).join('\n')
+                });
+            }
         }
     }
 
@@ -1433,8 +1466,25 @@ class TaskEditor {
         if (!positions || positions.length === 0) { return; }
         positions.forEach(({ element, top, left }) => {
             if (!element) { return; }
-            element.scrollTop = top;
-            element.scrollLeft = left;
+            const prevTop = element.scrollTop;
+            const prevLeft = element.scrollLeft;
+            if (prevTop !== top) {
+                element.scrollTop = top;
+            }
+            if (prevLeft !== left) {
+                element.scrollLeft = left;
+            }
+            if (window.kanbanDebug?.enabled && (prevTop !== top || prevLeft !== left)) {
+                console.log('[SCROLL-RESTORE]', {
+                    element: element.id || element.className || element.tagName,
+                    prevTop,
+                    top,
+                    prevLeft,
+                    left,
+                    timestamp: performance.now(),
+                    stack: new Error().stack.split('\n').slice(0, 8).join('\n')
+                });
+            }
         });
     }
 
@@ -1447,6 +1497,41 @@ class TaskEditor {
         }
         requestAnimationFrame(() => {
             requestAnimationFrame(restore);
+        });
+    }
+
+    _getNearestScrollParent(element) {
+        let current = element instanceof HTMLElement ? element.parentElement : null;
+        while (current) {
+            const style = window.getComputedStyle(current);
+            if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
+                style.overflowX === 'auto' || style.overflowX === 'scroll') {
+                return current;
+            }
+            current = current.parentElement;
+        }
+        return null;
+    }
+
+    _logScrollSnapshot(reason, element = null) {
+        if (!window.kanbanDebug?.enabled) { return; }
+        const container = document.getElementById('kanban-container');
+        const board = document.getElementById('kanban-board');
+        const scrollParent = this._getNearestScrollParent(element);
+        console.log('[SCROLL-SNAPSHOT]', {
+            reason,
+            containerScrollTop: container?.scrollTop,
+            containerScrollLeft: container?.scrollLeft,
+            boardScrollTop: board?.scrollTop,
+            boardScrollLeft: board?.scrollLeft,
+            scrollParent: scrollParent ? {
+                id: scrollParent.id || scrollParent.className || scrollParent.tagName,
+                scrollTop: scrollParent.scrollTop,
+                scrollLeft: scrollParent.scrollLeft
+            } : null,
+            elementClass: element?.className,
+            activeElement: document.activeElement?.className,
+            timestamp: performance.now()
         });
     }
 
@@ -1472,7 +1557,13 @@ class TaskEditor {
 
         // DEBUG: Track scroll position through edit initialization
         if (window.kanbanDebug?.enabled) {
-            console.log('[START-EDIT] Begin', { type, taskId, scrollTop: scrollAtStart });
+            const board = document.getElementById('kanban-board');
+            console.log('[START-EDIT] Begin', {
+                type,
+                taskId,
+                containerScrollTop: scrollAtStart,
+                boardScrollTop: board?.scrollTop
+            });
         }
 
         // Get the appropriate elements based on type
@@ -1499,7 +1590,11 @@ class TaskEditor {
         }
 
         if (window.kanbanDebug?.enabled) {
-            console.log('[START-EDIT] After init value', { scrollTop: container?.scrollTop });
+            const board = document.getElementById('kanban-board');
+            console.log('[START-EDIT] After init value', {
+                containerScrollTop: container?.scrollTop,
+                boardScrollTop: board?.scrollTop
+            });
         }
 
         const useWysiwyg = this._shouldUseWysiwyg(type);
@@ -1513,21 +1608,35 @@ class TaskEditor {
         this._setupEditVisibility(displayElement, editElement, wysiwygContext?.container);
 
         if (window.kanbanDebug?.enabled) {
-            console.log('[START-EDIT] After visibility', { scrollTop: container?.scrollTop });
+            const board = document.getElementById('kanban-board');
+            console.log('[START-EDIT] After visibility', {
+                containerScrollTop: container?.scrollTop,
+                boardScrollTop: board?.scrollTop
+            });
+            this._logScrollSnapshot('startEdit.afterVisibility', editElement);
         }
 
         // Recalculate stack layout if needed
         this._recalculateStackLayout(containerElement);
 
         if (window.kanbanDebug?.enabled) {
-            console.log('[START-EDIT] After stack recalc', { scrollTop: container?.scrollTop });
+            const board = document.getElementById('kanban-board');
+            console.log('[START-EDIT] After stack recalc', {
+                containerScrollTop: container?.scrollTop,
+                boardScrollTop: board?.scrollTop
+            });
         }
 
         // Position cursor
         this._positionCursor(editElement, type, preserveCursor, wysiwygContext?.editor);
 
         if (window.kanbanDebug?.enabled) {
-            console.log('[START-EDIT] After cursor position', { scrollTop: container?.scrollTop });
+            const board = document.getElementById('kanban-board');
+            console.log('[START-EDIT] After cursor position', {
+                containerScrollTop: container?.scrollTop,
+                boardScrollTop: board?.scrollTop
+            });
+            this._logScrollSnapshot('startEdit.afterCursor', editElement);
         }
 
         // Store editor state
@@ -2217,6 +2326,10 @@ class TaskEditor {
         this._requestStackLayoutRecalc(closeColumnId);
         this._flushStackLayoutRecalc();
 
+        if (window.kanbanDebug?.enabled) {
+            this._logScrollSnapshot('closeEditor.afterLayout', element);
+        }
+
         // Focus the card after editing ends
         if (type === 'task-title' || type === 'task-description') {
             // Find the task item to focus
@@ -2535,8 +2648,10 @@ function editDescription(element, taskId, columnId) {
     // DEBUG: Log scroll position at editDescription entry
     if (window.kanbanDebug?.enabled) {
         const container = document.getElementById('kanban-container');
+        const board = document.getElementById('kanban-board');
         console.log('[CLICK-DEBUG] editDescription entry', {
             scrollTop: container?.scrollTop,
+            boardScrollTop: board?.scrollTop,
             taskId
         });
     }
