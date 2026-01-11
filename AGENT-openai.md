@@ -3,4 +3,5 @@
 - increase the revision version number after each change.
 - after each major (introducing multiple new features or changing the interface more then just a layout or smaller change) then change change the minor version number and create a build by using the ./build.sh script!
 - after each change give testing descriptions how to test for anything that might have been broken. Document it in ToTest.md as tasks which the user might check. Cleanup this file if the tasks are checked or enhance test requirements if similar tasks already exist.
-
+- allways focus on solving the reason for a problem. Do not add alternative implementations, fallbacks or failovers in case the first implementation fails. allways focus on solving the main code in a way it handles all situations properly. that might include raising an error and adding error handlers in case it cannot be recovered.
+- for every problem analysis, check the code that is run and causes the error, then check all callers of the code.

@@ -7,6 +7,7 @@
 - [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
 - [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).
 - [ ] Attempt to save when the board has no columns and confirm a single error message appears without repeated save failures in logs.
+- [ ] Clear all columns (empty board), press Cmd+S, and confirm the save succeeds without validation errors.
 - [ ] Toggle the debug button (version menu) and confirm regular logs stop when debug is disabled while `WebviewBridge` warnings and errors still appear in the console when debug mode is on.
 - [ ] Verify task menu actions still execute (move top/up/down/bottom, move to column list, and sort options).
 - [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.

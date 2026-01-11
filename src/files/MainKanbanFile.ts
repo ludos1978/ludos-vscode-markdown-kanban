@@ -282,9 +282,7 @@ export class MainKanbanFile extends MarkdownFile {
             // Additional validation
             const errors: string[] = [];
 
-            if (board.columns.length === 0) {
-                errors.push('Board must have at least one column');
-            }
+            // Allow saving empty boards (users may intentionally clear all columns)
 
             return {
                 valid: errors.length === 0,
