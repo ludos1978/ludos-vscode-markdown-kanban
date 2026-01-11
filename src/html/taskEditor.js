@@ -487,7 +487,7 @@ class TaskEditor {
 
                     // Restore focus if we're still editing the same element
                     if (this.currentEditor && this.currentEditor.element === currentElement) {
-                        currentElement.focus();
+                        this._focusElement(currentElement);
                     }
                 }, 300);
                 return; // Let the system handle the shortcut
@@ -534,7 +534,7 @@ class TaskEditor {
                 // Small delay to ensure the window focus event has fully processed
                 setTimeout(() => {
                     if (this.currentEditor && this.currentEditor.element) {
-                        this.currentEditor.element.focus();
+                        this._focusElement(this.currentEditor.element);
                     }
                 }, 50);
             }
@@ -546,7 +546,7 @@ class TaskEditor {
             if (!document.hidden && this.currentEditor && this.currentEditor.element) {
                 setTimeout(() => {
                     if (this.currentEditor && this.currentEditor.element) {
-                        this.currentEditor.element.focus();
+                        this._focusElement(this.currentEditor.element);
                     }
                 }, 100);
             }
@@ -897,11 +897,20 @@ class TaskEditor {
      */
     _positionCursor(editElement, type, preserveCursor, wysiwygEditor = null) {
         if (wysiwygEditor) {
-            wysiwygEditor.focus();
+            const viewDom = wysiwygEditor.getViewDom?.();
+            if (viewDom) {
+                this._focusElement(viewDom);
+            } else {
+                try {
+                    wysiwygEditor.focus();
+                } catch (error) {
+                    this._focusElement(editElement);
+                }
+            }
             return;
         }
 
-        editElement.focus();
+        this._focusElement(editElement);
 
         if (!preserveCursor) {
             // Default behavior: move cursor to end
@@ -1059,7 +1068,7 @@ class TaskEditor {
                         const cursorPos = pending.selectionEnd + style.start.length + style.end.length;
                         editElement.selectionStart = cursorPos;
                         editElement.selectionEnd = cursorPos;
-                        editElement.focus();
+                        this._focusElement(editElement);
                         console.log('[STYLE-DEBUG] Ambiguous wrap applied:', { char, value: editElement.value });
                     }, 0);
                 } else {
@@ -1350,6 +1359,15 @@ class TaskEditor {
             this._flushStackLayoutRecalc();
             this._wysiwygRecalcTimeout = null;
         }, 150);
+    }
+
+    _focusElement(element) {
+        if (!element || typeof element.focus !== 'function') { return; }
+        try {
+            element.focus({ preventScroll: true });
+        } catch (error) {
+            element.focus();
+        }
     }
 
     _captureScrollPositions(baseElement) {
@@ -2172,7 +2190,7 @@ class TaskEditor {
             if (taskItem) {
                 // Small delay to ensure display element is visible
                 setTimeout(() => {
-                    taskItem.focus();
+                    this._focusElement(taskItem);
                 }, 10);
             }
         }
@@ -2438,7 +2456,7 @@ class TaskEditor {
         element.setSelectionRange(newCursorPos, newCursorPos);
 
         // Focus the element
-        element.focus();
+        this._focusElement(element);
 
     }
 }

@@ -3,6 +3,7 @@
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
 - [ ] Verify tag menus still list active tags correctly for columns and tasks, including custom groups and active-tag overrides.
 - [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
+- [ ] While scrolled in multi-row mode, click a task description to edit and confirm the board does not jump to the top (no large scroll debug spikes).
 - [ ] Toggle the debug button (version menu) and confirm regular logs stop when debug is disabled while `WebviewBridge` warnings and errors still appear in the console when debug mode is on.
 - [ ] Verify task menu actions still execute (move top/up/down/bottom, move to column list, and sort options).
 - [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
