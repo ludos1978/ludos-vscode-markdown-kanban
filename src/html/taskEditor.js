@@ -854,14 +854,6 @@ class TaskEditor {
         const boardScrollTop = board?.scrollTop || 0;
         const boardScrollLeft = board?.scrollLeft || 0;
 
-        if (displayElement) { displayElement.style.display = 'none'; }
-        if (wysiwygContainer) {
-            editElement.style.display = 'none';
-            wysiwygContainer.style.display = 'block';
-        } else {
-            editElement.style.display = 'block';
-        }
-
         // Fix the ENTIRE VIEW height during editing to prevent scroll jumps
         // The kanban-board is the actual scroll container when multi-row is active
         const kanbanBoard = document.querySelector('.kanban-board');
@@ -869,6 +861,14 @@ class TaskEditor {
             const currentHeight = kanbanBoard.scrollHeight;
             kanbanBoard.style.minHeight = currentHeight + 'px';
             kanbanBoard._editingMinHeight = currentHeight; // Store for later cleanup
+        }
+
+        if (displayElement) { displayElement.style.display = 'none'; }
+        if (wysiwygContainer) {
+            editElement.style.display = 'none';
+            wysiwygContainer.style.display = 'block';
+        } else {
+            editElement.style.display = 'block';
         }
 
         if (!wysiwygContainer) {
@@ -2322,11 +2322,30 @@ class TaskEditor {
             displayElement.style.removeProperty('display');
         }
 
-        // Release the fixed view height that was set during editing
+        // Release the fixed view height after layout stabilizes to avoid scroll jumps
         const kanbanBoard = document.querySelector('.kanban-board');
         if (kanbanBoard && kanbanBoard._editingMinHeight) {
-            kanbanBoard.style.removeProperty('min-height');
-            delete kanbanBoard._editingMinHeight;
+            const minHeight = kanbanBoard._editingMinHeight;
+            let attempts = 0;
+            const tryRelease = () => {
+                attempts += 1;
+                if (kanbanBoard.scrollHeight >= minHeight) {
+                    kanbanBoard.style.removeProperty('min-height');
+                    delete kanbanBoard._editingMinHeight;
+                    return;
+                }
+                if (attempts < 6) {
+                    requestAnimationFrame(tryRelease);
+                    return;
+                }
+                if (window.kanbanDebug?.enabled) {
+                    console.log('[EDIT-MIN-HEIGHT] Keeping min-height to avoid scroll jump', {
+                        current: kanbanBoard.scrollHeight,
+                        minHeight
+                    });
+                }
+            };
+            requestAnimationFrame(tryRelease);
         }
 
         const col = element.closest('.kanban-full-height-column');

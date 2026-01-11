@@ -5,6 +5,7 @@
 - [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
 - [ ] While scrolled in multi-row mode, enter and exit a task description edit and confirm the board does not jump to the top while the cursor positions (no large scroll debug spikes).
 - [ ] With a tall board (multi-row), enter/exit edit and confirm scroll anchoring does not pull the view (no unexpected scroll offsets).
+- [ ] Enter/exit edit while scrolled near the bottom and confirm the board height lock prevents any temporary jump (no clamp to near-top).
 - [ ] With debug enabled, reproduce the edit scroll issue and confirm `[SCROLL-EVENT]`, `[SCROLL-RESTORE]`, or `[FOCUS-SCROLL]` logs show which element moved (including stack traces).
 - [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
 - [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).
