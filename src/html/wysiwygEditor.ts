@@ -32,6 +32,35 @@ const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
     '<': { start: '<', end: '>' }
 };
 
+const videoExtensions = new Set(['avi', 'm4v', 'mkv', 'mov', 'mpg', 'mp4', 'ogv', 'webm', 'wmv']);
+const audioExtensions = new Set(['aac', 'flac', 'm4a', 'mp3', 'oga', 'ogg', 'wav']);
+
+function inferMediaTypeFromSrc(src: string): 'video' | 'audio' | null {
+    if (!src) {
+        return null;
+    }
+    try {
+        const url = new URL(src, 'http://unused.invalid');
+        const extension = url.pathname.split('.').pop()?.toLowerCase() ?? '';
+        if (videoExtensions.has(extension)) {
+            return 'video';
+        }
+        if (audioExtensions.has(extension)) {
+            return 'audio';
+        }
+    } catch {
+        const cleaned = src.split(/[?#]/)[0];
+        const extension = cleaned.split('.').pop()?.toLowerCase() ?? '';
+        if (videoExtensions.has(extension)) {
+            return 'video';
+        }
+        if (audioExtensions.has(extension)) {
+            return 'audio';
+        }
+    }
+    return null;
+}
+
 const TILDE_DEAD_CODES = new Set([
     'IntlBackslash',
     'Backquote',
@@ -760,7 +789,8 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (!src) {
                 return null;
             }
-            const attrs: Record<string, unknown> = { src, mediaType: 'image' };
+            const inferred = inferMediaTypeFromSrc(src);
+            const attrs: Record<string, unknown> = { src, mediaType: inferred || 'image' };
             if (alt) {
                 attrs.alt = alt;
             }
@@ -777,7 +807,8 @@ function buildMarkdownInputRules(schema: any): InputRule[] {
             if (!src) {
                 return null;
             }
-            const attrs: Record<string, unknown> = { src, mediaType: 'image' };
+            const inferred = inferMediaTypeFromSrc(src);
+            const attrs: Record<string, unknown> = { src, mediaType: inferred || 'image' };
             if (alt) {
                 attrs.alt = alt;
             }
