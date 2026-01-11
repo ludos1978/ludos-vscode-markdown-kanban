@@ -866,18 +866,20 @@ class TaskEditor {
         }
 
         // CRITICAL: Add spacer BEFORE visibility changes to maintain scroll capacity
-        // The spacer adds content height, keeping scrollHeight high enough to preserve scroll position
-        if (board) {
-            board._editingScrollHeight = boardScrollHeight;
+        // Spacer = height of display element being hidden (the height we're "losing")
+        // This is the exact amount needed to compensate for hiding the display element
+        const displayHeight = displayElement?.offsetHeight || 0;
+        if (board && displayHeight > 0) {
+            board._editingDisplayHeight = displayHeight;
             if (!board._editScrollSpacer) {
                 const spacer = document.createElement('div');
                 spacer.className = 'kanban-edit-scroll-spacer';
-                spacer.style.height = `${boardScrollHeight}px`;
+                spacer.style.height = `${displayHeight}px`;
                 spacer.style.flexShrink = '0';  // Prevent flex from collapsing it
                 board.appendChild(spacer);
                 board._editScrollSpacer = spacer;
             } else {
-                board._editScrollSpacer.style.height = `${boardScrollHeight}px`;
+                board._editScrollSpacer.style.height = `${displayHeight}px`;
             }
             void board.offsetHeight;  // Force reflow to apply spacer
         }
@@ -2383,20 +2385,10 @@ class TaskEditor {
         // Clean up spacer (set by _setupEditVisibility on #kanban-board)
         const board = document.getElementById('kanban-board');
         if (board && board._editScrollSpacer) {
-            const targetHeight = board._editingScrollHeight || 0;
-            let attempts = 0;
-            const tryReleaseSpacer = () => {
-                attempts += 1;
-                // Remove spacer once content is restored or after max attempts
-                if (board.scrollHeight >= targetHeight || attempts >= 6) {
-                    board._editScrollSpacer.remove();
-                    delete board._editScrollSpacer;
-                    delete board._editingScrollHeight;
-                    return;
-                }
-                requestAnimationFrame(tryReleaseSpacer);
-            };
-            requestAnimationFrame(tryReleaseSpacer);
+            // Remove spacer immediately - content is being restored
+            board._editScrollSpacer.remove();
+            delete board._editScrollSpacer;
+            delete board._editingDisplayHeight;
         }
 
         const col = element.closest('.kanban-full-height-column');
