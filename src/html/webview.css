@@ -1024,6 +1024,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   bottom: 0;
   overflow-x: auto;
   overflow-y: auto;
+  overflow-anchor: none;
   display: flex;
   flex-direction: column;
 }
@@ -1034,6 +1035,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   flex-wrap: nowrap;
   width: max-content; /* Allow horizontal expansion */
   align-items: flex-start;
+  overflow-anchor: none;
 }
 
 /* when it has no child - kanban-row */
@@ -1049,6 +1051,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   width: 100%;
   height: 100%;
 	overflow: auto;
+  overflow-anchor: none;
 }
 
 /* Kanban columns - Full height wrapper for sticky positioning */

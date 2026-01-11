@@ -848,8 +848,11 @@ class TaskEditor {
      */
     _setupEditVisibility(displayElement, editElement, wysiwygContainer = null) {
         const container = document.getElementById('kanban-container');
+        const board = document.getElementById('kanban-board');
         const scrollTop = container?.scrollTop || 0;
         const scrollLeft = container?.scrollLeft || 0;
+        const boardScrollTop = board?.scrollTop || 0;
+        const boardScrollLeft = board?.scrollLeft || 0;
 
         if (displayElement) { displayElement.style.display = 'none'; }
         if (wysiwygContainer) {
@@ -875,6 +878,10 @@ class TaskEditor {
         if (container) {
             container.scrollTop = scrollTop;
             container.scrollLeft = scrollLeft;
+        }
+        if (board) {
+            board.scrollTop = boardScrollTop;
+            board.scrollLeft = boardScrollLeft;
         }
     }
 
@@ -2287,6 +2294,7 @@ class TaskEditor {
         if (!this.currentEditor) {return;}
 
         const { element, displayElement, type, wysiwyg, wysiwygContainer } = this.currentEditor;
+        const scrollPositions = this._captureScrollPositions(element);
 
         if (!wysiwyg && typeof window.removeSpecialCharOverlay === 'function') {
             window.removeSpecialCharOverlay(element);
@@ -2330,6 +2338,8 @@ class TaskEditor {
             this._logScrollSnapshot('closeEditor.afterLayout', element);
         }
 
+        this._scheduleScrollRestore(scrollPositions);
+
         // Focus the card after editing ends
         if (type === 'task-title' || type === 'task-description') {
             // Find the task item to focus
@@ -2338,6 +2348,7 @@ class TaskEditor {
                 // Small delay to ensure display element is visible
                 setTimeout(() => {
                     this._focusElement(taskItem);
+                    this._scheduleScrollRestore(scrollPositions);
                 }, 10);
             }
         }
