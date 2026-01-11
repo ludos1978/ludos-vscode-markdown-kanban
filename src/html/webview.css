@@ -2055,13 +2055,6 @@ body.section-height-limited .task-section figure img {
   border-left: 1px solid var(--vscode-panel-border);
 }
 
-.task-description-wysiwyg .wysiwyg-media[data-type]:not([data-type="image"])::before {
-  content: attr(data-type);
-  text-transform: uppercase;
-  font-size: 0.75em;
-  margin-right: 4px;
-  opacity: 0.7;
-}
 
 .task-description-wysiwyg .wysiwyg-diagram-preview {
   margin: 0;
