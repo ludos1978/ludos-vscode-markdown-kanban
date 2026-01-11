@@ -1830,11 +1830,23 @@ body.section-height-limited .task-section figure img {
   min-height: 1em;
   cursor: text;
   color: var(--vscode-foreground);
-  caret-color: var(--vscode-editorCursor-foreground, currentColor);
+  caret-color: var(--vscode-editorCursor-foreground, var(--vscode-foreground, #000));
+}
+
+.task-description-wysiwyg .ProseMirror:focus {
+  caret-color: var(--vscode-editorCursor-foreground, var(--vscode-foreground, #000));
 }
 
 .task-description-wysiwyg .ProseMirror * {
   caret-color: inherit;
+}
+
+.task-description-wysiwyg .ProseMirror ::selection {
+  background: var(--vscode-editor-selectionBackground, rgba(0, 120, 215, 0.3));
+}
+
+.task-description-wysiwyg .ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid var(--vscode-focusBorder, #007acc);
 }
 
 .task-description-wysiwyg .ProseMirror h1,

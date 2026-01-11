@@ -847,44 +847,26 @@ class TaskEditor {
      * @private
      */
     _setupEditVisibility(displayElement, editElement, wysiwygContainer = null, containerElement = null) {
-        const container = document.getElementById('kanban-container');
-        const board = document.getElementById('kanban-board');
-        const scrollTop = container?.scrollTop || 0;
-        const scrollLeft = container?.scrollLeft || 0;
-        const boardScrollTop = board?.scrollTop || 0;
-        const boardScrollLeft = board?.scrollLeft || 0;
-        const boardScrollHeight = board?.scrollHeight || 0;
-
-        const heightContainer = containerElement || displayElement?.parentElement || editElement?.parentElement;
-        if (displayElement && heightContainer && !heightContainer._editingMinHeight) {
-            const displayHeight = displayElement.offsetHeight || 0;
-            heightContainer._editingPrevMinHeight = heightContainer.style.minHeight || '';
-            heightContainer._editingMinHeight = displayHeight;
-            if (displayHeight > 0) {
-                heightContainer.style.minHeight = `${displayHeight}px`;
-            }
+        // SIMPLIFIED: Lock task-item height to prevent flex shrink cascade
+        // This is the ONE mechanism that prevents scroll jump - no spacers or scroll restoration needed
+        const taskItem = containerElement?.closest('.task-item');
+        if (taskItem && !taskItem._editingHeightLock) {
+            taskItem._editingHeightLock = {
+                height: taskItem.style.height,
+                flexShrink: taskItem.style.flexShrink,
+                position: taskItem.style.position,
+                zIndex: taskItem.style.zIndex,
+                originalHeight: taskItem.offsetHeight
+            };
+            taskItem.style.height = `${taskItem.offsetHeight}px`;
+            taskItem.style.flexShrink = '0';
+            // Raise z-index above sticky footer (which has 1000000+)
+            taskItem.style.position = 'relative';
+            taskItem.style.zIndex = '1100000';
+            void taskItem.offsetHeight; // Force reflow before visibility change
         }
 
-        // CRITICAL: Add spacer BEFORE visibility changes to maintain scroll capacity
-        // Spacer = height of display element being hidden (the height we're "losing")
-        // This is the exact amount needed to compensate for hiding the display element
-        const displayHeight = displayElement?.offsetHeight || 0;
-        if (board && displayHeight > 0) {
-            board._editingDisplayHeight = displayHeight;
-            if (!board._editScrollSpacer) {
-                const spacer = document.createElement('div');
-                spacer.className = 'kanban-edit-scroll-spacer';
-                spacer.style.height = `${displayHeight}px`;
-                spacer.style.flexShrink = '0';  // Prevent flex from collapsing it
-                board.appendChild(spacer);
-                board._editScrollSpacer = spacer;
-            } else {
-                board._editScrollSpacer.style.height = `${displayHeight}px`;
-            }
-            void board.offsetHeight;  // Force reflow to apply spacer
-        }
-
-        // Change visibility - scroll should be preserved because spacer maintains scrollHeight
+        // Change visibility - scroll WON'T clamp because task-item height is locked
         if (displayElement) { displayElement.style.display = 'none'; }
         if (wysiwygContainer) {
             editElement.style.display = 'none';
@@ -896,19 +878,6 @@ class TaskEditor {
         if (!wysiwygContainer) {
             this.autoResize(editElement);
         }
-
-        // Restore scroll positions immediately and lock them
-        if (container) {
-            container.scrollTop = scrollTop;
-            container.scrollLeft = scrollLeft;
-        }
-        if (board) {
-            board.scrollTop = boardScrollTop;
-            board.scrollLeft = boardScrollLeft;
-        }
-        // Use aggressive locking to prevent any subsequent scroll changes
-        this._lockScrollForFrames(container, scrollTop, scrollLeft, 10);
-        this._lockScrollForFrames(board, boardScrollTop, boardScrollLeft, 10);
     }
 
     /**
@@ -1672,8 +1641,10 @@ class TaskEditor {
             this._logScrollSnapshot('startEdit.afterVisibility', editElement);
         }
 
-        // Recalculate stack layout if needed
+        // Recalculate stack layout immediately - needed because task height is now locked
+        // and stack positions need to reflect the new layout
         this._recalculateStackLayout(containerElement);
+        this._flushStackLayoutRecalc();
 
         if (window.kanbanDebug?.enabled) {
             const board = document.getElementById('kanban-board');
@@ -2371,32 +2342,23 @@ class TaskEditor {
             displayElement.style.removeProperty('display');
         }
 
-        const editContainer = this.currentEditor.containerElement;
-        if (editContainer && editContainer._editingMinHeight !== undefined) {
-            if (editContainer._editingPrevMinHeight) {
-                editContainer.style.minHeight = editContainer._editingPrevMinHeight;
-            } else {
-                editContainer.style.removeProperty('min-height');
-            }
-            delete editContainer._editingMinHeight;
-            delete editContainer._editingPrevMinHeight;
-        }
-
         const col = element.closest('.kanban-full-height-column');
         const closeColumnId = col ? col.dataset.columnId || null : null;
         this._requestStackLayoutRecalc(closeColumnId);
         this._flushStackLayoutRecalc();
 
-        // Clean up spacer AFTER layout recalc to prevent scroll jump
-        const board = document.getElementById('kanban-board');
-        if (board && board._editScrollSpacer) {
-            // Wait for layout to stabilize before removing spacer
+        // Release task-item height lock AFTER layout recalc to prevent scroll jump
+        const taskItem = element.closest('.task-item');
+        if (taskItem && taskItem._editingHeightLock) {
+            // Wait for layout to stabilize before releasing height lock
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    if (board._editScrollSpacer) {
-                        board._editScrollSpacer.remove();
-                        delete board._editScrollSpacer;
-                        delete board._editingDisplayHeight;
+                    if (taskItem._editingHeightLock) {
+                        taskItem.style.height = taskItem._editingHeightLock.height || '';
+                        taskItem.style.flexShrink = taskItem._editingHeightLock.flexShrink || '';
+                        taskItem.style.position = taskItem._editingHeightLock.position || '';
+                        taskItem.style.zIndex = taskItem._editingHeightLock.zIndex || '';
+                        delete taskItem._editingHeightLock;
                     }
                 });
             });

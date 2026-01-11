@@ -210,17 +210,10 @@ function serializeWikiLink(node: WysiwygNode): string {
 
 function serializeMediaInline(node: WysiwygNode): string {
     const src = typeof node.attrs?.src === 'string' ? node.attrs.src : '';
-    const mediaType = typeof node.attrs?.mediaType === 'string' ? node.attrs.mediaType : 'image';
-
-    if (mediaType === 'image') {
-        const alt = typeof node.attrs?.alt === 'string' ? node.attrs.alt : '';
-        const title = typeof node.attrs?.title === 'string' ? node.attrs.title : '';
-        const titlePart = title ? ` "${escapeAttribute(title)}"` : '';
-        return `![${alt}](${src}${titlePart})`;
-    }
-
-    const tag = mediaType === 'audio' ? 'audio' : 'video';
-    return `<${tag} src="${escapeAttribute(src)}" controls></${tag}>`;
+    const alt = typeof node.attrs?.alt === 'string' ? node.attrs.alt : '';
+    const title = typeof node.attrs?.title === 'string' ? node.attrs.title : '';
+    const titlePart = title ? ` "${escapeAttribute(title)}"` : '';
+    return `![${alt}](${src}${titlePart})`;
 }
 
 function serializeContainer(node: WysiwygNode, config: Required<WysiwygSerializerOptions>): string {

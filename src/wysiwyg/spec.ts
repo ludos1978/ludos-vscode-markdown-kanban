@@ -220,34 +220,3 @@ export const tokenMappings: TokenMapping[] = [
     { tokens: ['image', 'audio', 'video'], node: 'media_inline', attrs: ['src', 'mediaType', 'alt', 'title'] },
     { tokens: ['footnote_ref', 'footnote_block'], node: 'footnote', notes: 'Doc-level store required' }
 ];
-
-export type SerializerRule = {
-    node?: string;
-    mark?: string;
-    strategy: string;
-    notes?: string;
-};
-
-export const serializerRules: SerializerRule[] = [
-    { node: 'diagram_fence', strategy: 'fenced code block with lang + raw code' },
-    { node: 'multicolumn', strategy: '---: <growth> / :--: / :--- markers' },
-    { node: 'include_block', strategy: '!!!include(path)!!! on its own line' },
-    { node: 'include_inline', strategy: '!!!include(path)!!! inline' },
-    { node: 'html_block', strategy: 'preserve raw content as-is', notes: 'Visibility is config-only' },
-    { node: 'speaker_note', strategy: 'prefix each line with ;;' },
-    { node: 'wiki_link', strategy: '[[doc|title]] or [[doc]]' },
-    { node: 'tag', strategy: '#tag with original content' },
-    { node: 'date_tag', strategy: '@date or @W12' },
-    { node: 'person_tag', strategy: '@name' },
-    { node: 'temporal_tag', strategy: '.token' },
-    { mark: 'strike', strategy: 'preserve delimiter style (~~ or --)' },
-    { mark: 'underline', strategy: '_underline_ (not emphasis)' },
-    { mark: 'mark', strategy: '==mark==' },
-    { mark: 'sub', strategy: '~sub~' },
-    { mark: 'sup', strategy: '^sup^' },
-    { mark: 'ins', strategy: '++ins++' },
-    { mark: 'abbr', strategy: 'keep title in definition store' },
-    { node: 'media_inline', strategy: 'markdown-it-media syntax where available' },
-    { node: 'media_block', strategy: 'markdown-it-media syntax where available' },
-    { node: 'footnote', strategy: 'preserve ids and definition ordering' }
-];

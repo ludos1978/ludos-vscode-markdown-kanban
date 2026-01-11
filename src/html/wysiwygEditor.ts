@@ -1,5 +1,5 @@
-import { EditorState, TextSelection } from 'prosemirror-state';
-import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { EditorState, TextSelection, Selection, Transaction } from 'prosemirror-state';
+import type { Node as ProseMirrorNode, Schema } from 'prosemirror-model';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -10,6 +10,7 @@ import { wrapInList } from 'prosemirror-schema-list';
 import { buildProseMirrorSchema } from '../wysiwyg/prosemirrorSchema';
 import { proseMirrorToWysiwygDoc, wysiwygDocToProseMirror } from '../wysiwyg/prosemirrorAdapter';
 import { markdownToWysiwygDoc, wysiwygDocToMarkdown } from '../wysiwyg/pipeline';
+import { inferMediaTypeFromSrc, getTagFlavor, isDateLike } from '../wysiwyg/utils';
 
 export type WysiwygEditorOptions = {
     markdown: string;
@@ -31,35 +32,6 @@ const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
     '{': { start: '{', end: '}' },
     '<': { start: '<', end: '>' }
 };
-
-const videoExtensions = new Set(['avi', 'm4v', 'mkv', 'mov', 'mpg', 'mp4', 'ogv', 'webm', 'wmv']);
-const audioExtensions = new Set(['aac', 'flac', 'm4a', 'mp3', 'oga', 'ogg', 'wav']);
-
-function inferMediaTypeFromSrc(src: string): 'video' | 'audio' | null {
-    if (!src) {
-        return null;
-    }
-    try {
-        const url = new URL(src, 'http://unused.invalid');
-        const extension = url.pathname.split('.').pop()?.toLowerCase() ?? '';
-        if (videoExtensions.has(extension)) {
-            return 'video';
-        }
-        if (audioExtensions.has(extension)) {
-            return 'audio';
-        }
-    } catch {
-        const cleaned = src.split(/[?#]/)[0];
-        const extension = cleaned.split('.').pop()?.toLowerCase() ?? '';
-        if (videoExtensions.has(extension)) {
-            return 'video';
-        }
-        if (audioExtensions.has(extension)) {
-            return 'audio';
-        }
-    }
-    return null;
-}
 
 const TILDE_DEAD_CODES = new Set([
     'IntlBackslash',
@@ -274,10 +246,61 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     }
 }
 
-function createMediaView(node: any, isBlock: boolean): NodeView {
+function createMediaView(
+    node: ProseMirrorNode,
+    view: EditorView,
+    getPos: () => number | undefined,
+    isBlock: boolean
+): NodeView {
     const dom = document.createElement(isBlock ? 'div' : 'span');
 
-    const render = (currentNode: any) => {
+    // Handle clicks on the container to set proper selection
+    dom.addEventListener('mousedown', (evt) => {
+        const e = evt as MouseEvent;
+        const pos = getPos();
+        if (pos === undefined) {
+            return;
+        }
+
+        // Don't interfere with menu button clicks
+        const target = e.target as HTMLElement;
+        if (target.closest('.image-menu-btn') || target.closest('.video-menu-btn')) {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const nodeSize = node.nodeSize;
+        const rect = dom.getBoundingClientRect();
+        const clickX = e.clientX;
+        const placeAfter = clickX >= rect.left + rect.width / 2;
+        const targetPos = placeAfter ? pos + nodeSize : pos;
+
+        console.log('[WYSIWYG-DEBUG] NodeView mousedown on media:', {
+            nodeType: node.type.name,
+            pos,
+            nodeSize,
+            placeAfter,
+            targetPos,
+            isBlock
+        });
+
+        const $pos = view.state.doc.resolve(targetPos);
+        const selection = Selection.near($pos, placeAfter ? 1 : -1);
+
+        console.log('[WYSIWYG-DEBUG] NodeView setting selection:', {
+            selectionType: selection.constructor.name,
+            from: selection.from,
+            to: selection.to,
+            empty: selection.empty
+        });
+
+        view.dispatch(view.state.tr.setSelection(selection));
+        view.focus();
+    });
+
+    const render = (currentNode: ProseMirrorNode) => {
         const mediaType = currentNode.attrs?.mediaType || 'image';
         const src = currentNode.attrs?.src || '';
         const alt = currentNode.attrs?.alt || '';
@@ -395,15 +418,15 @@ function createMediaView(node: any, isBlock: boolean): NodeView {
     };
 }
 
-function createMediaInlineView(node: any): NodeView {
-    return createMediaView(node, false);
+function createMediaInlineView(node: ProseMirrorNode, view: EditorView, getPos: () => number | undefined): NodeView {
+    return createMediaView(node, view, getPos, false);
 }
 
-function createMediaBlockView(node: any): NodeView {
-    return createMediaView(node, true);
+function createMediaBlockView(node: ProseMirrorNode, view: EditorView, getPos: () => number | undefined): NodeView {
+    return createMediaView(node, view, getPos, true);
 }
 
-function createDiagramFenceView(node: any): NodeView {
+function createDiagramFenceView(node: ProseMirrorNode): NodeView {
     const dom = document.createElement('div');
     dom.className = 'wysiwyg-diagram-block';
 
@@ -427,7 +450,7 @@ function createDiagramFenceView(node: any): NodeView {
     dom.appendChild(editBtn);
     dom.appendChild(pre);
 
-    const render = (currentNode: any) => {
+    const render = (currentNode: ProseMirrorNode) => {
         const lang = currentNode.attrs?.lang || '';
         dom.dataset.lang = lang;
         pre.dataset.lang = lang;
@@ -596,7 +619,7 @@ function focusDiagram(view: EditorView, nodePos: number): void {
     view.focus();
 }
 
-function addMulticolumnColumn(view: EditorView, node: any, nodePos: number): void {
+function addMulticolumnColumn(view: EditorView, node: ProseMirrorNode, nodePos: number): void {
     if (!node || node.type?.name !== 'multicolumn') {
         return;
     }
@@ -609,7 +632,7 @@ function addMulticolumnColumn(view: EditorView, node: any, nodePos: number): voi
     view.dispatch(view.state.tr.insert(insertPos, columnNode));
 }
 
-function removeMulticolumnColumn(view: EditorView, node: any, nodePos: number): void {
+function removeMulticolumnColumn(view: EditorView, node: ProseMirrorNode, nodePos: number): void {
     if (!node || node.type?.name !== 'multicolumn') {
         return;
     }
@@ -618,7 +641,7 @@ function removeMulticolumnColumn(view: EditorView, node: any, nodePos: number): 
     }
     let lastOffset: number | null = null;
     let lastSize = 0;
-    node.forEach((child: any, offset: number) => {
+    node.forEach((child: ProseMirrorNode, offset: number) => {
         lastOffset = offset;
         lastSize = child.nodeSize;
     });
@@ -643,39 +666,7 @@ function getStyleKey(event: KeyboardEvent): string | null {
     return null;
 }
 
-function getTagFlavor(value: string): string {
-    if (value.startsWith('gather_')) {
-        return 'gather';
-    }
-    if (/^(\+\+|\+|\u00f8|\u00d8|--|-)$/u.test(value)) {
-        return 'polarity';
-    }
-    return 'tag';
-}
-
-function isDateLike(value: string): boolean {
-    if (!value) {
-        return false;
-    }
-    if (/[0-9]/.test(value)) {
-        return true;
-    }
-    return /^w\d+/i.test(value) || /[:/.-]/.test(value);
-}
-
-function replaceInlineWithNode(state: any, match: RegExpMatchArray, start: number, end: number, node: any): any {
-    const full = match[0] || '';
-    const hasLeadingSpace = full.length > 0 && /\s/.test(full[0]);
-    const hasTrailingSpace = full.length > 0 && /\s/.test(full[full.length - 1]);
-    const replaceStart = start + (hasLeadingSpace ? 1 : 0);
-    const replaceEnd = end - (hasTrailingSpace ? 1 : 0);
-    if (replaceEnd <= replaceStart) {
-        return null;
-    }
-    return state.tr.replaceWith(replaceStart, replaceEnd, node);
-}
-
-function replaceInlineWithNodePreserveSpace(state: any, match: RegExpMatchArray, start: number, end: number, node: any): any {
+function replaceInlineWithNodePreserveSpace(state: EditorState, match: RegExpMatchArray, start: number, end: number, node: ProseMirrorNode): Transaction | null {
     const full = match[0] || '';
     const leadingSpace = full.length > 0 && /\s/.test(full[0]) ? full[0] : '';
     const trailingSpace = full.length > 0 && /\s/.test(full[full.length - 1]) ? full[full.length - 1] : '';
@@ -706,24 +697,19 @@ function wrapSelectionWithText(view: EditorView, start: string, end: string): bo
     return true;
 }
 
-function inlineNodeToMarkdown(node: any, temporalPrefix: string): string | null {
+function inlineNodeToMarkdown(node: ProseMirrorNode, temporalPrefix: string): string | null {
     if (!node || !node.type?.name) {
         return null;
     }
     switch (node.type.name) {
         case 'media_inline': {
-            const mediaType = node.attrs?.mediaType || 'image';
             const src = node.attrs?.src || '';
             if (!src) {
                 return null;
             }
-            if (mediaType === 'image') {
-                const alt = node.attrs?.alt || '';
-                const title = node.attrs?.title ? ` "${node.attrs.title}"` : '';
-                return `![${alt}](${src}${title})`;
-            }
-            const tag = mediaType === 'audio' ? 'audio' : 'video';
-            return `<${tag} src="${src}" controls></${tag}>`;
+            const alt = node.attrs?.alt || '';
+            const title = node.attrs?.title ? ` "${node.attrs.title}"` : '';
+            return `![${alt}](${src}${title})`;
         }
         case 'include_inline': {
             const path = node.attrs?.path || '';
@@ -762,7 +748,7 @@ function inlineNodeToMarkdown(node: any, temporalPrefix: string): string | null 
     }
 }
 
-function buildMarkdownInputRules(schema: any): InputRule[] {
+function buildMarkdownInputRules(schema: Schema): InputRule[] {
     const rules: InputRule[] = [];
 
     if (schema.nodes.bullet_list) {
@@ -947,7 +933,32 @@ export class WysiwygEditor {
             markdownItOptions: { temporalPrefix: this.temporalPrefix },
             serializerOptions: { temporalPrefix: this.temporalPrefix }
         });
-        const pmDoc = wysiwygDocToProseMirror(schema, initialDoc);
+        let pmDoc = wysiwygDocToProseMirror(schema, initialDoc);
+
+        // Ensure cursor can be placed before and after atom blocks (like media_block)
+        // Add empty paragraphs at start/end if first/last nodes are atoms
+        if (pmDoc.content.size > 0) {
+            const emptyParagraph = () => schema.nodes.paragraph.create();
+            const firstChild = pmDoc.content.firstChild;
+            const lastChild = pmDoc.content.lastChild;
+            let content = pmDoc.content;
+
+            // Add paragraph at start if first node is an atom (can't place cursor before it)
+            if (firstChild && firstChild.isAtom) {
+                content = content.addToStart(emptyParagraph());
+                console.log('[WYSIWYG-DEBUG] Added empty paragraph at start for cursor placement');
+            }
+
+            // Add paragraph at end if last node is an atom (can't place cursor after it)
+            if (lastChild && lastChild.isAtom) {
+                content = content.addToEnd(emptyParagraph());
+                console.log('[WYSIWYG-DEBUG] Added empty paragraph at end for cursor placement');
+            }
+
+            if (content !== pmDoc.content) {
+                pmDoc = schema.nodes.doc.create(null, content);
+            }
+        }
 
         const plugins = [
             history(),
@@ -1100,8 +1111,8 @@ export class WysiwygEditor {
                 plugins
             }),
             nodeViews: {
-                media_inline: (node) => createMediaInlineView(node),
-                media_block: (node) => createMediaBlockView(node),
+                media_inline: (node, view, getPos) => createMediaInlineView(node, view, getPos as () => number | undefined),
+                media_block: (node, view, getPos) => createMediaBlockView(node, view, getPos as () => number | undefined),
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
             handleKeyDown: (view, event) => {
@@ -1133,7 +1144,27 @@ export class WysiwygEditor {
                 }
                 return false;
             },
+            handleClick: (view, pos, event) => {
+                console.log('[WYSIWYG-DEBUG] handleClick:', {
+                    pos,
+                    targetTag: (event?.target as HTMLElement)?.tagName,
+                    targetClass: (event?.target as HTMLElement)?.className,
+                    currentSelection: {
+                        type: view.state.selection.constructor.name,
+                        from: view.state.selection.from,
+                        to: view.state.selection.to
+                    }
+                });
+                return false; // Don't handle, let handleClickOn take over
+            },
             handleClickOn: (view, pos, node, nodePos, event) => {
+                console.log('[WYSIWYG-DEBUG] handleClickOn:', {
+                    pos,
+                    nodeType: node?.type?.name,
+                    nodePos,
+                    targetTag: (event?.target as HTMLElement)?.tagName,
+                    targetClass: (event?.target as HTMLElement)?.className
+                });
                 const target = event?.target as HTMLElement | null;
                 if (!target) {
                     return false;
@@ -1169,13 +1200,26 @@ export class WysiwygEditor {
                         return true;
                     }
                 }
-                if (node?.type?.name === 'media_inline') {
+                if (node?.type?.name === 'media_inline' || node?.type?.name === 'media_block') {
                     const host = target.closest?.('.wysiwyg-media') as HTMLElement | null;
                     const rect = (host || target).getBoundingClientRect();
                     const clickX = event?.clientX ?? rect.left;
                     const placeAfter = clickX >= rect.left + rect.width / 2;
-                    const selectionPos = placeAfter ? nodePos + node.nodeSize : nodePos;
-                    const selection = TextSelection.create(view.state.doc, selectionPos);
+                    const targetPos = placeAfter ? nodePos + node.nodeSize : nodePos;
+                    const $pos = view.state.doc.resolve(targetPos);
+                    const selection = Selection.near($pos, placeAfter ? 1 : -1);
+                    console.log('[WYSIWYG-DEBUG] Click on media:', {
+                        nodeType: node.type.name,
+                        nodePos,
+                        nodeSize: node.nodeSize,
+                        placeAfter,
+                        targetPos,
+                        selectionType: selection.constructor.name,
+                        selectionFrom: selection.from,
+                        selectionTo: selection.to,
+                        selectionEmpty: selection.empty,
+                        docSize: view.state.doc.content.size
+                    });
                     view.dispatch(view.state.tr.setSelection(selection));
                     view.focus();
                     return true;
@@ -1224,16 +1268,50 @@ export class WysiwygEditor {
                 return false;
             },
             dispatchTransaction: (transaction) => {
+                const oldSelection = this.view.state.selection;
+                const oldDoc = this.view.state.doc;
+
+                // Debug: log transaction details
+                if (transaction.docChanged) {
+                    const stepsInfo = transaction.steps.map((step, i) => {
+                        const json = step.toJSON ? JSON.stringify(step.toJSON()) : 'no toJSON';
+                        return `Step ${i}: ${step.constructor.name} - ${json}`;
+                    });
+                    console.log('[WYSIWYG-DEBUG] Transaction with doc change:');
+                    console.log('  selectionBefore:', oldSelection.constructor.name, 'from:', oldSelection.from, 'to:', oldSelection.to, 'empty:', oldSelection.empty);
+                    console.log('  oldDocSize:', oldDoc.content.size);
+                    console.log('  steps:', stepsInfo.join(' | '));
+                    console.log('  meta:', transaction.getMeta('pointer') ? 'pointer' : transaction.getMeta('uiEvent') || 'unknown');
+                    // Log doc structure
+                    const docStructure: string[] = [];
+                    oldDoc.forEach((node, offset) => {
+                        docStructure.push(`${node.type.name}(size=${node.nodeSize}, pos=${offset})`);
+                    });
+                    console.log('  docStructure:', docStructure.join(', '));
+                }
+
                 let newState = this.view.state.apply(transaction);
                 let normalized = null;
                 if (transaction.docChanged) {
                     normalized = normalizeMediaBlocks(newState);
                     if (normalized) {
+                        console.log('[WYSIWYG-DEBUG] normalizeMediaBlocks applied');
                         newState = newState.apply(normalized);
                     }
                 }
                 const docChanged = transaction.docChanged || Boolean(normalized);
                 this.view.updateState(newState);
+
+                // Debug: log new selection
+                if (transaction.selectionSet || transaction.docChanged) {
+                    console.log('[WYSIWYG-DEBUG] Selection after transaction:', {
+                        type: newState.selection.constructor.name,
+                        from: newState.selection.from,
+                        to: newState.selection.to,
+                        empty: newState.selection.empty,
+                        newDocSize: newState.doc.content.size
+                    });
+                }
 
                 if (docChanged) {
                     this.lastMarkdown = this.serializeState(newState);

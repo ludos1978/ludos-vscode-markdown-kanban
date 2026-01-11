@@ -1,5 +1,6 @@
 import { MarkdownItToken, WysiwygDoc, WysiwygMark, WysiwygNode } from './types';
 import { tokenMappings } from './spec';
+import { diagramLangs, inferMediaTypeFromSrc, getTagFlavor } from './utils';
 
 const mappingByToken = new Map<string, { node?: string; mark?: string }>();
 for (const mapping of tokenMappings) {
@@ -10,9 +11,6 @@ for (const mapping of tokenMappings) {
     }
 }
 
-const diagramLangs = new Set(['mermaid', 'plantuml']);
-const videoExtensions = new Set(['avi', 'm4v', 'mkv', 'mov', 'mpg', 'mp4', 'ogv', 'webm', 'wmv']);
-const audioExtensions = new Set(['aac', 'flac', 'm4a', 'mp3', 'oga', 'ogg', 'wav']);
 const inlineTextTokens = new Set(['text', 'emoji']);
 const transparentBlockTokens = new Set(['thead_open', 'thead_close', 'tbody_open', 'tbody_close']);
 
@@ -110,32 +108,6 @@ function parseColumnGrowth(token: MarkdownItToken): number {
     return Number.isFinite(growth) && growth > 0 ? growth : 1;
 }
 
-function inferMediaTypeFromSrc(src: string): 'video' | 'audio' | null {
-    if (!src) {
-        return null;
-    }
-    try {
-        const url = new URL(src, 'http://unused.invalid');
-        const extension = url.pathname.split('.').pop()?.toLowerCase() ?? '';
-        if (videoExtensions.has(extension)) {
-            return 'video';
-        }
-        if (audioExtensions.has(extension)) {
-            return 'audio';
-        }
-    } catch {
-        const cleaned = src.split(/[?#]/)[0];
-        const extension = cleaned.split('.').pop()?.toLowerCase() ?? '';
-        if (videoExtensions.has(extension)) {
-            return 'video';
-        }
-        if (audioExtensions.has(extension)) {
-            return 'audio';
-        }
-    }
-    return null;
-}
-
 function createTextNode(text: string, marks: WysiwygMark[]): WysiwygNode {
     const node: WysiwygNode = { type: 'text', text };
     if (marks.length > 0) {
@@ -203,16 +175,9 @@ function createIncludeBlockNode(token: MarkdownItToken): WysiwygNode {
 
 function createTagNode(token: MarkdownItToken): WysiwygNode {
     const value = token.content || '';
-    let flavor = 'tag';
-    if (value.startsWith('gather_')) {
-        flavor = 'gather';
-    } else if (/^(\+\+|\+|\u00f8|\u00d8|--|-)$/u.test(value)) {
-        flavor = 'polarity';
-    }
-
     return {
         type: 'tag',
-        attrs: { value, flavor }
+        attrs: { value, flavor: getTagFlavor(value) }
     };
 }
 
