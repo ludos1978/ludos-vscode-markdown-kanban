@@ -1250,7 +1250,7 @@ function updateWysiwygToggleUI(isEnabled) {
 }
 
 function toggleWysiwygEditor() {
-    const nextState = !(window.wysiwygEnabled ?? true);
+    const nextState = !(window.wysiwygEnabled ?? false);
     window.wysiwygEnabled = nextState;
     if (window.configManager) {
         window.configManager.setPreference('wysiwygEnabled', nextState);
@@ -2586,7 +2586,7 @@ if (!webviewEventListenersInitialized) {
             window.cachedConfig.showSpecialCharacters = window.showSpecialCharacters;
             const wysiwygValue = typeof configData.wysiwygEnabled === 'boolean'
                 ? configData.wysiwygEnabled
-                : (typeof window.wysiwygEnabled === 'boolean' ? window.wysiwygEnabled : true);
+                : (typeof window.wysiwygEnabled === 'boolean' ? window.wysiwygEnabled : false);
             window.wysiwygEnabled = Boolean(wysiwygValue);
             updateWysiwygToggleUI(window.wysiwygEnabled);
             if (typeof pendingMarpOverride === 'boolean') {

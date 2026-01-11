@@ -81,6 +81,7 @@
 - [ ] In WYSIWYG, diagram fences default to preview-only (no code block), and the Edit button toggles the code block without changing the preview sizing.
 - [ ] In display mode, audio embeds show the same path menu behavior as videos and handle missing files with a placeholder.
 - [ ] Right burger menu: toggling “Enable WYSIWYG editor” switches between WYSIWYG and plain textarea for the current description.
+- [ ] Reload the board and confirm WYSIWYG is disabled by default (textarea editor), then enable it from the right burger menu and confirm it persists.
 - [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
 - [ ] In WYSIWYG multicolumn blocks, the +/- overlays stay above images (no overlap/behind) and do not clip.
 - [ ] In WYSIWYG multicolumn blocks, image sizing (width/height) matches the display-mode columns for the same content.

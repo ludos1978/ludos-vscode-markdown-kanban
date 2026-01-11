@@ -39,7 +39,7 @@ class ConfigManager {
             htmlContentRenderMode: 'html',
             showMarpSettings: true,
             showSpecialCharacters: false,
-            wysiwygEnabled: true
+            wysiwygEnabled: false
         };
     }
 

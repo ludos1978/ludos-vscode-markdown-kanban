@@ -1266,8 +1266,8 @@ class TaskEditor {
         if (typeof window.wysiwygEnabled === 'boolean') {
             return window.wysiwygEnabled;
         }
-        const configValue = window.configManager?.getConfig('wysiwygEnabled', true);
-        return configValue !== false;
+        const configValue = window.configManager?.getConfig('wysiwygEnabled', false);
+        return Boolean(configValue);
     }
 
     _setupWysiwygEditor(editElement, containerElement) {
