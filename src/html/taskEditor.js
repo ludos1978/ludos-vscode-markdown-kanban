@@ -910,17 +910,37 @@ class TaskEditor {
             return;
         }
 
-        this._focusElementAfterRender(editElement);
-
+        let selectionStart = null;
+        let selectionEnd = null;
         if (!preserveCursor) {
             // Default behavior: move cursor to end
-            editElement.setSelectionRange(editElement.value.length, editElement.value.length);
+            selectionStart = editElement.value.length;
+            selectionEnd = selectionStart;
         } else if (type === 'task-title' || type === 'column-title') {
             // For title fields, position cursor before first tag
             const cursorPosition = this.findPositionBeforeFirstTag(editElement.value);
-            editElement.setSelectionRange(cursorPosition, cursorPosition);
+            selectionStart = cursorPosition;
+            selectionEnd = cursorPosition;
         }
         // For description fields with preserveCursor=true, don't move cursor
+
+        const focusAndSelect = () => {
+            this._focusElement(editElement);
+            if (selectionStart !== null && typeof editElement.setSelectionRange === 'function') {
+                try {
+                    editElement.setSelectionRange(selectionStart, selectionEnd);
+                } catch (error) {
+                    // Ignore unsupported selection operations.
+                }
+            }
+        };
+
+        if (typeof window.queueFocusAfterRender === 'function') {
+            window.queueFocusAfterRender(focusAndSelect);
+            return;
+        }
+
+        focusAndSelect();
     }
 
     /**
