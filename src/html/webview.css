@@ -1813,6 +1813,7 @@ body.section-height-limited .task-section figure img {
   font-feature-settings: normal;
   margin: 0;
   padding: 0;
+  caret-color: var(--vscode-editorCursor-foreground);
 }
 
 .task-description-wysiwyg .ProseMirror h1,
