@@ -1038,6 +1038,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   overflow-anchor: none;
 }
 
+.kanban-board * {
+  overflow-anchor: none;
+}
+
 /* when it has no child - kanban-row */
 .kanban-board:not(:has(.kanban-row)) {
 	gap: var(--whitespace);

@@ -897,10 +897,12 @@ class TaskEditor {
         if (container) {
             container.scrollTop = scrollTop;
             container.scrollLeft = scrollLeft;
+            this._lockScrollForFrames(container, scrollTop, scrollLeft);
         }
         if (board) {
             board.scrollTop = boardScrollTop;
             board.scrollLeft = boardScrollLeft;
+            this._lockScrollForFrames(board, boardScrollTop, boardScrollLeft);
         }
     }
 
@@ -1455,6 +1457,28 @@ class TaskEditor {
             return;
         }
         this._focusElement(element);
+    }
+
+    _lockScrollForFrames(element, top, left, frames = 6) {
+        if (!element) { return; }
+        const lock = { top, left, frames };
+        element._scrollLock = lock;
+        const step = () => {
+            if (element._scrollLock !== lock) { return; }
+            if (Math.abs(element.scrollTop - top) > 0.5) {
+                element.scrollTop = top;
+            }
+            if (Math.abs(element.scrollLeft - left) > 0.5) {
+                element.scrollLeft = left;
+            }
+            lock.frames -= 1;
+            if (lock.frames > 0) {
+                requestAnimationFrame(step);
+            } else {
+                delete element._scrollLock;
+            }
+        };
+        requestAnimationFrame(step);
     }
 
     _captureScrollPositions(baseElement) {
@@ -2396,6 +2420,9 @@ class TaskEditor {
         }
 
         this._scheduleScrollRestore(scrollPositions);
+        scrollPositions.forEach(({ element: scrollElement, top, left }) => {
+            this._lockScrollForFrames(scrollElement, top, left);
+        });
 
         // Focus the card after editing ends
         if (type === 'task-title' || type === 'task-description') {
@@ -2406,6 +2433,9 @@ class TaskEditor {
                 setTimeout(() => {
                     this._focusElement(taskItem);
                     this._scheduleScrollRestore(scrollPositions);
+                    scrollPositions.forEach(({ element: scrollElement, top, left }) => {
+                        this._lockScrollForFrames(scrollElement, top, left);
+                    });
                 }, 10);
             }
         }
