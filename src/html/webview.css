@@ -5891,10 +5891,7 @@ figcaption {
 
 .task-overlay-panel {
   position: absolute;
-  top: 10vh;
-  left: 10vw;
-  width: 80vw;
-  height: 80vh;
+  inset: 10vh 10vw;
   max-width: 80vw;
   max-height: 80vh;
   background: var(--vscode-editor-background);
