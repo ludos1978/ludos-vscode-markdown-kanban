@@ -35,10 +35,13 @@ export class KeybindingService {
 
     /** Cache TTL for VS Code commands list */
     private static readonly COMMANDS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    private static readonly SNIPPETS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
     /** Cached list of available VS Code commands */
     private _cachedCommands: string[] | null = null;
     private _cachedCommandsTimestamp: number = 0;
+    private _cachedSnippets: Map<string, string> | null = null;
+    private _cachedSnippetsTimestamp: number = 0;
 
     private constructor() {}
 
@@ -47,6 +50,18 @@ export class KeybindingService {
             KeybindingService.instance = new KeybindingService();
         }
         return KeybindingService.instance;
+    }
+
+    public async resolveSnippetByName(name: string): Promise<string | null> {
+        if (!name) {
+            return null;
+        }
+        const now = Date.now();
+        if (!this._cachedSnippets || (now - this._cachedSnippetsTimestamp) > KeybindingService.SNIPPETS_CACHE_TTL) {
+            this._cachedSnippets = await this._loadVSCodeSnippets();
+            this._cachedSnippetsTimestamp = now;
+        }
+        return this._cachedSnippets.get(name) || null;
     }
 
     /**
@@ -203,6 +218,61 @@ export class KeybindingService {
         }
     }
 
+    private async _loadVSCodeSnippets(): Promise<Map<string, string>> {
+        const snippets = new Map<string, string>();
+        try {
+            const userSnippetDir = this.getUserSnippetDir();
+            if (userSnippetDir && fs.existsSync(userSnippetDir)) {
+                this._loadSnippetFilesFromDir(userSnippetDir, snippets);
+            }
+            const workspaceSnippetDir = this.getWorkspaceSnippetDir();
+            if (workspaceSnippetDir && fs.existsSync(workspaceSnippetDir)) {
+                this._loadSnippetFilesFromDir(workspaceSnippetDir, snippets);
+            }
+        } catch (error) {
+            console.error('[KeybindingService] Failed to load snippets:', error);
+        }
+        return snippets;
+    }
+
+    private _loadSnippetFilesFromDir(dir: string, snippets: Map<string, string>): void {
+        const files = fs.readdirSync(dir);
+        const snippetFiles = files.filter((file) => file.endsWith('.json') || file.endsWith('.code-snippets'));
+        for (const file of snippetFiles) {
+            const filePath = path.join(dir, file);
+            if (!fs.existsSync(filePath)) {
+                continue;
+            }
+            const snippetData = this._readSnippetFile(filePath);
+            if (!snippetData || typeof snippetData !== 'object') {
+                continue;
+            }
+            for (const [name, value] of Object.entries(snippetData)) {
+                const snippet = value as { body?: string | string[] };
+                if (!snippet || snippet.body === undefined || snippet.body === null) {
+                    continue;
+                }
+                if (typeof snippet.body === 'string') {
+                    snippets.set(name, snippet.body);
+                } else if (Array.isArray(snippet.body)) {
+                    snippets.set(name, snippet.body.join('\n'));
+                }
+            }
+        }
+    }
+
+    private _readSnippetFile(filePath: string): Record<string, unknown> | null {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const jsonContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+            const parsed = JSON.parse(jsonContent);
+            return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+        } catch (error) {
+            console.error('[KeybindingService] Failed to read snippet file:', filePath, error);
+            return null;
+        }
+    }
+
     private getUserKeybindingsPath(): string | null {
         try {
             const userDataDir = this.getVSCodeUserDataDir();
@@ -225,6 +295,27 @@ export class KeybindingService {
             return null;
         } catch (error) {
             console.error('[KeybindingService] Failed to get workspace keybindings path:', error);
+            return null;
+        }
+    }
+
+    private getUserSnippetDir(): string | null {
+        const userDataDir = this.getVSCodeUserDataDir();
+        if (!userDataDir) {
+            return null;
+        }
+        return path.join(userDataDir, 'User', 'snippets');
+    }
+
+    private getWorkspaceSnippetDir(): string | null {
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                return path.join(workspaceFolders[0].uri.fsPath, '.vscode');
+            }
+            return null;
+        } catch (error) {
+            console.error('[KeybindingService] Failed to get workspace snippet dir:', error);
             return null;
         }
     }

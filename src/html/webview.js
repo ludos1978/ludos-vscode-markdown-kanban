@@ -5,6 +5,7 @@
 // When VS Code restores a webview from serialized state, all scripts run again.
 // This flag ensures listeners are only added once.
 let webviewEventListenersInitialized = false;
+window.cachedShortcuts = window.cachedShortcuts || {};
 
 // Global variables
 let currentFileInfo = null;

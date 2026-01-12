@@ -15,6 +15,7 @@ import * as vscode from 'vscode';
 import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage, HandleEditorShortcutMessage } from './core/bridge/MessageTypes';
 import { CapturedEdit } from './files/FileInterfaces';
 import { STOP_EDITING_TIMEOUT_MS } from './constants/TimeoutConstants';
+import { KeybindingService } from './services/KeybindingService';
 
 /**
  * Simplified dependencies for MessageHandler
@@ -210,8 +211,11 @@ export class MessageHandler {
         }
 
         if (command === 'editor.action.insertSnippet') {
-            const args = message.args as { snippet?: string } | undefined;
-            const snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+            const args = message.args as { snippet?: string; name?: string } | undefined;
+            let snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+            if (!snippet && typeof args?.name === 'string') {
+                snippet = await KeybindingService.getInstance().resolveSnippetByName(args.name);
+            }
             if (snippet) {
                 const bridge = this._deps.getWebviewBridge?.() ?? this._deps.getWebviewPanel()?.getWebviewBridge?.();
                 if (bridge) {
@@ -224,6 +228,8 @@ export class MessageHandler {
                 }
                 return;
             }
+            console.warn('[handleEditorShortcut] Snippet not found:', args);
+            return;
         }
 
         try {
@@ -243,6 +249,19 @@ export class MessageHandler {
                 }
                 return;
             }
+        }
+
+        if (message.type === 'requestShortcuts') {
+            try {
+                const shortcuts = await KeybindingService.getInstance().getAllShortcuts();
+                const bridge = this._deps.getWebviewBridge?.() ?? this._deps.getWebviewPanel()?.getWebviewBridge?.();
+                if (bridge) {
+                    bridge.send({ type: 'updateShortcuts', shortcuts });
+                }
+            } catch (error) {
+                console.error('[MessageHandler] Failed to send shortcuts:', error);
+            }
+            return;
         }
 
         // File search messages are handled by FileSearchWebview's own listener

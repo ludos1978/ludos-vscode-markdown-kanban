@@ -7,6 +7,7 @@ import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
+import { KeybindingService } from './services/KeybindingService';
 import { showError, showWarning, showInfo } from './services/NotificationService';
 import { WorkspaceMediaIndex } from './services/WorkspaceMediaIndex';
 
@@ -241,7 +242,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	const insertSnippetCommand = vscode.commands.registerCommand('markdown-kanban.insertSnippet', async (args?: { snippet?: string }) => {
+	const insertSnippetCommand = vscode.commands.registerCommand('markdown-kanban.insertSnippet', async (args?: { snippet?: string; name?: string }) => {
 		const panels = KanbanWebviewPanel.getAllPanels();
 		if (panels.length === 0) {
 			showWarning('No kanban panel is currently open.');
@@ -251,7 +252,10 @@ export function activate(context: vscode.ExtensionContext) {
 		// Get the active panel (assuming first panel for now, could be improved)
 		const activePanel = panels[0];
 
-		const snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+		let snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+		if (!snippet && typeof args?.name === 'string') {
+			snippet = await KeybindingService.getInstance().resolveSnippetByName(args.name);
+		}
 		if (snippet) {
 			activePanel.insertSnippetContent(snippet);
 			return;
