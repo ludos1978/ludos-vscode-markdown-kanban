@@ -320,12 +320,14 @@ function createMediaView(
 
             // Handle broken images - show menu button always
             img.addEventListener('error', () => {
-                console.log('[IMAGE-DEBUG] Image error, adding image-broken class', src);
-                dom.classList.add('image-broken');
+                if (dom && dom.classList) {
+                    dom.classList.add('image-broken');
+                }
             });
             img.addEventListener('load', () => {
-                console.log('[IMAGE-DEBUG] Image loaded, removing image-broken class', src);
-                dom.classList.remove('image-broken');
+                if (dom && dom.classList) {
+                    dom.classList.remove('image-broken');
+                }
             });
 
             const menuBtn = document.createElement('button');
@@ -1024,21 +1026,15 @@ function buildMarkdownInputRules(schema: Schema): InputRule[] {
     }
 
     // Multicolumn input rules
-    console.log('[MULTICOLUMN-DEBUG] schema.nodes.multicolumn exists:', !!schema.nodes.multicolumn);
     if (schema.nodes.multicolumn) {
-        console.log('[MULTICOLUMN-DEBUG] Adding multicolumn input rules');
         // ---: or ---: N at start of paragraph + space → create multicolumn
         rules.push(new InputRule(/^---:\s*(\d*)\s$/, (state, match, start, end) => {
-            console.log('[MULTICOLUMN-DEBUG] ---: matched', { match: match[0], start, end });
             // Only create if NOT already inside a multicolumn
             if (isInsideMulticolumn(state)) {
-                console.log('[MULTICOLUMN-DEBUG] Already inside multicolumn, skipping');
                 return null;
             }
             const growth = parseInt(match[1]) || 1;
-            const result = createMulticolumnTransaction(state, schema, growth, start, end);
-            console.log('[MULTICOLUMN-DEBUG] Transaction result:', result ? 'created' : 'null');
-            return result;
+            return createMulticolumnTransaction(state, schema, growth, start, end);
         }));
 
         // :--: or :--: N inside multicolumn + space → add column separator
@@ -1298,19 +1294,15 @@ export class WysiwygEditor {
                 }
                 const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
                 if (imageMenuButton) {
-                    console.log('[WYSIWYG-MENU-DEBUG] Image menu button clicked');
                     const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
                     const imagePath = container?.dataset?.imagePath ||
                         container?.querySelector('img')?.getAttribute('data-original-src') ||
                         container?.querySelector('img')?.getAttribute('data-image-path') ||
                         container?.querySelector('img')?.getAttribute('src');
-                    console.log('[WYSIWYG-MENU-DEBUG] Container:', !!container, 'imagePath:', imagePath);
                     const menuApi = window as unknown as { toggleImagePathMenu?: (container: HTMLElement, imagePath: string) => void };
-                    console.log('[WYSIWYG-MENU-DEBUG] toggleImagePathMenu exists:', typeof menuApi.toggleImagePathMenu);
                     if (container && imagePath && typeof menuApi.toggleImagePathMenu === 'function') {
                         event.preventDefault();
                         event.stopPropagation();
-                        console.log('[WYSIWYG-MENU-DEBUG] Calling toggleImagePathMenu');
                         menuApi.toggleImagePathMenu(container, imagePath);
                         return true;
                     }
