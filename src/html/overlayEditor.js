@@ -295,6 +295,43 @@
 
     function handleSave() {
         // Requires: save task + re-render only affected task.
+        const resolved = resolveTaskData(state.taskRef);
+        if (!resolved) {
+            closeOverlay();
+            return;
+        }
+        const { task, column } = resolved;
+        const nextValue = activeAdapter && typeof activeAdapter.getValue === 'function'
+            ? activeAdapter.getValue()
+            : state.draft;
+        const normalizedValue = typeof nextValue === 'string' ? nextValue : '';
+        const currentValue = task.description || '';
+        if (normalizedValue === currentValue && !task.includeMode) {
+            closeOverlay();
+            return;
+        }
+        state.draft = normalizedValue;
+        task.description = normalizedValue;
+        if (typeof window.renderSingleTask === 'function') {
+            window.renderSingleTask(task.id, task, column.id);
+        } else if (typeof window.renderSingleColumn === 'function') {
+            window.renderSingleColumn(column.id, column);
+        } else if (typeof window.renderBoard === 'function') {
+            window.renderBoard();
+        }
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            requestAnimationFrame(() => {
+                window.applyStackedColumnStyles(column.id);
+            });
+        }
+        if (window.vscode?.postMessage) {
+            window.vscode.postMessage({
+                type: 'editTask',
+                taskId: task.id,
+                columnId: column.id,
+                taskData: task
+            });
+        }
         closeOverlay();
     }
 

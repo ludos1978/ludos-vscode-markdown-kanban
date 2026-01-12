@@ -112,3 +112,4 @@
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
 - [ ] With overlay editor enabled, clicking a task description opens the overlay instead of inline editing.
 - [ ] Overlay editor dual mode renders preview using markdown-it pipeline and updates on input.
+- [ ] Overlay editor Save updates the task description and re-renders only that task (no full board refresh).
