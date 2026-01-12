@@ -643,11 +643,7 @@
 
     function requestClose(reason) {
         if (!overlay.classList.contains('visible')) { return; }
-        if (reason === 'save') {
-            handleSave();
-            return;
-        }
-        closeOverlay();
+        handleSave();
     }
 
     function closeOverlay() {
@@ -751,6 +747,9 @@
         // Requires: save + mode switch handlers.
         document.addEventListener('keydown', (event) => {
             if (!overlay.classList.contains('visible')) { return; }
+            if (handleEditorShortcut(event)) {
+                return;
+            }
             if (event.key === 'Escape') {
                 requestClose('escape');
                 return;
@@ -815,6 +814,82 @@
         }
     }
 
+    function handleEditorShortcut(event) {
+        if (!event) {
+            return false;
+        }
+        const hasModifier = event.altKey || event.metaKey || event.ctrlKey;
+        if (!hasModifier) {
+            return false;
+        }
+        const isShortcutKey = event.code && (
+            event.code.match(/^Key[A-Z]$/) ||
+            event.code.match(/^Digit[0-9]$/)
+        );
+        if (!isShortcutKey) {
+            return false;
+        }
+
+        const modifiers = [];
+        if (event.ctrlKey) modifiers.push('ctrl');
+        if (event.metaKey) modifiers.push('meta');
+        if (event.altKey) modifiers.push('alt');
+        if (event.shiftKey) modifiers.push('shift');
+
+        let keyChar = event.key;
+        if (event.code && event.code.match(/^Key[A-Z]$/)) {
+            keyChar = event.code.replace('Key', '').toLowerCase();
+        } else if (event.code && event.code.match(/^Digit[0-9]$/)) {
+            keyChar = event.code.replace('Digit', '');
+        }
+
+        const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
+        const cachedShortcuts = window.cachedShortcuts || {};
+        const entry = cachedShortcuts[shortcut];
+        if (!entry) {
+            return false;
+        }
+
+        const commandInfo = typeof entry === 'string' ? { command: entry } : entry;
+        if (!commandInfo || !commandInfo.command) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const activeElement = document.activeElement;
+        const selectionStart = activeElement?.selectionStart ?? 0;
+        const selectionEnd = activeElement?.selectionEnd ?? selectionStart;
+        const selectedText = activeElement?.value?.substring(selectionStart, selectionEnd) || '';
+        const fullText = typeof activeAdapter?.getValue === 'function' ? activeAdapter.getValue() : '';
+
+        if (window.vscode?.postMessage) {
+            window.vscode.postMessage({
+                type: 'handleEditorShortcut',
+                shortcut: shortcut,
+                command: commandInfo.command,
+                args: commandInfo.args,
+                key: event.key,
+                ctrlKey: event.ctrlKey,
+                metaKey: event.metaKey,
+                altKey: event.altKey,
+                shiftKey: event.shiftKey,
+                cursorPosition: selectionStart,
+                selectionStart: selectionStart,
+                selectionEnd: selectionEnd,
+                selectedText: selectedText,
+                fullText: fullText,
+                fieldType: 'task-description',
+                taskId: state.taskRef?.taskId,
+                columnId: state.taskRef?.columnId
+            });
+        }
+
+        return true;
+    }
+
     loadSettingsFromConfig();
     attachHandlers();
 
@@ -824,6 +899,15 @@
         close: closeOverlay,
         setMode,
         applySettings,
-        registry: commandRegistry
+        registry: commandRegistry,
+        insertText: (text) => {
+            if (activeAdapter && typeof activeAdapter.insertText === 'function') {
+                activeAdapter.insertText(text);
+                if (typeof activeAdapter.focus === 'function') {
+                    activeAdapter.focus();
+                }
+            }
+        },
+        isVisible: () => overlay.classList.contains('visible')
     };
 })();

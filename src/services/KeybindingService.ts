@@ -22,6 +22,11 @@ interface VSCodeKeybinding {
     args?: unknown;
 }
 
+interface ShortcutEntry {
+    command: string;
+    args?: unknown;
+}
+
 /**
  * KeybindingService - Singleton service for keybinding management
  */
@@ -48,8 +53,8 @@ export class KeybindingService {
      * Get all available shortcuts as a map (shortcut -> command)
      * This is called when the webview gains focus to refresh shortcuts
      */
-    async getAllShortcuts(): Promise<Record<string, string>> {
-        const shortcutMap: Record<string, string> = {};
+    async getAllShortcuts(): Promise<Record<string, ShortcutEntry>> {
+        const shortcutMap: Record<string, ShortcutEntry> = {};
 
         try {
             // 1. Load user keybindings first (lowest priority)
@@ -60,11 +65,11 @@ export class KeybindingService {
             for (const binding of keybindings) {
                 if (binding.key && binding.command && !binding.command.startsWith('-')) {
                     // Normalize the key format
-                    const normalizedKey = binding.key
-                        .toLowerCase()
-                        .replace(/cmd/g, 'meta')
-                        .replace(/\s+/g, '');
-                    shortcutMap[normalizedKey] = binding.command;
+                    const normalizedKey = this._normalizeKeybinding(binding.key);
+                    shortcutMap[normalizedKey] = {
+                        command: binding.command,
+                        args: binding.args
+                    };
                 }
             }
 
@@ -79,7 +84,7 @@ export class KeybindingService {
         return shortcutMap;
     }
 
-    private async getExtensionShortcuts(): Promise<Record<string, string>> {
+    private async getExtensionShortcuts(): Promise<Record<string, ShortcutEntry>> {
         const isMac = process.platform === 'darwin';
         const mod = isMac ? 'meta' : 'ctrl';
 
@@ -123,15 +128,44 @@ export class KeybindingService {
             this._cachedCommandsTimestamp = now;
         }
         const allCommands = this._cachedCommands;
-        const validShortcuts: Record<string, string> = {};
+        const validShortcuts: Record<string, ShortcutEntry> = {};
 
         for (const [shortcut, command] of Object.entries(extensionShortcuts)) {
             if (allCommands.includes(command)) {
-                validShortcuts[shortcut] = command;
+                const normalizedKey = this._normalizeKeybinding(shortcut);
+                validShortcuts[normalizedKey] = { command };
             }
         }
 
         return validShortcuts;
+    }
+
+    private _normalizeKeybinding(key: string): string {
+        if (!key) {
+            return '';
+        }
+        const normalized = key
+            .toLowerCase()
+            .replace(/cmd/g, 'meta')
+            .replace(/\s+/g, '');
+        const parts = normalized.split('+').filter(Boolean);
+        const modifiers = new Set<string>();
+        let mainKey = '';
+
+        for (const part of parts) {
+            if (part === 'ctrl' || part === 'meta' || part === 'alt' || part === 'shift') {
+                modifiers.add(part);
+            } else {
+                mainKey = part;
+            }
+        }
+
+        const orderedModifiers = ['ctrl', 'meta', 'alt', 'shift'].filter((mod) => modifiers.has(mod));
+        if (!mainKey) {
+            return orderedModifiers.join('+');
+        }
+        const prefix = orderedModifiers.length > 0 ? `${orderedModifiers.join('+')}+` : '';
+        return `${prefix}${mainKey}`;
     }
 
     private async loadVSCodeKeybindings(): Promise<VSCodeKeybinding[]> {

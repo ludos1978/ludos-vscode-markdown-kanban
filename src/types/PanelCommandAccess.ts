@@ -11,7 +11,7 @@
 import * as vscode from 'vscode';
 import { ConflictResolver } from '../services/ConflictResolver';
 import { MessageHandler } from '../messageHandler';
-import { EditingStoppedMessage, BoardUpdateFromFrontendMessage } from '../core/bridge/MessageTypes';
+import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, HandleEditorShortcutMessage } from '../core/bridge/MessageTypes';
 
 /**
  * Extended MessageHandler interface for command access
@@ -36,7 +36,7 @@ export interface MessageHandlerCommandAccess extends MessageHandler {
 
     // Editor handlers
     handleVSCodeSnippet?(message: unknown): Promise<void>;
-    handleEditorShortcut?(message: unknown): Promise<void>;
+    handleEditorShortcut(message: HandleEditorShortcutMessage): Promise<void>;
 
     // Template handlers
     handleGetTemplates?(): Promise<void>;

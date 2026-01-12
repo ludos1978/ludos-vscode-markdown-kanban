@@ -303,7 +303,12 @@ export interface SyncDirtyItemsMessage extends BaseMessage {
  */
 export interface UpdateShortcutsMessage extends BaseMessage {
     type: 'updateShortcuts';
-    shortcuts: Record<string, string>;
+    shortcuts: Record<string, ShortcutEntry>;
+}
+
+export interface ShortcutEntry {
+    command: string;
+    args?: unknown;
 }
 
 /**
@@ -1242,6 +1247,22 @@ export interface TriggerVSCodeSnippetMessage extends BaseMessage {
  */
 export interface HandleEditorShortcutMessage extends BaseMessage {
     type: 'handleEditorShortcut';
+    shortcut?: string;
+    command?: string;
+    args?: unknown;
+    key?: string;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+    shiftKey?: boolean;
+    cursorPosition?: number;
+    selectionStart?: number;
+    selectionEnd?: number;
+    selectedText?: string;
+    fullText?: string;
+    fieldType?: string;
+    taskId?: string;
+    columnId?: string;
 }
 
 /**

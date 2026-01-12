@@ -136,3 +136,6 @@
 - [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
 - [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
 - [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.
+- [ ] Overlay editor: clicking the backdrop saves the current draft before closing (no data loss).
+- [ ] Overlay editor: Escape, Alt+Enter, Save button, and backdrop click always save changes (no exit path discards edits).
+- [ ] VS Code keybindings with snippet args (e.g., Meta+1) insert snippet text in inline editor, inline WYSIWYG, and overlay editor.

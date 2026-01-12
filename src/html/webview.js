@@ -3836,6 +3836,12 @@ if (!webviewEventListenersInitialized) {
  * Insert VS Code snippet content into the active editor
  */
 function insertVSCodeSnippetContent(content, fieldType, taskId) {
+    if (window.taskOverlayEditor?.isVisible?.()) {
+        if (typeof window.taskOverlayEditor.insertText === 'function') {
+            window.taskOverlayEditor.insertText(content);
+            return;
+        }
+    }
     // Use the current editor from taskEditor instead of searching for focused element
     // This fixes the timing issue where focus might be lost by the time the snippet arrives
     if (window.taskEditor && window.taskEditor.currentEditor) {

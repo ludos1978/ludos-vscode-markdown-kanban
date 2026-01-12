@@ -12,7 +12,7 @@ import { PanelContext } from './panel/PanelContext';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands, PathCommands, ProcessCommands } from './commands';
 import * as vscode from 'vscode';
-import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage } from './core/bridge/MessageTypes';
+import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage, HandleEditorShortcutMessage } from './core/bridge/MessageTypes';
 import { CapturedEdit } from './files/FileInterfaces';
 import { STOP_EDITING_TIMEOUT_MS } from './constants/TimeoutConstants';
 
@@ -201,6 +201,36 @@ export class MessageHandler {
 
         // Clean up
         this._pendingStopEditingRequests.delete(requestId);
+    }
+
+    public async handleEditorShortcut(message: HandleEditorShortcutMessage): Promise<void> {
+        const command = message.command;
+        if (!command) {
+            return;
+        }
+
+        if (command === 'editor.action.insertSnippet') {
+            const args = message.args as { snippet?: string } | undefined;
+            const snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+            if (snippet) {
+                const bridge = this._deps.getWebviewBridge?.() ?? this._deps.getWebviewPanel()?.getWebviewBridge?.();
+                if (bridge) {
+                    bridge.send({
+                        type: 'insertSnippetContent',
+                        content: snippet,
+                        fieldType: message.fieldType,
+                        taskId: message.taskId
+                    });
+                }
+                return;
+            }
+        }
+
+        try {
+            await vscode.commands.executeCommand(command, message.args);
+        } catch (error) {
+            console.error('[handleEditorShortcut] Failed to execute command:', command, error);
+        }
     }
 
     public async handleMessage(message: IncomingMessage): Promise<void> {

@@ -377,16 +377,20 @@ class TaskEditor {
             if (!this.currentEditor) {return;}
 
             const element = this.currentEditor.element;
-            if (this.currentEditor.wysiwyg) {
-                const viewDom = this.currentEditor.wysiwyg.getViewDom?.();
-                const isInsideWysiwyg = viewDom && (e.target === viewDom || viewDom.contains(e.target));
-                if (isInsideWysiwyg) {
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        this.save();
-                    }
-                    return;
-                }
+            const viewDom = this.currentEditor.wysiwyg?.getViewDom?.();
+            const isInsideWysiwyg = !!(viewDom && (e.target === viewDom || viewDom.contains(e.target)));
+            if (isInsideWysiwyg && e.key === 'Escape') {
+                e.preventDefault();
+                this.save();
+                return;
+            }
+
+            if (this._handleVSCodeShortcut(e, element)) {
+                return;
+            }
+
+            if (isInsideWysiwyg) {
+                return;
             }
 
             // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
@@ -599,6 +603,80 @@ class TaskEditor {
         const lineEndIndex = value.indexOf('\n', end);
         const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
         return { lineStart, lineEnd };
+    }
+
+    _handleVSCodeShortcut(event, element) {
+        if (!event) {
+            return false;
+        }
+        const hasModifier = event.altKey || event.metaKey || event.ctrlKey;
+        if (!hasModifier) {
+            return false;
+        }
+        const isShortcutKey = event.code && (
+            event.code.match(/^Key[A-Z]$/) ||
+            event.code.match(/^Digit[0-9]$/)
+        );
+        if (!isShortcutKey) {
+            return false;
+        }
+
+        const modifiers = [];
+        if (event.ctrlKey) modifiers.push('ctrl');
+        if (event.metaKey) modifiers.push('meta');
+        if (event.altKey) modifiers.push('alt');
+        if (event.shiftKey) modifiers.push('shift');
+
+        let keyChar = event.key;
+        if (event.code && event.code.match(/^Key[A-Z]$/)) {
+            keyChar = event.code.replace('Key', '').toLowerCase();
+        } else if (event.code && event.code.match(/^Digit[0-9]$/)) {
+            keyChar = event.code.replace('Digit', '');
+        }
+
+        const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
+        const cachedShortcuts = window.cachedShortcuts || {};
+        const entry = cachedShortcuts[shortcut];
+        if (!entry) {
+            return false;
+        }
+
+        const commandInfo = typeof entry === 'string' ? { command: entry } : entry;
+        if (!commandInfo || !commandInfo.command) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const cursorPos = element?.selectionStart ?? 0;
+        const selectionStart = element?.selectionStart ?? 0;
+        const selectionEnd = element?.selectionEnd ?? selectionStart;
+        const selectedText = element?.value?.substring(selectionStart, selectionEnd) || '';
+
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'handleEditorShortcut',
+                shortcut: shortcut,
+                command: commandInfo.command,
+                args: commandInfo.args,
+                key: event.key,
+                ctrlKey: event.ctrlKey,
+                metaKey: event.metaKey,
+                altKey: event.altKey,
+                shiftKey: event.shiftKey,
+                cursorPosition: cursorPos,
+                selectionStart: selectionStart,
+                selectionEnd: selectionEnd,
+                selectedText: selectedText,
+                fullText: element?.value || '',
+                fieldType: this.currentEditor?.type,
+                taskId: this.currentEditor?.taskId,
+                columnId: this.currentEditor?.columnId
+            });
+        }
+        return true;
     }
 
     _handleMarkdownStyleInsertion(event, element) {
