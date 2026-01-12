@@ -25,6 +25,7 @@
         backdrop: overlay.querySelector('.task-overlay-backdrop'),
         panel: overlay.querySelector('.task-overlay-panel'),
         header: overlay.querySelector('.task-overlay-header'),
+        title: overlay.querySelector('.task-overlay-title'),
         tools: overlay.querySelector('.task-overlay-tools'),
         markdownWrap: overlay.querySelector('.task-overlay-markdown'),
         previewWrap: overlay.querySelector('.task-overlay-preview'),
@@ -56,13 +57,29 @@
 
     class MarkdownAdapter {
         // Requires: textarea + preview rendering via markdownRenderer pipeline.
-        constructor(textarea, preview) {
+        constructor(textarea, preview, onChange) {
             this.textarea = textarea;
             this.preview = preview;
+            this.onChange = onChange;
+            this.inputHandler = null;
         }
 
-        activate() {}
-        deactivate() {}
+        activate() {
+            if (!this.textarea || this.inputHandler) { return; }
+            this.inputHandler = () => {
+                if (typeof this.onChange === 'function') {
+                    this.onChange();
+                }
+            };
+            this.textarea.addEventListener('input', this.inputHandler);
+        }
+
+        deactivate() {
+            if (this.textarea && this.inputHandler) {
+                this.textarea.removeEventListener('input', this.inputHandler);
+            }
+            this.inputHandler = null;
+        }
 
         getValue() {
             return this.textarea ? this.textarea.value : '';
@@ -72,6 +89,9 @@
             if (this.textarea) {
                 this.textarea.value = value || '';
             }
+            if (typeof this.onChange === 'function') {
+                this.onChange();
+            }
         }
 
         insertText(text) {
@@ -80,6 +100,9 @@
             const before = value.slice(0, selectionStart);
             const after = value.slice(selectionEnd);
             this.textarea.value = `${before}${text}${after}`;
+            if (typeof this.onChange === 'function') {
+                this.onChange();
+            }
         }
 
         setFontScale() {}
@@ -118,12 +141,66 @@
 
     const commandRegistry = new CommandRegistry();
     const adapters = {
-        markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap),
+        markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap, () => {
+            state.draft = elements.textarea ? elements.textarea.value : '';
+            schedulePreviewRender();
+        }),
         wysiwyg: new WysiwygAdapter(elements.wysiwygWrap)
     };
     const dropHandler = new DropHandler(elements.panel, adapters);
     let activeAdapter = adapters.markdown;
     let keydownHandler = null;
+    let previewTimer = null;
+    const previewDelayMs = 80;
+
+    function resolveTaskData(taskRef) {
+        if (!taskRef || !window.cachedBoard || !taskRef.taskId || !taskRef.columnId) {
+            return null;
+        }
+        const column = window.cachedBoard.columns?.find(c => c.id === taskRef.columnId);
+        if (!column) { return null; }
+        const task = column.tasks?.find(t => t.id === taskRef.taskId);
+        if (!task) { return null; }
+        return { task, column };
+    }
+
+    function updateHeaderTitle(task) {
+        if (!elements.title) { return; }
+        if (!task?.title) {
+            elements.title.textContent = 'Edit Task';
+            return;
+        }
+        const displayTitle = window.removeTagsForDisplay ? window.removeTagsForDisplay(task.title) : task.title;
+        elements.title.textContent = displayTitle || 'Edit Task';
+    }
+
+    function renderPreview() {
+        if (!elements.previewWrap) { return; }
+        const draft = state.draft || '';
+        const includeContext = state.taskRef?.includeContext;
+        const taskTitle = state.taskRef?.title;
+        if (taskTitle && window.tagUtils?.extractTimeSlotTag) {
+            window.currentRenderingTimeSlot = window.tagUtils.extractTimeSlotTag(taskTitle);
+        }
+        let rendered = typeof window.renderMarkdown === 'function'
+            ? window.renderMarkdown(draft, includeContext)
+            : (window.escapeHtml ? window.escapeHtml(draft) : draft);
+        window.currentRenderingTimeSlot = null;
+        if (typeof window.wrapTaskSections === 'function') {
+            rendered = window.wrapTaskSections(rendered);
+        }
+        elements.previewWrap.innerHTML = rendered;
+    }
+
+    function schedulePreviewRender() {
+        if (state.mode !== 'dual') { return; }
+        if (previewTimer) {
+            window.clearTimeout(previewTimer);
+        }
+        previewTimer = window.setTimeout(() => {
+            renderPreview();
+        }, previewDelayMs);
+    }
 
     function persistPreference(key, value) {
         if (window.configManager) {
@@ -161,11 +238,23 @@
 
     function openOverlay(taskRef) {
         // Requires: block board-level drag/drop and focus traps while open.
-        state.taskRef = taskRef;
+        const resolved = resolveTaskData(taskRef);
+        const task = resolved?.task || null;
+        state.taskRef = {
+            taskId: taskRef?.taskId,
+            columnId: taskRef?.columnId,
+            includeContext: task?.includeContext || null,
+            title: task?.title || ''
+        };
+        state.draft = task?.description || '';
+        updateHeaderTitle(task);
         overlay.classList.add('visible');
         overlay.setAttribute('aria-hidden', 'false');
         setMode(state.mode);
         applyFontScale(state.fontScale);
+        if (activeAdapter && typeof activeAdapter.setValue === 'function') {
+            activeAdapter.setValue(state.draft);
+        }
         if (activeAdapter && typeof activeAdapter.focus === 'function') {
             activeAdapter.focus();
         }
@@ -194,6 +283,7 @@
             elements.settings.classList.remove('open');
         }
         state.taskRef = null;
+        state.draft = '';
         if (dropHandler && typeof dropHandler.detach === 'function') {
             dropHandler.detach();
         }
@@ -215,6 +305,11 @@
         state.mode = mode;
         overlay.dataset.mode = mode;
         setActiveAdapter(mode);
+        if (mode !== 'dual' && previewTimer) {
+            window.clearTimeout(previewTimer);
+            previewTimer = null;
+        }
+        schedulePreviewRender();
         if (persist) {
             persistPreference(configKeys.defaultMode, mode);
         }
