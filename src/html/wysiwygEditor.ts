@@ -579,10 +579,15 @@ function normalizeMediaBlocks(state: EditorState) {
     }
 
     const targets: Array<{ pos: number; size: number; nodes: ProseMirrorNode[] }> = [];
+    const selectionFrom = state.selection.from;
+    const selectionTo = state.selection.to;
     state.doc.descendants((node, pos) => {
         if (node.type.name !== 'paragraph') {
             return;
         }
+        const paragraphStart = pos;
+        const paragraphEnd = pos + node.nodeSize;
+        const selectionInside = selectionFrom > paragraphStart && selectionTo < paragraphEnd;
         const mediaNodes: ProseMirrorNode[] = [];
         let hasOther = false;
         node.forEach((child) => {
@@ -595,7 +600,7 @@ function normalizeMediaBlocks(state: EditorState) {
             }
             hasOther = true;
         });
-        if (hasOther || mediaNodes.length === 0) {
+        if (hasOther || mediaNodes.length === 0 || selectionInside) {
             return;
         }
         const blockNodes = mediaNodes.map(child => mediaBlock.create({ ...child.attrs }));
