@@ -632,8 +632,8 @@ function normalizeBlockBoundaries(state: EditorState): Transaction | null {
 
     const insertions = new Set<number>();
 
-    state.doc.descendants((node, pos) => {
-        if (!node.isBlock) {
+    const inspectContainer = (node: ProseMirrorNode, pos: number) => {
+        if (!(node.isBlock || node.type.name === 'doc')) {
             return;
         }
         const contentSpec = node.type?.spec?.content || '';
@@ -656,7 +656,7 @@ function normalizeBlockBoundaries(state: EditorState): Transaction | null {
             }
             const prev = index > 0 ? children[index - 1].node : null;
             const next = index < children.length - 1 ? children[index + 1].node : null;
-            const childPos = pos + 1 + entry.offset;
+            const childPos = (node.type.name === 'doc' ? pos : pos + 1) + entry.offset;
             if (!prev || !prev.isTextblock) {
                 insertions.add(childPos);
             }
@@ -664,6 +664,11 @@ function normalizeBlockBoundaries(state: EditorState): Transaction | null {
                 insertions.add(childPos + child.nodeSize);
             }
         });
+    };
+
+    inspectContainer(state.doc, 0);
+    state.doc.descendants((node, pos) => {
+        inspectContainer(node, pos);
     });
 
     if (insertions.size === 0) {
