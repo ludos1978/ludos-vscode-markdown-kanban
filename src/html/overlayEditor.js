@@ -18,23 +18,18 @@
         mode: 'markdown', // markdown | dual | wysiwyg
         fontScale: 1.2,
         draft: '',
-        taskRef: null // { taskId, columnId, includeContext }
+        taskRef: null, // { taskId, columnId, includeContext, title }
+        taskData: null // { task, column }
     };
 
     const elements = {
         backdrop: overlay.querySelector('.task-overlay-backdrop'),
         panel: overlay.querySelector('.task-overlay-panel'),
-        header: overlay.querySelector('.task-overlay-header'),
         title: overlay.querySelector('.task-overlay-title'),
-        tools: overlay.querySelector('.task-overlay-tools'),
-        markdownWrap: overlay.querySelector('.task-overlay-markdown'),
         previewWrap: overlay.querySelector('.task-overlay-preview'),
         wysiwygWrap: overlay.querySelector('.task-overlay-wysiwyg'),
         textarea: overlay.querySelector('.task-overlay-textarea'),
-        settings: overlay.querySelector('.task-overlay-settings'),
-        settingsMenu: overlay.querySelector('.task-overlay-settings-menu'),
-        buttons: overlay.querySelectorAll('.task-overlay-btn'),
-        fontScaleButtons: overlay.querySelectorAll('[data-font-scale]')
+        settings: overlay.querySelector('.task-overlay-settings')
     };
 
     class CommandRegistry {
@@ -510,6 +505,9 @@
         if (Object.prototype.hasOwnProperty.call(nextState, 'taskRef')) {
             state.taskRef = nextState.taskRef;
         }
+        if (Object.prototype.hasOwnProperty.call(nextState, 'taskData')) {
+            state.taskData = nextState.taskData;
+        }
         if (Object.prototype.hasOwnProperty.call(nextState, 'enabled')) {
             state.enabled = Boolean(nextState.enabled);
         }
@@ -567,6 +565,7 @@
         // Requires: block board-level drag/drop and focus traps while open.
         const resolved = resolveTaskData(taskRef);
         const task = resolved?.task || null;
+        const column = resolved?.column || null;
         const nextTaskRef = {
             taskId: taskRef?.taskId,
             columnId: taskRef?.columnId,
@@ -577,6 +576,7 @@
         setState(
             {
                 taskRef: nextTaskRef,
+                taskData: resolved ? { task, column } : null,
                 draft: nextDraft,
                 mode: state.mode,
                 fontScale: state.fontScale
@@ -616,8 +616,7 @@
         if (elements.settings) {
             elements.settings.classList.remove('open');
         }
-        state.taskRef = null;
-        state.draft = '';
+        setState({ taskRef: null, taskData: null, draft: '' });
         window.currentTaskIncludeContext = null;
         if (dropHandler && typeof dropHandler.detach === 'function') {
             dropHandler.detach();
@@ -630,8 +629,8 @@
 
     function handleSave() {
         // Requires: save task + re-render only affected task.
-        const resolved = resolveTaskData(state.taskRef);
-        if (!resolved) {
+        const resolved = state.taskData || resolveTaskData(state.taskRef);
+        if (!resolved || !resolved.task || !resolved.column) {
             closeOverlay();
             return;
         }
