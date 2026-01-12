@@ -115,17 +115,87 @@
 
     class WysiwygAdapter {
         // Requires: WysiwygEditor integration with toolbar + markdown-it tokens.
-        constructor(container) {
+        constructor(container, options = {}) {
             this.container = container;
+            this.editor = null;
+            this.onChange = options.onChange;
+            this.onSubmit = options.onSubmit;
+            this.temporalPrefix = options.temporalPrefix || (window.TAG_PREFIXES?.TEMPORAL || '!');
         }
 
-        activate() {}
-        deactivate() {}
-        getValue() { return ''; }
-        setValue() {}
-        insertText() {}
-        setFontScale() {}
-        focus() {}
+        activate() {
+            if (!this.container || typeof window.WysiwygEditor !== 'function') { return; }
+            window.currentTaskIncludeContext = state.taskRef?.includeContext || null;
+            if (!this.editor) {
+                this.container.innerHTML = '';
+                this.editor = new window.WysiwygEditor(this.container, {
+                    markdown: state.draft || '',
+                    temporalPrefix: this.temporalPrefix,
+                    onChange: (markdown) => {
+                        state.draft = markdown;
+                        if (typeof this.onChange === 'function') {
+                            this.onChange(markdown);
+                        }
+                    },
+                    onSubmit: () => {
+                        if (typeof this.onSubmit === 'function') {
+                            this.onSubmit();
+                        }
+                    }
+                });
+            } else if (typeof this.editor.setMarkdown === 'function') {
+                this.editor.setMarkdown(state.draft || '');
+            }
+        }
+
+        deactivate() {
+            if (this.editor && typeof this.editor.destroy === 'function') {
+                this.editor.destroy();
+            }
+            this.editor = null;
+            if (this.container) {
+                this.container.innerHTML = '';
+            }
+        }
+
+        getValue() {
+            if (this.editor && typeof this.editor.getMarkdown === 'function') {
+                return this.editor.getMarkdown();
+            }
+            return state.draft || '';
+        }
+
+        setValue(value) {
+            state.draft = value || '';
+            if (this.editor && typeof this.editor.setMarkdown === 'function') {
+                this.editor.setMarkdown(state.draft);
+            }
+        }
+
+        insertText(text) {
+            if (this.editor && typeof this.editor.insertText === 'function') {
+                this.editor.insertText(text);
+                return;
+            }
+            if (this.editor && typeof this.editor.getMarkdown === 'function' &&
+                typeof this.editor.setMarkdown === 'function') {
+                const current = this.editor.getMarkdown() || '';
+                this.editor.setMarkdown(current + text);
+                return;
+            }
+        }
+
+        setFontScale(scale) {
+            if (this.container) {
+                this.container.style.fontSize = `calc(1em * ${scale})`;
+            }
+        }
+
+        focus() {
+            if (this.editor && typeof this.editor.focus === 'function') {
+                this.editor.focus();
+            }
+        }
     }
 
     class DropHandler {
@@ -261,7 +331,12 @@
             state.draft = elements.textarea ? elements.textarea.value : '';
             schedulePreviewRender();
         }),
-        wysiwyg: new WysiwygAdapter(elements.wysiwygWrap)
+        wysiwyg: new WysiwygAdapter(elements.wysiwygWrap, {
+            onChange: (markdown) => {
+                state.draft = markdown;
+            },
+            onSubmit: () => handleSave()
+        })
     };
     const dropHandler = new DropHandler(elements.panel, () => activeAdapter);
     let activeAdapter = adapters.markdown;
@@ -400,6 +475,7 @@
         }
         state.taskRef = null;
         state.draft = '';
+        window.currentTaskIncludeContext = null;
         if (dropHandler && typeof dropHandler.detach === 'function') {
             dropHandler.detach();
         }

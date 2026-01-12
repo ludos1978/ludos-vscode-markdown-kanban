@@ -1445,6 +1445,17 @@ export class WysiwygEditor {
         return this.view.dom;
     }
 
+    insertText(text: string): void {
+        const value = text ?? '';
+        const state = this.view.state;
+        const { from, to } = state.selection;
+        let tr = state.tr.insertText(value, from, to);
+        const nextPos = Math.min(tr.doc.content.size, from + value.length);
+        tr = tr.setSelection(TextSelection.create(tr.doc, nextPos));
+        this.view.dispatch(tr);
+        this.view.focus();
+    }
+
     private serializeState(state: EditorState): string {
         const doc = proseMirrorToWysiwygDoc(state.doc);
         return wysiwygDocToMarkdown(doc, {

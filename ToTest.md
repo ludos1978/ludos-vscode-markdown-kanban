@@ -114,3 +114,4 @@
 - [ ] Overlay editor dual mode renders preview using markdown-it pipeline and updates on input.
 - [ ] Overlay editor Save updates the task description and re-renders only that task (no full board refresh).
 - [ ] Overlay editor: dropping external files inserts markdown links at the cursor in the active editor mode.
+- [ ] Overlay editor WYSIWYG mode accepts dropped files and inserts markdown links at the cursor.
