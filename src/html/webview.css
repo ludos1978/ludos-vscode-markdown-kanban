@@ -5951,10 +5951,12 @@ figcaption {
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .task-overlay-editor[data-mode="wysiwyg"] .task-overlay-tools {
-  display: block;
+  display: flex;
 }
 
 .task-overlay-tool-group {
