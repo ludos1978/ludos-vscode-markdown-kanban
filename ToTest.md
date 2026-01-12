@@ -141,6 +141,7 @@
 - [ ] In overlay WYSIWYG, large images never exceed 80% of the editor pane height.
 - [ ] In overlay WYSIWYG, when a task starts or ends with an image, you can still type before and after it.
 - [ ] In overlay WYSIWYG, selecting text and pressing Link inserts `[text](url)` with the selection placed in the text or url portion based on filename/path detection, and keeps that portion selected.
+- [ ] In WYSIWYG, every block type (media, include, hr, table, list, multicolumn, code, container) allows inserting new text blocks before and after it.
 - [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
 - [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
 - [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.

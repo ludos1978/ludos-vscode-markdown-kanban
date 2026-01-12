@@ -84,30 +84,6 @@ function isLikelyPathSelection(value: string): boolean {
     return /\.[A-Za-z0-9]{1,5}$/.test(text);
 }
 
-function ensureDocTextBuffers(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
-    if (!doc || doc.content.size === 0) {
-        return doc;
-    }
-    const emptyParagraph = () => schema.nodes.paragraph.create();
-    const firstChild = doc.content.firstChild;
-    const lastChild = doc.content.lastChild;
-    let content = doc.content;
-
-    if (firstChild && firstChild.isAtom) {
-        content = content.addToStart(emptyParagraph());
-    }
-
-    if (lastChild && lastChild.isAtom) {
-        content = content.addToEnd(emptyParagraph());
-    }
-
-    if (content !== doc.content) {
-        return schema.nodes.doc.create(null, content);
-    }
-
-    return doc;
-}
-
 function toggleMarkOnce(markType: MarkType) {
     return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
         let nextTr: Transaction | null = null;
@@ -648,6 +624,73 @@ function normalizeMediaBlocks(state: EditorState) {
     return tr;
 }
 
+function normalizeBlockBoundaries(state: EditorState): Transaction | null {
+    const paragraph = state.schema.nodes.paragraph;
+    if (!paragraph) {
+        return null;
+    }
+
+    const insertions = new Set<number>();
+
+    state.doc.descendants((node, pos) => {
+        if (!node.isBlock) {
+            return;
+        }
+        const contentSpec = node.type?.spec?.content || '';
+        if (!contentSpec.includes('block')) {
+            return;
+        }
+        if (node.childCount === 0) {
+            return;
+        }
+
+        const children: Array<{ node: ProseMirrorNode; offset: number }> = [];
+        node.forEach((child, offset) => {
+            children.push({ node: child, offset });
+        });
+
+        children.forEach((entry, index) => {
+            const child = entry.node;
+            if (child.isTextblock) {
+                return;
+            }
+            const prev = index > 0 ? children[index - 1].node : null;
+            const next = index < children.length - 1 ? children[index + 1].node : null;
+            const childPos = pos + 1 + entry.offset;
+            if (!prev || !prev.isTextblock) {
+                insertions.add(childPos);
+            }
+            if (!next || !next.isTextblock) {
+                insertions.add(childPos + child.nodeSize);
+            }
+        });
+    });
+
+    if (insertions.size === 0) {
+        return null;
+    }
+
+    const positions = Array.from(insertions).sort((a, b) => b - a);
+    let tr = state.tr;
+    positions.forEach((insertPos) => {
+        tr = tr.insert(insertPos, paragraph.create());
+    });
+    return tr;
+}
+
+function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
+    let state = EditorState.create({ schema, doc });
+    const mediaTr = normalizeMediaBlocks(state);
+    if (mediaTr) {
+        state = state.apply(mediaTr);
+    }
+    const boundaryTr = normalizeBlockBoundaries(state);
+    if (boundaryTr) {
+        state = state.apply(boundaryTr);
+    }
+    return state.doc;
+}
+
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
     const tr = view.state.tr.setNodeMarkup(pos, undefined, attrs);
     view.dispatch(tr);
@@ -1182,7 +1225,7 @@ export class WysiwygEditor {
             markdownItOptions: { temporalPrefix: this.temporalPrefix },
             serializerOptions: { temporalPrefix: this.temporalPrefix }
         });
-        let pmDoc = ensureDocTextBuffers(schema, wysiwygDocToProseMirror(schema, initialDoc));
+        let pmDoc = normalizeEditableDoc(schema, wysiwygDocToProseMirror(schema, initialDoc));
 
         const plugins = [
             history(),
@@ -1465,13 +1508,18 @@ export class WysiwygEditor {
             dispatchTransaction: (transaction) => {
                 let newState = this.view.state.apply(transaction);
                 let normalized = null;
+                let boundaryNormalized = null;
                 if (transaction.docChanged) {
                     normalized = normalizeMediaBlocks(newState);
                     if (normalized) {
                         newState = newState.apply(normalized);
                     }
+                    boundaryNormalized = normalizeBlockBoundaries(newState);
+                    if (boundaryNormalized) {
+                        newState = newState.apply(boundaryNormalized);
+                    }
                 }
-                const docChanged = transaction.docChanged || Boolean(normalized);
+                const docChanged = transaction.docChanged || Boolean(normalized) || Boolean(boundaryNormalized);
                 this.view.updateState(newState);
                 const selectionChanged = transaction.selectionSet || transaction.storedMarksSet || transaction.docChanged;
 
@@ -1511,7 +1559,7 @@ export class WysiwygEditor {
             markdownItOptions: { temporalPrefix: this.temporalPrefix },
             serializerOptions: { temporalPrefix: this.temporalPrefix }
         });
-        const pmDoc = ensureDocTextBuffers(schema, wysiwygDocToProseMirror(schema, doc));
+        const pmDoc = normalizeEditableDoc(schema, wysiwygDocToProseMirror(schema, doc));
         const newState = EditorState.create({
             schema,
             doc: pmDoc,
