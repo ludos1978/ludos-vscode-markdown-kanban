@@ -241,7 +241,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	const insertSnippetCommand = vscode.commands.registerCommand('markdown-kanban.insertSnippet', async () => {
+	const insertSnippetCommand = vscode.commands.registerCommand('markdown-kanban.insertSnippet', async (args?: { snippet?: string }) => {
 		const panels = KanbanWebviewPanel.getAllPanels();
 		if (panels.length === 0) {
 			showWarning('No kanban panel is currently open.');
@@ -250,6 +250,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// Get the active panel (assuming first panel for now, could be improved)
 		const activePanel = panels[0];
+
+		const snippet = typeof args?.snippet === 'string' ? args.snippet : null;
+		if (snippet) {
+			activePanel.insertSnippetContent(snippet);
+			return;
+		}
 
 		// Trigger snippet insertion in the webview
 		activePanel.triggerSnippetInsertion();

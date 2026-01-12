@@ -363,6 +363,17 @@ export interface ConfigurationUpdateMessage extends BaseMessage {
 }
 
 /**
+ * Insert snippet content into active editor
+ */
+export interface InsertSnippetContentMessage extends BaseMessage {
+    type: 'insertSnippetContent';
+    content: string;
+    fieldType?: string;
+    taskId?: string;
+    columnId?: string;
+}
+
+/**
  * Trigger snippet insertion in webview
  */
 export interface TriggerSnippetMessage extends BaseMessage {
@@ -1785,6 +1796,7 @@ export type OutgoingMessage =
     | UpdateIncludeContentMessage
     | SyncDirtyItemsMessage
     | UpdateShortcutsMessage
+    | InsertSnippetContentMessage
     | UpdateColumnContentExtendedMessage
     | UpdateTaskContentExtendedMessage
     | ConfigurationUpdateMessage

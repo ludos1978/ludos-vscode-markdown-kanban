@@ -1967,6 +1967,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // This implements request-response pattern - backend queues board updates until this is received
     vscode.postMessage({ type: 'webviewReady' });
     vscode.postMessage({ type: 'requestFileInfo' });
+    if (!window.cachedShortcuts) {
+        window.cachedShortcuts = {};
+    }
+    if (!window._shortcutRequestPending && typeof vscode !== 'undefined') {
+        window._shortcutRequestPending = true;
+        vscode.postMessage({ type: 'requestShortcuts' });
+        setTimeout(() => { window._shortcutRequestPending = false; }, 1000);
+    }
 
     // Setup drag and drop
     setupDragAndDrop();

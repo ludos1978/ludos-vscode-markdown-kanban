@@ -140,4 +140,5 @@
 - [ ] Overlay editor: Escape, Alt+Enter, Save button, and backdrop click always save changes (no exit path discards edits).
 - [ ] VS Code keybindings with snippet args (e.g., Meta+1) insert snippet text in inline editor, inline WYSIWYG, and overlay editor.
 - [ ] VS Code keybindings with modifiers work in overlay WYSIWYG even when the editor consumes key events (capture phase).
+- [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "snippet": "..." }` and confirm it inserts even when VS Code would normally capture Cmd+1.
 - [ ] On initial webview load, cached shortcuts populate and Meta+1 (or other Meta+digit) snippet keybindings insert the configured snippet without requiring a second keypress.

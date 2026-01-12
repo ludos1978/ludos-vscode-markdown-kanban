@@ -23,7 +23,7 @@ import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
-import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
+import { InsertSnippetContentMessage, TriggerSnippetMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { cleanupAutoExportSubscription } from './commands';
 import {
@@ -672,5 +672,12 @@ export class KanbanWebviewPanel {
 
     public triggerSnippetInsertion(): void {
         if (this._panel) this._webviewBridge.send({ type: 'triggerSnippet' } as TriggerSnippetMessage);
+    }
+
+    public insertSnippetContent(snippet: string): void {
+        if (!this._panel || !snippet) {
+            return;
+        }
+        this._webviewBridge.send({ type: 'insertSnippetContent', content: snippet } as InsertSnippetContentMessage);
     }
 }
