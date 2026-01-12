@@ -236,6 +236,7 @@
                     adapter.insertText(markdown);
                 } else if (elements.textarea) {
                     elements.textarea.value += markdown;
+                    setState({ draft: elements.textarea.value }, { renderPreview: true });
                 }
             };
             this.target.addEventListener('dragover', this.handleDragOver);
@@ -447,6 +448,10 @@
         elements.previewWrap.innerHTML = rendered;
     }
 
+    function normalizeDraft(value) {
+        return typeof value === 'string' ? value : '';
+    }
+
     function updatePreview(options = {}) {
         const { immediate = false } = options;
         if (state.mode !== 'dual') {
@@ -482,6 +487,27 @@
 
     function getAdapterForMode(mode) {
         return mode === 'wysiwyg' ? adapters.wysiwyg : adapters.markdown;
+    }
+
+    function syncDraftFromActiveAdapter() {
+        if (!activeAdapter || typeof activeAdapter.getValue !== 'function') {
+            return state.draft;
+        }
+        const adapterValue = normalizeDraft(activeAdapter.getValue());
+        if (adapterValue !== state.draft) {
+            setState({ draft: adapterValue }, { renderPreview: true });
+        }
+        return adapterValue;
+    }
+
+    function syncDraftToActiveAdapter() {
+        if (!activeAdapter || typeof activeAdapter.setValue !== 'function') { return; }
+        const draft = normalizeDraft(state.draft);
+        const adapterValue = typeof activeAdapter.getValue === 'function'
+            ? normalizeDraft(activeAdapter.getValue())
+            : null;
+        if (adapterValue !== null && adapterValue === draft) { return; }
+        activeAdapter.setValue(draft);
     }
 
     function setActiveAdapter(nextAdapter) {
@@ -558,6 +584,7 @@
 
     function setMode(mode, options = {}) {
         // Requires: mode switching for markdown, dual, and wysiwyg.
+        syncDraftFromActiveAdapter();
         setState(
             { mode },
             {
@@ -566,6 +593,7 @@
                 immediatePreview: true
             }
         );
+        syncDraftToActiveAdapter();
     }
 
     function openOverlay(taskRef) {
@@ -593,9 +621,7 @@
         updateHeaderTitle(task);
         overlay.classList.add('visible');
         overlay.setAttribute('aria-hidden', 'false');
-        if (activeAdapter && typeof activeAdapter.setValue === 'function') {
-            activeAdapter.setValue(nextDraft);
-        }
+        syncDraftToActiveAdapter();
         if (activeAdapter && typeof activeAdapter.focus === 'function') {
             activeAdapter.focus();
         }
@@ -634,11 +660,9 @@
             closeOverlay();
             return;
         }
+        syncDraftFromActiveAdapter();
         const { task, column } = resolved;
-        const nextValue = activeAdapter && typeof activeAdapter.getValue === 'function'
-            ? activeAdapter.getValue()
-            : state.draft;
-        const normalizedValue = typeof nextValue === 'string' ? nextValue : '';
+        const normalizedValue = normalizeDraft(state.draft);
         const currentValue = task.description || '';
         if (normalizedValue === currentValue && !task.includeMode) {
             closeOverlay();
