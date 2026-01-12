@@ -118,3 +118,4 @@
 - [ ] Task burger menu: “Edit task (overlay)” is the first item and opens the overlay.
 - [ ] Overlay tools pane: buttons and insert menu add markdown snippets into the active editor mode.
 - [ ] Overlay tools pane: mark buttons toggle formatting in WYSIWYG mode (bold/italic/underline/strike/mark/sub/sup/code).
+- [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
