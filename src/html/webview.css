@@ -6038,6 +6038,33 @@ figcaption {
   display: block;
 }
 
+.task-overlay-wysiwyg {
+  overflow: auto;
+}
+
+.task-overlay-wysiwyg .ProseMirror {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.task-overlay-wysiwyg img,
+.task-overlay-wysiwyg video,
+.task-overlay-wysiwyg iframe,
+.task-overlay-wysiwyg canvas,
+.task-overlay-wysiwyg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.task-overlay-wysiwyg .image-path-overlay-container,
+.task-overlay-wysiwyg .video-path-overlay-container,
+.task-overlay-wysiwyg .wysiwyg-media,
+.task-overlay-wysiwyg .wysiwyg-media-block,
+.task-overlay-wysiwyg .wysiwyg-diagram-preview {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .task-overlay-textarea {
   width: 100%;
   height: 100%;
