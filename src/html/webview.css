@@ -6118,6 +6118,7 @@ figcaption {
 .task-overlay-wysiwyg canvas,
 .task-overlay-wysiwyg svg {
   max-width: 100%;
+  max-height: 100%;
   height: auto;
 }
 
@@ -6127,6 +6128,7 @@ figcaption {
 .task-overlay-wysiwyg .wysiwyg-media-block,
 .task-overlay-wysiwyg .wysiwyg-diagram-preview {
   max-width: 100%;
+  max-height: 100%;
   box-sizing: border-box;
 }
 
