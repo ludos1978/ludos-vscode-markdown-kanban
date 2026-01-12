@@ -2781,6 +2781,11 @@ class TaskEditor {
             return;
         }
 
+        if (this.currentEditor.wysiwyg && typeof this.currentEditor.wysiwyg.insertText === 'function') {
+            this.currentEditor.wysiwyg.insertText(newText);
+            return;
+        }
+
         const element = this.currentEditor.element;
         const start = element.selectionStart;
         const end = element.selectionEnd;

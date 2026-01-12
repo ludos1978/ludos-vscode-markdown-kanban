@@ -374,6 +374,28 @@
         }
     }
 
+    function replaceSelection(text) {
+        if (typeof text !== 'string') { return; }
+        const adapter = activeAdapter;
+        if (adapter && typeof adapter.insertText === 'function') {
+            adapter.insertText(text);
+            if (typeof adapter.focus === 'function') {
+                adapter.focus();
+            }
+            return;
+        }
+        if (elements.textarea) {
+            const { selectionStart = 0, selectionEnd = 0, value = '' } = elements.textarea;
+            const before = value.slice(0, selectionStart);
+            const after = value.slice(selectionEnd);
+            elements.textarea.value = `${before}${text}${after}`;
+            setState({ draft: elements.textarea.value }, { renderPreview: true });
+            if (typeof elements.textarea.focus === 'function') {
+                elements.textarea.focus();
+            }
+        }
+    }
+
     Object.entries(commandSnippets).forEach(([key, snippet]) => {
         commandRegistry.register(key, (payload = {}) => {
             const adapter = payload.adapter || activeAdapter;
@@ -757,7 +779,7 @@
             if (event.key === 'Enter' && event.altKey) {
                 requestClose('save');
             }
-        });
+        }, true);
 
         overlay.addEventListener('click', (event) => {
             const toolButton = event.target.closest('.task-overlay-tool');
@@ -822,11 +844,14 @@
         if (!hasModifier) {
             return false;
         }
-        const isShortcutKey = event.code && (
+        const hasCode = typeof event.code === 'string' && event.code.length > 0;
+        const isShortcutKey = hasCode && (
             event.code.match(/^Key[A-Z]$/) ||
             event.code.match(/^Digit[0-9]$/)
         );
-        if (!isShortcutKey) {
+        const isFallbackKey = !isShortcutKey && typeof event.key === 'string' &&
+            event.key.length === 1 && /^[a-z0-9]$/i.test(event.key);
+        if (!isShortcutKey && !isFallbackKey) {
             return false;
         }
 
@@ -841,12 +866,19 @@
             keyChar = event.code.replace('Key', '').toLowerCase();
         } else if (event.code && event.code.match(/^Digit[0-9]$/)) {
             keyChar = event.code.replace('Digit', '');
+        } else if (typeof keyChar === 'string') {
+            keyChar = keyChar.toLowerCase();
         }
 
         const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
         const cachedShortcuts = window.cachedShortcuts || {};
         const entry = cachedShortcuts[shortcut];
         if (!entry) {
+            if (!window._shortcutRequestPending && window.vscode?.postMessage) {
+                window._shortcutRequestPending = true;
+                window.vscode.postMessage({ type: 'requestShortcuts' });
+                setTimeout(() => { window._shortcutRequestPending = false; }, 1000);
+            }
             return false;
         }
 
@@ -900,6 +932,7 @@
         setMode,
         applySettings,
         registry: commandRegistry,
+        replaceSelection,
         insertText: (text) => {
             if (activeAdapter && typeof activeAdapter.insertText === 'function') {
                 activeAdapter.insertText(text);

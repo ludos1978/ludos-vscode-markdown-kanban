@@ -3097,7 +3097,9 @@ if (!webviewEventListenersInitialized) {
             break;
         case 'replaceSelection':
             // Replace selected text with result from command (e.g., translation)
-            if (window.taskEditorManager) {
+            if (window.taskOverlayEditor?.isVisible?.() && typeof window.taskOverlayEditor.replaceSelection === 'function') {
+                window.taskOverlayEditor.replaceSelection(message.text);
+            } else if (window.taskEditorManager) {
                 window.taskEditorManager.replaceSelection(message.text);
             }
             break;
