@@ -3860,6 +3860,11 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
     // Use the current editor from taskEditor instead of searching for focused element
     // This fixes the timing issue where focus might be lost by the time the snippet arrives
     if (window.taskEditor && window.taskEditor.currentEditor) {
+        const wysiwygEditor = window.taskEditor.currentEditor.wysiwyg;
+        if (wysiwygEditor && typeof wysiwygEditor.insertText === 'function') {
+            wysiwygEditor.insertText(content);
+            return;
+        }
         const activeEditor = window.taskEditor.currentEditor.element;
 
         if (activeEditor) {
