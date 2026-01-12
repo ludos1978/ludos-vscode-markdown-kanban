@@ -7948,7 +7948,7 @@ body.font-size-5x .task-description-wysiwyg {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    z-index: 10000;
+    z-index: var(--z-search-modal);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
