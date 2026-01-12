@@ -1456,6 +1456,45 @@ export class WysiwygEditor {
         this.view.focus();
     }
 
+    applyCommand(command: string): boolean {
+        const state = this.view.state;
+        const dispatch = this.view.dispatch.bind(this.view);
+        const schema = state.schema;
+
+        switch (command) {
+            case 'bold':
+                return schema.marks.strong ? toggleMark(schema.marks.strong)(state, dispatch) : false;
+            case 'italic':
+                return schema.marks.em ? toggleMark(schema.marks.em)(state, dispatch) : false;
+            case 'underline':
+                return schema.marks.underline ? toggleMark(schema.marks.underline)(state, dispatch) : false;
+            case 'strike':
+                return schema.marks.strike ? toggleMark(schema.marks.strike)(state, dispatch) : false;
+            case 'mark':
+                return schema.marks.mark ? toggleMark(schema.marks.mark)(state, dispatch) : false;
+            case 'sub':
+                return schema.marks.sub ? toggleMark(schema.marks.sub)(state, dispatch) : false;
+            case 'sup':
+                return schema.marks.sup ? toggleMark(schema.marks.sup)(state, dispatch) : false;
+            case 'code':
+                return schema.marks.code ? toggleMark(schema.marks.code)(state, dispatch) : false;
+            case 'ins':
+                return schema.marks.ins ? toggleMark(schema.marks.ins)(state, dispatch) : false;
+            case 'code-block':
+                return schema.nodes.code_block ? setBlockType(schema.nodes.code_block)(state, dispatch) : false;
+            case 'multicolumn': {
+                const tr = createMulticolumnTransaction(state, schema, 1, state.selection.from, state.selection.to);
+                if (!tr) {
+                    return false;
+                }
+                dispatch(tr);
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
     private serializeState(state: EditorState): string {
         const doc = proseMirrorToWysiwygDoc(state.doc);
         return wysiwygDocToMarkdown(doc, {

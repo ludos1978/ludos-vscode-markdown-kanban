@@ -185,6 +185,13 @@
             }
         }
 
+        applyCommand(command) {
+            if (this.editor && typeof this.editor.applyCommand === 'function') {
+                return this.editor.applyCommand(command);
+            }
+            return false;
+        }
+
         setFontScale(scale) {
             if (this.container) {
                 this.container.style.fontSize = `calc(1em * ${scale})`;
@@ -370,7 +377,16 @@
     }
 
     Object.entries(commandSnippets).forEach(([key, snippet]) => {
-        commandRegistry.register(key, () => insertSnippet(snippet));
+        commandRegistry.register(key, (payload = {}) => {
+            const adapter = payload.adapter || activeAdapter;
+            if (adapter && typeof adapter.applyCommand === 'function') {
+                const handled = adapter.applyCommand(key);
+                if (handled) {
+                    return;
+                }
+            }
+            insertSnippet(snippet);
+        });
     });
     const adapters = {
         markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap, () => {
@@ -663,7 +679,7 @@
             btn.addEventListener('click', () => {
                 const command = btn.dataset.command;
                 if (command) {
-                    commandRegistry.execute(command);
+                    commandRegistry.execute(command, { adapter: activeAdapter });
                 }
             });
         });
@@ -673,7 +689,7 @@
             select.addEventListener('change', () => {
                 const command = select.value;
                 if (command) {
-                    commandRegistry.execute(command);
+                    commandRegistry.execute(command, { adapter: activeAdapter });
                     select.value = '';
                 }
             });
