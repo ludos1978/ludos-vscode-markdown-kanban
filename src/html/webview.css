@@ -1788,8 +1788,11 @@ body.section-height-limited .task-section figure img {
   padding: 4px;
   width: 100%;
   min-height: 3em;
-  field-sizing: content; /* Auto-size based on content - no JS needed */
   overflow-anchor: none; /* Prevent scroll adjustment when size changes */
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .task-description-wysiwyg {
