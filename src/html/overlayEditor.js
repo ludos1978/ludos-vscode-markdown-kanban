@@ -113,33 +113,33 @@
         constructor(container, options = {}) {
             this.container = container;
             this.editor = null;
-            this.onChange = options.onChange;
-            this.onSubmit = options.onSubmit;
+            this.context = options.context;
             this.temporalPrefix = options.temporalPrefix || (window.TAG_PREFIXES?.TEMPORAL || '!');
         }
 
         activate() {
             if (!this.container || typeof window.WysiwygEditor !== 'function') { return; }
-            window.currentTaskIncludeContext = state.taskRef?.includeContext || null;
+            const taskRef = this.context?.getTaskRef?.() || null;
+            const draft = this.context?.getDraft?.() || '';
+            window.currentTaskIncludeContext = taskRef?.includeContext || null;
             if (!this.editor) {
                 this.container.innerHTML = '';
                 this.editor = new window.WysiwygEditor(this.container, {
-                    markdown: state.draft || '',
+                    markdown: draft,
                     temporalPrefix: this.temporalPrefix,
                     onChange: (markdown) => {
-                        state.draft = markdown;
-                        if (typeof this.onChange === 'function') {
-                            this.onChange(markdown);
+                        if (this.context?.setDraft) {
+                            this.context.setDraft(markdown);
                         }
                     },
                     onSubmit: () => {
-                        if (typeof this.onSubmit === 'function') {
-                            this.onSubmit();
+                        if (this.context?.onSubmit) {
+                            this.context.onSubmit();
                         }
                     }
                 });
             } else if (typeof this.editor.setMarkdown === 'function') {
-                this.editor.setMarkdown(state.draft || '');
+                this.editor.setMarkdown(draft);
             }
         }
 
@@ -157,13 +157,15 @@
             if (this.editor && typeof this.editor.getMarkdown === 'function') {
                 return this.editor.getMarkdown();
             }
-            return state.draft || '';
+            return this.context?.getDraft?.() || '';
         }
 
         setValue(value) {
-            state.draft = value || '';
+            if (this.context?.setDraft) {
+                this.context.setDraft(value || '');
+            }
             if (this.editor && typeof this.editor.setMarkdown === 'function') {
-                this.editor.setMarkdown(state.draft);
+                this.editor.setMarkdown(value || '');
             }
         }
 
@@ -383,16 +385,22 @@
             insertSnippet(snippet);
         });
     });
+    const adapterContext = {
+        getDraft: () => state.draft,
+        setDraft: (value, options = {}) => {
+            setState({ draft: value }, options);
+        },
+        getTaskRef: () => state.taskRef,
+        onSubmit: () => handleSave()
+    };
+
     const adapters = {
         markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap, () => {
             const value = elements.textarea ? elements.textarea.value : '';
             setState({ draft: value }, { renderPreview: true });
         }),
         wysiwyg: new WysiwygAdapter(elements.wysiwygWrap, {
-            onChange: (markdown) => {
-                setState({ draft: markdown });
-            },
-            onSubmit: () => handleSave()
+            context: adapterContext
         })
     };
     const dropHandler = new DropHandler(elements.panel, () => activeAdapter);
@@ -596,6 +604,15 @@
         }
     }
 
+    function requestClose(reason) {
+        if (!overlay.classList.contains('visible')) { return; }
+        if (reason === 'save') {
+            handleSave();
+            return;
+        }
+        closeOverlay();
+    }
+
     function closeOverlay() {
         // Requires: close on Alt+Enter, Escape, Save, and click outside.
         overlay.classList.remove('visible');
@@ -700,11 +717,11 @@
         document.addEventListener('keydown', (event) => {
             if (!overlay.classList.contains('visible')) { return; }
             if (event.key === 'Escape') {
-                closeOverlay();
+                requestClose('escape');
                 return;
             }
             if (event.key === 'Enter' && event.altKey) {
-                handleSave();
+                requestClose('save');
             }
         });
 
@@ -728,7 +745,7 @@
                 return;
             }
             if (action === 'save') {
-                handleSave();
+                requestClose('save');
                 return;
             }
             if (action === 'settings') {
@@ -759,7 +776,7 @@
         });
 
         if (elements.backdrop) {
-            elements.backdrop.addEventListener('click', closeOverlay);
+            elements.backdrop.addEventListener('click', () => requestClose('backdrop'));
         }
     }
 
