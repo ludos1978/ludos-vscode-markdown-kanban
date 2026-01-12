@@ -696,11 +696,12 @@ function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirror
     return state.doc;
 }
 
-function placeCursorAroundMediaBlock(view: EditorView, nodePos: number, placeAfter: boolean, insertText?: string): boolean {
+function convertMediaBlockToInline(view: EditorView, nodePos: number, placeAfter: boolean, insertText?: string): boolean {
     const { state } = view;
     const mediaBlock = state.schema.nodes.media_block;
+    const mediaInline = state.schema.nodes.media_inline;
     const paragraph = state.schema.nodes.paragraph;
-    if (!mediaBlock || !paragraph) {
+    if (!mediaBlock || !mediaInline || !paragraph) {
         return false;
     }
     const node = state.doc.nodeAt(nodePos);
@@ -708,35 +709,14 @@ function placeCursorAroundMediaBlock(view: EditorView, nodePos: number, placeAft
         return false;
     }
 
-    const insertPos = placeAfter ? nodePos + node.nodeSize : nodePos;
-    const resolved = state.doc.resolve(insertPos);
-    let tr = state.tr;
-    let selectionPos = insertPos + 1;
-
-    if (placeAfter) {
-        const next = resolved.nodeAfter;
-        if (next && next.isTextblock) {
-            selectionPos = insertPos + 1;
-        } else {
-            tr = tr.insert(insertPos, paragraph.create());
-            selectionPos = insertPos + 1;
-        }
-    } else {
-        const prev = resolved.nodeBefore;
-        if (prev && prev.isTextblock) {
-            const prevPos = insertPos - prev.nodeSize;
-            selectionPos = prevPos + prev.nodeSize - 1;
-        } else {
-            tr = tr.insert(insertPos, paragraph.create());
-            selectionPos = insertPos + 1;
-        }
-    }
-
+    const inlineNode = mediaInline.create({ ...node.attrs });
+    const para = paragraph.create(null, [inlineNode]);
+    let tr = state.tr.replaceWith(nodePos, nodePos + node.nodeSize, para);
+    let selectionPos = nodePos + 1 + (placeAfter ? inlineNode.nodeSize : 0);
     if (insertText) {
         tr = tr.insertText(insertText, selectionPos, selectionPos);
         selectionPos += insertText.length;
     }
-
     tr = tr.setSelection(TextSelection.create(tr.doc, selectionPos));
     view.dispatch(tr);
     view.focus();
@@ -753,7 +733,7 @@ function insertTextNextToSelectedMediaBlock(view: EditorView, text: string): boo
     if (!mediaBlock || selection.node.type !== mediaBlock) {
         return false;
     }
-    return placeCursorAroundMediaBlock(view, selection.from, true, text);
+    return convertMediaBlockToInline(view, selection.from, true, text);
 }
 
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
@@ -1527,7 +1507,7 @@ export class WysiwygEditor {
                     const rect = (host || target).getBoundingClientRect();
                     const clickX = event?.clientX ?? rect.left;
                     const placeAfter = clickX >= rect.left + rect.width / 2;
-                    return placeCursorAroundMediaBlock(view, nodePos, placeAfter);
+                    return convertMediaBlockToInline(view, nodePos, placeAfter);
                 }
                 if (node?.type?.name === 'media_inline') {
                     const host = target.closest?.('.wysiwyg-media') as HTMLElement | null;
