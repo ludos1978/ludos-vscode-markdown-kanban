@@ -1467,6 +1467,14 @@ export class WysiwygEditor {
                 return false; // Don't handle, let handleClickOn take over
             },
             handleClickOn: (view, pos, node, nodePos, event) => {
+                if (event?.altKey) {
+                    console.log('[WYSIWYG-DEBUG] click', {
+                        nodeType: node?.type?.name,
+                        nodePos,
+                        clickX: event?.clientX,
+                        target: (event?.target as HTMLElement | null)?.className || ''
+                    });
+                }
                 const target = event?.target as HTMLElement | null;
                 if (!target) {
                     return false;
@@ -1507,6 +1515,9 @@ export class WysiwygEditor {
                     const rect = (host || target).getBoundingClientRect();
                     const clickX = event?.clientX ?? rect.left;
                     const placeAfter = clickX >= rect.left + rect.width / 2;
+                    if (event?.altKey) {
+                        console.log('[WYSIWYG-DEBUG] media block click', { placeAfter, rect });
+                    }
                     return convertMediaBlockToInline(view, nodePos, placeAfter);
                 }
                 if (node?.type?.name === 'media_inline') {
