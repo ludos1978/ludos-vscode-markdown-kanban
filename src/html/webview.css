@@ -5946,10 +5946,49 @@ figcaption {
   display: none;
   padding: 8px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .task-overlay-editor[data-mode="wysiwyg"] .task-overlay-tools {
   display: block;
+}
+
+.task-overlay-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-overlay-tool {
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.task-overlay-tool:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.task-overlay-tool-select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.task-overlay-tool .tool-underline {
+  text-decoration: underline;
+}
+
+.task-overlay-tool .tool-strike {
+  text-decoration: line-through;
 }
 
 .task-overlay-body {

@@ -326,6 +326,52 @@
     }
 
     const commandRegistry = new CommandRegistry();
+    const commandSnippets = {
+        bold: '**bold**',
+        italic: '*italic*',
+        underline: '_underline_',
+        strike: '~~strike~~',
+        mark: '==mark==',
+        sub: 'H~2~O',
+        sup: '29^th^',
+        link: '[text](url)',
+        image: '![alt](path)',
+        code: '`code`',
+        'code-block': '```\ncode\n```',
+        multicolumn: '---:\n\n:--:\n\n:---',
+        footnote: 'Footnote reference[^1]\n\n[^1]: Footnote text',
+        emoji: ':smile:',
+        wiki: '[[Page]]',
+        include: '!!!include(path)!!!',
+        'container-note': '::: note\n\n:::\n',
+        'container-comment': '::: comment\n\n:::\n',
+        'container-highlight': '::: highlight\n\n:::\n',
+        'container-mark-red': '::: mark-red\n\n:::\n',
+        'container-mark-green': '::: mark-green\n\n:::\n',
+        'container-mark-blue': '::: mark-blue\n\n:::\n',
+        'container-mark-cyan': '::: mark-cyan\n\n:::\n',
+        'container-mark-magenta': '::: mark-magenta\n\n:::\n',
+        'container-mark-yellow': '::: mark-yellow\n\n:::\n',
+        'container-center': '::: center\n\n:::\n',
+        'container-center100': '::: center100\n\n:::\n',
+        'container-right': '::: right\n\n:::\n',
+        'container-caption': '::: caption\n\n:::\n'
+    };
+
+    function insertSnippet(snippet) {
+        if (!snippet) { return; }
+        const adapter = activeAdapter;
+        if (adapter && typeof adapter.insertText === 'function') {
+            adapter.insertText(snippet);
+            if (typeof adapter.focus === 'function') {
+                adapter.focus();
+            }
+        }
+    }
+
+    Object.entries(commandSnippets).forEach(([key, snippet]) => {
+        commandRegistry.register(key, () => insertSnippet(snippet));
+    });
     const adapters = {
         markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap, () => {
             state.draft = elements.textarea ? elements.textarea.value : '';
@@ -608,6 +654,27 @@
                 }
                 if (action === 'mode-wysiwyg') {
                     setMode('wysiwyg', { persist: true });
+                }
+            });
+        });
+
+        const toolButtons = overlay.querySelectorAll('.task-overlay-tool');
+        toolButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const command = btn.dataset.command;
+                if (command) {
+                    commandRegistry.execute(command);
+                }
+            });
+        });
+
+        const toolSelects = overlay.querySelectorAll('.task-overlay-tool-select');
+        toolSelects.forEach((select) => {
+            select.addEventListener('change', () => {
+                const command = select.value;
+                if (command) {
+                    commandRegistry.execute(command);
+                    select.value = '';
                 }
             });
         });

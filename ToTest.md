@@ -116,3 +116,4 @@
 - [ ] Overlay editor: dropping external files inserts markdown links at the cursor in the active editor mode.
 - [ ] Overlay editor WYSIWYG mode accepts dropped files and inserts markdown links at the cursor.
 - [ ] Task burger menu: “Edit task (overlay)” is the first item and opens the overlay.
+- [ ] Overlay tools pane: buttons and insert menu add markdown snippets into the active editor mode.

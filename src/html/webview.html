@@ -662,6 +662,44 @@
             <!-- Tools pane (WYSIWYG) -->
             <div class="task-overlay-tools" data-mode="wysiwyg">
                 <!-- Requires: toolbar commands (multicolumn, mark, sub/sup, underline, insert, strike, containers, footnotes, emoji, links, images) -->
+                <div class="task-overlay-tool-group">
+                    <button class="task-overlay-tool" data-command="bold" title="Bold"><strong>B</strong></button>
+                    <button class="task-overlay-tool" data-command="italic" title="Italic"><em>I</em></button>
+                    <button class="task-overlay-tool" data-command="underline" title="Underline"><span class="tool-underline">U</span></button>
+                    <button class="task-overlay-tool" data-command="strike" title="Strikethrough"><span class="tool-strike">S</span></button>
+                    <button class="task-overlay-tool" data-command="mark" title="Mark">Mark</button>
+                    <button class="task-overlay-tool" data-command="sub" title="Subscript">Sub</button>
+                    <button class="task-overlay-tool" data-command="sup" title="Superscript">Sup</button>
+                </div>
+                <div class="task-overlay-tool-group">
+                    <button class="task-overlay-tool" data-command="link" title="Link">Link</button>
+                    <button class="task-overlay-tool" data-command="image" title="Image">Image</button>
+                    <button class="task-overlay-tool" data-command="code" title="Inline code">Code</button>
+                    <button class="task-overlay-tool" data-command="code-block" title="Code block">Block</button>
+                </div>
+                <div class="task-overlay-tool-group">
+                    <select class="task-overlay-tool-select" data-command="snippet">
+                        <option value="">Insert…</option>
+                        <option value="multicolumn">Multicolumn ---: :--: :---</option>
+                        <option value="container-note">Container: note</option>
+                        <option value="container-comment">Container: comment</option>
+                        <option value="container-highlight">Container: highlight</option>
+                        <option value="container-mark-red">Container: mark-red</option>
+                        <option value="container-mark-green">Container: mark-green</option>
+                        <option value="container-mark-blue">Container: mark-blue</option>
+                        <option value="container-mark-cyan">Container: mark-cyan</option>
+                        <option value="container-mark-magenta">Container: mark-magenta</option>
+                        <option value="container-mark-yellow">Container: mark-yellow</option>
+                        <option value="container-center">Container: center</option>
+                        <option value="container-center100">Container: center100</option>
+                        <option value="container-right">Container: right</option>
+                        <option value="container-caption">Container: caption</option>
+                        <option value="footnote">Footnote</option>
+                        <option value="emoji">Emoji</option>
+                        <option value="wiki">Wiki link</option>
+                        <option value="include">Include</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Body -->
