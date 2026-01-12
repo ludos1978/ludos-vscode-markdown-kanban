@@ -2043,7 +2043,28 @@ body.section-height-limited .task-section figure img {
   overflow: visible;
 }
 
+.task-overlay-wysiwyg .wysiwyg-multicolumn {
+  position: relative;
+  margin: 10px 0;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  outline: 1px dashed color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+  overflow: visible;
+}
+
 .task-description-wysiwyg .wysiwyg-multicolumn-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.task-overlay-wysiwyg .wysiwyg-multicolumn-toolbar {
   position: absolute;
   top: 0;
   left: 0;
@@ -2072,11 +2093,38 @@ body.section-height-limited .task-section figure img {
   transform: translateY(-6px);
 }
 
+.task-overlay-wysiwyg .wysiwyg-multicolumn-btn {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 3px;
+  font-size: 0.7em;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transform: translateY(-6px);
+}
+
 .task-description-wysiwyg .wysiwyg-multicolumn-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground);
 }
 
+.task-overlay-wysiwyg .wysiwyg-multicolumn-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
 .task-description-wysiwyg .wysiwyg-multicolumn-columns {
+  display: flex;
+  gap: 10px;
+}
+
+.task-overlay-wysiwyg .wysiwyg-multicolumn-columns {
   display: flex;
   gap: 10px;
 }
@@ -2088,7 +2136,18 @@ body.section-height-limited .task-section figure img {
   border-left: none;
 }
 
+.task-overlay-wysiwyg .wysiwyg-multicolumn-column {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px;
+  border-left: none;
+}
+
 .task-description-wysiwyg .wysiwyg-multicolumn-column + .wysiwyg-multicolumn-column {
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.task-overlay-wysiwyg .wysiwyg-multicolumn-column + .wysiwyg-multicolumn-column {
   border-left: 1px solid var(--vscode-panel-border);
 }
 
