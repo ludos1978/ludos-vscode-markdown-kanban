@@ -144,3 +144,4 @@
 - [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "name": "Markdown Marp Table Separator Left" }` and confirm snippet names resolve from user/workspace snippet files.
 - [ ] On initial webview load, cached shortcuts populate and Meta+1 (or other Meta+digit) snippet keybindings insert the configured snippet without requiring a second keypress.
 - [ ] If bound, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm text undo/redo works via the editor undo/redo commands.
+- [ ] Without explicit keybindings, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm native undo/redo works (including QWERTZ layouts where key code reports KeyY).

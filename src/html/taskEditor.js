@@ -385,6 +385,10 @@ class TaskEditor {
                 return;
             }
 
+            if (!isInsideWysiwyg && this._handleInlineUndoRedo(e)) {
+                return;
+            }
+
             if (this._handleVSCodeShortcut(e, element)) {
                 return;
             }
@@ -613,11 +617,14 @@ class TaskEditor {
         if (!hasModifier) {
             return false;
         }
-        const isShortcutKey = event.code && (
+        const hasCode = typeof event.code === 'string' && event.code.length > 0;
+        const isShortcutKey = hasCode && (
             event.code.match(/^Key[A-Z]$/) ||
             event.code.match(/^Digit[0-9]$/)
         );
-        if (!isShortcutKey) {
+        const isFallbackKey = !isShortcutKey && typeof event.key === 'string' &&
+            event.key.length === 1 && /^[a-z0-9]$/i.test(event.key);
+        if (!isShortcutKey && !isFallbackKey) {
             return false;
         }
 
@@ -632,12 +639,19 @@ class TaskEditor {
             keyChar = event.code.replace('Key', '').toLowerCase();
         } else if (event.code && event.code.match(/^Digit[0-9]$/)) {
             keyChar = event.code.replace('Digit', '');
+        } else if (typeof keyChar === 'string') {
+            keyChar = keyChar.toLowerCase();
         }
 
         const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
         const cachedShortcuts = window.cachedShortcuts || {};
         const entry = cachedShortcuts[shortcut];
         if (!entry) {
+            if (!window._shortcutRequestPending && typeof vscode !== 'undefined') {
+                window._shortcutRequestPending = true;
+                vscode.postMessage({ type: 'requestShortcuts' });
+                setTimeout(() => { window._shortcutRequestPending = false; }, 1000);
+            }
             return false;
         }
 
@@ -676,6 +690,45 @@ class TaskEditor {
                 columnId: this.currentEditor?.columnId
             });
         }
+        return true;
+    }
+
+    _handleInlineUndoRedo(event) {
+        if (!event) {
+            return false;
+        }
+        const hasModifier = event.altKey || event.metaKey || event.ctrlKey;
+        if (!hasModifier) {
+            return false;
+        }
+        const keyChar = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+        const isUndo = keyChar === 'z' && !event.shiftKey;
+        const isRedo = (keyChar === 'y' && !event.shiftKey) || (keyChar === 'z' && event.shiftKey);
+        if (!isUndo && !isRedo) {
+            return false;
+        }
+
+        const modifiers = [];
+        if (event.ctrlKey) modifiers.push('ctrl');
+        if (event.metaKey) modifiers.push('meta');
+        if (event.altKey) modifiers.push('alt');
+        if (event.shiftKey) modifiers.push('shift');
+        const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
+        const cachedShortcuts = window.cachedShortcuts || {};
+        if (cachedShortcuts[shortcut]) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        try {
+            document.execCommand(isUndo ? 'undo' : 'redo');
+        } catch (error) {
+            console.warn('[TaskEditor] execCommand undo/redo failed:', error);
+        }
+
         return true;
     }
 
