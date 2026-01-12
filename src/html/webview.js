@@ -159,6 +159,9 @@ let currentWhitespace = '8px';
 let currentTaskMinHeight = 'auto';
 let currentLayoutRows = 1;
 window.showSpecialCharacters = window.configManager?.getPreference('showSpecialCharacters', false) ?? false;
+window.overlayEditorEnabled = window.configManager?.getPreference('overlayEditorEnabled', false) ?? false;
+window.overlayEditorDefaultMode = window.configManager?.getPreference('overlayEditorDefaultMode', 'markdown') ?? 'markdown';
+window.overlayEditorFontScale = window.configManager?.getPreference('overlayEditorFontScale', 1.2) ?? 1.2;
 
 // ============================================================================
 // PlantUML Initialization
@@ -1249,6 +1252,16 @@ function updateWysiwygToggleUI(isEnabled) {
     }
 }
 
+function updateOverlayEditorToggleUI(isEnabled) {
+    const toggleButton = document.getElementById('overlay-editor-toggle');
+    if (!toggleButton) { return; }
+    toggleButton.classList.toggle('selected', isEnabled);
+    const checkmark = toggleButton.querySelector('.menu-checkmark');
+    if (checkmark) {
+        checkmark.textContent = isEnabled ? '✓' : '';
+    }
+}
+
 function toggleWysiwygEditor() {
     const nextState = !(window.wysiwygEnabled ?? false);
     window.wysiwygEnabled = nextState;
@@ -1275,6 +1288,25 @@ function toggleWysiwygEditor() {
 }
 
 window.toggleWysiwygEditor = toggleWysiwygEditor;
+
+function toggleOverlayEditor() {
+    const nextState = !(window.overlayEditorEnabled ?? false);
+    window.overlayEditorEnabled = nextState;
+    if (window.configManager) {
+        window.configManager.setPreference('overlayEditorEnabled', nextState);
+    } else {
+        vscode.postMessage({ type: 'setPreference', key: 'overlayEditorEnabled', value: nextState });
+    }
+    if (window.cachedConfig) {
+        window.cachedConfig.overlayEditorEnabled = nextState;
+    }
+    updateOverlayEditorToggleUI(nextState);
+    if (window.taskOverlayEditor?.applySettings) {
+        window.taskOverlayEditor.applySettings({ enabled: nextState });
+    }
+}
+
+window.toggleOverlayEditor = toggleOverlayEditor;
 window.createSpecialCharOverlay = createSpecialCharOverlay;
 window.updateSpecialCharOverlay = updateSpecialCharOverlay;
 window.removeSpecialCharOverlay = removeSpecialCharOverlay;
@@ -2652,6 +2684,29 @@ if (!webviewEventListenersInitialized) {
                 : (typeof window.wysiwygEnabled === 'boolean' ? window.wysiwygEnabled : false);
             window.wysiwygEnabled = Boolean(wysiwygValue);
             updateWysiwygToggleUI(window.wysiwygEnabled);
+            const overlayEnabledValue = typeof configData.overlayEditorEnabled === 'boolean'
+                ? configData.overlayEditorEnabled
+                : (typeof window.overlayEditorEnabled === 'boolean' ? window.overlayEditorEnabled : false);
+            window.overlayEditorEnabled = Boolean(overlayEnabledValue);
+            updateOverlayEditorToggleUI(window.overlayEditorEnabled);
+            const overlayDefaultModeValue = typeof configData.overlayEditorDefaultMode === 'string'
+                ? configData.overlayEditorDefaultMode
+                : (typeof window.overlayEditorDefaultMode === 'string' ? window.overlayEditorDefaultMode : 'markdown');
+            const overlayFontScaleValue = Number.isFinite(configData.overlayEditorFontScale)
+                ? configData.overlayEditorFontScale
+                : (Number.isFinite(window.overlayEditorFontScale) ? window.overlayEditorFontScale : 1.2);
+            window.overlayEditorDefaultMode = overlayDefaultModeValue;
+            window.overlayEditorFontScale = overlayFontScaleValue;
+            window.cachedConfig.overlayEditorEnabled = window.overlayEditorEnabled;
+            window.cachedConfig.overlayEditorDefaultMode = overlayDefaultModeValue;
+            window.cachedConfig.overlayEditorFontScale = overlayFontScaleValue;
+            if (window.taskOverlayEditor?.applySettings) {
+                window.taskOverlayEditor.applySettings({
+                    enabled: window.overlayEditorEnabled,
+                    mode: overlayDefaultModeValue,
+                    fontScale: overlayFontScaleValue
+                });
+            }
             if (typeof pendingMarpOverride === 'boolean') {
                 window.pendingMarpSettingsOverride = undefined;
             }
@@ -4796,6 +4851,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update special character toggle UI
     updateSpecialCharToggleUI(window.showSpecialCharacters ?? false);
+    updateOverlayEditorToggleUI(window.overlayEditorEnabled ?? false);
 });
 } // End of third webviewEventListenersInitialized guard
 

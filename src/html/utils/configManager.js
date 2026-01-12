@@ -39,7 +39,10 @@ class ConfigManager {
             htmlContentRenderMode: 'html',
             showMarpSettings: true,
             showSpecialCharacters: false,
-            wysiwygEnabled: false
+            wysiwygEnabled: false,
+            overlayEditorEnabled: false,
+            overlayEditorDefaultMode: 'markdown',
+            overlayEditorFontScale: 1.2
         };
     }
 

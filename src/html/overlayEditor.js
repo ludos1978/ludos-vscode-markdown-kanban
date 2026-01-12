@@ -6,6 +6,11 @@
     if (!overlay) { return; }
 
     const supportedModes = new Set(['markdown', 'dual', 'wysiwyg']);
+    const configKeys = {
+        enabled: 'overlayEditorEnabled',
+        defaultMode: 'overlayEditorDefaultMode',
+        fontScale: 'overlayEditorFontScale'
+    };
 
     const state = {
         // Requires: global settings (enable toggle, default mode, font scale).
@@ -120,12 +125,27 @@
     let activeAdapter = adapters.markdown;
     let keydownHandler = null;
 
-    function applyFontScale(scale) {
+    function persistPreference(key, value) {
+        if (window.configManager) {
+            window.configManager.setPreference(key, value);
+        } else if (window.vscode?.postMessage) {
+            window.vscode.postMessage({ type: 'setPreference', key, value });
+        }
+        if (window.cachedConfig) {
+            window.cachedConfig[key] = value;
+        }
+    }
+
+    function applyFontScale(scale, options = {}) {
+        const { persist = false } = options;
         const nextScale = Number.isFinite(scale) ? scale : state.fontScale;
         state.fontScale = nextScale;
         overlay.style.setProperty('--task-overlay-font-scale', `${nextScale}`);
         if (activeAdapter && typeof activeAdapter.setFontScale === 'function') {
             activeAdapter.setFontScale(nextScale);
+        }
+        if (persist) {
+            persistPreference(configKeys.fontScale, nextScale);
         }
     }
 
@@ -188,12 +208,46 @@
         closeOverlay();
     }
 
-    function setMode(mode) {
+    function setMode(mode, options = {}) {
         // Requires: mode switching for markdown, dual, and wysiwyg.
+        const { persist = false } = options;
         if (!supportedModes.has(mode)) { return; }
         state.mode = mode;
         overlay.dataset.mode = mode;
         setActiveAdapter(mode);
+        if (persist) {
+            persistPreference(configKeys.defaultMode, mode);
+        }
+    }
+
+    function applySettings(settings = {}) {
+        if (typeof settings.enabled === 'boolean') {
+            state.enabled = settings.enabled;
+        }
+        if (typeof settings.mode === 'string') {
+            setMode(settings.mode);
+        }
+        if (Number.isFinite(settings.fontScale)) {
+            applyFontScale(settings.fontScale);
+        }
+    }
+
+    function loadSettingsFromConfig() {
+        const config = window.cachedConfig || {};
+        const resolvedMode = typeof config.overlayEditorDefaultMode === 'string'
+            ? config.overlayEditorDefaultMode
+            : (window.configManager?.getConfig?.(configKeys.defaultMode, state.mode) ?? state.mode);
+        const resolvedFontScale = Number.isFinite(config.overlayEditorFontScale)
+            ? config.overlayEditorFontScale
+            : (window.configManager?.getConfig?.(configKeys.fontScale, state.fontScale) ?? state.fontScale);
+        const resolvedEnabled = typeof config.overlayEditorEnabled === 'boolean'
+            ? config.overlayEditorEnabled
+            : (window.configManager?.getConfig?.(configKeys.enabled, state.enabled) ?? state.enabled);
+        applySettings({
+            enabled: resolvedEnabled,
+            mode: resolvedMode,
+            fontScale: resolvedFontScale
+        });
     }
 
     function toggleSettingsMenu(forceOpen) {
@@ -212,7 +266,7 @@
                 const action = btn.dataset.action;
                 const fontScale = Number.parseFloat(btn.dataset.fontScale);
                 if (Number.isFinite(fontScale)) {
-                    applyFontScale(fontScale);
+                    applyFontScale(fontScale, { persist: true });
                     toggleSettingsMenu(false);
                     return;
                 }
@@ -223,13 +277,13 @@
                     toggleSettingsMenu();
                 }
                 if (action === 'mode-markdown') {
-                    setMode('markdown');
+                    setMode('markdown', { persist: true });
                 }
                 if (action === 'mode-dual') {
-                    setMode('dual');
+                    setMode('dual', { persist: true });
                 }
                 if (action === 'mode-wysiwyg') {
-                    setMode('wysiwyg');
+                    setMode('wysiwyg', { persist: true });
                 }
             });
         });
@@ -239,8 +293,7 @@
         }
     }
 
-    applyFontScale(state.fontScale);
-    setMode(state.mode);
+    loadSettingsFromConfig();
     attachHandlers();
 
     // Expose minimal API for integration (task burger menu + global toggle).
@@ -248,6 +301,7 @@
         open: openOverlay,
         close: closeOverlay,
         setMode,
+        applySettings,
         registry: commandRegistry
     };
 })();

@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.97.92",
+  "version": "0.97.93",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -470,6 +470,28 @@
             "type": "boolean",
             "default": false,
             "description": "Enable the WYSIWYG editor for task descriptions."
+          },
+          "markdown-kanban.overlayEditorEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable the overlay task editor as the default editing experience."
+          },
+          "markdown-kanban.overlayEditorDefaultMode": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "dual",
+              "wysiwyg"
+            ],
+            "default": "markdown",
+            "description": "Default mode used when opening the overlay task editor."
+          },
+          "markdown-kanban.overlayEditorFontScale": {
+            "type": "number",
+            "default": 1.2,
+            "minimum": 0.8,
+            "maximum": 2.0,
+            "description": "Font scale multiplier applied inside the overlay task editor."
           },
 
 

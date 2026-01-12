@@ -73,6 +73,11 @@ export interface BoardUpdateMessage extends BaseMessage {
     openLinksInNewTab?: boolean;
     pathGeneration?: 'relative' | 'absolute';
     showMarpSettings?: boolean;
+    showSpecialCharacters?: boolean;
+    wysiwygEnabled?: boolean;
+    overlayEditorEnabled?: boolean;
+    overlayEditorDefaultMode?: 'markdown' | 'dual' | 'wysiwyg';
+    overlayEditorFontScale?: number;
     imageMappings?: Record<string, string>;
     // Optional fields for full board loads
     isFullRefresh?: boolean;

@@ -32,6 +32,11 @@ export interface KanbanConfiguration {
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
     showMarpSettings: boolean;
+    showSpecialCharacters: boolean;
+    wysiwygEnabled: boolean;
+    overlayEditorEnabled: boolean;
+    overlayEditorDefaultMode: 'markdown' | 'dual' | 'wysiwyg';
+    overlayEditorFontScale: number;
     marp: {
         enginePath: string;
         defaultTheme: string;
@@ -86,6 +91,11 @@ export class ConfigurationService {
         htmlContentRenderMode: 'html',
         arrowKeyFocusScroll: 'center',
         showMarpSettings: true,
+        showSpecialCharacters: false,
+        wysiwygEnabled: false,
+        overlayEditorEnabled: false,
+        overlayEditorDefaultMode: 'markdown',
+        overlayEditorFontScale: 1.2,
         marp: {
             enginePath: './marp-engine/engine.js',
             defaultTheme: 'default',
@@ -251,7 +261,12 @@ export class ConfigurationService {
             arrowKeyFocusScroll: this.getConfig('arrowKeyFocusScroll'),
             openLinksInNewTab: this.getConfig('openLinksInNewTab'),
             pathGeneration: this.getConfig('pathGeneration'),
-            showMarpSettings: this.getConfig('showMarpSettings')
+            showMarpSettings: this.getConfig('showMarpSettings'),
+            showSpecialCharacters: this.getConfig('showSpecialCharacters'),
+            wysiwygEnabled: this.getConfig('wysiwygEnabled'),
+            overlayEditorEnabled: this.getConfig('overlayEditorEnabled'),
+            overlayEditorDefaultMode: this.getConfig('overlayEditorDefaultMode'),
+            overlayEditorFontScale: this.getConfig('overlayEditorFontScale')
         };
     }
 
