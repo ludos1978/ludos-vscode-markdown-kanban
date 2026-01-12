@@ -56,6 +56,7 @@
 - [ ] Select text, press *, _, ~, [, (, or { and confirm the editor adds the matching start/end characters around the selection while keeping it highlighted; with no selection the keys should just insert their character.
 - [ ] In the WYSIWYG editor, select text and press *, _, ~, [, (, or { and confirm the selection stays highlighted and gets wrapped with the matching characters.
 - [ ] On keyboard layouts where ~ is a dead key (e.g., Alt+N then Space), confirm ~ inserts normally with no selection, wraps selected text when pressed with a selection, and does not insert an extra ~ afterward.
+- [ ] In WYSIWYG, apply a mark (bold/italic/etc) to a selection and then type after it; new text should be unstyled (mark does not stay sticky).
 - [ ] Open the debug overlay and confirm the main file path shown comes from the registry (matches the real file), and that Force Save All reports an error if no main file is registered.
 - [ ] Use Reload All Included Files and confirm include files reload from disk and the file list stays correct in the debug overlay.
 - [ ] Review docs/wysiwyg-mapping.md and confirm all markdown-it plugins/custom syntaxes are captured in the mapping plan.
@@ -134,6 +135,7 @@
 - [ ] Task burger menu: “Edit task (overlay)” is the first item and opens the overlay.
 - [ ] Overlay tools pane: buttons and insert menu add markdown snippets into the active editor mode.
 - [ ] Overlay tools pane: mark buttons toggle formatting in WYSIWYG mode (bold/italic/underline/strike/mark/sub/sup/code).
+- [ ] Overlay tools pane: formatting buttons reflect the active mark when the cursor is inside styled text.
 - [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
 - [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
 - [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.

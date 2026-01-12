@@ -136,6 +136,11 @@
                         if (this.context?.onSubmit) {
                             this.context.onSubmit();
                         }
+                    },
+                    onSelectionChange: (selectionState) => {
+                        if (this.context?.onSelectionChange) {
+                            this.context.onSelectionChange(selectionState);
+                        }
                     }
                 });
             } else if (typeof this.editor.setMarkdown === 'function') {
@@ -363,6 +368,37 @@
         'container-caption': '::: caption\n\n:::\n'
     };
 
+    const commandMarkMap = {
+        bold: 'strong',
+        italic: 'em',
+        underline: 'underline',
+        strike: 'strike',
+        mark: 'mark',
+        sub: 'sub',
+        sup: 'sup',
+        code: 'code',
+        link: 'link',
+        ins: 'ins'
+    };
+
+    function updateWysiwygToolbar(selectionState) {
+        const toolbar = overlay.querySelector('.task-overlay-tools');
+        if (!toolbar) { return; }
+        const marks = new Set(selectionState?.marks || []);
+        const block = selectionState?.block || '';
+        const toolButtons = toolbar.querySelectorAll('.task-overlay-tool');
+        toolButtons.forEach((button) => {
+            const command = button.dataset.command;
+            let isActive = false;
+            if (command === 'code-block') {
+                isActive = block === 'code_block';
+            } else if (command && commandMarkMap[command]) {
+                isActive = marks.has(commandMarkMap[command]);
+            }
+            button.classList.toggle('active', isActive);
+        });
+    }
+
     function insertSnippet(snippet) {
         if (!snippet) { return; }
         const adapter = activeAdapter;
@@ -414,7 +450,8 @@
             setState({ draft: value }, options);
         },
         getTaskRef: () => state.taskRef,
-        onSubmit: () => handleSave()
+        onSubmit: () => handleSave(),
+        onSelectionChange: (selectionState) => updateWysiwygToolbar(selectionState)
     };
 
     const adapters = {

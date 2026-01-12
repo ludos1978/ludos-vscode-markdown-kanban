@@ -1,5 +1,5 @@
 import { EditorState, TextSelection, Selection, Transaction } from 'prosemirror-state';
-import type { Node as ProseMirrorNode, Schema } from 'prosemirror-model';
+import type { MarkType, Node as ProseMirrorNode, Schema } from 'prosemirror-model';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -17,6 +17,12 @@ export type WysiwygEditorOptions = {
     temporalPrefix?: string;
     onChange?: (markdown: string) => void;
     onSubmit?: () => void;
+    onSelectionChange?: (state: WysiwygSelectionState) => void;
+};
+
+export type WysiwygSelectionState = {
+    marks: string[];
+    block: string | null;
 };
 
 const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
@@ -42,6 +48,46 @@ const TILDE_DEAD_CODES = new Set([
     'BracketRight',
     'Digit4'
 ]);
+
+function isMarkActive(state: EditorState, type: MarkType): boolean {
+    const { from, to, empty, $from } = state.selection;
+    if (empty) {
+        const marks = state.storedMarks || $from.marks();
+        return Boolean(type?.isInSet(marks));
+    }
+    return Boolean(type && state.doc.rangeHasMark(from, to, type));
+}
+
+function buildSelectionState(state: EditorState): WysiwygSelectionState {
+    const marks: string[] = [];
+    const schemaMarks = state.schema?.marks || {};
+    Object.entries(schemaMarks).forEach(([name, type]) => {
+        if (isMarkActive(state, type)) {
+            marks.push(name);
+        }
+    });
+    const block = state.selection.$from.parent?.type?.name || null;
+    return { marks, block };
+}
+
+function toggleMarkOnce(markType: MarkType) {
+    return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
+        let nextTr: Transaction | null = null;
+        const handled = toggleMark(markType)(state, (tr) => {
+            nextTr = tr;
+        });
+        if (!handled || !nextTr) {
+            return handled;
+        }
+        if (!state.selection.empty) {
+            (nextTr as Transaction).setStoredMarks([]);
+        }
+        if (dispatch) {
+            dispatch(nextTr);
+        }
+        return true;
+    };
+}
 
 const DIAGRAM_PREVIEW_DEBOUNCE_MS = 200;
 const diagramPreviewTimers = new WeakMap<HTMLElement, number>();
@@ -1064,11 +1110,13 @@ export class WysiwygEditor {
     private temporalPrefix: string;
     private onChange?: (markdown: string) => void;
     private onSubmit?: () => void;
+    private onSelectionChange?: (state: WysiwygSelectionState) => void;
 
     constructor(container: HTMLElement, options: WysiwygEditorOptions) {
         this.temporalPrefix = options.temporalPrefix || '!';
         this.onChange = options.onChange;
         this.onSubmit = options.onSubmit;
+        this.onSelectionChange = options.onSelectionChange;
 
         const schema = buildProseMirrorSchema();
         const initialDoc = markdownToWysiwygDoc(options.markdown || '', {
@@ -1231,9 +1279,9 @@ export class WysiwygEditor {
                 'Mod-z': undo,
                 'Shift-Mod-z': redo,
                 'Mod-y': redo,
-                'Mod-b': toggleMark(schema.marks.strong),
-                'Mod-i': toggleMark(schema.marks.em),
-                'Mod-`': toggleMark(schema.marks.code),
+                'Mod-b': toggleMarkOnce(schema.marks.strong),
+                'Mod-i': toggleMarkOnce(schema.marks.em),
+                'Mod-`': toggleMarkOnce(schema.marks.code),
                 'Shift-Ctrl-8': wrapInList(schema.nodes.bullet_list),
                 'Shift-Ctrl-9': wrapInList(schema.nodes.ordered_list),
                 'Shift-Ctrl-0': setBlockType(schema.nodes.paragraph),
@@ -1389,6 +1437,7 @@ export class WysiwygEditor {
                 }
                 const docChanged = transaction.docChanged || Boolean(normalized);
                 this.view.updateState(newState);
+                const selectionChanged = transaction.selectionSet || transaction.storedMarksSet || transaction.docChanged;
 
                 if (docChanged) {
                     this.lastMarkdown = this.serializeState(newState);
@@ -1397,11 +1446,15 @@ export class WysiwygEditor {
                     }
                     syncWysiwygImages(this.view.dom);
                 }
+                if (selectionChanged) {
+                    this.emitSelectionChange(newState);
+                }
             }
         });
 
         this.lastMarkdown = this.serializeState(this.view.state);
         syncWysiwygImages(this.view.dom);
+        this.emitSelectionChange(this.view.state);
     }
 
     focus(): void {
@@ -1431,6 +1484,7 @@ export class WysiwygEditor {
         this.view.updateState(newState);
         this.lastMarkdown = this.serializeState(this.view.state);
         syncWysiwygImages(this.view.dom);
+        this.emitSelectionChange(this.view.state);
     }
 
     getViewDom(): HTMLElement {
@@ -1455,23 +1509,23 @@ export class WysiwygEditor {
 
         switch (command) {
             case 'bold':
-                return schema.marks.strong ? toggleMark(schema.marks.strong)(state, dispatch) : false;
+                return schema.marks.strong ? toggleMarkOnce(schema.marks.strong)(state, dispatch) : false;
             case 'italic':
-                return schema.marks.em ? toggleMark(schema.marks.em)(state, dispatch) : false;
+                return schema.marks.em ? toggleMarkOnce(schema.marks.em)(state, dispatch) : false;
             case 'underline':
-                return schema.marks.underline ? toggleMark(schema.marks.underline)(state, dispatch) : false;
+                return schema.marks.underline ? toggleMarkOnce(schema.marks.underline)(state, dispatch) : false;
             case 'strike':
-                return schema.marks.strike ? toggleMark(schema.marks.strike)(state, dispatch) : false;
+                return schema.marks.strike ? toggleMarkOnce(schema.marks.strike)(state, dispatch) : false;
             case 'mark':
-                return schema.marks.mark ? toggleMark(schema.marks.mark)(state, dispatch) : false;
+                return schema.marks.mark ? toggleMarkOnce(schema.marks.mark)(state, dispatch) : false;
             case 'sub':
-                return schema.marks.sub ? toggleMark(schema.marks.sub)(state, dispatch) : false;
+                return schema.marks.sub ? toggleMarkOnce(schema.marks.sub)(state, dispatch) : false;
             case 'sup':
-                return schema.marks.sup ? toggleMark(schema.marks.sup)(state, dispatch) : false;
+                return schema.marks.sup ? toggleMarkOnce(schema.marks.sup)(state, dispatch) : false;
             case 'code':
-                return schema.marks.code ? toggleMark(schema.marks.code)(state, dispatch) : false;
+                return schema.marks.code ? toggleMarkOnce(schema.marks.code)(state, dispatch) : false;
             case 'ins':
-                return schema.marks.ins ? toggleMark(schema.marks.ins)(state, dispatch) : false;
+                return schema.marks.ins ? toggleMarkOnce(schema.marks.ins)(state, dispatch) : false;
             case 'code-block':
                 return schema.nodes.code_block ? setBlockType(schema.nodes.code_block)(state, dispatch) : false;
             case 'multicolumn': {
@@ -1485,6 +1539,13 @@ export class WysiwygEditor {
             default:
                 return false;
         }
+    }
+
+    private emitSelectionChange(state: EditorState): void {
+        if (!this.onSelectionChange) {
+            return;
+        }
+        this.onSelectionChange(buildSelectionState(state));
     }
 
     private serializeState(state: EditorState): string {

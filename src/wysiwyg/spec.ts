@@ -157,17 +157,17 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
         text: { group: 'inline' }
     },
     marks: {
-        em: {},
-        strong: {},
-        code: {},
-        strike: { attrs: { style: { default: 'tilde' } } },
-        underline: {},
-        mark: {},
-        sub: {},
-        sup: {},
-        ins: {},
-        link: { attrs: { href: { default: '' }, title: { default: '' } } },
-        abbr: { attrs: { title: { default: '' } } }
+        em: { inclusive: false },
+        strong: { inclusive: false },
+        code: { inclusive: false },
+        strike: { attrs: { style: { default: 'tilde' } }, inclusive: false },
+        underline: { inclusive: false },
+        mark: { inclusive: false },
+        sub: { inclusive: false },
+        sup: { inclusive: false },
+        ins: { inclusive: false },
+        link: { attrs: { href: { default: '' }, title: { default: '' } }, inclusive: false },
+        abbr: { attrs: { title: { default: '' } }, inclusive: false }
     }
 };
 
