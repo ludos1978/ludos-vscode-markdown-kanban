@@ -2528,6 +2528,16 @@ class TaskEditor {
         if (scrollHeight > currentHeight) {
             textarea.style.height = scrollHeight + 'px';
         }
+
+        // Keep the task item height lock in sync when editing descriptions
+        const taskItem = textarea.closest ? textarea.closest('.task-item') : null;
+        if (taskItem && taskItem._editingHeightLock) {
+            const lockedHeight = taskItem.offsetHeight;
+            const neededHeight = Math.max(taskItem.scrollHeight, taskItem._editingHeightLock.originalHeight || 0);
+            if (neededHeight > lockedHeight) {
+                taskItem.style.height = `${neededHeight}px`;
+            }
+        }
     }
 
     /**
