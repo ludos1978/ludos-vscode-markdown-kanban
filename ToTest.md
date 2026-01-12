@@ -110,3 +110,4 @@
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
+- [ ] With overlay editor enabled, clicking a task description opens the overlay instead of inline editing.

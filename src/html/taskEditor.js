@@ -1576,6 +1576,22 @@ class TaskEditor {
         // If transitioning, don't interfere
         if (this.isTransitioning) { return; }
 
+        if (type === 'task-description' && taskId && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            const task = column?.tasks?.find(t => t.id === taskId);
+            if (task?.includeError) {
+                console.warn('[startEdit] Cannot edit description for broken task include:', taskId);
+                return;
+            }
+            if (window.overlayEditorEnabled && window.taskOverlayEditor?.open) {
+                if (this.currentEditor && !this.isTransitioning) {
+                    this.save();
+                }
+                window.taskOverlayEditor.open({ taskId, columnId });
+                return;
+            }
+        }
+
         const container = document.getElementById('kanban-container');
         const scrollAtStart = container?.scrollTop || 0;
         const scrollLeftAtStart = container?.scrollLeft || 0;
