@@ -1,3 +1,7 @@
+editor view:
+- can we add a dedicated task edit view. it is added to the burger menu of a task (edit task) at the top. it opens a overlay with which fills 80% of width and height with an increased font size (configurable in a burger menu in the overlay editor). the overlay editor can only be closed by alt+enter or pressing save or escape or clicks outside the view. drop events (of external files should behave as direct link creation within the editor). the editor has 3 view modes. - markdown only mode - dual mode, where markdown is written left and the preview is on the right side. - wysiwyg mode where we re-use the wysiwyg editor, but with an additional tools pane at the top (adding image links, etc. as in a typical wysiwyg editor.) 
+
+
 wysiwyg errors:
 - pressing outside the edit field with the mouse should close the editor. it doesnt currently.
 - 
