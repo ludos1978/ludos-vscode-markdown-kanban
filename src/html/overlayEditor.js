@@ -130,13 +130,129 @@
 
     class DropHandler {
         // Requires: convert external file drops into markdown link/image insertions.
-        constructor(target, adapters) {
+        constructor(target, getAdapter) {
             this.target = target;
-            this.adapters = adapters;
+            this.getAdapter = getAdapter;
+            this.attached = false;
+            this.handleDragOver = null;
+            this.handleDrop = null;
         }
 
-        attach() {}
-        detach() {}
+        attach() {
+            if (this.attached || !this.target) { return; }
+            this.attached = true;
+            this.handleDragOver = (event) => {
+                if (!overlay.classList.contains('visible')) { return; }
+                if (!this.target.contains(event.target)) { return; }
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.dataTransfer) {
+                    event.dataTransfer.dropEffect = 'copy';
+                }
+            };
+            this.handleDrop = async (event) => {
+                if (!overlay.classList.contains('visible')) { return; }
+                if (!this.target.contains(event.target)) { return; }
+                event.preventDefault();
+                event.stopPropagation();
+                const markdown = await resolveDropContent(event.dataTransfer);
+                if (!markdown) { return; }
+                const adapter = typeof this.getAdapter === 'function' ? this.getAdapter() : null;
+                if (adapter && typeof adapter.insertText === 'function') {
+                    adapter.insertText(markdown);
+                } else if (elements.textarea) {
+                    elements.textarea.value += markdown;
+                }
+            };
+            this.target.addEventListener('dragover', this.handleDragOver);
+            this.target.addEventListener('drop', this.handleDrop);
+        }
+
+        detach() {
+            if (!this.attached || !this.target) { return; }
+            this.attached = false;
+            if (this.handleDragOver) {
+                this.target.removeEventListener('dragover', this.handleDragOver);
+            }
+            if (this.handleDrop) {
+                this.target.removeEventListener('drop', this.handleDrop);
+            }
+            this.handleDragOver = null;
+            this.handleDrop = null;
+        }
+    }
+
+    function isUrl(text) {
+        return /^https?:\/\//i.test(text);
+    }
+
+    function normalizeUriList(uriList) {
+        if (!uriList) { return []; }
+        return uriList
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'))
+            .map(line => {
+                if (line.startsWith('file://')) {
+                    let filePath = line.replace('file://', '');
+                    if (filePath.startsWith('/')) {
+                        filePath = filePath.replace(/^\/([A-Za-z]:\/)/, '$1');
+                    }
+                    try {
+                        return decodeURIComponent(filePath);
+                    } catch (error) {
+                        return filePath;
+                    }
+                }
+                return line;
+            });
+    }
+
+    function buildMarkdownLinks(paths) {
+        const linkFn = (typeof createFileMarkdownLink === 'function')
+            ? createFileMarkdownLink
+            : (path) => path;
+        return paths.map(path => linkFn(path)).join('\n');
+    }
+
+    async function resolveDropContent(dataTransfer) {
+        if (!dataTransfer) { return null; }
+        const files = Array.from(dataTransfer.files || []);
+        if (files.length > 0) {
+            const paths = files.map(file => file.path || file.name).filter(Boolean);
+            if (paths.length > 0) {
+                return buildMarkdownLinks(paths);
+            }
+        }
+        const uriList = dataTransfer.getData('text/uri-list');
+        if (uriList) {
+            const uris = normalizeUriList(uriList);
+            if (uris.length > 0) {
+                return buildMarkdownLinks(uris);
+            }
+        }
+        const text = dataTransfer.getData('text/plain');
+        if (text && text.trim()) {
+            const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            if (lines.length > 1) {
+                const linkable = lines.filter(line => (window.isFilePath && window.isFilePath(line)) || isUrl(line));
+                if (linkable.length > 0) {
+                    return buildMarkdownLinks(linkable);
+                }
+            }
+            if (typeof processClipboardText === 'function') {
+                try {
+                    const processed = await processClipboardText(text.trim());
+                    if (processed?.content) {
+                        return processed.content;
+                    }
+                } catch (error) {
+                    // Fallback to raw text insert.
+                }
+            }
+            return text;
+        }
+        return null;
     }
 
     const commandRegistry = new CommandRegistry();
@@ -147,7 +263,7 @@
         }),
         wysiwyg: new WysiwygAdapter(elements.wysiwygWrap)
     };
-    const dropHandler = new DropHandler(elements.panel, adapters);
+    const dropHandler = new DropHandler(elements.panel, () => activeAdapter);
     let activeAdapter = adapters.markdown;
     let keydownHandler = null;
     let previewTimer = null;

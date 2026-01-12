@@ -113,3 +113,4 @@
 - [ ] With overlay editor enabled, clicking a task description opens the overlay instead of inline editing.
 - [ ] Overlay editor dual mode renders preview using markdown-it pipeline and updates on input.
 - [ ] Overlay editor Save updates the task description and re-renders only that task (no full board refresh).
+- [ ] Overlay editor: dropping external files inserts markdown links at the cursor in the active editor mode.
