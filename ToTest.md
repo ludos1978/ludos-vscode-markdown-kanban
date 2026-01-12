@@ -106,6 +106,7 @@
 - [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.
 - [ ] In WYSIWYG, Tab inserts two spaces (and indents all selected lines), Shift+Tab unindents selected lines or removes spaces before the cursor, and Alt+Enter saves the edit without Tab ending editing.
 - [ ] Task burger menu: selecting “Edit task (overlay)” opens the overlay editor shell without console errors.
+- [ ] Overlay editor panel stays within 80% of viewport width/height (no overflow beyond 80vw/80vh).
 - [ ] Overlay editor mode buttons (Markdown/Dual/WYSIWYG) toggle visibility of the correct panes.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).

@@ -5891,13 +5891,19 @@ figcaption {
 
 .task-overlay-panel {
   position: absolute;
-  inset: 10%;
+  top: 10vh;
+  left: 10vw;
+  width: 80vw;
+  height: 80vh;
+  max-width: 80vw;
+  max-height: 80vh;
   background: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   font-family: var(--vscode-editor-font-family);
+  box-sizing: border-box;
 }
 
 .task-overlay-header {
