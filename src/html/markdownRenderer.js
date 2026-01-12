@@ -979,9 +979,23 @@ let diagramRequestId = 0;
 const pendingDiagramQueue = [];
 let diagramQueueProcessing = false;
 
-// Track rendered media files with their mtimes for change detection
-// Key: filePath, Value: { mtime, diagramType, element }
+// Track rendered diagram files with their mtimes for change detection
+// Key: `${diagramType}:${filePath}:${includeDir || ''}`, Value: { mtime, imageDataUrl }
 const renderedMediaTracker = new Map();
+
+function getRenderedDiagramKey(filePath, diagramType, includeDir) {
+    return `${diagramType}:${filePath}:${includeDir || ''}`;
+}
+
+function getRenderedDiagramCache(filePath, diagramType, includeDir) {
+    const key = getRenderedDiagramKey(filePath, diagramType, includeDir);
+    return renderedMediaTracker.get(key);
+}
+
+function setRenderedDiagramCache(filePath, diagramType, includeDir, mtime, imageDataUrl) {
+    const key = getRenderedDiagramKey(filePath, diagramType, includeDir);
+    renderedMediaTracker.set(key, { mtime, imageDataUrl });
+}
 
 /**
  * Invalidate cached diagram renders for a specific file path
@@ -994,6 +1008,11 @@ function invalidateDiagramCache(filePath, diagramType) {
             diagramRenderCache.delete(key);
         }
     }
+    for (const key of renderedMediaTracker.keys()) {
+        if (key.startsWith(prefix)) {
+            renderedMediaTracker.delete(key);
+        }
+    }
 }
 
 /**
@@ -1001,6 +1020,7 @@ function invalidateDiagramCache(filePath, diagramType) {
  */
 function clearDiagramCache() {
     diagramRenderCache.clear();
+    renderedMediaTracker.clear();
 }
 
 // Expose diagram cache functions for external calls (e.g., from webview.js)
@@ -1321,22 +1341,32 @@ async function processDiagramQueue() {
                 fileMtime = result.fileMtime;
                 displayLabel = `PDF page ${item.pageNumber}`;
             } else {
-                // Render diagram (draw.io or excalidraw)
-                const result = await renderDiagram(item.filePath, item.diagramType, item.includeDir);
-                imageDataUrl = result.svgDataUrl;
-                fileMtime = result.fileMtime;
+                // Render diagram (draw.io or excalidraw) with cache reuse when unchanged
+                const cachedDiagram = getRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir);
+                if (cachedDiagram) {
+                    imageDataUrl = cachedDiagram.imageDataUrl;
+                    fileMtime = cachedDiagram.mtime;
+                } else {
+                    const result = await renderDiagram(item.filePath, item.diagramType, item.includeDir);
+                    imageDataUrl = result.svgDataUrl;
+                    fileMtime = result.fileMtime;
+                    setRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir, fileMtime, imageDataUrl);
+                }
                 displayLabel = `${item.diagramType} diagram`;
             }
 
             // Cache with mtime for invalidation on file changes
             const cacheKey = item.diagramType === 'pdf'
                 ? `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`
-                : `${item.diagramType}:${item.filePath}:${fileMtime}`;
+                : `${item.diagramType}:${item.filePath}:${item.includeDir || ''}:${fileMtime}`;
 
             // Invalidate old cache entries for this file first
             invalidateDiagramCache(item.filePath, item.diagramType);
             // Add current version (with size limit)
             setCacheWithLimit(diagramRenderCache, cacheKey, imageDataUrl);
+            if (item.diagramType !== 'pdf' && item.diagramType !== 'pdf-slideshow') {
+                setRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir, fileMtime, imageDataUrl);
+            }
 
             // Replace placeholder with rendered image wrapped in overlay container with menu
             // Include data-original-src for alt-click to open in editor
