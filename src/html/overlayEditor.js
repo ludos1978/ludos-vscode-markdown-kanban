@@ -452,6 +452,16 @@
         return typeof value === 'string' ? value : '';
     }
 
+    function updateModeButtons() {
+        const buttons = overlay.querySelectorAll('.task-overlay-btn[data-action^="mode-"]');
+        buttons.forEach((button) => {
+            const action = button.dataset.action || '';
+            const isActive = action === `mode-${state.mode}`;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
     function updatePreview(options = {}) {
         const { immediate = false } = options;
         if (state.mode !== 'dual') {
@@ -554,6 +564,7 @@
             state.mode = nextState.mode;
             overlay.dataset.mode = nextState.mode;
             setActiveAdapter(getAdapterForMode(nextState.mode));
+            updateModeButtons();
             shouldUpdatePreview = true;
             if (persistMode) {
                 persistPreference(configKeys.defaultMode, nextState.mode);

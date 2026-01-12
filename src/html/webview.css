@@ -5977,6 +5977,12 @@ figcaption {
   background: var(--vscode-button-secondaryHoverBackground);
 }
 
+.task-overlay-btn.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
+}
+
 .task-overlay-tool-select {
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);

@@ -114,6 +114,7 @@
 - [ ] Overlay editor closes via Escape/Alt+Enter even after multiple open/close cycles (no duplicate handlers).
 - [ ] Overlay editor WYSIWYG still syncs draft text when switching modes or saving.
 - [ ] Overlay editor: switching between Markdown/Dual/WYSIWYG preserves the exact draft (no divergent content).
+- [ ] Overlay editor highlights the active mode button (Markdown/Dual/WYSIWYG).
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
