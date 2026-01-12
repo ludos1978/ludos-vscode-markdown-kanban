@@ -887,12 +887,24 @@ function createMulticolumnTransaction(
     const paragraphStart = $from.before(paragraphDepth);
     const paragraphEnd = $from.after(paragraphDepth);
 
-    // Create: multicolumn > multicolumn_column(growth) > paragraph
-    const paragraph = schema.nodes.paragraph.create();
-    const column = schema.nodes.multicolumn_column.create({ growth }, paragraph);
+    const sourceParagraph = $from.node(paragraphDepth);
+    const beforeParagraph = schema.nodes.paragraph.create(null, sourceParagraph.content);
+    const afterParagraph = schema.nodes.paragraph.create();
+
+    // Create: paragraph (before) + multicolumn + paragraph (after)
+    const columnParagraph = schema.nodes.paragraph.create();
+    const column = schema.nodes.multicolumn_column.create({ growth }, columnParagraph);
     const multicolumn = schema.nodes.multicolumn.create(null, column);
 
-    return state.tr.replaceWith(paragraphStart, paragraphEnd, multicolumn);
+    const tr = state.tr.replaceWith(paragraphStart, paragraphEnd, [
+        beforeParagraph,
+        multicolumn,
+        afterParagraph
+    ]);
+
+    const multicolumnPos = paragraphStart + beforeParagraph.nodeSize;
+    const selectionPos = multicolumnPos + 3;
+    return tr.setSelection(TextSelection.create(tr.doc, selectionPos));
 }
 
 function addColumnTransaction(

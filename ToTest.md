@@ -137,6 +137,7 @@
 - [ ] Overlay tools pane: mark buttons toggle formatting in WYSIWYG mode (bold/italic/underline/strike/mark/sub/sup/code).
 - [ ] Overlay tools pane: formatting buttons reflect the active mark when the cursor is inside styled text.
 - [ ] Overlay tools pane includes buttons for multicolumn, include, wiki link, and footnote.
+- [ ] Overlay insert menu no longer lists multicolumn, include, wiki link, or footnote.
 - [ ] In overlay WYSIWYG, large images never exceed 80% of the editor pane height.
 - [ ] In overlay WYSIWYG, when a task starts or ends with an image, you can still type before and after it.
 - [ ] In overlay WYSIWYG, selecting text and pressing Link inserts `[text](url)` with the selection placed in the text or url portion based on filename/path detection, and keeps that portion selected.
