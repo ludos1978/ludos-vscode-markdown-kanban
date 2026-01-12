@@ -58,3 +58,38 @@
 - Step 2 (Design): define the overlay editor state model, adapters, and command registry.
 - Step 3 (Implement UI): wire toolbar commands to the adapter registry, add mode switching and persistence.
 - Step 4 (Drag/drop): implement drop strategy and route to adapters; verify insertion in markdown + wysiwyg.
+
+## Final implementation plan (steps)
+1) Inventory + parity map
+   - Confirm markdown-it plugins used in `src/html/markdownRenderer.js`.
+   - Confirm WYSIWYG pipeline plugins/tokens from `src/wysiwyg/markdownItFactory.ts`.
+   - Produce an adapter capability list that both modes must support.
+
+2) Overlay editor core module
+   - Add an overlay editor controller (open/close/save/mode switch).
+   - State model: `mode`, `draft`, `fontScale`, `taskRef`, `includeContext`.
+   - Global settings (config only, no per-board state): enable toggle, default mode, font scale.
+
+3) UI + mode wiring
+   - HTML/CSS overlay (80% width/height, dim backdrop, focus trap).
+   - Mode selector + font size menu in overlay toolbar.
+   - Markdown-only + dual mode share a textarea; dual shows live preview using same markdown-it pipeline.
+   - WYSIWYG mode reuses ProseMirror with a tools pane (including multicolumn `---: :--: :---` control and other plugin actions).
+
+4) Toolbar command registry
+   - Implement a command registry that routes actions to the active adapter.
+   - Commands: bold/italic/underline/strike/mark/sub/sup, link, image, list, heading, container blocks, multicolumn, include, footnote, emoji.
+
+5) Drag & drop integration
+   - Add a drop handler that converts external drops into markdown links/images at the cursor.
+   - Route drops through the active adapter (markdown or WYSIWYG) so behavior is identical.
+   - Ensure overlay blocks board-level drop handlers while active.
+
+6) Save + close behavior
+   - Save updates task data and re-renders only affected task.
+   - Close conditions: Alt+Enter, Save, Escape, click outside.
+   - Inline editor remains available; overlay can be launched from task burger even when globally disabled.
+
+7) Verification
+   - Manual checks for plugin parity and toolbar actions.
+   - Confirm diagram/media rendering in preview matches board rendering.
