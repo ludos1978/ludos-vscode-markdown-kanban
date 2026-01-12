@@ -108,6 +108,7 @@
 - [ ] Task burger menu: selecting “Edit task (overlay)” opens the overlay editor shell without console errors.
 - [ ] Overlay editor panel stays within 80% of viewport width/height (no overflow beyond 80vw/80vh).
 - [ ] Overlay editor mode buttons (Markdown/Dual/WYSIWYG) toggle visibility of the correct panes.
+- [ ] Overlay editor dual mode shows a visible separator between markdown and preview panes.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.

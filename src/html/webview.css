@@ -6017,6 +6017,10 @@ figcaption {
   display: block;
 }
 
+.task-overlay-editor[data-mode="dual"] .task-overlay-markdown {
+  border-right: 1px solid var(--vscode-panel-border);
+}
+
 .task-overlay-editor[data-mode="wysiwyg"] .task-overlay-wysiwyg {
   display: block;
 }
