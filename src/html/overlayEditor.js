@@ -543,6 +543,14 @@
         }, previewDelayMs);
     }
 
+    function updateWysiwygHeight() {
+        if (!overlay.classList.contains('visible')) { return; }
+        if (!elements.wysiwygWrap) { return; }
+        const rect = elements.wysiwygWrap.getBoundingClientRect();
+        if (!rect.height) { return; }
+        overlay.style.setProperty('--task-overlay-wysiwyg-height', `${Math.floor(rect.height)}px`);
+    }
+
     function persistPreference(key, value) {
         if (!window.configManager || typeof window.configManager.setPreference !== 'function') {
             console.error('[OverlayEditor] configManager missing, cannot persist preference', key);
@@ -603,6 +611,7 @@
             immediatePreview = false
         } = options;
         let shouldUpdatePreview = false;
+        let shouldUpdateWysiwyg = false;
 
         if (Object.prototype.hasOwnProperty.call(nextState, 'taskRef')) {
             state.taskRef = nextState.taskRef;
@@ -625,6 +634,7 @@
             setActiveAdapter(getAdapterForMode(nextState.mode));
             updateModeButtons();
             shouldUpdatePreview = true;
+            shouldUpdateWysiwyg = state.mode === 'wysiwyg';
             if (persistMode) {
                 persistPreference(configKeys.defaultMode, nextState.mode);
             }
@@ -636,12 +646,16 @@
             if (activeAdapter && typeof activeAdapter.setFontScale === 'function') {
                 activeAdapter.setFontScale(nextScale);
             }
+            shouldUpdateWysiwyg = shouldUpdateWysiwyg || state.mode === 'wysiwyg';
             if (persistFontScale) {
                 persistPreference(configKeys.fontScale, nextScale);
             }
         }
         if (shouldUpdatePreview) {
             updatePreview({ immediate: immediatePreview });
+        }
+        if (shouldUpdateWysiwyg && overlay.classList.contains('visible')) {
+            requestAnimationFrame(() => updateWysiwygHeight());
         }
     }
 
@@ -695,6 +709,7 @@
         if (activeAdapter && typeof activeAdapter.focus === 'function') {
             activeAdapter.focus();
         }
+        requestAnimationFrame(() => updateWysiwygHeight());
         if (dropHandler && typeof dropHandler.attach === 'function') {
             dropHandler.attach();
         }
@@ -871,6 +886,8 @@
         if (elements.backdrop) {
             elements.backdrop.addEventListener('click', () => requestClose('backdrop'));
         }
+
+        window.addEventListener('resize', () => updateWysiwygHeight());
     }
 
     function handleEditorShortcut(event) {
