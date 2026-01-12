@@ -143,3 +143,4 @@
 - [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "snippet": "..." }` and confirm it inserts even when VS Code would normally capture Cmd+1.
 - [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "name": "Markdown Marp Table Separator Left" }` and confirm snippet names resolve from user/workspace snippet files.
 - [ ] On initial webview load, cached shortcuts populate and Meta+1 (or other Meta+digit) snippet keybindings insert the configured snippet without requiring a second keypress.
+- [ ] While editing inline, press Cmd+Z/Cmd+Shift+Z and confirm text undo/redo works inside the textarea (VS Code keybinding route).

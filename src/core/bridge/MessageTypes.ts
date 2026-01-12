@@ -374,6 +374,20 @@ export interface InsertSnippetContentMessage extends BaseMessage {
 }
 
 /**
+ * Perform editor undo inside webview
+ */
+export interface PerformEditorUndoMessage extends BaseMessage {
+    type: 'performEditorUndo';
+}
+
+/**
+ * Perform editor redo inside webview
+ */
+export interface PerformEditorRedoMessage extends BaseMessage {
+    type: 'performEditorRedo';
+}
+
+/**
  * Trigger snippet insertion in webview
  */
 export interface TriggerSnippetMessage extends BaseMessage {
@@ -1797,6 +1811,8 @@ export type OutgoingMessage =
     | SyncDirtyItemsMessage
     | UpdateShortcutsMessage
     | InsertSnippetContentMessage
+    | PerformEditorUndoMessage
+    | PerformEditorRedoMessage
     | UpdateColumnContentExtendedMessage
     | UpdateTaskContentExtendedMessage
     | ConfigurationUpdateMessage

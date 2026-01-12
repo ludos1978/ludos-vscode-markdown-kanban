@@ -265,6 +265,22 @@ export function activate(context: vscode.ExtensionContext) {
 		activePanel.triggerSnippetInsertion();
 	});
 
+	const editorUndoCommand = vscode.commands.registerCommand('markdown-kanban.editorUndo', () => {
+		const panels = KanbanWebviewPanel.getAllPanels();
+		if (panels.length === 0) {
+			return;
+		}
+		panels[0].performEditorUndo();
+	});
+
+	const editorRedoCommand = vscode.commands.registerCommand('markdown-kanban.editorRedo', () => {
+		const panels = KanbanWebviewPanel.getAllPanels();
+		if (panels.length === 0) {
+			return;
+		}
+		panels[0].performEditorRedo();
+	});
+
 	// Sidebar commands
 	const scanWorkspaceCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.scanWorkspace', async () => {
 		await sidebarProvider.scanWorkspace();
@@ -325,6 +341,8 @@ export function activate(context: vscode.ExtensionContext) {
 		clearSidebarCommand,
 		refreshSidebarCommand,
 		filterSidebarCommand,
+		editorUndoCommand,
+		editorRedoCommand,
 		activeEditorChangeListener,
 	);
 

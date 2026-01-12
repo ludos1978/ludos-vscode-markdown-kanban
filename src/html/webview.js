@@ -3089,6 +3089,12 @@ if (!webviewEventListenersInitialized) {
             // Insert VS Code snippet content into the active editor
             insertVSCodeSnippetContent(message.content, message.fieldType, message.taskId);
             break;
+        case 'performEditorUndo':
+            performEditorUndo();
+            break;
+        case 'performEditorRedo':
+            performEditorRedo();
+            break;
         case 'replaceSelection':
             // Replace selected text with result from command (e.g., translation)
             if (window.taskEditorManager) {
@@ -3887,6 +3893,55 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
             hasTaskEditor: !!window.taskEditor,
             hasCurrentEditor: !!(window.taskEditor && window.taskEditor.currentEditor)
         });
+    }
+}
+
+function performEditorUndo() {
+    const activeElement = document.activeElement;
+    const isTextInput = activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT');
+    const viewDom = window.taskEditor?.currentEditor?.wysiwyg?.getViewDom?.();
+    const isWysiwyg = !!(viewDom && (activeElement === viewDom || viewDom.contains(activeElement)));
+    if (isWysiwyg && viewDom) {
+        const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+        const event = new KeyboardEvent('keydown', {
+            key: 'z',
+            code: 'KeyZ',
+            metaKey: isMac,
+            ctrlKey: !isMac,
+            bubbles: true,
+            cancelable: true
+        });
+        viewDom.dispatchEvent(event);
+        return;
+    }
+    if (isTextInput) {
+        activeElement.focus();
+        document.execCommand('undo');
+    }
+}
+
+function performEditorRedo() {
+    const activeElement = document.activeElement;
+    const isTextInput = activeElement && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT');
+    const viewDom = window.taskEditor?.currentEditor?.wysiwyg?.getViewDom?.();
+    const isWysiwyg = !!(viewDom && (activeElement === viewDom || viewDom.contains(activeElement)));
+    if (isWysiwyg && viewDom) {
+        const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+        const event = new KeyboardEvent('keydown', {
+            key: 'z',
+            code: 'KeyZ',
+            metaKey: isMac,
+            ctrlKey: !isMac,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true
+        });
+        viewDom.dispatchEvent(event);
+        return;
+    }
+    if (isTextInput) {
+        activeElement.focus();
+        document.execCommand('redo');
     }
 }
 

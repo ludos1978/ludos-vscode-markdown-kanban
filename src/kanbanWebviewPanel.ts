@@ -23,7 +23,7 @@ import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
-import { InsertSnippetContentMessage, TriggerSnippetMessage } from './core/bridge/MessageTypes';
+import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { cleanupAutoExportSubscription } from './commands';
 import {
@@ -679,5 +679,19 @@ export class KanbanWebviewPanel {
             return;
         }
         this._webviewBridge.send({ type: 'insertSnippetContent', content: snippet } as InsertSnippetContentMessage);
+    }
+
+    public performEditorUndo(): void {
+        if (!this._panel) {
+            return;
+        }
+        this._webviewBridge.send({ type: 'performEditorUndo' } as PerformEditorUndoMessage);
+    }
+
+    public performEditorRedo(): void {
+        if (!this._panel) {
+            return;
+        }
+        this._webviewBridge.send({ type: 'performEditorRedo' } as PerformEditorRedoMessage);
     }
 }
