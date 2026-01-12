@@ -115,3 +115,4 @@
 - [ ] Overlay editor Save updates the task description and re-renders only that task (no full board refresh).
 - [ ] Overlay editor: dropping external files inserts markdown links at the cursor in the active editor mode.
 - [ ] Overlay editor WYSIWYG mode accepts dropped files and inserts markdown links at the cursor.
+- [ ] Task burger menu: “Edit task (overlay)” is the first item and opens the overlay.
