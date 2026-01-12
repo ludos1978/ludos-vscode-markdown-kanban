@@ -397,7 +397,6 @@
     };
     const dropHandler = new DropHandler(elements.panel, () => activeAdapter);
     let activeAdapter = getAdapterForMode(state.mode);
-    let keydownHandler = null;
     let previewTimer = null;
     const previewDelayMs = 80;
 
@@ -595,18 +594,6 @@
         if (dropHandler && typeof dropHandler.attach === 'function') {
             dropHandler.attach();
         }
-        if (!keydownHandler) {
-            keydownHandler = (event) => {
-                if (event.key === 'Escape') {
-                    closeOverlay();
-                    return;
-                }
-                if (event.key === 'Enter' && event.altKey) {
-                    handleSave();
-                }
-            };
-            document.addEventListener('keydown', keydownHandler);
-        }
     }
 
     function closeOverlay() {
@@ -620,10 +607,6 @@
         window.currentTaskIncludeContext = null;
         if (dropHandler && typeof dropHandler.detach === 'function') {
             dropHandler.detach();
-        }
-        if (keydownHandler) {
-            document.removeEventListener('keydown', keydownHandler);
-            keydownHandler = null;
         }
     }
 
@@ -714,6 +697,17 @@
 
     function attachHandlers() {
         // Requires: save + mode switch handlers.
+        document.addEventListener('keydown', (event) => {
+            if (!overlay.classList.contains('visible')) { return; }
+            if (event.key === 'Escape') {
+                closeOverlay();
+                return;
+            }
+            if (event.key === 'Enter' && event.altKey) {
+                handleSave();
+            }
+        });
+
         overlay.addEventListener('click', (event) => {
             const toolButton = event.target.closest('.task-overlay-tool');
             if (toolButton && overlay.contains(toolButton)) {

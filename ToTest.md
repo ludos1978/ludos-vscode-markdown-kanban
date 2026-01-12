@@ -111,6 +111,7 @@
 - [ ] Overlay editor dual mode shows a visible separator between markdown and preview panes.
 - [ ] Overlay editor toolbar actions (tools, mode toggles, font scale, save) still respond after the refactor.
 - [ ] Overlay editor save uses the current task data (no failure after switching modes or reopening).
+- [ ] Overlay editor closes via Escape/Alt+Enter even after multiple open/close cycles (no duplicate handlers).
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
