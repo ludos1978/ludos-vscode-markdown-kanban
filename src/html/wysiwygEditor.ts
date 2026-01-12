@@ -696,37 +696,64 @@ function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirror
     return state.doc;
 }
 
-function replaceSelectedMediaBlockWithInline(view: EditorView, text: string): boolean {
+function placeCursorAroundMediaBlock(view: EditorView, nodePos: number, placeAfter: boolean, insertText?: string): boolean {
+    const { state } = view;
+    const mediaBlock = state.schema.nodes.media_block;
+    const paragraph = state.schema.nodes.paragraph;
+    if (!mediaBlock || !paragraph) {
+        return false;
+    }
+    const node = state.doc.nodeAt(nodePos);
+    if (!node || node.type !== mediaBlock) {
+        return false;
+    }
+
+    const insertPos = placeAfter ? nodePos + node.nodeSize : nodePos;
+    const resolved = state.doc.resolve(insertPos);
+    let tr = state.tr;
+    let selectionPos = insertPos + 1;
+
+    if (placeAfter) {
+        const next = resolved.nodeAfter;
+        if (next && next.isTextblock) {
+            selectionPos = insertPos + 1;
+        } else {
+            tr = tr.insert(insertPos, paragraph.create());
+            selectionPos = insertPos + 1;
+        }
+    } else {
+        const prev = resolved.nodeBefore;
+        if (prev && prev.isTextblock) {
+            const prevPos = insertPos - prev.nodeSize;
+            selectionPos = prevPos + prev.nodeSize - 1;
+        } else {
+            tr = tr.insert(insertPos, paragraph.create());
+            selectionPos = insertPos + 1;
+        }
+    }
+
+    if (insertText) {
+        tr = tr.insertText(insertText, selectionPos, selectionPos);
+        selectionPos += insertText.length;
+    }
+
+    tr = tr.setSelection(TextSelection.create(tr.doc, selectionPos));
+    view.dispatch(tr);
+    view.focus();
+    return true;
+}
+
+function insertTextNextToSelectedMediaBlock(view: EditorView, text: string): boolean {
     const { state } = view;
     const selection = state.selection;
     if (!(selection instanceof NodeSelection)) {
         return false;
     }
     const mediaBlock = state.schema.nodes.media_block;
-    const mediaInline = state.schema.nodes.media_inline;
-    const paragraph = state.schema.nodes.paragraph;
-    if (!mediaBlock || !mediaInline || !paragraph) {
+    if (!mediaBlock || selection.node.type !== mediaBlock) {
         return false;
     }
-    const node = selection.node;
-    if (!node || node.type !== mediaBlock) {
-        return false;
-    }
-
-    const content: ProseMirrorNode[] = [];
-    if (text) {
-        content.push(state.schema.text(text));
-    }
-    content.push(mediaInline.create({ ...node.attrs }));
-    const para = paragraph.create(null, content);
-
-    const pos = selection.from;
-    let tr = state.tr.replaceWith(pos, pos + node.nodeSize, para);
-    const cursorPos = pos + 1 + (text ? text.length : 0);
-    tr = tr.setSelection(TextSelection.create(tr.doc, cursorPos));
-    view.dispatch(tr);
-    view.focus();
-    return true;
+    return placeCursorAroundMediaBlock(view, selection.from, true, text);
 }
 
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
@@ -1421,7 +1448,7 @@ export class WysiwygEditor {
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
             handleKeyDown: (view, event) => {
-                if (event.key === ' ' && replaceSelectedMediaBlockWithInline(view, ' ')) {
+                if (event.key === ' ' && insertTextNextToSelectedMediaBlock(view, ' ')) {
                     event.preventDefault();
                     return true;
                 }
@@ -1440,7 +1467,7 @@ export class WysiwygEditor {
                 return handled;
             },
             handleTextInput: (view, _from, _to, text) => {
-                return replaceSelectedMediaBlockWithInline(view, text);
+                return insertTextNextToSelectedMediaBlock(view, text);
             },
             handleDoubleClickOn: (view, pos, node, nodePos) => {
                 if (!node) {
@@ -1495,7 +1522,14 @@ export class WysiwygEditor {
                         return true;
                     }
                 }
-                if (node?.type?.name === 'media_inline' || node?.type?.name === 'media_block') {
+                if (node?.type?.name === 'media_block') {
+                    const host = target.closest?.('.wysiwyg-media') as HTMLElement | null;
+                    const rect = (host || target).getBoundingClientRect();
+                    const clickX = event?.clientX ?? rect.left;
+                    const placeAfter = clickX >= rect.left + rect.width / 2;
+                    return placeCursorAroundMediaBlock(view, nodePos, placeAfter);
+                }
+                if (node?.type?.name === 'media_inline') {
                     const host = target.closest?.('.wysiwyg-media') as HTMLElement | null;
                     const rect = (host || target).getBoundingClientRect();
                     const clickX = event?.clientX ?? rect.left;
