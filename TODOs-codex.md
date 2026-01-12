@@ -33,43 +33,43 @@
 - Diagram images: draw.io (`.drawio`/`.dio`) and Excalidraw (`.excalidraw(.json/.svg)`).
 - PDF embeds and slideshows (placeholder + async render).
 
-## TODO: Overlay editor feature parity
+## Task definitions (overlay editor parity)
 
-- [ ] Overlay preview parity (markdown-it pipeline)
-  - Scope: Use the same markdown-it instance configuration + plugins as `src/html/markdownRenderer.js` for overlay preview rendering.
-  - Entry criteria: Overlay preview rendering exists and can be pointed to a markdown-it factory.
-  - Exit criteria: Preview output matches board rendering for a fixture set that covers all listed plugins.
-  - Integration point: `src/html/overlayEditor.js` (new) + `src/html/markdownRenderer.js` factory reuse.
-  - Affected surface: Markdown preview (overlay dual mode).
-  - Settings storage: No (global config already used by markdown renderer).
-  - Drag/drop/toolbar: No.
+### Overlay preview parity (markdown-it pipeline)
+- Scope: Use the same markdown-it instance configuration + plugins as `src/html/markdownRenderer.js` for overlay preview rendering.
+- Entry criteria: Overlay preview rendering exists and can be pointed to a markdown-it factory.
+- Exit criteria: Preview output matches board rendering for a fixture set that covers all listed plugins.
+- Integration point: `src/html/overlayEditor.js` (new) + `src/html/markdownRenderer.js` factory reuse.
+- Affected surface: Markdown preview (overlay dual mode).
+- Settings storage: No (global config already used by markdown renderer).
+- Drag/drop/toolbar: No.
 
-- [ ] WYSIWYG plugin parity
-  - Scope: Ensure WYSIWYG mode uses the same markdown-it plugin set and custom tokens as `src/wysiwyg/markdownItFactory.ts`.
-  - Entry criteria: Overlay WYSIWYG mode loads with `WysiwygEditor` and can pass markdown-it options.
-  - Exit criteria: Token/mark coverage matches existing WYSIWYG pipeline for all supported plugins.
-  - Integration point: `src/html/overlayEditor.js` + `src/html/wysiwygEditor.ts` integration points.
-  - Affected surface: WYSIWYG.
-  - Settings storage: No.
-  - Drag/drop/toolbar: No.
+### WYSIWYG plugin parity
+- Scope: Ensure WYSIWYG mode uses the same markdown-it plugin set and custom tokens as `src/wysiwyg/markdownItFactory.ts`.
+- Entry criteria: Overlay WYSIWYG mode loads with `WysiwygEditor` and can pass markdown-it options.
+- Exit criteria: Token/mark coverage matches existing WYSIWYG pipeline for all supported plugins.
+- Integration point: `src/html/overlayEditor.js` + `src/html/wysiwygEditor.ts` integration points.
+- Affected surface: WYSIWYG.
+- Settings storage: No.
+- Drag/drop/toolbar: No.
 
-- [ ] WYSIWYG toolbar coverage for plugin syntax
-  - Scope: Add toolbar actions for multicolumn (`---: :--: :---`), mark, sub/sup, underline, insert, alt-strike, containers, footnotes, emoji, wiki links, include.
-  - Entry criteria: Toolbar exists and can dispatch commands to the active adapter.
-  - Exit criteria: Each button inserts/edits correct syntax and renders immediately in WYSIWYG.
-  - Integration point: `src/html/overlayEditor.js` toolbar + command registry; WYSIWYG adapter command handlers.
-  - Affected surface: WYSIWYG.
-  - Settings storage: No.
-  - Drag/drop/toolbar: Toolbar updates required.
+### WYSIWYG toolbar coverage for plugin syntax
+- Scope: Add toolbar actions for multicolumn (`---: :--: :---`), mark, sub/sup, underline, insert, alt-strike, containers, footnotes, emoji, wiki links, include.
+- Entry criteria: Toolbar exists and can dispatch commands to the active adapter.
+- Exit criteria: Each button inserts/edits correct syntax and renders immediately in WYSIWYG.
+- Integration point: `src/html/overlayEditor.js` toolbar + command registry; WYSIWYG adapter command handlers.
+- Affected surface: WYSIWYG.
+- Settings storage: No.
+- Drag/drop/toolbar: Toolbar updates required.
 
-- [ ] Diagram/media parity in overlay preview
-  - Scope: Preview must render mermaid/plantuml fences, draw.io/excalidraw diagrams, and PDFs the same as board.
-  - Entry criteria: Overlay preview uses markdown renderer and can access diagram/media helpers.
-  - Exit criteria: Same placeholders, async rendering, and menu behaviors as board view.
-  - Integration point: `src/html/markdownRenderer.js` diagram/media pipeline reused by overlay preview.
-  - Affected surface: Markdown preview (overlay dual mode).
-  - Settings storage: No.
-  - Drag/drop/toolbar: No.
+### Diagram/media parity in overlay preview
+- Scope: Preview must render mermaid/plantuml fences, draw.io/excalidraw diagrams, and PDFs the same as board.
+- Entry criteria: Overlay preview uses markdown renderer and can access diagram/media helpers.
+- Exit criteria: Same placeholders, async rendering, and menu behaviors as board view.
+- Integration point: `src/html/markdownRenderer.js` diagram/media pipeline reused by overlay preview.
+- Affected surface: Markdown preview (overlay dual mode).
+- Settings storage: No.
+- Drag/drop/toolbar: No.
 
 ## Design pattern description
 - Overlay editor module with a single state model (`mode`, `draft`, `fontScale`, `taskRef`) and a centralized controller that owns lifecycle (open, close, save, mode switch).
@@ -78,13 +78,7 @@
 - Drag/drop implemented as a strategy: `DropHandler` translates drops into markdown/link insertions, then delegates to the active adapter.
 - Global settings persisted through the config manager; avoid per-board state.
 
-## Plan integration (where it lands)
-- Step 1 (Inventory): map markdown-it plugins + WYSIWYG tokens into adapter capabilities list.
-- Step 2 (Design): define the overlay editor state model, adapters, and command registry.
-- Step 3 (Implement UI): wire toolbar commands to the adapter registry, add mode switching and persistence.
-- Step 4 (Drag/drop): implement drop strategy and route to adapters; verify insertion in markdown + wysiwyg.
-
-## Final implementation plan (steps)
+## Integration plan (how to implement)
 1) Inventory + parity map
    - Confirm markdown-it plugins used in `src/html/markdownRenderer.js`.
    - Confirm WYSIWYG pipeline plugins/tokens from `src/wysiwyg/markdownItFactory.ts`.
