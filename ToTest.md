@@ -144,6 +144,7 @@
 - [ ] In WYSIWYG, every block type (media, include, hr, table, list, multicolumn, code, container) allows inserting new text blocks before and after it.
 - [ ] In WYSIWYG, clicking the left/right half of an image block lets you type on the same line (image becomes inline, cursor before/after).
 - [ ] In WYSIWYG, typing while an image block is selected inserts text on the same line after the image (image stays inline).
+- [ ] In WYSIWYG, inline nodes (images/include/wiki links/tags/footnotes) leave a small horizontal gap so the caret is visible on both sides.
 - [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
 - [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
 - [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.

@@ -1936,7 +1936,7 @@ body.section-height-limited .task-section figure img {
   display: block;
   width: fit-content;
   max-width: 100%;
-  margin: 0;
+  margin: 0 3px;
 }
 
 .task-description-wysiwyg .image-path-overlay-container.wysiwyg-media-block {
@@ -1966,12 +1966,21 @@ body.section-height-limited .task-section figure img {
 .task-description-wysiwyg .wysiwyg-date-tag,
 .task-description-wysiwyg .wysiwyg-person-tag,
 .task-description-wysiwyg .wysiwyg-temporal-tag,
-.task-description-wysiwyg .wysiwyg-footnote {
+.task-description-wysiwyg .wysiwyg-footnote,
+.task-overlay-wysiwyg .wysiwyg-include-inline,
+.task-overlay-wysiwyg .wysiwyg-include-block,
+.task-overlay-wysiwyg .wysiwyg-media,
+.task-overlay-wysiwyg .wysiwyg-wiki-link,
+.task-overlay-wysiwyg .wysiwyg-tag,
+.task-overlay-wysiwyg .wysiwyg-date-tag,
+.task-overlay-wysiwyg .wysiwyg-person-tag,
+.task-overlay-wysiwyg .wysiwyg-temporal-tag,
+.task-overlay-wysiwyg .wysiwyg-footnote {
   background: var(--button-secondary-background);
   color: var(--button-secondary-foreground);
   border-radius: 3px;
-  padding: 0 0px;
-  margin: 0 0px;
+  padding: 0 3px;
+  margin: 0 3px;
   display: inline-block;
 }
 
@@ -2035,7 +2044,7 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-multicolumn {
   position: relative;
-  margin: 10px 0;
+  margin: 10px 3px;
   padding: 0;
   border-radius: 4px;
   background: transparent;
@@ -2045,7 +2054,7 @@ body.section-height-limited .task-section figure img {
 
 .task-overlay-wysiwyg .wysiwyg-multicolumn {
   position: relative;
-  margin: 10px 0;
+  margin: 10px 3px;
   padding: 0;
   border-radius: 4px;
   background: transparent;
@@ -2153,7 +2162,7 @@ body.section-height-limited .task-section figure img {
 
 
 .task-description-wysiwyg .wysiwyg-diagram-preview {
-  margin: 0;
+  margin: 0 3px;
 }
 
 .task-description-wysiwyg .diagram-overlay-container,
@@ -2165,8 +2174,9 @@ body.section-height-limited .task-section figure img {
   margin: 0;
 }
 
-.task-description-wysiwyg .wysiwyg-include-block {
-  margin: 2px 0;
+.task-description-wysiwyg .wysiwyg-include-block,
+.task-overlay-wysiwyg .wysiwyg-include-block {
+  margin: 2px 3px;
   padding: 2px 6px;
 }
 
@@ -6130,6 +6140,11 @@ figcaption {
   max-width: 100%;
   max-height: var(--task-overlay-wysiwyg-height, 100%);
   box-sizing: border-box;
+}
+
+.task-overlay-wysiwyg .wysiwyg-media-block,
+.task-overlay-wysiwyg .wysiwyg-diagram-preview {
+  margin: 0 3px;
 }
 
 .task-overlay-textarea {
