@@ -390,18 +390,18 @@
     });
     const adapters = {
         markdown: new MarkdownAdapter(elements.textarea, elements.previewWrap, () => {
-            state.draft = elements.textarea ? elements.textarea.value : '';
-            schedulePreviewRender();
+            const value = elements.textarea ? elements.textarea.value : '';
+            setState({ draft: value }, { renderPreview: true });
         }),
         wysiwyg: new WysiwygAdapter(elements.wysiwygWrap, {
             onChange: (markdown) => {
-                state.draft = markdown;
+                setState({ draft: markdown });
             },
             onSubmit: () => handleSave()
         })
     };
     const dropHandler = new DropHandler(elements.panel, () => activeAdapter);
-    let activeAdapter = adapters.markdown;
+    let activeAdapter = getAdapterForMode(state.mode);
     let keydownHandler = null;
     let previewTimer = null;
     const previewDelayMs = 80;
@@ -445,10 +445,22 @@
         elements.previewWrap.innerHTML = rendered;
     }
 
-    function schedulePreviewRender() {
-        if (state.mode !== 'dual') { return; }
+    function updatePreview(options = {}) {
+        const { immediate = false } = options;
+        if (state.mode !== 'dual') {
+            if (previewTimer) {
+                window.clearTimeout(previewTimer);
+                previewTimer = null;
+            }
+            return;
+        }
         if (previewTimer) {
             window.clearTimeout(previewTimer);
+        }
+        if (immediate) {
+            previewTimer = null;
+            renderPreview();
+            return;
         }
         previewTimer = window.setTimeout(() => {
             renderPreview();
@@ -456,57 +468,126 @@
     }
 
     function persistPreference(key, value) {
-        if (window.configManager) {
-            window.configManager.setPreference(key, value);
-        } else if (window.vscode?.postMessage) {
-            window.vscode.postMessage({ type: 'setPreference', key, value });
+        if (!window.configManager || typeof window.configManager.setPreference !== 'function') {
+            console.error('[OverlayEditor] configManager missing, cannot persist preference', key);
+            return;
         }
+        window.configManager.setPreference(key, value);
         if (window.cachedConfig) {
             window.cachedConfig[key] = value;
         }
     }
 
-    function applyFontScale(scale, options = {}) {
-        const { persist = false } = options;
-        const nextScale = Number.isFinite(scale) ? scale : state.fontScale;
-        state.fontScale = nextScale;
-        overlay.style.setProperty('--task-overlay-font-scale', `${nextScale}`);
-        if (activeAdapter && typeof activeAdapter.setFontScale === 'function') {
-            activeAdapter.setFontScale(nextScale);
-        }
-        if (persist) {
-            persistPreference(configKeys.fontScale, nextScale);
-        }
+    function getAdapterForMode(mode) {
+        return mode === 'wysiwyg' ? adapters.wysiwyg : adapters.markdown;
     }
 
-    function setActiveAdapter(mode) {
+    function setActiveAdapter(nextAdapter) {
+        if (activeAdapter === nextAdapter) {
+            if (activeAdapter && typeof activeAdapter.activate === 'function') {
+                activeAdapter.activate();
+            }
+            return;
+        }
         if (activeAdapter && typeof activeAdapter.deactivate === 'function') {
             activeAdapter.deactivate();
         }
-        activeAdapter = mode === 'wysiwyg' ? adapters.wysiwyg : adapters.markdown;
+        activeAdapter = nextAdapter;
         if (activeAdapter && typeof activeAdapter.activate === 'function') {
             activeAdapter.activate();
         }
+    }
+
+    function setState(nextState = {}, options = {}) {
+        const {
+            persistMode = false,
+            persistFontScale = false,
+            renderPreview = false,
+            immediatePreview = false
+        } = options;
+        let shouldUpdatePreview = false;
+
+        if (Object.prototype.hasOwnProperty.call(nextState, 'taskRef')) {
+            state.taskRef = nextState.taskRef;
+        }
+        if (Object.prototype.hasOwnProperty.call(nextState, 'enabled')) {
+            state.enabled = Boolean(nextState.enabled);
+        }
+        if (Object.prototype.hasOwnProperty.call(nextState, 'draft')) {
+            state.draft = typeof nextState.draft === 'string' ? nextState.draft : '';
+            if (renderPreview) {
+                shouldUpdatePreview = true;
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(nextState, 'mode') && supportedModes.has(nextState.mode)) {
+            state.mode = nextState.mode;
+            overlay.dataset.mode = nextState.mode;
+            setActiveAdapter(getAdapterForMode(nextState.mode));
+            shouldUpdatePreview = true;
+            if (persistMode) {
+                persistPreference(configKeys.defaultMode, nextState.mode);
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(nextState, 'fontScale')) {
+            const nextScale = Number.isFinite(nextState.fontScale) ? nextState.fontScale : state.fontScale;
+            state.fontScale = nextScale;
+            overlay.style.setProperty('--task-overlay-font-scale', `${nextScale}`);
+            if (activeAdapter && typeof activeAdapter.setFontScale === 'function') {
+                activeAdapter.setFontScale(nextScale);
+            }
+            if (persistFontScale) {
+                persistPreference(configKeys.fontScale, nextScale);
+            }
+        }
+        if (shouldUpdatePreview) {
+            updatePreview({ immediate: immediatePreview });
+        }
+    }
+
+    function applyFontScale(scale, options = {}) {
+        setState(
+            { fontScale: scale },
+            { persistFontScale: options.persist === true }
+        );
+    }
+
+    function setMode(mode, options = {}) {
+        // Requires: mode switching for markdown, dual, and wysiwyg.
+        setState(
+            { mode },
+            {
+                persistMode: options.persist === true,
+                renderPreview: true,
+                immediatePreview: true
+            }
+        );
     }
 
     function openOverlay(taskRef) {
         // Requires: block board-level drag/drop and focus traps while open.
         const resolved = resolveTaskData(taskRef);
         const task = resolved?.task || null;
-        state.taskRef = {
+        const nextTaskRef = {
             taskId: taskRef?.taskId,
             columnId: taskRef?.columnId,
             includeContext: task?.includeContext || null,
             title: task?.title || ''
         };
-        state.draft = task?.description || '';
+        const nextDraft = task?.description || '';
+        setState(
+            {
+                taskRef: nextTaskRef,
+                draft: nextDraft,
+                mode: state.mode,
+                fontScale: state.fontScale
+            },
+            { renderPreview: true, immediatePreview: true }
+        );
         updateHeaderTitle(task);
         overlay.classList.add('visible');
         overlay.setAttribute('aria-hidden', 'false');
-        setMode(state.mode);
-        applyFontScale(state.fontScale);
         if (activeAdapter && typeof activeAdapter.setValue === 'function') {
-            activeAdapter.setValue(state.draft);
+            activeAdapter.setValue(nextDraft);
         }
         if (activeAdapter && typeof activeAdapter.focus === 'function') {
             activeAdapter.focus();
@@ -564,7 +645,7 @@
             closeOverlay();
             return;
         }
-        state.draft = normalizedValue;
+        setState({ draft: normalizedValue });
         task.description = normalizedValue;
         if (typeof window.renderSingleTask === 'function') {
             window.renderSingleTask(task.id, task, column.id);
@@ -589,32 +670,19 @@
         closeOverlay();
     }
 
-    function setMode(mode, options = {}) {
-        // Requires: mode switching for markdown, dual, and wysiwyg.
-        const { persist = false } = options;
-        if (!supportedModes.has(mode)) { return; }
-        state.mode = mode;
-        overlay.dataset.mode = mode;
-        setActiveAdapter(mode);
-        if (mode !== 'dual' && previewTimer) {
-            window.clearTimeout(previewTimer);
-            previewTimer = null;
-        }
-        schedulePreviewRender();
-        if (persist) {
-            persistPreference(configKeys.defaultMode, mode);
-        }
-    }
-
     function applySettings(settings = {}) {
+        const nextState = {};
         if (typeof settings.enabled === 'boolean') {
-            state.enabled = settings.enabled;
+            nextState.enabled = settings.enabled;
         }
         if (typeof settings.mode === 'string') {
-            setMode(settings.mode);
+            nextState.mode = settings.mode;
         }
         if (Number.isFinite(settings.fontScale)) {
-            applyFontScale(settings.fontScale);
+            nextState.fontScale = settings.fontScale;
+        }
+        if (Object.keys(nextState).length > 0) {
+            setState(nextState, { renderPreview: true, immediatePreview: true });
         }
     }
 
@@ -647,52 +715,54 @@
 
     function attachHandlers() {
         // Requires: save + mode switch handlers.
-        elements.buttons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const action = btn.dataset.action;
-                const fontScale = Number.parseFloat(btn.dataset.fontScale);
-                if (Number.isFinite(fontScale)) {
-                    applyFontScale(fontScale, { persist: true });
-                    toggleSettingsMenu(false);
-                    return;
-                }
-                if (action === 'save') {
-                    handleSave();
-                }
-                if (action === 'settings') {
-                    toggleSettingsMenu();
-                }
-                if (action === 'mode-markdown') {
-                    setMode('markdown', { persist: true });
-                }
-                if (action === 'mode-dual') {
-                    setMode('dual', { persist: true });
-                }
-                if (action === 'mode-wysiwyg') {
-                    setMode('wysiwyg', { persist: true });
-                }
-            });
-        });
-
-        const toolButtons = overlay.querySelectorAll('.task-overlay-tool');
-        toolButtons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const command = btn.dataset.command;
+        overlay.addEventListener('click', (event) => {
+            const toolButton = event.target.closest('.task-overlay-tool');
+            if (toolButton && overlay.contains(toolButton)) {
+                const command = toolButton.dataset.command;
                 if (command) {
                     commandRegistry.execute(command, { adapter: activeAdapter });
                 }
-            });
+                return;
+            }
+
+            const button = event.target.closest('.task-overlay-btn');
+            if (!button || !overlay.contains(button)) { return; }
+            const action = button.dataset.action;
+            const fontScale = Number.parseFloat(button.dataset.fontScale);
+            if (Number.isFinite(fontScale)) {
+                applyFontScale(fontScale, { persist: true });
+                toggleSettingsMenu(false);
+                return;
+            }
+            if (action === 'save') {
+                handleSave();
+                return;
+            }
+            if (action === 'settings') {
+                toggleSettingsMenu();
+                return;
+            }
+            if (action === 'mode-markdown') {
+                setMode('markdown', { persist: true });
+                return;
+            }
+            if (action === 'mode-dual') {
+                setMode('dual', { persist: true });
+                return;
+            }
+            if (action === 'mode-wysiwyg') {
+                setMode('wysiwyg', { persist: true });
+            }
         });
 
-        const toolSelects = overlay.querySelectorAll('.task-overlay-tool-select');
-        toolSelects.forEach((select) => {
-            select.addEventListener('change', () => {
-                const command = select.value;
-                if (command) {
-                    commandRegistry.execute(command, { adapter: activeAdapter });
-                    select.value = '';
-                }
-            });
+        overlay.addEventListener('change', (event) => {
+            const select = event.target.closest('.task-overlay-tool-select');
+            if (!select || !overlay.contains(select)) { return; }
+            const command = select.value;
+            if (command) {
+                commandRegistry.execute(command, { adapter: activeAdapter });
+                select.value = '';
+            }
         });
 
         if (elements.backdrop) {
