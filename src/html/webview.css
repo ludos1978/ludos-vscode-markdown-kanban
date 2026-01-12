@@ -6009,6 +6009,7 @@ figcaption {
   display: flex;
   flex: 1;
   min-height: 0;
+  gap: 10px;
 }
 
 .task-overlay-markdown,
@@ -6017,6 +6018,7 @@ figcaption {
   flex: 1;
   min-width: 0;
   display: none;
+  box-sizing: border-box;
 }
 
 .task-overlay-editor[data-mode="markdown"] .task-overlay-markdown {
@@ -6047,6 +6049,7 @@ figcaption {
   font-family: var(--vscode-editor-font-family);
   font-size: calc(1em * var(--task-overlay-font-scale)); /* Requires: font scale control */
   outline: none;
+  box-sizing: border-box;
 }
 
 .modal.loading-modal {

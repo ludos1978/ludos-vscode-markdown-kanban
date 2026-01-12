@@ -118,6 +118,7 @@
 - [ ] Overlay editor WYSIWYG tools bar spans full width without forced multi-row wrapping.
 - [ ] Inline task description editing grows the card height as you type (no text overlapping the next card).
 - [ ] Inline task description edit field stays within the card width and wraps long paths (no overflow).
+- [ ] Overlay editor body has a 10px gap between panes and textarea fits within its pane.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
