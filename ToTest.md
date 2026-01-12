@@ -145,3 +145,4 @@
 - [ ] On initial webview load, cached shortcuts populate and Meta+1 (or other Meta+digit) snippet keybindings insert the configured snippet without requiring a second keypress.
 - [ ] If bound, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm text undo/redo works via the editor undo/redo commands.
 - [ ] Without explicit keybindings, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm native undo/redo works (including QWERTZ layouts where key code reports KeyY).
+- [ ] Inline undo/redo restores cursor position and supports multiple steps even after snippet insertion (manual undo stack).

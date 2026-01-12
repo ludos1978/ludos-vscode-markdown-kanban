@@ -385,7 +385,7 @@ class TaskEditor {
                 return;
             }
 
-            if (!isInsideWysiwyg && this._handleInlineUndoRedo(e)) {
+            if (!isInsideWysiwyg && this._handleInlineUndoRedo(e, element)) {
                 return;
             }
 
@@ -693,7 +693,7 @@ class TaskEditor {
         return true;
     }
 
-    _handleInlineUndoRedo(event) {
+    _handleInlineUndoRedo(event, element) {
         if (!event) {
             return false;
         }
@@ -717,6 +717,38 @@ class TaskEditor {
         const cachedShortcuts = window.cachedShortcuts || {};
         if (cachedShortcuts[shortcut]) {
             return false;
+        }
+
+        const target = element || this.currentEditor?.element;
+        if (!target) {
+            return false;
+        }
+
+        const stack = target._undoStack;
+        if (Array.isArray(stack) && typeof target._undoIndex === 'number') {
+            const nextIndex = isUndo ? target._undoIndex - 1 : target._undoIndex + 1;
+            if (nextIndex < 0 || nextIndex >= stack.length) {
+                return false;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            target._undoApplying = true;
+            target._undoIndex = nextIndex;
+            const state = stack[nextIndex];
+            target.value = state.value;
+            if (typeof target.setSelectionRange === 'function') {
+                target.setSelectionRange(state.selectionStart, state.selectionEnd);
+            }
+            if (typeof this.autoResize === 'function') {
+                this.autoResize(target);
+            }
+            if (typeof window.updateSpecialCharOverlay === 'function') {
+                window.updateSpecialCharOverlay(target);
+            }
+            target._undoApplying = false;
+            return true;
         }
 
         event.preventDefault();
@@ -1020,6 +1052,16 @@ class TaskEditor {
             wysiwygContainer: wysiwygContext?.container || null
         };
 
+        if (editElement) {
+            editElement._undoStack = [{
+                value: editElement.value || '',
+                selectionStart: editElement.selectionStart || 0,
+                selectionEnd: editElement.selectionEnd || 0
+            }];
+            editElement._undoIndex = 0;
+            editElement._undoApplying = false;
+        }
+
         if (!wysiwygContext && typeof window.createSpecialCharOverlay === 'function') {
             window.createSpecialCharOverlay(editElement);
         }
@@ -1192,6 +1234,25 @@ class TaskEditor {
                 });
             }
             const container = document.getElementById('kanban-container');
+
+            if (!editElement._undoApplying) {
+                const undoStack = Array.isArray(editElement._undoStack) ? editElement._undoStack : [];
+                const lastState = undoStack.length > 0 ? undoStack[undoStack.length - 1] : null;
+                const nextState = {
+                    value: editElement.value || '',
+                    selectionStart: editElement.selectionStart || 0,
+                    selectionEnd: editElement.selectionEnd || 0
+                };
+                if (!lastState || lastState.value !== nextState.value) {
+                    // Drop redo history when typing after undo.
+                    if (typeof editElement._undoIndex === 'number' && editElement._undoIndex < undoStack.length - 1) {
+                        undoStack.splice(editElement._undoIndex + 1);
+                    }
+                    undoStack.push(nextState);
+                    editElement._undoStack = undoStack;
+                    editElement._undoIndex = undoStack.length - 1;
+                }
+            }
 
             // Throttle autoResize to max 60fps
             if (!autoResizePending) {
