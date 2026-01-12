@@ -4,6 +4,7 @@
 - [ ] Review `TODOs-codex.md` and confirm the markdown-it feature list is complete for the overlay editor.
 - [ ] Review `TODOs-codex.md` and confirm the design pattern + plan integration sections align with the overlay editor architecture.
 - [ ] Review `TODOs-codex.md` and confirm the final implementation plan steps are complete and ordered correctly.
+- [ ] Trigger the overlay editor entrypoint and confirm the shell renders (header, body panes) without blocking normal board interaction.
 - [ ] Verify tag menus still list active tags correctly for columns and tasks, including custom groups and active-tag overrides.
 - [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
 - [ ] While scrolled in multi-row mode, enter and exit a task description edit and confirm the board does not jump to the top while the cursor positions (no large scroll debug spikes).

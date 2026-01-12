@@ -2049,6 +2049,15 @@ function handleFocusAfterUndoRedo(focusTargets) {
     }
 }
 
+// Task overlay editor integration entrypoint (structure-only).
+// Requires: task burger menu to call this when overlay editing is requested.
+window.openTaskOverlayEditor = function(taskId, columnId) {
+    if (!window.taskOverlayEditor || typeof window.taskOverlayEditor.open !== 'function') {
+        return;
+    }
+    window.taskOverlayEditor.open({ taskId, columnId });
+};
+
 // Helper function to perform the actual focus actions
 function performFocusActions(focusTargets) {
     

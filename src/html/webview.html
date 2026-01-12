@@ -623,6 +623,46 @@
         </div>
     </div>
 
+    <!-- Task overlay editor (structure only; behavior in overlayEditor.js) -->
+    <div id="task-overlay-editor" class="task-overlay-editor" aria-hidden="true">
+        <div class="task-overlay-backdrop"></div>
+        <div class="task-overlay-panel" role="dialog" aria-modal="true" aria-label="Task editor">
+            <!-- Header / toolbar -->
+            <div class="task-overlay-header">
+                <!-- Requires: mode switching (markdown/dual/wysiwyg), save/close controls, font size menu -->
+                <div class="task-overlay-header-left">
+                    <span class="task-overlay-title">Edit Task</span>
+                </div>
+                <div class="task-overlay-header-actions">
+                    <button class="task-overlay-btn" data-action="save">Save</button>
+                    <button class="task-overlay-btn" data-action="close">Close</button>
+                </div>
+            </div>
+
+            <!-- Tools pane (WYSIWYG) -->
+            <div class="task-overlay-tools" data-mode="wysiwyg">
+                <!-- Requires: toolbar commands (multicolumn, mark, sub/sup, underline, insert, strike, containers, footnotes, emoji, links, images) -->
+            </div>
+
+            <!-- Body -->
+            <div class="task-overlay-body">
+                <!-- Markdown / dual mode -->
+                <div class="task-overlay-markdown">
+                    <!-- Requires: markdown textarea with drag/drop and cursor insert -->
+                    <textarea class="task-overlay-textarea" spellcheck="true"></textarea>
+                </div>
+                <div class="task-overlay-preview">
+                    <!-- Requires: preview rendering using markdownRenderer pipeline -->
+                </div>
+
+                <!-- WYSIWYG mode -->
+                <div class="task-overlay-wysiwyg">
+                    <!-- Requires: WysiwygEditor instance, toolbar integration, and drag/drop insertion -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Input modal -->
     <div id="input-modal" class="modal">
         <div class="modal-content">
@@ -1447,6 +1487,7 @@
     </script>
 
     <script src="wysiwyg-editor.js"></script>
+    <script src="overlayEditor.js"></script>
     <!-- Main webview entry point (must be last) -->
     <script src="webview.js"></script>
     <div id="path-context-menu" class="context-menu hidden">

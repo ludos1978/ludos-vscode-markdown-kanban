@@ -5870,6 +5870,93 @@ figcaption {
   z-index: 10000;
 }
 
+/* Task overlay editor (structure-only styles) */
+.task-overlay-editor {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: var(--z-modal-overlay);
+}
+
+.task-overlay-editor.visible {
+  display: block;
+}
+
+.task-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.task-overlay-panel {
+  position: absolute;
+  inset: 10%;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.task-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.task-overlay-tools {
+  display: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.task-overlay-editor[data-mode="wysiwyg"] .task-overlay-tools {
+  display: block;
+}
+
+.task-overlay-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.task-overlay-markdown,
+.task-overlay-preview,
+.task-overlay-wysiwyg {
+  flex: 1;
+  min-width: 0;
+  display: none;
+}
+
+.task-overlay-editor[data-mode="markdown"] .task-overlay-markdown {
+  display: block;
+}
+
+.task-overlay-editor[data-mode="dual"] .task-overlay-markdown,
+.task-overlay-editor[data-mode="dual"] .task-overlay-preview {
+  display: block;
+}
+
+.task-overlay-editor[data-mode="wysiwyg"] .task-overlay-wysiwyg {
+  display: block;
+}
+
+.task-overlay-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 12px;
+  resize: none;
+  background: transparent;
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 1.2em; /* Requires: font scale control */
+  outline: none;
+}
+
 .modal.loading-modal {
   background: rgba(0, 0, 0, 0.3);
 }
