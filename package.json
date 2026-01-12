@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.97.129",
+  "version": "0.97.130",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -4797,18 +4797,6 @@
         "command": "markdown-kanban.insertSnippet",
         "key": "ctrl+space",
         "mac": "cmd+space",
-        "when": "webviewId == markdownKanbanPanel && kanbanTaskEditing"
-      },
-      {
-        "command": "markdown-kanban.editorUndo",
-        "key": "ctrl+z",
-        "mac": "cmd+z",
-        "when": "webviewId == markdownKanbanPanel && kanbanTaskEditing"
-      },
-      {
-        "command": "markdown-kanban.editorRedo",
-        "key": "ctrl+y",
-        "mac": "cmd+shift+z",
         "when": "webviewId == markdownKanbanPanel && kanbanTaskEditing"
       }
     ]
