@@ -137,6 +137,7 @@
 - [ ] Overlay tools pane: mark buttons toggle formatting in WYSIWYG mode (bold/italic/underline/strike/mark/sub/sup/code).
 - [ ] Overlay tools pane: formatting buttons reflect the active mark when the cursor is inside styled text.
 - [ ] In overlay WYSIWYG, large images never exceed the editor pane height; they fit within the visible view.
+- [ ] In overlay WYSIWYG, when a task starts or ends with an image, you can still type before and after it.
 - [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
 - [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
 - [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.

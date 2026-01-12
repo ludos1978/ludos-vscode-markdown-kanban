@@ -70,6 +70,30 @@ function buildSelectionState(state: EditorState): WysiwygSelectionState {
     return { marks, block };
 }
 
+function ensureDocTextBuffers(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
+    if (!doc || doc.content.size === 0) {
+        return doc;
+    }
+    const emptyParagraph = () => schema.nodes.paragraph.create();
+    const firstChild = doc.content.firstChild;
+    const lastChild = doc.content.lastChild;
+    let content = doc.content;
+
+    if (firstChild && firstChild.isAtom) {
+        content = content.addToStart(emptyParagraph());
+    }
+
+    if (lastChild && lastChild.isAtom) {
+        content = content.addToEnd(emptyParagraph());
+    }
+
+    if (content !== doc.content) {
+        return schema.nodes.doc.create(null, content);
+    }
+
+    return doc;
+}
+
 function toggleMarkOnce(markType: MarkType) {
     return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
         let nextTr: Transaction | null = null;
@@ -598,6 +622,15 @@ function normalizeMediaBlocks(state: EditorState) {
         tr = tr.replaceWith(target.pos, target.pos + target.size, target.nodes);
     }
 
+    const firstChild = tr.doc.content.firstChild;
+    const lastChild = tr.doc.content.lastChild;
+    if (firstChild && firstChild.isAtom) {
+        tr = tr.insert(0, state.schema.nodes.paragraph.create());
+    }
+    if (lastChild && lastChild.isAtom) {
+        tr = tr.insert(tr.doc.content.size, state.schema.nodes.paragraph.create());
+    }
+
     return tr;
 }
 
@@ -1123,30 +1156,7 @@ export class WysiwygEditor {
             markdownItOptions: { temporalPrefix: this.temporalPrefix },
             serializerOptions: { temporalPrefix: this.temporalPrefix }
         });
-        let pmDoc = wysiwygDocToProseMirror(schema, initialDoc);
-
-        // Ensure cursor can be placed before and after atom blocks (like media_block)
-        // Add empty paragraphs at start/end if first/last nodes are atoms
-        if (pmDoc.content.size > 0) {
-            const emptyParagraph = () => schema.nodes.paragraph.create();
-            const firstChild = pmDoc.content.firstChild;
-            const lastChild = pmDoc.content.lastChild;
-            let content = pmDoc.content;
-
-            // Add paragraph at start if first node is an atom (can't place cursor before it)
-            if (firstChild && firstChild.isAtom) {
-                content = content.addToStart(emptyParagraph());
-            }
-
-            // Add paragraph at end if last node is an atom (can't place cursor after it)
-            if (lastChild && lastChild.isAtom) {
-                content = content.addToEnd(emptyParagraph());
-            }
-
-            if (content !== pmDoc.content) {
-                pmDoc = schema.nodes.doc.create(null, content);
-            }
-        }
+        let pmDoc = ensureDocTextBuffers(schema, wysiwygDocToProseMirror(schema, initialDoc));
 
         const plugins = [
             history(),
@@ -1475,7 +1485,7 @@ export class WysiwygEditor {
             markdownItOptions: { temporalPrefix: this.temporalPrefix },
             serializerOptions: { temporalPrefix: this.temporalPrefix }
         });
-        const pmDoc = wysiwygDocToProseMirror(schema, doc);
+        const pmDoc = ensureDocTextBuffers(schema, wysiwygDocToProseMirror(schema, doc));
         const newState = EditorState.create({
             schema,
             doc: pmDoc,
