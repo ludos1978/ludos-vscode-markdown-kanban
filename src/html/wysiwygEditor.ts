@@ -1,4 +1,4 @@
-import { EditorState, TextSelection, Selection, Transaction } from 'prosemirror-state';
+import { EditorState, NodeSelection, TextSelection, Selection, Transaction } from 'prosemirror-state';
 import type { MarkType, Node as ProseMirrorNode, Schema } from 'prosemirror-model';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
@@ -696,6 +696,39 @@ function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirror
     return state.doc;
 }
 
+function replaceSelectedMediaBlockWithInline(view: EditorView, text: string): boolean {
+    const { state } = view;
+    const selection = state.selection;
+    if (!(selection instanceof NodeSelection)) {
+        return false;
+    }
+    const mediaBlock = state.schema.nodes.media_block;
+    const mediaInline = state.schema.nodes.media_inline;
+    const paragraph = state.schema.nodes.paragraph;
+    if (!mediaBlock || !mediaInline || !paragraph) {
+        return false;
+    }
+    const node = selection.node;
+    if (!node || node.type !== mediaBlock) {
+        return false;
+    }
+
+    const content: ProseMirrorNode[] = [];
+    if (text) {
+        content.push(state.schema.text(text));
+    }
+    content.push(mediaInline.create({ ...node.attrs }));
+    const para = paragraph.create(null, content);
+
+    const pos = selection.from;
+    let tr = state.tr.replaceWith(pos, pos + node.nodeSize, para);
+    const cursorPos = pos + 1 + (text ? text.length : 0);
+    tr = tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+    view.dispatch(tr);
+    view.focus();
+    return true;
+}
+
 function updateNodeAttrs(view: EditorView, pos: number, attrs: Record<string, unknown>): void {
     const tr = view.state.tr.setNodeMarkup(pos, undefined, attrs);
     view.dispatch(tr);
@@ -1388,6 +1421,10 @@ export class WysiwygEditor {
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
             handleKeyDown: (view, event) => {
+                if (event.key === ' ' && replaceSelectedMediaBlockWithInline(view, ' ')) {
+                    event.preventDefault();
+                    return true;
+                }
                 const styleKey = getStyleKey(event);
                 if (!styleKey) {
                     return false;
@@ -1401,6 +1438,9 @@ export class WysiwygEditor {
                     event.preventDefault();
                 }
                 return handled;
+            },
+            handleTextInput: (view, _from, _to, text) => {
+                return replaceSelectedMediaBlockWithInline(view, text);
             },
             handleDoubleClickOn: (view, pos, node, nodePos) => {
                 if (!node) {
