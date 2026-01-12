@@ -70,6 +70,20 @@ function buildSelectionState(state: EditorState): WysiwygSelectionState {
     return { marks, block };
 }
 
+function isLikelyPathSelection(value: string): boolean {
+    const text = (value || '').trim();
+    if (!text) {
+        return false;
+    }
+    if (/[\\/]/.test(text)) {
+        return true;
+    }
+    if (/\s/.test(text)) {
+        return false;
+    }
+    return /\.[A-Za-z0-9]{1,5}$/.test(text);
+}
+
 function ensureDocTextBuffers(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
     if (!doc || doc.content.size === 0) {
         return doc;
@@ -1536,6 +1550,26 @@ export class WysiwygEditor {
                 return schema.marks.code ? toggleMarkOnce(schema.marks.code)(state, dispatch) : false;
             case 'ins':
                 return schema.marks.ins ? toggleMarkOnce(schema.marks.ins)(state, dispatch) : false;
+            case 'link': {
+                const { from, to, empty } = state.selection;
+                const selectedText = empty
+                    ? ''
+                    : state.doc.textBetween(from, to, '\n', '\n');
+                const isPath = selectedText ? isLikelyPathSelection(selectedText) : false;
+                const textPart = isPath ? 'text' : (selectedText || 'text');
+                const urlPart = isPath ? (selectedText || 'url') : 'url';
+                const linkText = `[${textPart}](${urlPart})`;
+                const tr = state.tr.insertText(linkText, from, to);
+                let selectionStart = from + 1;
+                let selectionEnd = selectionStart + textPart.length;
+                if (isPath || empty) {
+                    selectionStart = from + 1 + textPart.length + 2;
+                    selectionEnd = selectionStart + urlPart.length;
+                }
+                dispatch(tr.setSelection(TextSelection.create(tr.doc, selectionStart, selectionEnd)));
+                this.view.focus();
+                return true;
+            }
             case 'code-block':
                 return schema.nodes.code_block ? setBlockType(schema.nodes.code_block)(state, dispatch) : false;
             case 'multicolumn': {
