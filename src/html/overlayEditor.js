@@ -548,7 +548,8 @@
         if (!elements.wysiwygWrap) { return; }
         const rect = elements.wysiwygWrap.getBoundingClientRect();
         if (!rect.height) { return; }
-        overlay.style.setProperty('--task-overlay-wysiwyg-height', `${Math.floor(rect.height)}px`);
+        const maxHeight = Math.floor(rect.height * 0.8);
+        overlay.style.setProperty('--task-overlay-wysiwyg-height', `${maxHeight}px`);
     }
 
     function persistPreference(key, value) {
