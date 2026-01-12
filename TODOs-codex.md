@@ -35,16 +35,41 @@
 
 ## TODO: Overlay editor feature parity
 
-- [ ] Ensure overlay preview uses the same markdown-it pipeline and plugins as `markdownRenderer.js`.
-- [ ] Ensure overlay WYSIWYG mode covers the same plugin set (see `src/wysiwyg/markdownItFactory.ts` + custom tokens).
-- [ ] Add WYSIWYG toolbar controls for multicolumn (`---: :--: :---`) and other plugin-driven syntax (mark, sub/sup, underline, insert, alt-strike, containers, footnotes, emoji, wiki links, include).
-- [ ] Validate diagram/media handling in overlay preview (mermaid, plantuml, draw.io, excalidraw, PDF).
+- [ ] Overlay preview parity (markdown-it pipeline)
+  - Scope: Use the same markdown-it instance configuration + plugins as `src/html/markdownRenderer.js` for overlay preview rendering.
+  - Entry criteria: Overlay preview rendering exists and can be pointed to a markdown-it factory.
+  - Exit criteria: Preview output matches board rendering for a fixture set that covers all listed plugins.
+  - Integration point: `src/html/overlayEditor.js` (new) + `src/html/markdownRenderer.js` factory reuse.
+  - Affected surface: Markdown preview (overlay dual mode).
+  - Settings storage: No (global config already used by markdown renderer).
+  - Drag/drop/toolbar: No.
 
-## TODO elements (definition)
-- A TODO entry must include: scope, entry criteria, exit criteria, and integration point (file/module).
-- A TODO entry must state the affected editor surface: markdown preview, WYSIWYG, or both.
-- A TODO entry must state whether it changes settings storage (global config only).
-- A TODO entry must state whether it requires drag/drop handling or toolbar command updates.
+- [ ] WYSIWYG plugin parity
+  - Scope: Ensure WYSIWYG mode uses the same markdown-it plugin set and custom tokens as `src/wysiwyg/markdownItFactory.ts`.
+  - Entry criteria: Overlay WYSIWYG mode loads with `WysiwygEditor` and can pass markdown-it options.
+  - Exit criteria: Token/mark coverage matches existing WYSIWYG pipeline for all supported plugins.
+  - Integration point: `src/html/overlayEditor.js` + `src/html/wysiwygEditor.ts` integration points.
+  - Affected surface: WYSIWYG.
+  - Settings storage: No.
+  - Drag/drop/toolbar: No.
+
+- [ ] WYSIWYG toolbar coverage for plugin syntax
+  - Scope: Add toolbar actions for multicolumn (`---: :--: :---`), mark, sub/sup, underline, insert, alt-strike, containers, footnotes, emoji, wiki links, include.
+  - Entry criteria: Toolbar exists and can dispatch commands to the active adapter.
+  - Exit criteria: Each button inserts/edits correct syntax and renders immediately in WYSIWYG.
+  - Integration point: `src/html/overlayEditor.js` toolbar + command registry; WYSIWYG adapter command handlers.
+  - Affected surface: WYSIWYG.
+  - Settings storage: No.
+  - Drag/drop/toolbar: Toolbar updates required.
+
+- [ ] Diagram/media parity in overlay preview
+  - Scope: Preview must render mermaid/plantuml fences, draw.io/excalidraw diagrams, and PDFs the same as board.
+  - Entry criteria: Overlay preview uses markdown renderer and can access diagram/media helpers.
+  - Exit criteria: Same placeholders, async rendering, and menu behaviors as board view.
+  - Integration point: `src/html/markdownRenderer.js` diagram/media pipeline reused by overlay preview.
+  - Affected surface: Markdown preview (overlay dual mode).
+  - Settings storage: No.
+  - Drag/drop/toolbar: No.
 
 ## Design pattern description
 - Overlay editor module with a single state model (`mode`, `draft`, `fontScale`, `taskRef`) and a centralized controller that owns lifecycle (open, close, save, mode switch).
