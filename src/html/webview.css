@@ -5876,6 +5876,7 @@ figcaption {
   inset: 0;
   display: none;
   z-index: var(--z-modal-overlay);
+  --task-overlay-font-scale: 1.2;
 }
 
 .task-overlay-editor.visible {
@@ -5905,6 +5906,40 @@ figcaption {
   justify-content: space-between;
   padding: 10px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.task-overlay-header-left,
+.task-overlay-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-overlay-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-overlay-settings {
+  position: relative;
+}
+
+.task-overlay-settings-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: none;
+  gap: 6px;
+  padding: 6px;
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  z-index: 1;
+}
+
+.task-overlay-settings.open .task-overlay-settings-menu {
+  display: flex;
 }
 
 .task-overlay-tools {
@@ -5953,7 +5988,7 @@ figcaption {
   background: transparent;
   color: var(--vscode-editor-foreground);
   font-family: var(--vscode-editor-font-family);
-  font-size: 1.2em; /* Requires: font scale control */
+  font-size: calc(1em * var(--task-overlay-font-scale)); /* Requires: font scale control */
   outline: none;
 }
 

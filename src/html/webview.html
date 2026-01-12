@@ -629,13 +629,28 @@
         <div class="task-overlay-panel" role="dialog" aria-modal="true" aria-label="Task editor">
             <!-- Header / toolbar -->
             <div class="task-overlay-header">
-                <!-- Requires: mode switching (markdown/dual/wysiwyg), save/close controls, font size menu -->
+                <!-- Requires: mode switching (markdown/dual/wysiwyg), save controls, font size menu -->
                 <div class="task-overlay-header-left">
                     <span class="task-overlay-title">Edit Task</span>
+                    <div class="task-overlay-mode-toggle">
+                        <!-- Requires: mode switch actions + active state -->
+                        <button class="task-overlay-btn" data-action="mode-markdown">Markdown</button>
+                        <button class="task-overlay-btn" data-action="mode-dual">Dual</button>
+                        <button class="task-overlay-btn" data-action="mode-wysiwyg">WYSIWYG</button>
+                    </div>
                 </div>
                 <div class="task-overlay-header-actions">
+                    <div class="task-overlay-settings">
+                        <!-- Requires: burger menu to configure font scale and overlay settings -->
+                        <button class="task-overlay-btn task-overlay-settings-btn" data-action="settings">⋯</button>
+                        <div class="task-overlay-settings-menu" role="menu">
+                            <!-- Requires: persistent font scale values (global config) -->
+                            <button class="task-overlay-btn" data-font-scale="1.0">Aa</button>
+                            <button class="task-overlay-btn" data-font-scale="1.2">Aa+</button>
+                            <button class="task-overlay-btn" data-font-scale="1.4">Aa++</button>
+                        </div>
+                    </div>
                     <button class="task-overlay-btn" data-action="save">Save</button>
-                    <button class="task-overlay-btn" data-action="close">Close</button>
                 </div>
             </div>
 
