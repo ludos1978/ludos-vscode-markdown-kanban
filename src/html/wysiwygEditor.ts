@@ -335,8 +335,14 @@ function createMediaView(
         const rect = dom.getBoundingClientRect();
         const clickX = e.clientX;
         const placeAfter = clickX >= rect.left + rect.width / 2;
-        const targetPos = placeAfter ? pos + nodeSize : pos;
+        if (isBlock) {
+            const converted = convertMediaBlockToInline(view, pos, placeAfter);
+            if (converted) {
+                return;
+            }
+        }
 
+        const targetPos = placeAfter ? pos + nodeSize : pos;
         const $pos = view.state.doc.resolve(targetPos);
         const selection = Selection.near($pos, placeAfter ? 1 : -1);
 
