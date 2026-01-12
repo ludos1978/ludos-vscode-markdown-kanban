@@ -41,20 +41,20 @@
 - [ ] Validate diagram/media handling in overlay preview (mermaid, plantuml, draw.io, excalidraw, PDF).
 
 ## TODO elements (definition)
-- [ ] Each TODO includes: scope, entry criteria, exit criteria, and integration point (file/module).
-- [ ] Each TODO notes whether it touches markdown preview, WYSIWYG, or both modes.
-- [ ] Each TODO notes if it changes settings storage (global config only).
-- [ ] Each TODO notes if it requires drag/drop handling or toolbar command updates.
+- A TODO entry must include: scope, entry criteria, exit criteria, and integration point (file/module).
+- A TODO entry must state the affected editor surface: markdown preview, WYSIWYG, or both.
+- A TODO entry must state whether it changes settings storage (global config only).
+- A TODO entry must state whether it requires drag/drop handling or toolbar command updates.
 
 ## Design pattern description
-- [ ] Use an overlay editor module with a single state model (`mode`, `draft`, `fontScale`, `taskRef`) and a centralized controller that owns lifecycle (open, close, save, mode switch).
-- [ ] Apply an adapter layer for editor backends: `MarkdownAdapter` (textarea + preview) and `WysiwygAdapter` (ProseMirror) with a shared command API for toolbar actions.
-- [ ] Use a command registry for toolbar actions so the same button works in all modes (commands map to adapters).
-- [ ] Implement drag/drop as a strategy: `DropHandler` translates drops into markdown/link insertions, then delegates to the active adapter.
-- [ ] Persist global settings through the config manager; avoid per-board state.
+- Overlay editor module with a single state model (`mode`, `draft`, `fontScale`, `taskRef`) and a centralized controller that owns lifecycle (open, close, save, mode switch).
+- Adapter layer for editor backends: `MarkdownAdapter` (textarea + preview) and `WysiwygAdapter` (ProseMirror) with a shared command API for toolbar actions.
+- Command registry for toolbar actions so the same button works in all modes (commands map to adapters).
+- Drag/drop implemented as a strategy: `DropHandler` translates drops into markdown/link insertions, then delegates to the active adapter.
+- Global settings persisted through the config manager; avoid per-board state.
 
 ## Plan integration (where it lands)
-- [ ] Step 1 (Inventory): map markdown-it plugins + WYSIWYG tokens into adapter capabilities list.
-- [ ] Step 2 (Design): define the overlay editor state model, adapters, and command registry.
-- [ ] Step 3 (Implement UI): wire toolbar commands to the adapter registry, add mode switching and persistence.
-- [ ] Step 4 (Drag/drop): implement drop strategy and route to adapters; verify insertion in markdown + wysiwyg.
+- Step 1 (Inventory): map markdown-it plugins + WYSIWYG tokens into adapter capabilities list.
+- Step 2 (Design): define the overlay editor state model, adapters, and command registry.
+- Step 3 (Implement UI): wire toolbar commands to the adapter registry, add mode switching and persistence.
+- Step 4 (Drag/drop): implement drop strategy and route to adapters; verify insertion in markdown + wysiwyg.
