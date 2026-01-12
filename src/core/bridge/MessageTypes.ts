@@ -306,6 +306,13 @@ export interface UpdateShortcutsMessage extends BaseMessage {
     shortcuts: Record<string, ShortcutEntry>;
 }
 
+/**
+ * Request keyboard shortcuts from backend
+ */
+export interface RequestShortcutsMessage extends BaseMessage {
+    type: 'requestShortcuts';
+}
+
 export interface ShortcutEntry {
     command: string;
     args?: unknown;
@@ -1861,7 +1868,7 @@ export type IncomingMessage =
     | RenderSkippedMessage
     | UpdateIncludeContentMessage
     | SyncDirtyItemsMessage
-    | UpdateShortcutsMessage
+    | RequestShortcutsMessage
     | UpdateColumnContentExtendedMessage
     | UpdateTaskContentExtendedMessage
     // UI messages

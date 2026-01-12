@@ -433,6 +433,7 @@ export class KanbanWebviewPanel {
         const wasAlreadyReady = this._context.webviewReady;
         this._context.setWebviewReady(true);
         logger.debug('[KanbanWebviewPanel._handleWebviewReady] wasAlreadyReady:', wasAlreadyReady);
+        const refreshConfiguration = () => { void this.refreshConfiguration(); };
 
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         logger.debug('[KanbanWebviewPanel._handleWebviewReady] pendingUpdate:', pendingUpdate);
@@ -440,6 +441,7 @@ export class KanbanWebviewPanel {
             logger.debug('[KanbanWebviewPanel._handleWebviewReady] Sending pending update');
             this._fileManager.sendFileInfo();
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
+            refreshConfiguration();
             return;
         }
 
@@ -451,7 +453,8 @@ export class KanbanWebviewPanel {
         }
 
         // First ready without pending update - nothing to do
-        logger.debug('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - exiting');
+        refreshConfiguration();
+        logger.debug('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - configuration refreshed');
     }
 
     private async _ensureBoardAndSendUpdate() {
