@@ -109,12 +109,20 @@ Task Drop sources can be dropped in all Tasks
 - Task from clipboard data (can handle binary images, which creates them in a {filename}-Media folder)
 - Empty excalidraw & drawio diagrams
 
+### Copying Data
+- Columns and Tasks can be copied as MARP Markdown format
+
+### Pasting Data
+- Pasting using shift+ctrl+v or shift+meta+v pastes a image link using all forms of copied data.
+  - It pastes it if no file exists in the media folder of the file it's pased into.
+
 ### Column Templates
 Column templates allow creating templates of multiple columns that can be dropped somewhere in the kanban board.
 
 ### Processes
 - Media index scan
 - Media index cancel
+
 
 ### WYSIWYG Editor
 - if a text is selected and the link-button or the image-button is clicked, the text is classified (filename/path vs normal text) and placed in the right part of the link, keeping the selection.
