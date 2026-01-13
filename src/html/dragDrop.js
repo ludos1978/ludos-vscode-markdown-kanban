@@ -2168,36 +2168,62 @@ function showFileDropDialogue(options) {
         isImage,
         existingFile,
         existingFilePath,
-        dropPosition
+        dropPosition,
+        hasSourcePath,
+        sourcePath
     } = options;
 
     const sizeText = fileSize ? ` (${formatFileSize(fileSize)})` : '';
     const buttons = [];
+    const hasPendingFile = pendingFileDrops.has(dropId);
+    const canCopy = Boolean(hasSourcePath && sourcePath) || hasPendingFile;
+    const linkAvailable = Boolean(existingFile);
+    const primaryAction = linkAvailable ? 'link' : (canCopy ? 'copy' : 'search');
 
     // Option 1: Link existing file (if found in workspace by hash match - FIRST option)
-    if (existingFile) {
-        buttons.push({
-            text: `Link existing file`,
-            primary: true,
-            action: () => {
+    buttons.push({
+        text: 'Link existing file',
+        primary: primaryAction === 'link',
+        disabled: !linkAvailable,
+        action: linkAvailable ? () => {
+            cancelPendingFileDrop(dropId);
+            vscode.postMessage({
+                type: 'linkExistingFile',
+                dropId: dropId,
+                existingFile: existingFile,
+                existingFilePath: existingFilePath,
+                fileName: fileName,
+                isImage: isImage,
+                dropPosition: dropPosition
+            });
+        } : null
+    });
+
+    // Option 2: Copy file into media folder (always available if we have data to copy)
+    buttons.push({
+        text: 'Copy file to Media folder',
+        primary: primaryAction === 'copy',
+        disabled: !canCopy,
+        action: canCopy ? () => {
+            if (hasSourcePath && sourcePath) {
                 cancelPendingFileDrop(dropId);
                 vscode.postMessage({
-                    type: 'linkExistingFile',
-                    dropId: dropId,
-                    existingFile: existingFile,
-                    existingFilePath: existingFilePath,
+                    type: 'executeFileDropCopy',
+                    sourcePath: sourcePath,
                     fileName: fileName,
                     isImage: isImage,
                     dropPosition: dropPosition
                 });
+                return;
             }
-        });
-    }
+            executeFileObjectCopy(dropId, isImage);
+        } : null
+    });
 
-    // Option 2: Search for file in workspace (always available)
+    // Option 3: Search for file in workspace (always available)
     buttons.push({
         text: 'Search for file',
-        primary: !existingFile, // Primary if no existing file found
+        primary: primaryAction === 'search',
         action: () => {
             cancelPendingFileDrop(dropId);
             vscode.postMessage({
@@ -2209,7 +2235,7 @@ function showFileDropDialogue(options) {
         }
     });
 
-    // Option 3: Open media folder (always available)
+    // Option 4: Open media folder (always available)
     buttons.push({
         text: 'Open media folder',
         primary: false,
@@ -2226,7 +2252,7 @@ function showFileDropDialogue(options) {
         }
     });
 
-    // Cancel button
+    // Option 5: Cancel
     buttons.push({
         text: 'Cancel',
         action: () => {
@@ -2236,8 +2262,8 @@ function showFileDropDialogue(options) {
 
     // Show the modal
     const message = existingFile
-        ? `File "${existingFile}" already exists in media folder. Link it, search for another, or copy manually.`
-        : `File not found in media folder${sizeText}. Search for it in your workspace or copy it manually.`;
+        ? `File "${existingFile}" already exists in the workspace. Link it, copy a new one, or search for another.`
+        : `File not found in the workspace${sizeText}. Copy it to Media, search for it, or open the Media folder to move it manually.`;
 
     modalUtils.showConfirmModal(
         `Add file: ${fileName}`,

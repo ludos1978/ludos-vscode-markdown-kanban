@@ -186,6 +186,9 @@ class ModalUtils {
             const button = document.createElement('button');
             button.className = 'modal-dialog-btn';
             button.textContent = buttonConfig.text;
+            if (buttonConfig.disabled) {
+                button.disabled = true;
+            }
 
             // Apply button variant via class
             if (buttonConfig.primary || buttonConfig.variant === 'primary') {
@@ -196,6 +199,7 @@ class ModalUtils {
 
             // Add click handler
             button.onclick = () => {
+                if (button.disabled) { return; }
                 this.closeModal(modal);
                 if (buttonConfig.action) {
                     buttonConfig.action();

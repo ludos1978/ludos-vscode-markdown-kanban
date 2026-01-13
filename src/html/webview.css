@@ -6313,6 +6313,13 @@ figcaption {
   color: var(--vscode-button-foreground);
 }
 
+.custom-modal .modal-dialog-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
 .loading-modal .loading-spinner {
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-dropdown-border);
