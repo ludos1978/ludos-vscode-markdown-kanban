@@ -38,6 +38,7 @@
 - [ ] File search modal opens/closes cleanly and handles special characters safely.
 - [ ] Broken file menus update paths in all editors (inline markdown, inline WYSIWYG, overlay preview/markdown/WYSIWYG).
 - [ ] Burger menu Open + Alt+click open in VS Code first, fallback to system editor when needed.
+- [ ] External file drops into include-backed tasks copy into the include file’s media folder and link correctly.
 
 ## File Import & Media Index
 - [ ] File import dialog shows consistent options and updates the hash DB after copy.

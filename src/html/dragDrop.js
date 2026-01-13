@@ -2044,10 +2044,14 @@ async function handleVSCodeFileDrop(e, files) {
     // Generate unique ID for this drop
     const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    const activeEditor = getActiveTextEditor();
+    const includeContext = activeEditor?.includeContext || null;
+
     // Store file object for later use if user chooses to copy
     pendingFileDrops.set(dropId, {
         file: file,
-        dropPosition: { x: e.clientX, y: e.clientY }
+        dropPosition: { x: e.clientX, y: e.clientY },
+        includeContext: includeContext
     });
 
     // Read first 1MB for hash calculation (safe even for large files)
@@ -2068,7 +2072,8 @@ async function handleVSCodeFileDrop(e, files) {
         fileType: file.type || 'application/octet-stream',
         hasSourcePath: false, // File objects don't have accessible paths
         partialHashData: partialHashData, // First 1MB for hash matching
-        dropPosition: { x: e.clientX, y: e.clientY }
+        dropPosition: { x: e.clientX, y: e.clientY },
+        includeContext: includeContext || undefined
     });
 }
 
@@ -2082,7 +2087,7 @@ function executeFileObjectCopy(dropId, isImage) {
         return;
     }
 
-    const { file, dropPosition } = pending;
+    const { file, dropPosition, includeContext } = pending;
     const fileName = file.name;
 
     // Clean up pending entry
@@ -2098,7 +2103,8 @@ function executeFileObjectCopy(dropId, isImage) {
                     imageData: base64Data,
                     originalFileName: fileName,
                     imageType: file.type,
-                    dropPosition: dropPosition
+                    dropPosition: dropPosition,
+                    includeContext: includeContext || undefined
                 });
             } catch (error) {
                 console.error('[Image-Drop] Failed to process image:', error);
@@ -2123,7 +2129,8 @@ function executeFileObjectCopy(dropId, isImage) {
                     fileData: base64Data,
                     originalFileName: fileName,
                     fileType: file.type || 'application/octet-stream',
-                    dropPosition: dropPosition
+                    dropPosition: dropPosition,
+                    includeContext: includeContext || undefined
                 });
             } catch (error) {
                 console.error('[File-Drop] Failed to process file:', error);
@@ -2170,7 +2177,8 @@ function showFileDropDialogue(options) {
         existingFilePath,
         dropPosition,
         hasSourcePath,
-        sourcePath
+        sourcePath,
+        includeContext
     } = options;
 
     const sizeText = fileSize ? ` (${formatFileSize(fileSize)})` : '';
@@ -2194,7 +2202,8 @@ function showFileDropDialogue(options) {
                 existingFilePath: existingFilePath,
                 fileName: fileName,
                 isImage: isImage,
-                dropPosition: dropPosition
+                dropPosition: dropPosition,
+                includeContext: includeContext || undefined
             });
         } : null
     });
@@ -2212,7 +2221,8 @@ function showFileDropDialogue(options) {
                     sourcePath: sourcePath,
                     fileName: fileName,
                     isImage: isImage,
-                    dropPosition: dropPosition
+                    dropPosition: dropPosition,
+                    includeContext: includeContext || undefined
                 });
                 return;
             }
@@ -2230,7 +2240,8 @@ function showFileDropDialogue(options) {
                 type: 'searchForDroppedFile',
                 fileName: fileName,
                 isImage: isImage,
-                dropPosition: dropPosition
+                dropPosition: dropPosition,
+                includeContext: includeContext || undefined
             });
         }
     });
@@ -2242,7 +2253,8 @@ function showFileDropDialogue(options) {
         action: () => {
             cancelPendingFileDrop(dropId);
             vscode.postMessage({
-                type: 'openMediaFolder'
+                type: 'openMediaFolder',
+                includeContext: includeContext || undefined
             });
             // Show instructions
             modalUtils.showAlert(
@@ -2287,6 +2299,8 @@ function handleVSCodeUriDrop(e, uriData) {
     });
 
     if (uris.length > 0) {
+        const activeEditor = getActiveTextEditor();
+        const includeContext = activeEditor?.includeContext || null;
         uris.forEach(uri => {
             // Decode file:// URI but keep original path separators for backend filesystem operations
             const fullPath = uri.startsWith('file://')
@@ -2309,7 +2323,8 @@ function handleVSCodeUriDrop(e, uriData) {
                 sourcePath: fullPath,
                 isImage: isImage,
                 hasSourcePath: true,
-                dropPosition: { x: e.clientX, y: e.clientY }
+                dropPosition: { x: e.clientX, y: e.clientY },
+                includeContext: includeContext || undefined
             });
         });
     }
@@ -2325,7 +2340,8 @@ function getActiveTextEditor() {
             taskId: editor.taskId,
             columnId: editor.columnId,
             cursorPosition: editor.element.selectionStart || 0,
-            element: editor.element
+            element: editor.element,
+            includeContext: editor.includeContext || null
         };
     }
     

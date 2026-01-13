@@ -95,22 +95,22 @@ export class ClipboardCommands extends SwitchBasedCommand {
         },
         'saveDroppedImageFromContents': async (msg, ctx) => {
             const m = msg as any;
-            await this.handleAnyFileDrop(null, m.imageData, m.originalFileName, m.dropPosition, true, ctx);
+            await this.handleAnyFileDrop(null, m.imageData, m.originalFileName, m.dropPosition, true, m.includeContext ?? null, ctx);
             return this.success();
         },
         'copyImageToMedia': async (msg, ctx) => {
             const m = msg as any;
-            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, true, ctx);
+            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, true, m.includeContext ?? null, ctx);
             return this.success();
         },
         'handleFileUriDrop': async (msg, ctx) => {
             const m = msg as any;
-            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, false, ctx);
+            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, false, m.includeContext ?? null, ctx);
             return this.success();
         },
         'saveDroppedFileFromContents': async (msg, ctx) => {
             const m = msg as any;
-            await this.handleAnyFileDrop(null, m.fileData, m.originalFileName, m.dropPosition, false, ctx);
+            await this.handleAnyFileDrop(null, m.fileData, m.originalFileName, m.dropPosition, false, m.includeContext ?? null, ctx);
             return this.success();
         },
         'requestFileDropDialogue': async (msg, ctx) => {
@@ -129,13 +129,14 @@ export class ClipboardCommands extends SwitchBasedCommand {
             await this.handleLinkExistingFile(msg as LinkExistingFileMessage, ctx);
             return this.success();
         },
-        'openMediaFolder': async (_msg, ctx) => {
-            await this.handleOpenMediaFolder(ctx);
+        'openMediaFolder': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleOpenMediaFolder(ctx, m.includeContext ?? null);
             return this.success();
         },
         'searchForDroppedFile': async (msg, ctx) => {
             const m = msg as any;
-            await this.handleSearchForDroppedFile(m.fileName, m.isImage, m.dropPosition, ctx);
+            await this.handleSearchForDroppedFile(m.fileName, m.isImage, m.dropPosition, m.includeContext ?? null, ctx);
             return this.success();
         },
         'createDiagramFile': async (msg, ctx) => {
@@ -276,16 +277,17 @@ export class ClipboardCommands extends SwitchBasedCommand {
         originalFileName: string,
         dropPosition: { x: number; y: number },
         isImage: boolean,
+        includeContext: { includeFilePath?: string } | null,
         context: CommandContext
     ): Promise<void> {
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
+            const { directory, baseFileName } = this._getDropTargetPaths(context, includeContext);
 
             if (sourcePath && this._isFileInWorkspace(sourcePath)) {
-                return this._sendLinkMessage(sourcePath, originalFileName, dropPosition, directory, isImage, context);
+                return this._sendLinkMessage(sourcePath, originalFileName, dropPosition, directory, isImage, includeContext, context);
             }
 
-            return this._copyToMediaFolder(sourcePath, fileData, originalFileName, dropPosition, directory, baseFileName, isImage, context);
+            return this._copyToMediaFolder(sourcePath, fileData, originalFileName, dropPosition, directory, baseFileName, isImage, includeContext, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error handling file:', error);
             this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, fileData !== null, context);
@@ -293,15 +295,15 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     private async handleRequestFileDropDialogue(message: RequestFileDropDialogueMessage, context: CommandContext): Promise<void> {
-        const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition } = message;
+        const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition, includeContext } = message;
         let fileSize = message.fileSize;
 
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
+            const { directory } = this._getDropTargetPaths(context, includeContext ?? null);
 
             if (hasSourcePath && sourcePath) {
                 if (this._isFileInWorkspace(sourcePath)) {
-                    return this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage, context);
+                    return this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage, includeContext ?? null, context);
                 }
 
                 if (fs.existsSync(sourcePath)) {
@@ -351,7 +353,8 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 sourcePath: sourcePath,
                 existingFile: existingFile,
                 existingFilePath: existingFilePath,
-                dropPosition: dropPosition
+                dropPosition: dropPosition,
+                includeContext: includeContext ?? undefined
             });
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop dialogue:', error);
@@ -360,11 +363,11 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     private async handleExecuteFileDropCopy(message: ExecuteFileDropCopyMessage, context: CommandContext): Promise<void> {
-        const { sourcePath, fileName, isImage, dropPosition } = message;
+        const { sourcePath, fileName, isImage, dropPosition, includeContext } = message;
 
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
-            await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage, context);
+            const { directory, baseFileName } = this._getDropTargetPaths(context, includeContext ?? null);
+            await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage, includeContext ?? null, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop copy:', error);
             this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, false, context);
@@ -372,11 +375,11 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     private async handleExecuteFileDropLink(message: ExecuteFileDropLinkMessage, context: CommandContext): Promise<void> {
-        const { sourcePath, fileName, isImage, dropPosition } = message;
+        const { sourcePath, fileName, isImage, dropPosition, includeContext } = message;
 
         try {
-            const { directory } = this._getCurrentFilePaths(context);
-            this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage, context);
+            const { directory } = this._getDropTargetPaths(context, includeContext ?? null);
+            this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage, includeContext ?? null, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop link:', error);
             this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, false, context);
@@ -384,30 +387,29 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     private async handleLinkExistingFile(message: LinkExistingFileMessage, context: CommandContext): Promise<void> {
-        const { existingFile, existingFilePath: providedPath, fileName, isImage, dropPosition } = message;
+        const { existingFile, existingFilePath: providedPath, fileName, isImage, dropPosition, includeContext } = message;
 
         try {
-            const { directory } = this._getCurrentFilePaths(context);
+            const { directory, baseFileName } = this._getDropTargetPaths(context, includeContext ?? null);
 
             // Use provided full path if available (from workspace-wide hash match),
             // otherwise fall back to looking in media folder
             let filePath = providedPath;
             if (!filePath) {
-                const { baseFileName } = this._getCurrentFilePaths(context);
                 const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
                 filePath = path.join(mediaFolderPath, existingFile);
             }
 
-            this._sendLinkMessage(filePath, fileName, dropPosition, directory, isImage, context);
+            this._sendLinkMessage(filePath, fileName, dropPosition, directory, isImage, includeContext ?? null, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error linking existing file:', error);
             this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, true, context);
         }
     }
 
-    private async handleOpenMediaFolder(context: CommandContext): Promise<void> {
+    private async handleOpenMediaFolder(context: CommandContext, includeContext: { includeFilePath?: string } | null): Promise<void> {
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
+            const { directory, baseFileName } = this._getDropTargetPaths(context, includeContext);
             const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
 
             await vscode.commands.executeCommand('revealFileInOS', safeFileUri(mediaFolderPath, 'ClipboardCommands-revealMedia'));
@@ -426,10 +428,11 @@ export class ClipboardCommands extends SwitchBasedCommand {
         fileName: string,
         isImage: boolean,
         dropPosition: { x: number; y: number },
+        includeContext: { includeFilePath?: string } | null,
         context: CommandContext
     ): Promise<void> {
         try {
-            const { directory } = this._getCurrentFilePaths(context);
+            const { directory } = this._getDropTargetPaths(context, includeContext);
 
             // Set up FileSearchService
             const fileSearchService = new FileSearchService();
@@ -460,7 +463,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
 
             // File was selected - create a link to it
             const selectedFilePath = result.uri.fsPath;
-            this._sendLinkMessage(selectedFilePath, fileName, dropPosition, directory, isImage, context);
+            this._sendLinkMessage(selectedFilePath, fileName, dropPosition, directory, isImage, includeContext, context);
 
         } catch (error) {
             console.error('[ClipboardCommands] Error searching for dropped file:', error);
@@ -701,6 +704,21 @@ export class ClipboardCommands extends SwitchBasedCommand {
         return { currentFilePath, directory, fileName, baseFileName };
     }
 
+    private _getDropTargetPaths(
+        context: CommandContext,
+        includeContext: { includeFilePath?: string } | null
+    ): { directory: string; baseFileName: string } {
+        if (includeContext?.includeFilePath) {
+            const includePath = includeContext.includeFilePath;
+            return {
+                directory: path.dirname(includePath),
+                baseFileName: path.basename(includePath).replace(/\.[^/.]+$/, '')
+            };
+        }
+        const { directory, baseFileName } = this._getCurrentFilePaths(context);
+        return { directory, baseFileName };
+    }
+
     private _getMediaFolderPath(directory: string, baseFileName: string): string {
         const mediaFolderName = `${baseFileName}-MEDIA`;
         const mediaFolderPath = path.join(directory, mediaFolderName);
@@ -787,6 +805,15 @@ export class ClipboardCommands extends SwitchBasedCommand {
         return `./${toForwardSlashes(relativePath)}`;
     }
 
+    private _formatPathForBaseDir(absolutePath: string, baseDir: string): string {
+        const pathMode = configService.getPathGenerationMode();
+        if (pathMode === 'absolute') {
+            return absolutePath;
+        }
+        const relativePath = path.relative(baseDir, absolutePath);
+        return `./${toForwardSlashes(relativePath)}`;
+    }
+
     private _generateUniqueImageFilename(mediaFolderPath: string, originalFileName: string, fileBuffer: Buffer): string {
         const extension = path.extname(originalFileName) || '.png';
         const baseName = path.basename(originalFileName, extension);
@@ -830,11 +857,17 @@ export class ClipboardCommands extends SwitchBasedCommand {
         dropPosition: { x: number; y: number },
         directory: string,
         isImage: boolean,
+        includeContext: { includeFilePath?: string } | null,
         context: CommandContext
     ): void {
+        const baseDir = includeContext?.includeFilePath
+            ? path.dirname(includeContext.includeFilePath)
+            : directory;
         const formattedPath = isImage
-            ? this._formatImagePath(sourcePath, directory)
-            : context.fileManager.generateConfiguredPath(sourcePath);
+            ? this._formatImagePath(sourcePath, baseDir)
+            : (includeContext?.includeFilePath
+                ? this._formatPathForBaseDir(sourcePath, baseDir)
+                : context.fileManager.generateConfiguredPath(sourcePath));
 
         if (isImage) {
             this.postMessage({ type: 'droppedImageSaved',
@@ -863,6 +896,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
         directory: string,
         baseFileName: string,
         isImage: boolean,
+        includeContext: { includeFilePath?: string } | null,
         context: CommandContext
     ): Promise<void> {
         if (sourcePath && !fs.existsSync(sourcePath)) {
@@ -907,9 +941,14 @@ export class ClipboardCommands extends SwitchBasedCommand {
             mediaIndex.updateFile(targetPath);
         }
 
+        const baseDir = includeContext?.includeFilePath
+            ? path.dirname(includeContext.includeFilePath)
+            : directory;
         const formattedPath = isImage
-            ? this._formatImagePath(targetPath, directory)
-            : context.fileManager.generateConfiguredPath(targetPath);
+            ? this._formatImagePath(targetPath, baseDir)
+            : (includeContext?.includeFilePath
+                ? this._formatPathForBaseDir(targetPath, baseDir)
+                : context.fileManager.generateConfiguredPath(targetPath));
 
         if (isImage) {
             this.postMessage({ type: 'droppedImageSaved',

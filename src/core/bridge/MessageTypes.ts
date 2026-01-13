@@ -959,6 +959,12 @@ export interface SaveDroppedImageFromContentsMessage extends BaseMessage {
     imageData: string;
     originalFileName: string;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -969,6 +975,12 @@ export interface CopyImageToMediaMessage extends BaseMessage {
     sourcePath: string;
     originalFileName: string;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -979,6 +991,12 @@ export interface HandleFileUriDropMessage extends BaseMessage {
     sourcePath: string;
     originalFileName: string;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -989,6 +1007,12 @@ export interface SaveDroppedFileFromContentsMessage extends BaseMessage {
     fileData: string;
     originalFileName: string;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1004,6 +1028,12 @@ export interface RequestFileDropDialogueMessage extends BaseMessage {
     sourcePath?: string;
     partialHashData?: string;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1015,6 +1045,12 @@ export interface ExecuteFileDropCopyMessage extends BaseMessage {
     fileName: string;
     isImage: boolean;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1026,6 +1062,12 @@ export interface ExecuteFileDropLinkMessage extends BaseMessage {
     fileName: string;
     isImage: boolean;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1038,6 +1080,12 @@ export interface LinkExistingFileMessage extends BaseMessage {
     fileName: string;
     isImage: boolean;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1045,6 +1093,12 @@ export interface LinkExistingFileMessage extends BaseMessage {
  */
 export interface OpenMediaFolderMessage extends BaseMessage {
     type: 'openMediaFolder';
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1056,6 +1110,12 @@ export interface SearchForDroppedFileMessage extends BaseMessage {
     fileName: string;
     isImage: boolean;
     dropPosition: DropPosition;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
