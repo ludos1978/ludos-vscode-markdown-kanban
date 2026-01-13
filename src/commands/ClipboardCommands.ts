@@ -83,7 +83,14 @@ export class ClipboardCommands extends SwitchBasedCommand {
         },
         'pasteImageIntoField': async (msg, ctx) => {
             const m = msg as any;
-            await this.handlePasteImageIntoField(m.imageData, m.imageType, m.md5Hash ?? '', m.cursorPosition ?? 0, ctx);
+            await this.handlePasteImageIntoField(
+                m.imageData,
+                m.imageType,
+                m.md5Hash ?? '',
+                m.cursorPosition ?? 0,
+                m.includeContext ?? null,
+                ctx
+            );
             return this.success();
         },
         'saveDroppedImageFromContents': async (msg, ctx) => {
@@ -219,10 +226,20 @@ export class ClipboardCommands extends SwitchBasedCommand {
         imageType: string,
         md5Hash: string,
         cursorPosition: number,
+        includeContext: { includeFilePath?: string } | null,
         context: CommandContext
     ): Promise<void> {
         try {
-            const { directory, baseFileName } = this._getCurrentFilePaths(context);
+            let directory: string;
+            let baseFileName: string;
+            if (includeContext?.includeFilePath) {
+                directory = path.dirname(includeContext.includeFilePath);
+                baseFileName = path.basename(includeContext.includeFilePath).replace(/\.[^/.]+$/, '');
+            } else {
+                const currentPaths = this._getCurrentFilePaths(context);
+                directory = currentPaths.directory;
+                baseFileName = currentPaths.baseFileName;
+            }
 
             const extension = imageType.split('/')[1] || 'png';
             const imageFileName = `${md5Hash}.${extension}`;

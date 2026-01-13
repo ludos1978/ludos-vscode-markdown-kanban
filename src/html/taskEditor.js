@@ -314,13 +314,27 @@ class TaskEditor {
 
                                     window.addEventListener('message', imageHandler);
 
+                                    let includeContext = self.currentEditor?.includeContext || null;
+                                    if (!includeContext) {
+                                        const taskId = self.currentEditor?.taskId ||
+                                            (typeof window.getTaskIdFromElement === 'function'
+                                                ? window.getTaskIdFromElement(target)
+                                                : target?.closest?.('.task-item')?.dataset?.taskId);
+                                        const columnId = self.currentEditor?.columnId ||
+                                            (typeof window.getColumnIdFromElement === 'function'
+                                                ? window.getColumnIdFromElement(target)
+                                                : target?.closest?.('[data-column-id]')?.dataset?.columnId);
+                                        includeContext = self._getTaskIncludeContext(taskId, columnId);
+                                    }
+
                                     // Send to backend to save the image
                                     vscode.postMessage({
                                         type: 'pasteImageIntoField',
                                         imageData: imageData.data,
                                         imageType: type,
                                         md5Hash: md5Hash,
-                                        cursorPosition: cursorPos
+                                        cursorPosition: cursorPos,
+                                        includeContext: includeContext || undefined
                                     });
 
                                     return; // Exit early - image found and handled
@@ -596,6 +610,15 @@ class TaskEditor {
         if (task) {
             editElement.value = task.description || '';
         }
+    }
+
+    _getTaskIncludeContext(taskId, columnId) {
+        if (!taskId || !columnId) {
+            return null;
+        }
+        const column = window.cachedBoard?.columns?.find(col => col.id === columnId);
+        const task = column?.tasks?.find(t => t.id === taskId);
+        return task?.includeContext || null;
     }
 
     // ============= INDENTATION HELPERS =============
@@ -1039,7 +1062,7 @@ class TaskEditor {
      * Store current editor state
      * @private
      */
-    _storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext = null, containerElement = null) {
+    _storeEditorState(editElement, displayElement, type, taskId, columnId, includeContext = null, wysiwygContext = null, containerElement = null) {
         this.currentEditor = {
             element: editElement,
             displayElement: displayElement,
@@ -1049,7 +1072,8 @@ class TaskEditor {
             originalValue: editElement.value,
             containerElement: containerElement,
             wysiwyg: wysiwygContext?.editor || null,
-            wysiwygContainer: wysiwygContext?.container || null
+            wysiwygContainer: wysiwygContext?.container || null,
+            includeContext: includeContext || null
         };
 
         if (editElement) {
@@ -1810,8 +1834,12 @@ class TaskEditor {
             this._logScrollSnapshot('startEdit.afterCursor', editElement);
         }
 
+        const includeContext = (type === 'task-title' || type === 'task-description')
+            ? this._getTaskIncludeContext(taskId, columnId)
+            : null;
+
         // Store editor state
-        this._storeEditorState(editElement, displayElement, type, taskId, columnId, wysiwygContext, containerElement);
+        this._storeEditorState(editElement, displayElement, type, taskId, columnId, includeContext, wysiwygContext, containerElement);
 
         // Notify backend
         this._notifyEditingStarted(type, taskId, columnId);

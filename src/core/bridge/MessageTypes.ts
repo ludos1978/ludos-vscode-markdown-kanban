@@ -943,6 +943,12 @@ export interface PasteImageIntoFieldMessage extends BaseMessage {
     imageType: string;
     md5Hash?: string;
     cursorPosition?: number;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**

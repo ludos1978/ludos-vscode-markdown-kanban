@@ -51,6 +51,7 @@
 
 ## WYSIWYG Nodes & Media
 - [ ] Images/videos/audio/PDF/diagram previews render with path menus and resolve relative/include paths.
+- [ ] Shift+Cmd/Ctrl+V image paste in include-backed tasks saves into the include media folder and renders.
 - [ ] Inline vs block media behaves correctly; typing before/after images keeps them rendered.
 - [ ] Diagram fences show preview + editable code block; debounce works; Edit toggles correctly.
 - [ ] Draw.io/Excalidraw previews render and update without stuck placeholders.
