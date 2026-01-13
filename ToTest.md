@@ -152,6 +152,7 @@
 - [ ] Overlay insert menu no longer lists multicolumn, include, wiki link, or footnote.
 - [ ] In overlay WYSIWYG, large images never exceed 80% of the editor pane height.
 - [ ] In overlay WYSIWYG, when a task starts or ends with an image, you can still type before and after it.
+- [ ] In overlay WYSIWYG, clicking below the last line places the cursor at the end of the content.
 - [ ] In overlay WYSIWYG, PlantUML fences render to SVG (no endless "Rendering PlantUML diagram..." placeholder).
 - [ ] In overlay WYSIWYG, you can insert text before/after mermaid or plantuml diagram blocks (text does not get trapped inside the fence).
 - [ ] In WYSIWYG, focusing the editor does not draw an extra focus outline around the edit area.

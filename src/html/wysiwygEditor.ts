@@ -1322,8 +1322,11 @@ export class WysiwygEditor {
     private onChange?: (markdown: string) => void;
     private onSubmit?: () => void;
     private onSelectionChange?: (state: WysiwygSelectionState) => void;
+    private overlayClickHandler?: (event: MouseEvent) => void;
+    private container: HTMLElement;
 
     constructor(container: HTMLElement, options: WysiwygEditorOptions) {
+        this.container = container;
         this.temporalPrefix = options.temporalPrefix || '!';
         this.onChange = options.onChange;
         this.onSubmit = options.onSubmit;
@@ -1668,6 +1671,27 @@ export class WysiwygEditor {
         this.lastMarkdown = this.serializeState(this.view.state);
         syncWysiwygImages(this.view.dom);
         this.emitSelectionChange(this.view.state);
+
+        if (this.container.classList.contains('task-overlay-wysiwyg')) {
+            this.overlayClickHandler = (event: MouseEvent) => {
+                if (event.button !== 0) {
+                    return;
+                }
+                const target = event.target as HTMLElement | null;
+                if (!target || target !== this.container) {
+                    return;
+                }
+                const editorRect = this.view.dom.getBoundingClientRect();
+                if (event.clientY <= editorRect.bottom + 1) {
+                    return;
+                }
+                event.preventDefault();
+                const selection = Selection.atEnd(this.view.state.doc);
+                this.view.dispatch(this.view.state.tr.setSelection(selection).scrollIntoView());
+                this.view.focus();
+            };
+            this.container.addEventListener('mousedown', this.overlayClickHandler);
+        }
     }
 
     focus(): void {
@@ -1675,6 +1699,10 @@ export class WysiwygEditor {
     }
 
     destroy(): void {
+        if (this.overlayClickHandler) {
+            this.container.removeEventListener('mousedown', this.overlayClickHandler);
+            this.overlayClickHandler = undefined;
+        }
         this.view.destroy();
     }
 
