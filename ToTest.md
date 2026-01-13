@@ -42,6 +42,7 @@
 
 ## File Import & Media Index
 - [ ] File import dialog shows consistent options and updates the hash DB after copy.
+- [ ] Hash lookups skip deleted files (stale hash entries removed when detected).
 - [ ] MediaIndex scan scopes work: `mediaFolders`, `contentFolders`, `allWorkspaces`.
 
 ## WYSIWYG Core

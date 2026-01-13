@@ -398,14 +398,26 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         }
 
         try {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const workspaceRoot = workspaceFolder ? path.resolve(workspaceFolder.uri.fsPath) : null;
             const stmt = this.db.prepare('SELECT path, hash, mtime, size, type FROM media_files WHERE hash = ?');
             stmt.bind([hash]);
 
             const results: MediaFileRecord[] = [];
+            let removedAny = false;
             while (stmt.step()) {
                 const row = stmt.getAsObject() as Record<string, unknown>;
+                const relativePath = row.path as string;
+                if (workspaceRoot) {
+                    const absolutePath = path.resolve(workspaceRoot, relativePath);
+                    if (!fs.existsSync(absolutePath)) {
+                        this.db.run('DELETE FROM media_files WHERE path = ?', [relativePath]);
+                        removedAny = true;
+                        continue;
+                    }
+                }
                 results.push({
-                    path: row.path as string,
+                    path: relativePath,
                     hash: row.hash as string,
                     mtime: row.mtime as number,
                     size: row.size as number,
@@ -413,6 +425,10 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
                 });
             }
             stmt.free();
+
+            if (removedAny) {
+                this.save();
+            }
 
             return results;
         } catch (error) {
