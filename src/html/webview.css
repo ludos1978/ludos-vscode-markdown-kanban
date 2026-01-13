@@ -1812,7 +1812,7 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg:focus-within {
-  outline-color: var(--vscode-focusBorder);
+  outline-color: transparent;
 }
 
 .task-description-wysiwyg .ProseMirror {
@@ -1834,6 +1834,13 @@ body.section-height-limited .task-section figure img {
   cursor: text;
   color: var(--vscode-foreground);
   caret-color: var(--vscode-editorCursor-foreground, var(--vscode-foreground, #000));
+}
+
+.task-description-wysiwyg .ProseMirror-focused,
+.task-overlay-wysiwyg .ProseMirror-focused {
+  outline: none;
+  box-shadow: none;
+  border: none;
 }
 
 .task-description-wysiwyg .ProseMirror:focus {
