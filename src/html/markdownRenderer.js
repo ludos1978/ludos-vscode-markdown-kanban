@@ -126,7 +126,6 @@ function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) 
     .use(temporalTagPlugin)  // . prefix: .w49, .2025.12.05, .mon, .15:30, .09:00-17:00
     .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
     .use(speakerNotePlugin) // Speaker notes (;; syntax)
-    .use(taskCheckboxPlugin) // Task list checkboxes (- [ ] / - [x])
     .use(htmlCommentPlugin, {
         commentMode: htmlCommentRenderMode,
         contentMode: htmlContentRenderMode
@@ -295,60 +294,6 @@ function wikiLinksPlugin(md, options = {}) {
     
     md.renderer.rules.wiki_link_close = function() {
         return '</a>';
-    };
-}
-
-// Task checkbox plugin for markdown-it
-function taskCheckboxPlugin(md) {
-    md.core.ruler.after('inline', 'task-checkbox', function(state) {
-        const env = state.env || {};
-        let checkboxIndex = Number.isFinite(env.taskCheckboxIndex) ? env.taskCheckboxIndex : 0;
-
-        for (let i = 0; i < state.tokens.length; i++) {
-            const token = state.tokens[i];
-            if (token.type !== 'inline' || !token.children || token.children.length === 0) {
-                continue;
-            }
-
-            const prev = state.tokens[i - 1];
-            const prevPrev = state.tokens[i - 2];
-            if (!prev || !prevPrev || prev.type !== 'paragraph_open' || prevPrev.type !== 'list_item_open') {
-                continue;
-            }
-
-            const firstChild = token.children[0];
-            if (!firstChild || firstChild.type !== 'text') {
-                continue;
-            }
-
-            const match = firstChild.content.match(/^\[( |x|X)\]\s+/);
-            if (!match) {
-                continue;
-            }
-
-            const checked = match[1].toLowerCase() === 'x';
-            const checkboxToken = new state.Token('task_checkbox', 'span', 0);
-            checkboxToken.meta = {
-                checked,
-                index: checkboxIndex
-            };
-            checkboxIndex += 1;
-
-            firstChild.content = firstChild.content.slice(match[0].length);
-            token.children.unshift(checkboxToken);
-        }
-
-        env.taskCheckboxIndex = checkboxIndex;
-        state.env = env;
-    });
-
-    md.renderer.rules.task_checkbox = function(tokens, idx) {
-        const meta = tokens[idx]?.meta || {};
-        const checked = !!meta.checked;
-        const index = Number.isFinite(meta.index) ? meta.index : 0;
-        const classes = `md-task-checkbox${checked ? ' checked' : ''}`;
-        const aria = checked ? 'true' : 'false';
-        return `<span class="${classes}" data-checkbox-index="${index}" data-checked="${checked ? 'true' : 'false'}" role="checkbox" aria-checked="${aria}" tabindex="0"></span>`;
     };
 }
 
@@ -1969,8 +1914,7 @@ function renderMarkdown(text, includeContext) {
         // The renderers use window.currentTaskIncludeContext which is set per-render
         if (md._customRenderersRegistered) {
             // Renderers already registered, proceed to render directly
-            const env = { taskCheckboxIndex: 0 };
-            let rendered = md.render(text, env);
+            let rendered = md.render(text);
 
             // Trigger PlantUML queue processing after render completes
             if (pendingPlantUMLQueue.length > 0) {
@@ -2281,8 +2225,7 @@ function renderMarkdown(text, includeContext) {
         // Mark that custom renderers have been registered
         md._customRenderersRegistered = true;
 
-        const env = { taskCheckboxIndex: 0 };
-        let rendered = md.render(text, env);
+        let rendered = md.render(text);
 
         // Trigger PlantUML queue processing after render completes
         if (pendingPlantUMLQueue.length > 0) {

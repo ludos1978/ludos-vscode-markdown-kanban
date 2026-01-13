@@ -1638,36 +1638,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: inherit;
 }
 
-.task-description-display .md-task-checkbox {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 3px;
-  margin-right: 6px;
-  vertical-align: text-bottom;
-  background: var(--vscode-editor-background);
-  color: var(--vscode-button-foreground);
-  cursor: pointer;
-}
-
-.task-description-display .md-task-checkbox.checked {
-  background: var(--vscode-button-background);
-  border-color: var(--vscode-button-background);
-}
-
-.task-description-display .md-task-checkbox.checked::after {
-  content: '✓';
-  font-size: 11px;
-  line-height: 1;
-}
-
-.task-description-display .md-task-checkbox:hover {
-  border-color: var(--vscode-focusBorder);
-}
-
 /* Task section styling for content between HRs */
 .task-section {
   max-height: inherit;
