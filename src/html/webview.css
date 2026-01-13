@@ -6304,6 +6304,27 @@ figcaption {
   line-height: 1.4;
 }
 
+.custom-modal .modal-dialog-details {
+  margin: -10px 0 16px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.custom-modal .modal-dialog-checkbox {
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+}
+
+.custom-modal .modal-dialog-checkbox input {
+  margin: 0;
+}
+
 .custom-modal .modal-dialog-buttons {
   display: flex;
   gap: 10px;

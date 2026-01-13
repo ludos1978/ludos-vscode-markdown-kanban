@@ -298,7 +298,9 @@ export class ClipboardCommands extends SwitchBasedCommand {
         let fileSize = message.fileSize;
 
         try {
-            const { directory } = this._getDropTargetPaths(context, includeContext ?? null);
+            const { directory, baseFileName } = this._getDropTargetPaths(context, includeContext ?? null);
+            const mediaFolderName = `${baseFileName}-MEDIA`;
+            const mediaFolderPath = path.join(directory, mediaFolderName);
 
             if (hasSourcePath && sourcePath) {
                 if (this._isFileInWorkspace(sourcePath)) {
@@ -353,6 +355,8 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 existingFile: existingFile,
                 existingFilePath: existingFilePath,
                 dropPosition: dropPosition,
+                mediaFolderName: mediaFolderName,
+                mediaFolderPath: mediaFolderPath,
                 includeContext: includeContext ?? undefined
             });
         } catch (error) {

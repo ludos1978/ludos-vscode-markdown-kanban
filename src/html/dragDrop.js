@@ -41,6 +41,7 @@ let isProcessingDrop = false; // Prevent multiple simultaneous drops
 const pendingFileDrops = new Map();
 const pendingFileDropQueue = [];
 let fileDropDialogActive = false;
+let fileDropApplyAllAction = null;
 const FILE_SIZE_LIMIT_MB = 10;
 const FILE_SIZE_LIMIT_BYTES = FILE_SIZE_LIMIT_MB * 1024 * 1024;
 const PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB for partial hash calculation
@@ -58,6 +59,7 @@ function processNextFileDropDialog() {
     }
     const next = pendingFileDropQueue.shift();
     if (!next) {
+        fileDropApplyAllAction = null;
         return;
     }
     fileDropDialogActive = true;
@@ -2200,7 +2202,9 @@ function showFileDropDialogue(options) {
         dropPosition,
         hasSourcePath,
         sourcePath,
-        includeContext
+        includeContext,
+        mediaFolderPath,
+        mediaFolderName
     } = options;
 
     const sizeText = fileSize ? ` (${formatFileSize(fileSize)})` : '';
@@ -2209,13 +2213,10 @@ function showFileDropDialogue(options) {
     const canCopy = Boolean(hasSourcePath && sourcePath) || hasPendingFile;
     const linkAvailable = Boolean(existingFile);
     const primaryAction = linkAvailable ? 'link' : (canCopy ? 'copy' : 'search');
+    const hasQueuedFiles = pendingFileDropQueue.length > 0;
 
-    // Option 1: Link existing file (if found in workspace by hash match - FIRST option)
-    buttons.push({
-        text: 'Link existing file',
-        primary: primaryAction === 'link',
-        disabled: !linkAvailable,
-        action: linkAvailable ? () => {
+    const runAction = (action) => {
+        if (action === 'link' && linkAvailable) {
             cancelPendingFileDrop(dropId);
             vscode.postMessage({
                 type: 'linkExistingFile',
@@ -2228,15 +2229,10 @@ function showFileDropDialogue(options) {
                 includeContext: includeContext || undefined
             });
             finishFileDropDialog();
-        } : null
-    });
+            return true;
+        }
 
-    // Option 2: Copy file into media folder (always available if we have data to copy)
-    buttons.push({
-        text: 'Copy file to Media folder',
-        primary: primaryAction === 'copy',
-        disabled: !canCopy,
-        action: canCopy ? () => {
+        if (action === 'copy' && canCopy) {
             if (hasSourcePath && sourcePath) {
                 cancelPendingFileDrop(dropId);
                 vscode.postMessage({
@@ -2248,18 +2244,14 @@ function showFileDropDialogue(options) {
                     includeContext: includeContext || undefined
                 });
                 finishFileDropDialog();
-                return;
+                return true;
             }
             executeFileObjectCopy(dropId, isImage);
             finishFileDropDialog();
-        } : null
-    });
+            return true;
+        }
 
-    // Option 3: Search for file in workspace (always available)
-    buttons.push({
-        text: 'Search for file',
-        primary: primaryAction === 'search',
-        action: () => {
+        if (action === 'search') {
             cancelPendingFileDrop(dropId);
             vscode.postMessage({
                 type: 'searchForDroppedFile',
@@ -2269,6 +2261,76 @@ function showFileDropDialogue(options) {
                 includeContext: includeContext || undefined
             });
             finishFileDropDialog();
+            return true;
+        }
+
+        if (action === 'open') {
+            cancelPendingFileDrop(dropId);
+            vscode.postMessage({
+                type: 'openMediaFolder',
+                includeContext: includeContext || undefined
+            });
+            finishFileDropDialog();
+            modalUtils.showAlert(
+                'Copy file manually',
+                `Please copy "${fileName}" to the media folder that just opened, then drag it from the VS Code Explorer into the kanban.`
+            );
+            return true;
+        }
+
+        if (action === 'cancel') {
+            cancelPendingFileDrop(dropId);
+            finishFileDropDialog();
+            return true;
+        }
+
+        return false;
+    };
+
+    if (fileDropApplyAllAction) {
+        if (runAction(fileDropApplyAllAction)) {
+            return;
+        }
+        fileDropApplyAllAction = null;
+    }
+
+    let applyAllCheckbox = null;
+
+    // Option 1: Link existing file (if found in workspace by hash match - FIRST option)
+    buttons.push({
+        text: 'Link existing file',
+        primary: primaryAction === 'link',
+        disabled: !linkAvailable,
+        action: linkAvailable ? () => {
+            if (applyAllCheckbox?.checked) {
+                fileDropApplyAllAction = 'link';
+            }
+            runAction('link');
+        } : null
+    });
+
+    // Option 2: Copy file into media folder (always available if we have data to copy)
+    buttons.push({
+        text: 'Copy file to Media folder',
+        primary: primaryAction === 'copy',
+        disabled: !canCopy,
+        action: canCopy ? () => {
+            if (applyAllCheckbox?.checked) {
+                fileDropApplyAllAction = 'copy';
+            }
+            runAction('copy');
+        } : null
+    });
+
+    // Option 3: Search for file in workspace (always available)
+    buttons.push({
+        text: 'Search for file',
+        primary: primaryAction === 'search',
+        action: () => {
+            if (applyAllCheckbox?.checked) {
+                fileDropApplyAllAction = 'search';
+            }
+            runAction('search');
         }
     });
 
@@ -2277,17 +2339,10 @@ function showFileDropDialogue(options) {
         text: 'Open media folder',
         primary: false,
         action: () => {
-            cancelPendingFileDrop(dropId);
-            vscode.postMessage({
-                type: 'openMediaFolder',
-                includeContext: includeContext || undefined
-            });
-            finishFileDropDialog();
-            // Show instructions
-            modalUtils.showAlert(
-                'Copy file manually',
-                `Please copy "${fileName}" to the media folder that just opened, then drag it from the VS Code Explorer into the kanban.`
-            );
+            if (applyAllCheckbox?.checked) {
+                fileDropApplyAllAction = 'open';
+            }
+            runAction('open');
         }
     });
 
@@ -2295,8 +2350,10 @@ function showFileDropDialogue(options) {
     buttons.push({
         text: 'Cancel',
         action: () => {
-            cancelPendingFileDrop(dropId);
-            finishFileDropDialog();
+            if (applyAllCheckbox?.checked) {
+                fileDropApplyAllAction = 'cancel';
+            }
+            runAction('cancel');
         }
     });
 
@@ -2305,12 +2362,43 @@ function showFileDropDialogue(options) {
         ? `File "${existingFile}" already exists in the workspace. Link it, copy a new one, or search for another.`
         : `File not found in the workspace${sizeText}. Copy it to Media, search for it, or open the Media folder to move it manually.`;
 
-    modalUtils.showConfirmModal(
+    const modal = modalUtils.showConfirmModal(
         `Add file: ${fileName}`,
         message,
         buttons,
-        { maxWidth: '500px' }
+        { maxWidth: '500px', closeOnOutsideClick: false }
     );
+
+    const dialog = modal?.querySelector?.('.modal-dialog');
+    const messageElement = modal?.querySelector?.('.modal-dialog-message');
+    if (dialog && messageElement) {
+        const details = document.createElement('div');
+        details.className = 'modal-dialog-details';
+        const fileLine = document.createElement('div');
+        fileLine.textContent = `File: ${fileName}`;
+        const mediaFolderDisplay = mediaFolderPath || mediaFolderName || 'Unknown';
+        const folderLine = document.createElement('div');
+        folderLine.textContent = `Media folder: ${mediaFolderDisplay}`;
+        details.appendChild(fileLine);
+        details.appendChild(folderLine);
+        messageElement.insertAdjacentElement('afterend', details);
+
+        if (hasQueuedFiles) {
+            applyAllCheckbox = document.createElement('input');
+            applyAllCheckbox.type = 'checkbox';
+            applyAllCheckbox.id = `file-drop-apply-all-${dropId}`;
+
+            const label = document.createElement('label');
+            label.className = 'modal-dialog-checkbox';
+            label.htmlFor = applyAllCheckbox.id;
+            label.appendChild(applyAllCheckbox);
+            const labelText = document.createElement('span');
+            labelText.textContent = 'Apply this choice to all remaining files';
+            label.appendChild(labelText);
+
+            details.insertAdjacentElement('afterend', label);
+        }
+    }
 }
 
 // Make functions globally available
