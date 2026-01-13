@@ -924,6 +924,7 @@ window.plantumlRenderCache = plantumlRenderCache; // Make globally accessible
  */
 function queuePlantUMLRender(id, code) {
     pendingPlantUMLQueue.push({ id, code, timestamp: Date.now() });
+    setTimeout(() => processPlantUMLQueue(), 10);
 }
 
 // Map to store pending render requests

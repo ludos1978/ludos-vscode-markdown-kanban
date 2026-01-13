@@ -662,7 +662,8 @@ function normalizeBlockBoundaries(state: EditorState): Transaction | null {
 
         children.forEach((entry, index) => {
             const child = entry.node;
-            if (child.isTextblock) {
+            const needsBoundary = child.isTextblock && child.type.name === 'diagram_fence';
+            if (child.isTextblock && !needsBoundary) {
                 return;
             }
             const prev = index > 0 ? children[index - 1].node : null;
