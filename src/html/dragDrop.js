@@ -39,9 +39,35 @@ let isProcessingDrop = false; // Prevent multiple simultaneous drops
 
 // File drop dialogue: store pending File objects until user confirms action
 const pendingFileDrops = new Map();
+const pendingFileDropQueue = [];
+let fileDropDialogActive = false;
 const FILE_SIZE_LIMIT_MB = 10;
 const FILE_SIZE_LIMIT_BYTES = FILE_SIZE_LIMIT_MB * 1024 * 1024;
 const PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB for partial hash calculation
+
+function enqueueFileDropDialog(payload) {
+    pendingFileDropQueue.push(payload);
+    if (!fileDropDialogActive) {
+        processNextFileDropDialog();
+    }
+}
+
+function processNextFileDropDialog() {
+    if (fileDropDialogActive) {
+        return;
+    }
+    const next = pendingFileDropQueue.shift();
+    if (!next) {
+        return;
+    }
+    fileDropDialogActive = true;
+    vscode.postMessage(next);
+}
+
+function finishFileDropDialog() {
+    fileDropDialogActive = false;
+    processNextFileDropDialog();
+}
 
 /**
  * Get column DOM element by column ID
@@ -2031,120 +2057,46 @@ function processImageSave(e, base64Data, imageType, md5Hash) {
 }
 
 async function handleVSCodeFileDrop(e, files) {
-    if (files.length > 1) {
-        handleMultipleFileObjectDrop(e, files);
-        return;
-    }
-    const file = files[0];
-    const fileName = file.name;
-    const fileSize = file.size;
-    // Treat images, videos, and audio as media files that use ![]() syntax
-    const isMedia = file.type.startsWith('image/') ||
-                    file.type.startsWith('video/') ||
-                    file.type.startsWith('audio/');
-    // Keep isImage for backwards compatibility with backend messages
-    const isImage = isMedia;
-
-    // Generate unique ID for this drop
-    const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    const activeEditor = getActiveTextEditor();
-    const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
-
-    // Store file object for later use if user chooses to copy
-    pendingFileDrops.set(dropId, {
-        file: file,
-        dropPosition: { x: e.clientX, y: e.clientY },
-        includeContext: includeContext
-    });
-
-    // Read first 1MB for hash calculation (safe even for large files)
-    let partialHashData = null;
-    try {
-        partialHashData = await readPartialFileForHash(file);
-    } catch (error) {
-        console.warn('[File-Drop] Could not read partial hash data:', error);
-    }
-
-    // Request dialogue from backend (backend will respond with available options)
-    vscode.postMessage({
-        type: 'requestFileDropDialogue',
-        dropId: dropId,
-        fileName: fileName,
-        fileSize: fileSize,
-        isImage: isImage,
-        fileType: file.type || 'application/octet-stream',
-        hasSourcePath: false, // File objects don't have accessible paths
-        partialHashData: partialHashData, // First 1MB for hash matching
-        dropPosition: { x: e.clientX, y: e.clientY },
-        includeContext: includeContext || undefined
-    });
-}
-
-function handleMultipleFileObjectDrop(e, files) {
     const activeEditor = getActiveTextEditor();
     const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
     const dropPosition = { x: e.clientX, y: e.clientY };
 
-    Array.from(files).forEach(file => {
+    for (const file of Array.from(files)) {
         const fileName = file.name;
+        const fileSize = file.size;
         const isMedia = file.type.startsWith('image/') ||
                         file.type.startsWith('video/') ||
                         file.type.startsWith('audio/');
         const isImage = isMedia;
 
-        if (isImage) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const base64Data = event.target.result.split(',')[1];
-                    vscode.postMessage({
-                        type: 'saveDroppedImageFromContents',
-                        imageData: base64Data,
-                        originalFileName: fileName,
-                        imageType: file.type,
-                        dropPosition: dropPosition,
-                        includeContext: includeContext || undefined
-                    });
-                } catch (error) {
-                    console.error('[Image-Drop] Failed to process image:', error);
-                    createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to copy image` }], dropPosition);
-                }
-            };
-            reader.onerror = function(error) {
-                console.error('[Image-Drop] FileReader error:', error);
-                createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to read image` }], dropPosition);
-            };
-            reader.readAsDataURL(file);
-            return;
+        const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        pendingFileDrops.set(dropId, {
+            file: file,
+            dropPosition: dropPosition,
+            includeContext: includeContext
+        });
+
+        let partialHashData = null;
+        try {
+            partialHashData = await readPartialFileForHash(file);
+        } catch (error) {
+            console.warn('[File-Drop] Could not read partial hash data:', error);
         }
 
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const base64Data = btoa(
-                    new Uint8Array(event.target.result)
-                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
-                );
-                vscode.postMessage({
-                    type: 'saveDroppedFileFromContents',
-                    fileData: base64Data,
-                    originalFileName: fileName,
-                    fileType: file.type || 'application/octet-stream',
-                    dropPosition: dropPosition,
-                    includeContext: includeContext || undefined
-                });
-            } catch (error) {
-                console.error('[File-Drop] Failed to process file:', error);
-                createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to copy file` }], dropPosition);
-            }
-        };
-        reader.onerror = function(error) {
-            console.error('[File-Drop] FileReader error:', error);
-            createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to read file` }], dropPosition);
-        };
-        reader.readAsArrayBuffer(file);
-    });
+        enqueueFileDropDialog({
+            type: 'requestFileDropDialogue',
+            dropId: dropId,
+            fileName: fileName,
+            fileSize: fileSize,
+            isImage: isImage,
+            fileType: file.type || 'application/octet-stream',
+            hasSourcePath: false,
+            partialHashData: partialHashData,
+            dropPosition: dropPosition,
+            includeContext: includeContext || undefined
+        });
+    }
 }
 
 /**
@@ -2275,6 +2227,7 @@ function showFileDropDialogue(options) {
                 dropPosition: dropPosition,
                 includeContext: includeContext || undefined
             });
+            finishFileDropDialog();
         } : null
     });
 
@@ -2294,9 +2247,11 @@ function showFileDropDialogue(options) {
                     dropPosition: dropPosition,
                     includeContext: includeContext || undefined
                 });
+                finishFileDropDialog();
                 return;
             }
             executeFileObjectCopy(dropId, isImage);
+            finishFileDropDialog();
         } : null
     });
 
@@ -2313,6 +2268,7 @@ function showFileDropDialogue(options) {
                 dropPosition: dropPosition,
                 includeContext: includeContext || undefined
             });
+            finishFileDropDialog();
         }
     });
 
@@ -2326,6 +2282,7 @@ function showFileDropDialogue(options) {
                 type: 'openMediaFolder',
                 includeContext: includeContext || undefined
             });
+            finishFileDropDialog();
             // Show instructions
             modalUtils.showAlert(
                 'Copy file manually',
@@ -2339,6 +2296,7 @@ function showFileDropDialogue(options) {
         text: 'Cancel',
         action: () => {
             cancelPendingFileDrop(dropId);
+            finishFileDropDialog();
         }
     });
 
