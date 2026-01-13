@@ -2031,6 +2031,10 @@ function processImageSave(e, base64Data, imageType, md5Hash) {
 }
 
 async function handleVSCodeFileDrop(e, files) {
+    if (files.length > 1) {
+        handleMultipleFileObjectDrop(e, files);
+        return;
+    }
     const file = files[0];
     const fileName = file.name;
     const fileSize = file.size;
@@ -2074,6 +2078,72 @@ async function handleVSCodeFileDrop(e, files) {
         partialHashData: partialHashData, // First 1MB for hash matching
         dropPosition: { x: e.clientX, y: e.clientY },
         includeContext: includeContext || undefined
+    });
+}
+
+function handleMultipleFileObjectDrop(e, files) {
+    const activeEditor = getActiveTextEditor();
+    const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
+    const dropPosition = { x: e.clientX, y: e.clientY };
+
+    Array.from(files).forEach(file => {
+        const fileName = file.name;
+        const isMedia = file.type.startsWith('image/') ||
+                        file.type.startsWith('video/') ||
+                        file.type.startsWith('audio/');
+        const isImage = isMedia;
+
+        if (isImage) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const base64Data = event.target.result.split(',')[1];
+                    vscode.postMessage({
+                        type: 'saveDroppedImageFromContents',
+                        imageData: base64Data,
+                        originalFileName: fileName,
+                        imageType: file.type,
+                        dropPosition: dropPosition,
+                        includeContext: includeContext || undefined
+                    });
+                } catch (error) {
+                    console.error('[Image-Drop] Failed to process image:', error);
+                    createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to copy image` }], dropPosition);
+                }
+            };
+            reader.onerror = function(error) {
+                console.error('[Image-Drop] FileReader error:', error);
+                createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to read image` }], dropPosition);
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const base64Data = btoa(
+                    new Uint8Array(event.target.result)
+                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                );
+                vscode.postMessage({
+                    type: 'saveDroppedFileFromContents',
+                    fileData: base64Data,
+                    originalFileName: fileName,
+                    fileType: file.type || 'application/octet-stream',
+                    dropPosition: dropPosition,
+                    includeContext: includeContext || undefined
+                });
+            } catch (error) {
+                console.error('[File-Drop] Failed to process file:', error);
+                createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to copy file` }], dropPosition);
+            }
+        };
+        reader.onerror = function(error) {
+            console.error('[File-Drop] FileReader error:', error);
+            createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to read file` }], dropPosition);
+        };
+        reader.readAsArrayBuffer(file);
     });
 }
 

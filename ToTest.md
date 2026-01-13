@@ -29,6 +29,7 @@
 - [ ] Drag cancel + cleanup (Esc snaps back, indicators clear, no stuck states). Note: re-enter drop indicators should recover (currently failing).
 - [ ] Internal vs external drag indicators remain isolated (no external indicators during internal drag).
 - [ ] Drop sources (clipboard/empty/diagram/tasks/columns/templates) create items and clean up highlights.
+- [ ] Multi-file external drops create one task per file (images/files) without losing any.
 - [ ] Column drag drop zones appear before/between/after and accept drops.
 - [ ] Column move/insert updates #row/#stack tags correctly.
 - [ ] Column headers render via markdown-it (no raw markdown).
