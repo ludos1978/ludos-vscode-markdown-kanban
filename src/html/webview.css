@@ -2054,11 +2054,13 @@ body.section-height-limited .task-section figure img {
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-block .wysiwyg-edit-btn {
-  position: static;
-  margin: 0 0 6px 0;
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  margin: 0;
   opacity: 1;
   transition: opacity 0.15s ease;
-  order: -1;
+  z-index: 2;
 }
 
 .task-description-wysiwyg .wysiwyg-multicolumn {
@@ -6153,9 +6155,11 @@ figcaption {
 }
 
 .task-overlay-wysiwyg .wysiwyg-diagram-block .wysiwyg-edit-btn {
-  align-self: flex-start;
-  margin: 0 0 6px 0;
-  order: -1;
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  margin: 0;
+  z-index: 2;
 }
 
 .task-overlay-wysiwyg img,
