@@ -24,6 +24,7 @@ There are multiple Types of content editing
 ### Content Editor
 - can use VS Code shortcuts to insert snippets (meta/ctrl/alt/shift combinations)
 - supports undo/redo in editors
+- snippet insertion by name or inline snippet content
 - All embed/link types (Link, Image, Include and Wiki) have a burger menu with consistent actions. Alt+Click opens in VS Code first, and falls back to the system editor.
   - Open (in VS Code if available, otherwise in the system defined tool)
   - Reveal in File Explorer
@@ -56,6 +57,17 @@ There are multiple Types of content editing
 - Save state
 - Layout Templates
 - Main burger Menu
+
+### Settings & Preferences
+- WYSIWYG enable/disable
+- Overlay editor enable/disable
+- Overlay editor default mode
+- Overlay editor font scale
+- Path generation mode (relative/absolute)
+- Template bar visibility
+- Backup settings
+- Sidebar auto-scan
+- Layout presets
 
 ### General Drag & Drop
 Dragging and Dropping allows the creation of Tasks from Drop Sources or reordering Tasks and Columns within the Kanban Board. 
@@ -100,6 +112,10 @@ Task Drop sources can be dropped in all Tasks
 ### Column Templates
 Column templates allow creating templates of multiple columns that can be dropped somewhere in the kanban board.
 
+### Processes
+- Media index scan
+- Media index cancel
+
 ### WYSIWYG Editor
 - if a text is selected and the link-button or the image-button is clicked, the text is classified (filename/path vs normal text) and placed in the right part of the link, keeping the selection.
 - if a text is selected and any of the styling buttons are pressed, the style is applied and the selection stays.
@@ -119,6 +135,14 @@ Column templates allow creating templates of multiple columns that can be droppe
 
 Using the !!!include(filename.md)!!! a Marp presentation can be imported and directly edited from within the Kanban Board.
 The include statement can be added to the Column Header (best for large presentations), the Task Header (smaller data) or directly into a Task Content (content is read-only).
+
+### Markdown Features
+- Underline, sub, sup, mark
+- Footnotes
+- Multi-column blocks
+- Image figures
+- HTML comment handling
+- Markdown-it extensions for kanban rendering
 
 ### Tags
 - Tags are written as #tag in titles or descriptions.
@@ -149,10 +173,18 @@ Files can be embedded using ![alt-text](/path/to/file.jpg "text to image") . All
 
 A Burger Menu allows modification of path. Seaching for alternatives if a filepath is broken.
 
+### PDF
+- PDF page previews
+- PDF slideshows
 
 ### DrawIo, Excalidraw
 
 These types of diagrams can be directly added to the board, they will render to a cached image which is displayed in the Kanban. Alt+Clicking allows to edit them. A burger menu allows other modifications of the filename.
+
+### Mermaid & PlantUML
+- Mermaid diagrams
+- PlantUML diagrams
+- Diagram previews in WYSIWYG and overlay
 
 
 ### Search and Broken file finding
