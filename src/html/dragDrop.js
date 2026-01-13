@@ -2062,6 +2062,18 @@ async function handleVSCodeFileDrop(e, files) {
     const activeEditor = getActiveTextEditor();
     const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
     const dropPosition = { x: e.clientX, y: e.clientY };
+    if (window.kanbanDebug?.enabled) {
+        window.kanbanDebug.log('[kanban.dragDrop.fileDrop.incoming]', {
+            count: files.length,
+            files: Array.from(files).map(file => ({
+                name: file.name,
+                size: file.size,
+                type: file.type
+            })),
+            includeContext: includeContext || null,
+            dropPosition
+        });
+    }
 
     for (const file of Array.from(files)) {
         const fileName = file.name;
@@ -2433,6 +2445,14 @@ function handleVSCodeUriDrop(e, uriData) {
     if (uris.length > 0) {
         const activeEditor = getActiveTextEditor();
         const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
+        if (window.kanbanDebug?.enabled) {
+            window.kanbanDebug.log('[kanban.dragDrop.uriDrop.incoming]', {
+                count: uris.length,
+                uris: uris,
+                includeContext: includeContext || null,
+                dropPosition: { x: e.clientX, y: e.clientY }
+            });
+        }
         uris.forEach(uri => {
             // Decode file:// URI but keep original path separators for backend filesystem operations
             const fullPath = uri.startsWith('file://')

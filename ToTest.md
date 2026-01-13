@@ -33,6 +33,7 @@
 - [ ] File drop dialog shows filename + media folder and offers “apply to all remaining files” when multiple are queued.
 - [ ] Apply-all repeats when available; if action is unavailable for a file, the dialog prompts for an alternative.
 - [ ] Multi-file drops preserve the intended file order (first selected is handled first).
+- [ ] Debug mode logs incoming file/URI drop order and metadata to the console.
 - [ ] Column drag drop zones appear before/between/after and accept drops.
 - [ ] Column move/insert updates #row/#stack tags correctly.
 - [ ] Column headers render via markdown-it (no raw markdown).
