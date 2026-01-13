@@ -121,19 +121,27 @@ Using the !!!include(filename.md)!!! a Marp presentation can be imported and dir
 The include statement can be added to the Column Header (best for large presentations), the Task Header (smaller data) or directly into a Task Content (content is read-only).
 
 ### Tags
-...
+- Tags are written as #tag in titles or descriptions.
+- Tags can be colorized and categorized.
+- Tag visibility can be toggled (show all, hide, or only show for layout tags).
+- Tag configuration can be used in templates and formatting.
 
 ### Export
-...
+- Export board content using Marp or Pandoc integrations.
+- Export options are controlled via YAML header settings.
+- Export respects include files and embedded assets.
 
 #### Marp 
-...
+- Uses the Marp engine to generate slide decks from tasks/columns.
+- Theme and class settings can be configured from the YAML header.
 
 #### Pandoc
-...
+- Uses Pandoc to export to additional formats.
+- Pandoc binary path and options can be configured in settings.
 
 ### Sorting
-...
+- Manual sorting via drag & drop.
+- Optional sorting tools from the top bar.
 
 ### Visual File Embeddings
 
@@ -148,5 +156,6 @@ These types of diagrams can be directly added to the board, they will render to 
 
 
 ### Search and Broken file finding
-
-...
+- Broken links/images show a visible state.
+- Burger menu actions can search or browse for a replacement file.
+- Search can be done by filename and updates the path inline.
