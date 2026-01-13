@@ -987,6 +987,16 @@
         setMode,
         applySettings,
         registry: commandRegistry,
+        getTaskRef: () => state.taskRef,
+        updateDraft: (nextDraft, options = {}) => {
+            if (!overlay.classList.contains('visible')) { return; }
+            const draftValue = typeof nextDraft === 'string' ? nextDraft : '';
+            setState({ draft: draftValue }, { renderPreview: true, immediatePreview: true });
+            syncDraftToActiveAdapter();
+            if (options.focus && activeAdapter && typeof activeAdapter.focus === 'function') {
+                activeAdapter.focus();
+            }
+        },
         replaceSelection,
         insertText: (text) => {
             if (activeAdapter && typeof activeAdapter.insertText === 'function') {

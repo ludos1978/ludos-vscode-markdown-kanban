@@ -2210,8 +2210,8 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview,
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview {
-  height: 240px;
-  max-height: 240px;
+  /* height: 240px; */
+  /* max-height: 240px; */
   overflow: auto;
 }
 
@@ -2221,7 +2221,7 @@ body.section-height-limited .task-section figure img {
 .task-overlay-wysiwyg .wysiwyg-diagram-preview .mermaid-diagram,
 .task-description-wysiwyg .wysiwyg-diagram-preview .plantuml-diagram,
 .task-overlay-wysiwyg .wysiwyg-diagram-preview .plantuml-diagram {
-  width: 100%;
+  /* width: 100%; */
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview .diagram-overlay-container,
@@ -2230,7 +2230,8 @@ body.section-height-limited .task-section figure img {
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview .mermaid-diagram,
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview .plantuml-diagram,
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview .plantuml-diagram {
-  height: 100%;
+  height: -webkite-fill-available;
+  width: -webkite-fill-available;
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-preview svg,

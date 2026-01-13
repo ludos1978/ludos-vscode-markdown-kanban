@@ -3444,6 +3444,13 @@ if (!webviewEventListenersInitialized) {
                         }
                     }
 
+                    const overlayEditor = window.taskOverlayEditor;
+                    const overlayTaskRef = overlayEditor?.getTaskRef?.();
+                    const isOverlayEditingTask = overlayEditor?.isVisible?.() && overlayTaskRef?.taskId === message.taskId;
+                    if (isOverlayEditingTask && taskData.description !== undefined && typeof overlayEditor?.updateDraft === 'function') {
+                        overlayEditor.updateDraft(taskData.description);
+                    }
+
                     if (!isEditing) {
                         // Re-render just this task to reflect the update (not the entire column)
                         if (typeof window.renderSingleTask === 'function') {
