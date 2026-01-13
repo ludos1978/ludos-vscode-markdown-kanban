@@ -2063,8 +2063,7 @@ async function handleVSCodeFileDrop(e, files) {
     const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
     const dropPosition = { x: e.clientX, y: e.clientY };
 
-    const orderedFiles = Array.from(files).reverse();
-    for (const file of orderedFiles) {
+    for (const file of Array.from(files)) {
         const fileName = file.name;
         const fileSize = file.size;
         const isMedia = file.type.startsWith('image/') ||
@@ -2431,12 +2430,10 @@ function handleVSCodeUriDrop(e, uriData) {
         // Use fileTypeUtils for proper path detection (handles Unix and Windows)
         return fileTypeUtils.isFilePath(uri);
     });
-    const orderedUris = uris.slice().reverse();
-
-    if (orderedUris.length > 0) {
+    if (uris.length > 0) {
         const activeEditor = getActiveTextEditor();
         const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
-        orderedUris.forEach(uri => {
+        uris.forEach(uri => {
             // Decode file:// URI but keep original path separators for backend filesystem operations
             const fullPath = uri.startsWith('file://')
                 ? decodeURIComponent(uri.replace('file://', ''))
