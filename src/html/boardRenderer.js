@@ -2491,12 +2491,14 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
 function handleDescriptionClick(event, element, taskId, columnId) {
     const checkbox = event.target?.closest?.('.md-task-checkbox');
     if (checkbox) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (typeof window.toggleTaskDescriptionCheckbox === 'function') {
-            window.toggleTaskDescriptionCheckbox(checkbox, taskId, columnId);
+        if (event.altKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof window.toggleTaskDescriptionCheckbox === 'function') {
+                window.toggleTaskDescriptionCheckbox(checkbox, taskId, columnId);
+            }
+            return;
         }
-        return;
     }
 
     // DEBUG: Log scroll position at the VERY START of click handling
