@@ -2925,6 +2925,7 @@ button.file-bar-menu-item {
   grid-row: 1;
   grid-column: 1;
   align-self: start;
+  transform-style: preserve-3d;
 }
 
 /* Only expanded columns overlay with pointer-events */

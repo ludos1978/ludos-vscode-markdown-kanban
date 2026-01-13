@@ -35,6 +35,7 @@
 - [ ] Multi-file drops preserve the intended file order (first selected is handled first).
 - [ ] Debug mode logs incoming file/URI drop order and metadata to the console.
 - [ ] Sticky column titles render above column content in stacked columns.
+- [ ] Column stack headers stay above lower column content with translateZ layering.
 - [ ] Column drag drop zones appear before/between/after and accept drops.
 - [ ] Column move/insert updates #row/#stack tags correctly.
 - [ ] Column headers render via markdown-it (no raw markdown).
