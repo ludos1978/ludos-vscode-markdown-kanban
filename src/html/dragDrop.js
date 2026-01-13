@@ -2045,7 +2045,7 @@ async function handleVSCodeFileDrop(e, files) {
     const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const activeEditor = getActiveTextEditor();
-    const includeContext = activeEditor?.includeContext || null;
+    const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
 
     // Store file object for later use if user chooses to copy
     pendingFileDrops.set(dropId, {
@@ -2300,7 +2300,7 @@ function handleVSCodeUriDrop(e, uriData) {
 
     if (uris.length > 0) {
         const activeEditor = getActiveTextEditor();
-        const includeContext = activeEditor?.includeContext || null;
+        const includeContext = activeEditor?.includeContext || getIncludeContextForDrop(e) || null;
         uris.forEach(uri => {
             // Decode file:// URI but keep original path separators for backend filesystem operations
             const fullPath = uri.startsWith('file://')
@@ -2346,6 +2346,33 @@ function getActiveTextEditor() {
     }
     
     return null;
+}
+
+function getIncludeContextForDrop(event) {
+    if (window.taskOverlayEditor?.isVisible?.()) {
+        const overlayTaskRef = window.taskOverlayEditor.getTaskRef?.();
+        if (overlayTaskRef?.includeContext) {
+            return overlayTaskRef.includeContext;
+        }
+    }
+    if (!event) {
+        return null;
+    }
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const taskElement = target?.closest?.('.task-item');
+    if (!taskElement) {
+        return null;
+    }
+    const taskId = taskElement.dataset?.taskId;
+    const columnId = typeof window.getColumnIdFromElement === 'function'
+        ? window.getColumnIdFromElement(taskElement)
+        : taskElement.closest?.('[data-column-id]')?.dataset?.columnId;
+    if (!taskId || !columnId || !window.cachedBoard?.columns) {
+        return null;
+    }
+    const column = window.cachedBoard.columns.find(col => col.id === columnId);
+    const task = column?.tasks?.find(t => t.id === taskId);
+    return task?.includeContext || null;
 }
 
 /**
