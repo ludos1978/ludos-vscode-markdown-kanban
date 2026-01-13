@@ -3382,12 +3382,14 @@ if (!webviewEventListenersInitialized) {
                 // Find the task across all columns
                 let foundTask = null;
                 let foundColumn = null;
+                let previousDescription = null;
 
                 for (const column of window.cachedBoard.columns) {
                     const task = column.tasks.find(t => t.id === message.taskId);
                     if (task) {
                         foundTask = task;
                         foundColumn = column;
+                        previousDescription = task.description ?? '';
                         break;
                     }
                 }
@@ -3447,8 +3449,14 @@ if (!webviewEventListenersInitialized) {
                     const overlayEditor = window.taskOverlayEditor;
                     const overlayTaskRef = overlayEditor?.getTaskRef?.();
                     const isOverlayEditingTask = overlayEditor?.isVisible?.() && overlayTaskRef?.taskId === message.taskId;
+                    const overlayDraft = isOverlayEditingTask && typeof overlayEditor?.getDraft === 'function'
+                        ? overlayEditor.getDraft()
+                        : null;
                     if (isOverlayEditingTask && taskData.description !== undefined && typeof overlayEditor?.updateDraft === 'function') {
-                        overlayEditor.updateDraft(taskData.description);
+                        const shouldUpdateOverlay = overlayDraft === (previousDescription ?? '');
+                        if (shouldUpdateOverlay) {
+                            overlayEditor.updateDraft(taskData.description);
+                        }
                     }
 
                     if (!isEditing) {
@@ -3729,6 +3737,36 @@ if (!webviewEventListenersInitialized) {
                 // Refresh debug overlay to show updated state
                 if (typeof window.refreshDebugOverlay === 'function') {
                     setTimeout(() => window.refreshDebugOverlay(), 500);
+                }
+            }
+            break;
+        case 'pathReplaced':
+            {
+                const originalPath = message.actualPath || message.originalPath;
+                if (originalPath && message.newPath) {
+                    updatePathInDOM(originalPath, message.newPath, 'replace');
+                }
+                const overlayEditor = window.taskOverlayEditor;
+                const overlayTaskRef = overlayEditor?.getTaskRef?.();
+                const isOverlayEditingTask = overlayEditor?.isVisible?.()
+                    && overlayTaskRef?.taskId === message.taskId
+                    && overlayTaskRef?.columnId === message.columnId;
+                if (isOverlayEditingTask && typeof overlayEditor?.getDraft === 'function' && typeof overlayEditor?.updateDraft === 'function') {
+                    const draft = overlayEditor.getDraft() || '';
+                    const candidates = [
+                        message.actualPath,
+                        message.originalPath
+                    ].filter(Boolean);
+                    let nextDraft = draft;
+                    candidates.forEach((candidate) => {
+                        if (!candidate) { return; }
+                        if (nextDraft.includes(candidate)) {
+                            nextDraft = nextDraft.split(candidate).join(message.newPath);
+                        }
+                    });
+                    if (nextDraft !== draft) {
+                        overlayEditor.updateDraft(nextDraft);
+                    }
                 }
             }
             break;

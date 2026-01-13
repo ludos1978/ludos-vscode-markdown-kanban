@@ -141,6 +141,22 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
 function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     closeAllPathMenus();
 
+    if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
+        taskId = undefined;
+    }
+    if (columnId === 'undefined' || columnId === 'null' || columnId === '') {
+        columnId = undefined;
+    }
+    if (!taskId || !columnId) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (!taskId && overlayRef?.taskId) {
+            taskId = overlayRef.taskId;
+        }
+        if (!columnId && overlayRef?.columnId) {
+            columnId = overlayRef.columnId;
+        }
+    }
+
     const message = {
         type: 'searchForFile',
         filePath: filePath
@@ -185,6 +201,22 @@ function searchForIncludeFile(buttonElement, filePath, isColumnTitle) {
  */
 function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
     closeAllPathMenus();
+
+    if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
+        taskId = undefined;
+    }
+    if (columnId === 'undefined' || columnId === 'null' || columnId === '') {
+        columnId = undefined;
+    }
+    if (!taskId || !columnId) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (!taskId && overlayRef?.taskId) {
+            taskId = overlayRef.taskId;
+        }
+        if (!columnId && overlayRef?.columnId) {
+            columnId = overlayRef.columnId;
+        }
+    }
 
     const message = {
         type: 'browseForImage',

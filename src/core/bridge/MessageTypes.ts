@@ -118,6 +118,20 @@ export interface UpdateTaskContentMessage extends BaseMessage {
 }
 
 /**
+ * Path replacement update
+ */
+export interface PathReplacedMessage extends BaseMessage {
+    type: 'pathReplaced';
+    originalPath: string;
+    actualPath?: string;
+    newPath: string;
+    taskId?: string;
+    columnId?: string;
+    isColumnTitle?: boolean;
+    filePath?: string;
+}
+
+/**
  * Undo/redo status update
  */
 export interface UndoRedoStatusMessage extends BaseMessage {
@@ -1793,6 +1807,7 @@ export type OutgoingMessage =
     | BoardUpdateMessage
     | UpdateColumnContentMessage
     | UpdateTaskContentMessage
+    | PathReplacedMessage
     | UndoRedoStatusMessage
     | FileInfoMessage
     | OperationStartedMessage

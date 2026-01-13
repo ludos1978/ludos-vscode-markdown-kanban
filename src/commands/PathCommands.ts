@@ -758,6 +758,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         logger.debug('[PathCommands] Found path variant:', actualOldPath, 'in file:', foundFile.getRelativePath());
+        const replacementOldPath = actualOldPath || oldPath;
 
         // Use the FOUND FILE's directory as base for relative path calculation
         // This is critical for include files in different directories
@@ -815,7 +816,7 @@ export class PathCommands extends SwitchBasedCommand {
                     const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
 
                     // Manually update the column title with the new path
-                    column.title = LinkOperations.replaceSingleLink(column.title, oldPath, newPath, 0);
+                    column.title = LinkOperations.replaceSingleLink(column.title, replacementOldPath, newPath, 0);
 
                     // Extract new include paths after updating
                     const newIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
@@ -823,7 +824,7 @@ export class PathCommands extends SwitchBasedCommand {
 
                     // Check if include paths changed - if so, trigger include switch to reload content
                     // Use normalized comparison to handle URL encoding differences
-                    const normalizedOldPath = this.normalizePath(oldPath);
+                    const normalizedOldPath = this.normalizePath(replacementOldPath);
                     const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
                     if (oldPathWasInclude && newIncludePaths.length > 0) {
                         // Trigger include file switch to reload content from new path
@@ -861,9 +862,9 @@ export class PathCommands extends SwitchBasedCommand {
                     const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
 
                     // Manually update the task object with the new path
-                    task.title = LinkOperations.replaceSingleLink(task.title, oldPath, newPath, 0);
+                    task.title = LinkOperations.replaceSingleLink(task.title, replacementOldPath, newPath, 0);
                     if (task.description) {
-                        task.description = LinkOperations.replaceSingleLink(task.description, oldPath, newPath, 0);
+                        task.description = LinkOperations.replaceSingleLink(task.description, replacementOldPath, newPath, 0);
                     }
 
                     // Extract new include paths after updating
@@ -872,7 +873,7 @@ export class PathCommands extends SwitchBasedCommand {
 
                     // Check if include paths changed - if so, trigger include switch to reload content
                     // Use normalized comparison to handle URL encoding differences
-                    const normalizedOldPath = this.normalizePath(oldPath);
+                    const normalizedOldPath = this.normalizePath(replacementOldPath);
                     const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
                     if (oldPathWasInclude && newIncludePaths.length > 0) {
                         // Trigger include file switch to reload content from new path
@@ -909,6 +910,16 @@ export class PathCommands extends SwitchBasedCommand {
             type: 'imagePathReplaced',
             oldPath: oldPath,
             newPath: newPath,
+            filePath: foundFile.getRelativePath()
+        });
+        this.postMessage({
+            type: 'pathReplaced',
+            originalPath: oldPath,
+            actualPath: actualOldPath,
+            newPath: newPath,
+            taskId: taskId,
+            columnId: columnId,
+            isColumnTitle: isColumnTitle,
             filePath: foundFile.getRelativePath()
         });
 

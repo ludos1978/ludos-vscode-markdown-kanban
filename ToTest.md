@@ -125,6 +125,7 @@
 - [ ] File search modal appears above the overlay editor (not behind it).
 - [ ] In overlay dual mode, insert an image snippet, choose a file via the file search, and confirm the link updates in the markdown pane.
 - [ ] In overlay WYSIWYG, fix a broken image via Search for File and confirm the path updates in the editor immediately.
+- [ ] In overlay WYSIWYG, fix a broken image with URL-encoded characters (spaces/colons) and confirm the path replacement applies in the editor draft without closing the overlay.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.

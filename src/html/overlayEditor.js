@@ -988,6 +988,7 @@
         applySettings,
         registry: commandRegistry,
         getTaskRef: () => state.taskRef,
+        getDraft: () => state.draft,
         updateDraft: (nextDraft, options = {}) => {
             if (!overlay.classList.contains('visible')) { return; }
             const draftValue = typeof nextDraft === 'string' ? nextDraft : '';
