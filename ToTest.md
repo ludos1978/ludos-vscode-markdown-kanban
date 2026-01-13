@@ -143,7 +143,7 @@
 - [ ] In overlay WYSIWYG, PlantUML fences render to SVG (no endless "Rendering PlantUML diagram..." placeholder).
 - [ ] In overlay WYSIWYG, you can insert text before/after mermaid or plantuml diagram blocks (text does not get trapped inside the fence).
 - [ ] In WYSIWYG, focusing the editor does not draw an extra focus outline around the edit area.
-- [ ] In WYSIWYG, mermaid/plantuml blocks show clear ```lang ... ``` boundaries while editing, the burger menu includes the Edit action (no standalone Edit button), and the preview height stays fixed while editing expands below it.
+- [ ] In WYSIWYG, mermaid/plantuml blocks show clear ```lang ... ``` boundaries while editing, the burger menu includes the Edit action (no standalone Edit button), and the preview height is fixed only while editing.
 - [ ] In overlay WYSIWYG, selecting text and pressing Link inserts `[text](url)` with the selection placed in the text or url portion based on filename/path detection, and keeps that portion selected.
 - [ ] In WYSIWYG, every block type (media, include, hr, table, list, multicolumn, code, container) allows inserting new text blocks before and after it.
 - [ ] In WYSIWYG, clicking the left/right half of an image block lets you type on the same line (image becomes inline, cursor before/after).
