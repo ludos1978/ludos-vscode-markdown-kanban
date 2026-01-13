@@ -1518,7 +1518,7 @@ function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBrok
         <span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">
-            <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath(this, '${escapedPath}')">📄 Open</button>
             <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
             <button class="include-path-menu-item" onclick="event.stopPropagation(); searchForIncludeFile(this, '${escapedPath}', '${isColumnTitle}')">🔎 Search for File</button>
             <div class="include-path-menu-divider"></div>

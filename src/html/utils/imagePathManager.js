@@ -72,13 +72,84 @@ function convertSinglePath(imagePath, direction, skipRefresh = false) {
  * Open a file path directly (in VS Code or default app)
  * Called from inline onclick handlers in rendered markdown
  */
-function openPath(filePath) {
+function openPath(pathOrElement, taskId, columnId, isColumnTitle) {
     closeAllPathMenus();
 
-    vscode.postMessage({
-        type: 'openPath',
-        filePath: filePath
-    });
+    let filePath = pathOrElement;
+    let sourceElement = null;
+
+    if (pathOrElement && typeof pathOrElement === 'object' && pathOrElement.nodeType === 1) {
+        sourceElement = pathOrElement;
+        filePath = taskId;
+        taskId = undefined;
+        columnId = undefined;
+        isColumnTitle = undefined;
+    }
+
+    if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
+        taskId = undefined;
+    }
+    if (columnId === 'undefined' || columnId === 'null' || columnId === '') {
+        columnId = undefined;
+    }
+
+    if ((!taskId || !columnId) && sourceElement) {
+        const container = sourceElement.closest(
+            '.image-path-overlay-container, .video-path-overlay-container, .include-path-overlay-container, .image-not-found-container, .video-not-found-container, .image-path-menu, .include-path-menu, .image-not-found-menu, .video-not-found-menu'
+        );
+        const taskElement = container?.closest('.task-item');
+        const columnElement = container?.closest('.kanban-full-height-column') || container?.closest('[data-column-id]');
+        const columnTitleElement = container?.closest('.column-title');
+
+        if (!taskId && taskElement?.dataset?.taskId) {
+            taskId = taskElement.dataset.taskId;
+        }
+        if (!columnId && columnElement?.dataset?.columnId) {
+            columnId = columnElement.dataset.columnId;
+        }
+        if (!isColumnTitle && !taskElement && columnTitleElement) {
+            isColumnTitle = 'true';
+        }
+    }
+
+    if (!taskId || !columnId) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (!taskId && overlayRef?.taskId) {
+            taskId = overlayRef.taskId;
+        }
+        if (!columnId && overlayRef?.columnId) {
+            columnId = overlayRef.columnId;
+        }
+    }
+
+    let includeContext = null;
+    if (taskId && columnId && window.cachedBoard?.columns) {
+        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === taskId);
+        if (task?.includeContext) {
+            includeContext = task.includeContext;
+        }
+    }
+    if (!includeContext) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (overlayRef?.includeContext) {
+            includeContext = overlayRef.includeContext;
+        }
+    }
+
+    if (!filePath) {
+        return;
+    }
+
+    const message = {
+        type: 'openFileLink',
+        href: filePath
+    };
+    if (taskId) message.taskId = taskId;
+    if (columnId) message.columnId = columnId;
+    if (includeContext) message.includeContext = includeContext;
+
+    vscode.postMessage(message);
 }
 
 /**
@@ -317,7 +388,7 @@ function togglePathMenu(container, filePath, mediaType) {
     const openDisabled = isBroken;
 
     menu.innerHTML = `
-        <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}')"`}>📄 Open</button>
+        <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"`}>📄 Open</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>

@@ -129,6 +129,7 @@
 - [ ] In inline markdown edit, use the burger menu on a broken image to search/browse a file and confirm the editor value updates immediately without losing unsaved edits.
 - [ ] In inline WYSIWYG edit, use the burger menu on a broken image to search/browse a file and confirm the ProseMirror content updates immediately.
 - [ ] In overlay dual mode, use the burger menu on a broken image in the preview and confirm both preview and draft update.
+- [ ] Burger menu Open on images/diagrams opens in VS Code first (draw.io/excalidraw/image preview), and falls back to system default when no VS Code editor is available.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
