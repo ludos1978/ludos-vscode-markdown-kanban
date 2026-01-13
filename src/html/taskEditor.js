@@ -314,16 +314,34 @@ class TaskEditor {
 
                                     window.addEventListener('message', imageHandler);
 
+                                    const domTaskId = typeof window.getTaskIdFromElement === 'function'
+                                        ? window.getTaskIdFromElement(target)
+                                        : target?.closest?.('.task-item')?.dataset?.taskId;
+                                    const domColumnId = typeof window.getColumnIdFromElement === 'function'
+                                        ? window.getColumnIdFromElement(target)
+                                        : target?.closest?.('[data-column-id]')?.dataset?.columnId;
+                                    const taskId = self.currentEditor?.taskId || domTaskId;
+                                    const columnId = self.currentEditor?.columnId || domColumnId;
+
+                                    if (window.kanbanDebug?.enabled) {
+                                        console.log('[PASTE-DEBUG] image paste context', {
+                                            currentEditor: self.currentEditor ? {
+                                                type: self.currentEditor.type,
+                                                taskId: self.currentEditor.taskId,
+                                                columnId: self.currentEditor.columnId,
+                                                includeContext: !!self.currentEditor.includeContext
+                                            } : null,
+                                            domTaskId,
+                                            domColumnId,
+                                            resolvedTaskId: taskId,
+                                            resolvedColumnId: columnId,
+                                            targetClass: target?.className,
+                                            activeElement: document.activeElement?.className
+                                        });
+                                    }
+
                                     let includeContext = self.currentEditor?.includeContext || null;
                                     if (!includeContext) {
-                                        const taskId = self.currentEditor?.taskId ||
-                                            (typeof window.getTaskIdFromElement === 'function'
-                                                ? window.getTaskIdFromElement(target)
-                                                : target?.closest?.('.task-item')?.dataset?.taskId);
-                                        const columnId = self.currentEditor?.columnId ||
-                                            (typeof window.getColumnIdFromElement === 'function'
-                                                ? window.getColumnIdFromElement(target)
-                                                : target?.closest?.('[data-column-id]')?.dataset?.columnId);
                                         includeContext = self._getTaskIncludeContext(taskId, columnId);
                                     }
 

@@ -72,3 +72,4 @@
 ## Keybindings & Undo
 - [ ] VS Code keybindings/snippets work in inline/overlay/WYSIWYG (Meta+1, snippet name/content, capture phase).
 - [ ] Undo/redo works via commands and native stack; cursor restores after snippet insertions.
+- [ ] With debug enabled, Meta+Shift+V logs resolved task/column IDs for inline image paste.
