@@ -875,6 +875,14 @@ export class ClipboardCommands extends SwitchBasedCommand {
             fs.writeFileSync(targetPath, buffer);
         }
 
+        const mediaIndex = WorkspaceMediaIndex.getInstance();
+        if (mediaIndex) {
+            if (!mediaIndex.isInitialized()) {
+                await mediaIndex.initialize();
+            }
+            mediaIndex.updateFile(targetPath);
+        }
+
         const formattedPath = isImage
             ? this._formatImagePath(targetPath, directory)
             : context.fileManager.generateConfiguredPath(targetPath);

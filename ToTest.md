@@ -132,6 +132,7 @@
 - [ ] Burger menu Open on images/diagrams opens in VS Code first (draw.io/excalidraw/image preview), and falls back to system default when no VS Code editor is available.
 - [ ] Alt+clicking images also opens in VS Code first (image preview) and falls back to system default if VS Code cannot open it.
 - [ ] File drop dialog always shows the same options; “Link existing file” is disabled when no hash match exists and “Copy file to Media folder” is available for both file objects and file URIs.
+- [ ] Drop a file, choose “Copy file to Media folder,” then drop the same file again and confirm “Link existing file” is enabled (hash index updated).
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
