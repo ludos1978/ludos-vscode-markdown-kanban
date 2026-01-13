@@ -944,8 +944,11 @@ function toggleDiagramMenu(container, diagramType) {
     menu.style.zIndex = '999999';
 
     const typeLabel = diagramType === 'mermaid' ? 'Mermaid' : 'PlantUML';
+    const isWysiwyg = Boolean(container.closest('.wysiwyg-diagram-block'));
+    const editItem = isWysiwyg ? '<button class="image-path-menu-item" data-action="edit-diagram">✏️ Edit diagram</button>' : '';
 
     menu.innerHTML = `
+        ${editItem}
         <button class="image-path-menu-item" data-action="convert-svg">💾 Convert to SVG file</button>
         <button class="image-path-menu-item" data-action="copy-svg">📋 Copy SVG to clipboard</button>
         <button class="image-path-menu-item" data-action="copy-code">📝 Copy ${typeLabel} code</button>
@@ -960,6 +963,14 @@ function toggleDiagramMenu(container, diagramType) {
         menu.remove();
 
         switch (action) {
+            case 'edit-diagram': {
+                const block = container.closest('.wysiwyg-diagram-block');
+                const editButton = block?.querySelector('.wysiwyg-edit-btn[data-action="diagram"]');
+                if (editButton) {
+                    editButton.click();
+                }
+                break;
+            }
             case 'convert-svg':
                 convertDiagramToSVG(container, diagramType, code);
                 break;
