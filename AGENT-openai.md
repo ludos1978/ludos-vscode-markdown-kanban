@@ -5,3 +5,4 @@
 - after each change give testing descriptions how to test for anything that might have been broken. Document it in ToTest.md as tasks which the user might check. Cleanup this file if the tasks are checked or enhance test requirements if similar tasks already exist.
 - allways focus on solving the reason for a problem. Do not add alternative implementations, fallbacks or failovers in case the first implementation fails. allways focus on solving the main code in a way it handles all situations properly. that might include raising an error and adding error handlers in case it cannot be recovered.
 - for every problem analysis, check the code that is run and causes the error, then check all callers of the code.
+- ignore external changes in the tests folder as well as AGENT.md and TODOs-user.md
