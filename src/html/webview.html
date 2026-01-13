@@ -1200,6 +1200,14 @@
             if (previewToggleEl) previewToggleEl.addEventListener('click', toggleFilePreview);
         }
 
+        function requireOverlay(action) {
+            if (!overlay) {
+                console.warn(`[FileSearchModal] Missing overlay for ${action}`);
+                return false;
+            }
+            return true;
+        }
+
         function toggleFilePreview() {
             filePreviewEnabled = !filePreviewEnabled;
             if (previewToggleEl) previewToggleEl.classList.toggle('active', filePreviewEnabled);
@@ -1277,6 +1285,7 @@
         function show(path, initialSearch) {
             console.log('[FileSearchModal] show() called with path:', path, 'initialSearch:', initialSearch);
             if (!ensureModalReady()) { return; }
+            if (!requireOverlay('show')) { return; }
             originalPath = path; results = []; selectedIndex = -1; brokenPathData = null; batchAnalysisData = null; batchAnalysisCache = {};
             originalPathEl.textContent = path;
             searchInputEl.value = initialSearch || '';
@@ -1296,14 +1305,14 @@
         }
 
         function close() {
-            if (!overlay) { return; }
+            if (!requireOverlay('close')) { return; }
             isVisible = false;
             overlay.classList.remove('visible');
             vscode.postMessage({ type: 'fileSearchCancelled' });
         }
 
         function selectCurrentItem() {
-            if (!overlay) { return; }
+            if (!requireOverlay('select')) { return; }
             if (selectedIndex >= 0 && results[selectedIndex]) {
                 isVisible = false;
                 overlay.classList.remove('visible');
@@ -1472,7 +1481,9 @@
             // Use capture phase to ensure we get the events before the overlay blocks them
             document.addEventListener('mousemove', doColumnResize, true);
             document.addEventListener('mouseup', stopColumnResize, true);
-            overlay.classList.add('resizing');
+            if (requireOverlay('resize-start')) {
+                overlay.classList.add('resizing');
+            }
             document.body.style.cursor = 'col-resize';
         }
 
@@ -1493,7 +1504,9 @@
             resizeState = null;
             document.removeEventListener('mousemove', doColumnResize, true);
             document.removeEventListener('mouseup', stopColumnResize, true);
-            overlay.classList.remove('resizing');
+            if (requireOverlay('resize-stop')) {
+                overlay.classList.remove('resizing');
+            }
             document.body.style.cursor = '';
         }
 
