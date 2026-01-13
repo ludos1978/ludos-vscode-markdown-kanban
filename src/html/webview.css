@@ -2049,9 +2049,6 @@ body.section-height-limited .task-section figure img {
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview,
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview {
   grid-column: 1;
-  height: 240px;
-  max-height: 240px;
-  overflow: auto;
   border-right: 1px solid var(--vscode-panel-border);
   padding-right: 8px;
 }
@@ -2059,9 +2056,6 @@ body.section-height-limited .task-section figure img {
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram,
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram {
   grid-column: 2;
-  height: 240px;
-  max-height: 240px;
-  overflow: auto;
   margin: 0;
   border-left: 1px solid var(--vscode-panel-border);
   padding-left: 8px;
@@ -2249,7 +2243,7 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview svg,
 .task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview svg {
-  max-height: 100%;
+  max-height: none;
 }
 
 .task-description-wysiwyg .diagram-overlay-container,
