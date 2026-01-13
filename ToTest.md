@@ -37,6 +37,7 @@
 - [ ] Sticky column titles render above column content in stacked columns.
 - [ ] Column stack headers stay above lower column content with translateZ layering.
 - [ ] File search modal logs a warning instead of throwing if the overlay is missing.
+- [ ] Clicking markdown task checkboxes in descriptions toggles - [ ] / - [x] and saves the task.
 - [ ] Column drag drop zones appear before/between/after and accept drops.
 - [ ] Column move/insert updates #row/#stack tags correctly.
 - [ ] Column headers render via markdown-it (no raw markdown).
