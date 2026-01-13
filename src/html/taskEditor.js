@@ -334,6 +334,8 @@ class TaskEditor {
                                         imageType: type,
                                         md5Hash: md5Hash,
                                         cursorPosition: cursorPos,
+                                        taskId: taskId || undefined,
+                                        columnId: columnId || undefined,
                                         includeContext: includeContext || undefined
                                     });
 

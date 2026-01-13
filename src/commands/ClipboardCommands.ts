@@ -89,6 +89,8 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 m.md5Hash ?? '',
                 m.cursorPosition ?? 0,
                 m.includeContext ?? null,
+                m.taskId ?? null,
+                m.columnId ?? null,
                 ctx
             );
             return this.success();
@@ -228,19 +230,16 @@ export class ClipboardCommands extends SwitchBasedCommand {
         md5Hash: string,
         cursorPosition: number,
         includeContext: { includeFilePath?: string } | null,
+        taskId: string | null,
+        columnId: string | null,
         context: CommandContext
     ): Promise<void> {
         try {
-            let directory: string;
-            let baseFileName: string;
-            if (includeContext?.includeFilePath) {
-                directory = path.dirname(includeContext.includeFilePath);
-                baseFileName = path.basename(includeContext.includeFilePath).replace(/\.[^/.]+$/, '');
-            } else {
-                const currentPaths = this._getCurrentFilePaths(context);
-                directory = currentPaths.directory;
-                baseFileName = currentPaths.baseFileName;
+            let resolvedIncludeContext = includeContext;
+            if (!resolvedIncludeContext?.includeFilePath && taskId && columnId) {
+                resolvedIncludeContext = this._getIncludeContextForTask(taskId, columnId, context);
             }
+            const { directory, baseFileName } = this._getDropTargetPaths(context, resolvedIncludeContext);
 
             const extension = imageType.split('/')[1] || 'png';
             const imageFileName = `${md5Hash}.${extension}`;
@@ -717,6 +716,20 @@ export class ClipboardCommands extends SwitchBasedCommand {
         }
         const { directory, baseFileName } = this._getCurrentFilePaths(context);
         return { directory, baseFileName };
+    }
+
+    private _getIncludeContextForTask(
+        taskId: string,
+        columnId: string,
+        context: CommandContext
+    ): { includeFilePath?: string } | null {
+        const board = context.getCurrentBoard();
+        if (!board) {
+            return null;
+        }
+        const column = board.columns.find(col => col.id === columnId);
+        const task = column?.tasks.find(t => t.id === taskId);
+        return task?.includeContext || null;
     }
 
     private _getMediaFolderPath(directory: string, baseFileName: string): string {
