@@ -22,6 +22,7 @@
 - [ ] Tag menus list active tags correctly (including custom groups and overrides).
 - [ ] Font size and Marp settings toggles persist without `setPreference` errors.
 - [ ] Show special characters toggle only affects the active editor and preserves caret alignment.
+- [ ] With show-special-characters disabled, typing does not trigger special-char overlay rendering (no forced reflow spikes).
 
 ## Drag & Drop
 - [ ] Drag cancel + cleanup (Esc snaps back, indicators clear, no stuck states). Note: re-enter drop indicators should recover (currently failing).

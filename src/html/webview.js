@@ -1132,6 +1132,9 @@ function updateSpecialCharOverlay(editElement) {
     const isVisible = Boolean(window.showSpecialCharacters && window.isTaskEditorActive);
     overlay.style.display = isVisible ? '' : 'none';
     editElement.classList.toggle('special-char-textarea', isVisible);
+    if (!isVisible) {
+        return;
+    }
     alignSpecialCharOverlayStyles(editElement);
     if (inner) {
         inner.innerHTML = renderSpecialCharacterHtml(editElement.value || '');
