@@ -2059,12 +2059,22 @@ function startHeightPolling() {
         return;
     }
 
+    if (window.kanbanDebug?.enabled) {
+        console.log('[PERF-DEBUG] heightPolling.start', {
+            durationMs: POLLING_DURATION,
+            intervalMs: POLLING_INTERVAL
+        });
+    }
+
     heightPollingInterval = setInterval(() => {
         // Check if we should stop polling
         if (Date.now() > heightPollingEndTime) {
             clearInterval(heightPollingInterval);
             heightPollingInterval = null;
             updateBaselineHeights();
+            if (window.kanbanDebug?.enabled) {
+                console.log('[PERF-DEBUG] heightPolling.stop');
+            }
             return;
         }
 
@@ -2084,6 +2094,9 @@ function startHeightPolling() {
 
         // If any height differs from baseline, recalculate and update baseline
         if (heightChanged) {
+            if (window.kanbanDebug?.enabled) {
+                console.log('[PERF-DEBUG] heightPolling.recalc');
+            }
             document.querySelectorAll('.kanban-column-stack').forEach(stack => {
                 updateStackLayoutDebounced(stack);
             });

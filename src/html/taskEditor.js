@@ -1351,6 +1351,15 @@ class TaskEditor {
             ? null
             : Array.from(this._stackLayoutPendingColumns)[0];
 
+        if (window.kanbanDebug?.enabled) {
+            console.log('[PERF-DEBUG] taskEditor.flushStackLayout', {
+                columnId,
+                pendingCount,
+                needsFullRecalc: this._stackLayoutNeedsFullRecalc,
+                editorType: this.currentEditor?.type || null
+            });
+        }
+
         if (typeof window.logViewMovement === 'function') {
             window.logViewMovement('taskEditor.flushStackLayout', {
                 columnId,

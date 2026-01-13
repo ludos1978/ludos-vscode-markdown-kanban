@@ -12,6 +12,7 @@
 ## Board, Scroll & Save
 - [ ] Scroll stability in multi-row/stacked boards during edit enter/exit (no jump, no forced reflow warnings, height lock holds, tall descriptions stable).
 - [ ] Debug logs identify the moving element when scroll issues are reproduced.
+- [ ] With debug enabled, verify PERF-DEBUG logs show stack layout timings >50ms (scope, columns) to help pinpoint reflow sources.
 - [ ] Focus restore after re-render completes (no early focus steal).
 - [ ] Cmd+S issues a single save; empty board saves without repeated errors.
 

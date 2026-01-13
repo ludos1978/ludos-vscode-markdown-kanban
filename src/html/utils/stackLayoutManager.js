@@ -405,10 +405,17 @@ function updateStackLayoutDebounced(stackElement = null) {
  * @param {HTMLElement} stackElement - Specific stack to update, or null for all stacks
  */
 function updateStackLayoutCore(stackElement = null) {
+    const perfEnabled = window.kanbanDebug?.enabled;
+    const perfStart = perfEnabled ? performance.now() : 0;
     const stacks = stackElement ? [stackElement] : document.querySelectorAll('.kanban-column-stack');
+    const stackCount = stackElement ? 1 : stacks.length;
+    let columnCount = 0;
+    let measuredColumns = 0;
+    const measureStart = perfEnabled ? performance.now() : 0;
 
     stacks.forEach(stack => {
         const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+        columnCount += columns.length;
 
         // Check if all columns in stack are vertically folded
         const allVerticalFolded = columns.length > 0 && columns.every(col =>
@@ -474,6 +481,7 @@ function updateStackLayoutCore(stackElement = null) {
                     isHorizontallyFolded
                 });
             });
+            measuredColumns += columns.length;
 
             // All columns (including both horizontally and vertically folded) are included in stacking calculations
             const expandedColumns = columnData;
@@ -578,6 +586,9 @@ function updateStackLayoutCore(stackElement = null) {
             // OPTIMIZATION: Split DOM writes and reads into separate frames to avoid forced reflow.
             // Frame 1: apply styles only. Frame 2: read layout + update derived data.
             requestAnimationFrame(() => {
+                const measureEnd = perfEnabled ? performance.now() : 0;
+                const measureMs = perfEnabled ? (measureEnd - measureStart) : 0;
+                const applyStart = perfEnabled ? performance.now() : 0;
                 // Apply all calculated positions
                 positions.forEach(({ col, columnHeader, header, footer, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, isColumnSticky }) => {
                     // Recalculate mode flags from stored values
@@ -666,6 +677,7 @@ function updateStackLayoutCore(stackElement = null) {
                 }));
 
                 requestAnimationFrame(() => {
+                    const applyMs = perfEnabled ? (performance.now() - applyStart) : 0;
                     const scrollY = window.scrollY || window.pageYOffset;
 
                     // Store content area boundaries (absolute positions from top of page)
@@ -683,6 +695,24 @@ function updateStackLayoutCore(stackElement = null) {
                     // Update drop zones AFTER column positions are applied
                     if (typeof window.updateStackBottomDropZones === 'function') {
                         window.updateStackBottomDropZones();
+                    }
+
+                    if (perfEnabled) {
+                        const totalMs = performance.now() - perfStart;
+                        if (totalMs >= 50) {
+                            const stackId = stackElement
+                                ? (stackElement.id || stackElement.getAttribute('data-stack-id') || 'stack-element')
+                                : 'all';
+                            console.log('[PERF-DEBUG] updateStackLayoutCore', {
+                                scope: stackId,
+                                stackCount,
+                                columnCount,
+                                measuredColumns,
+                                measureMs: Math.round(measureMs),
+                                applyMs: Math.round(applyMs),
+                                totalMs: Math.round(totalMs)
+                            });
+                        }
                     }
                 });
             }); // End requestAnimationFrame
