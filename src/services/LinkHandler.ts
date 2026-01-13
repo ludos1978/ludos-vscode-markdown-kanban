@@ -152,6 +152,31 @@ export class LinkHandler {
                 }
             }
 
+            // Open images in VS Code first (image preview), then fall back to system default
+            const isImageFile = hasExtension(resolvedPath, DOTTED_EXTENSIONS.image);
+            if (isImageFile) {
+                try {
+                    const fileUri = safeFileUri(resolvedPath, 'linkHandler');
+                    await vscode.commands.executeCommand('vscode.open', fileUri);
+                    showInfo(
+                        `Opened image: ${path.basename(resolvedPath)}`
+                    );
+                    return;
+                } catch (error) {
+                    console.warn(`Could not open image in VS Code, trying external: ${resolvedPath}`, error);
+                    try {
+                        await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
+                        showInfo(
+                            `Opened externally: ${path.basename(resolvedPath)}`
+                        );
+                        return;
+                    } catch (externalError) {
+                        showError(`Failed to open image file: ${resolvedPath}`);
+                        return;
+                    }
+                }
+            }
+
             // Use centralized text file extensions
             const isTextFile = hasExtension(resolvedPath, TEXT_FILE_EXTENSIONS) ||
                             basename === 'makefile' ||
