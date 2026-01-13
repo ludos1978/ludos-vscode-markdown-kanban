@@ -60,6 +60,7 @@
 - [ ] Entry opens without errors; mode toggles (Markdown/Dual/WYSIWYG) preserve exact draft.
 - [ ] Save/close behavior works via Save, Escape, Alt+Enter, backdrop click (no data loss).
 - [ ] Layout constraints: 80% size, 10px pane gap, tools bar full width.
+- [ ] Task title is editable in the overlay header and saves with the task.
 - [ ] Overlay WYSIWYG: file drops insert links; large images stay within 80% height; clicking below last line moves caret to end; text before/after start/end images works.
 - [ ] Overlay settings menu updates font scale and preferences persist; overlay enable + default mode stick across reloads.
 

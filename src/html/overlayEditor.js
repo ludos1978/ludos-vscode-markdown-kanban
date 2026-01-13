@@ -25,7 +25,7 @@
     const elements = {
         backdrop: overlay.querySelector('.task-overlay-backdrop'),
         panel: overlay.querySelector('.task-overlay-panel'),
-        title: overlay.querySelector('.task-overlay-title'),
+        titleInput: overlay.querySelector('.task-overlay-title-input'),
         previewWrap: overlay.querySelector('.task-overlay-preview'),
         wysiwygWrap: overlay.querySelector('.task-overlay-wysiwyg'),
         textarea: overlay.querySelector('.task-overlay-textarea'),
@@ -479,14 +479,31 @@
         return { task, column };
     }
 
-    function updateHeaderTitle(task) {
-        if (!elements.title) { return; }
-        if (!task?.title) {
-            elements.title.textContent = 'Edit Task';
+    function normalizeTitle(value) {
+        return typeof value === 'string' ? value.replace(/[\r\n]+/g, ' ') : '';
+    }
+
+    function setTitleInputValue(value) {
+        if (!elements.titleInput) { return; }
+        elements.titleInput.value = normalizeTitle(value || '');
+    }
+
+    function syncTitleFromInput() {
+        if (!elements.titleInput) { return; }
+        const nextValue = normalizeTitle(elements.titleInput.value);
+        if (nextValue !== elements.titleInput.value) {
+            elements.titleInput.value = nextValue;
+        }
+        if (!state.taskRef) {
             return;
         }
-        const displayTitle = window.removeTagsForDisplay ? window.removeTagsForDisplay(task.title) : task.title;
-        elements.title.textContent = displayTitle || 'Edit Task';
+        if (state.taskRef.title !== nextValue) {
+            state.taskRef = { ...state.taskRef, title: nextValue };
+        }
+    }
+
+    function updateHeaderTitle(task) {
+        setTitleInputValue(task?.title || '');
     }
 
     function renderPreview() {
@@ -707,6 +724,7 @@
         overlay.classList.add('visible');
         overlay.setAttribute('aria-hidden', 'false');
         syncDraftToActiveAdapter();
+        syncTitleFromInput();
         if (activeAdapter && typeof activeAdapter.focus === 'function') {
             activeAdapter.focus();
         }
@@ -729,6 +747,7 @@
             elements.settings.classList.remove('open');
         }
         setState({ taskRef: null, taskData: null, draft: '' });
+        setTitleInputValue('');
         window.currentTaskIncludeContext = null;
         if (dropHandler && typeof dropHandler.detach === 'function') {
             dropHandler.detach();
@@ -743,15 +762,22 @@
             return;
         }
         syncDraftFromActiveAdapter();
+        syncTitleFromInput();
         const { task, column } = resolved;
         const normalizedValue = normalizeDraft(state.draft);
         const currentValue = task.description || '';
-        if (normalizedValue === currentValue && !task.includeMode) {
+        const normalizedTitle = normalizeTitle(state.taskRef?.title || '');
+        const currentTitle = task.title || '';
+        const titleChanged = normalizedTitle !== currentTitle;
+        if (normalizedValue === currentValue && !titleChanged && !task.includeMode) {
             closeOverlay();
             return;
         }
         setState({ draft: normalizedValue });
         task.description = normalizedValue;
+        if (titleChanged) {
+            task.title = normalizedTitle;
+        }
         if (typeof window.renderSingleTask === 'function') {
             window.renderSingleTask(task.id, task, column.id);
         } else if (typeof window.renderSingleColumn === 'function') {
@@ -873,6 +899,14 @@
                 setMode('wysiwyg', { persist: true });
             }
         });
+
+        if (elements.titleInput) {
+            elements.titleInput.addEventListener('input', () => {
+                if (!overlay.classList.contains('visible')) { return; }
+                syncTitleFromInput();
+                updatePreview({ immediate: true });
+            });
+        }
 
         overlay.addEventListener('change', (event) => {
             const select = event.target.closest('.task-overlay-tool-select');

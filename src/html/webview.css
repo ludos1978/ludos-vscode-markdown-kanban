@@ -6072,6 +6072,24 @@ figcaption {
   gap: 8px;
 }
 
+.task-overlay-title-input {
+  min-width: 160px;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: inherit;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.task-overlay-title-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 0;
+}
+
 .task-overlay-mode-toggle {
   display: flex;
   align-items: center;
