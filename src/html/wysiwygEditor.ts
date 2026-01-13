@@ -808,6 +808,58 @@ function focusDiagram(view: EditorView, nodePos: number): void {
     view.focus();
 }
 
+type WysiwygDomWithView = HTMLElement & { __wysiwygView?: EditorView };
+
+function getWysiwygViewFromDom(target: HTMLElement | null): EditorView | null {
+    if (!target) {
+        return null;
+    }
+    const root = target.closest('.ProseMirror') as WysiwygDomWithView | null;
+    return root?.__wysiwygView ?? null;
+}
+
+function findDiagramNodeFromDom(view: EditorView, block: HTMLElement): { nodePos: number; node: ProseMirrorNode } | null {
+    let pos: number | null = null;
+    try {
+        pos = view.posAtDOM(block, 0);
+    } catch {
+        pos = null;
+    }
+    if (pos === null) {
+        return null;
+    }
+    const $pos = view.state.doc.resolve(pos);
+    for (let depth = $pos.depth; depth > 0; depth -= 1) {
+        const node = $pos.node(depth);
+        if (node.type.name === 'diagram_fence') {
+            return { nodePos: $pos.before(depth), node };
+        }
+    }
+    const node = view.state.doc.nodeAt(pos);
+    if (node?.type?.name === 'diagram_fence') {
+        return { nodePos: pos, node };
+    }
+    return null;
+}
+
+function toggleDiagramEditing(view: EditorView, block: HTMLElement, nodePos?: number, node?: ProseMirrorNode): boolean {
+    const resolved = nodePos !== undefined && node
+        ? { nodePos, node }
+        : findDiagramNodeFromDom(view, block);
+    if (!resolved) {
+        return false;
+    }
+    const isEditing = block.classList.toggle('is-editing');
+    if (!isEditing) {
+        const after = resolved.nodePos + resolved.node.nodeSize;
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, after)));
+        view.focus();
+        return true;
+    }
+    focusDiagram(view, resolved.nodePos);
+    return true;
+}
+
 function addMulticolumnColumn(view: EditorView, node: ProseMirrorNode, nodePos: number): void {
     if (!node || node.type?.name !== 'multicolumn') {
         return;
@@ -1573,17 +1625,10 @@ export class WysiwygEditor {
                 }
                 if (action === 'diagram' && node?.type?.name === 'diagram_fence') {
                     const block = target.closest?.('.wysiwyg-diagram-block') as HTMLElement | null;
-                    if (block) {
-                        const isEditing = block.classList.toggle('is-editing');
-                        if (!isEditing) {
-                            const after = nodePos + node.nodeSize;
-                            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, after)));
-                            view.focus();
-                            return true;
-                        }
+                    if (!block) {
+                        return false;
                     }
-                    focusDiagram(view, nodePos);
-                    return true;
+                    return toggleDiagramEditing(view, block, nodePos, node);
                 }
                 return false;
             },
@@ -1617,6 +1662,8 @@ export class WysiwygEditor {
                 }
             }
         });
+
+        (this.view.dom as WysiwygDomWithView).__wysiwygView = this.view;
 
         this.lastMarkdown = this.serializeState(this.view.state);
         syncWysiwygImages(this.view.dom);
@@ -1743,6 +1790,20 @@ export class WysiwygEditor {
 }
 
 (function exposeWysiwygEditor() {
-    const globalWindow = window as unknown as { WysiwygEditor?: typeof WysiwygEditor };
+    const globalWindow = window as unknown as {
+        WysiwygEditor?: typeof WysiwygEditor;
+        toggleWysiwygDiagramEdit?: (container: HTMLElement) => boolean;
+    };
     globalWindow.WysiwygEditor = WysiwygEditor;
+    globalWindow.toggleWysiwygDiagramEdit = (container: HTMLElement) => {
+        const block = container.closest('.wysiwyg-diagram-block') as HTMLElement | null;
+        if (!block) {
+            return false;
+        }
+        const view = getWysiwygViewFromDom(block);
+        if (!view) {
+            return false;
+        }
+        return toggleDiagramEditing(view, block);
+    };
 })();

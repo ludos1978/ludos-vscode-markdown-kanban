@@ -2176,8 +2176,20 @@ body.section-height-limited .task-section figure img {
 }
 
 
-.task-description-wysiwyg .wysiwyg-diagram-preview {
+.task-description-wysiwyg .wysiwyg-diagram-preview,
+.task-overlay-wysiwyg .wysiwyg-diagram-preview {
   margin: 0 3px;
+  height: 240px;
+  max-height: 240px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-preview svg,
+.task-overlay-wysiwyg .wysiwyg-diagram-preview svg {
+  max-height: 100%;
 }
 
 .task-description-wysiwyg .diagram-overlay-container,
@@ -6172,8 +6184,7 @@ figcaption {
   box-sizing: border-box;
 }
 
-.task-overlay-wysiwyg .wysiwyg-media-block,
-.task-overlay-wysiwyg .wysiwyg-diagram-preview {
+.task-overlay-wysiwyg .wysiwyg-media-block {
   margin: 0 3px;
 }
 

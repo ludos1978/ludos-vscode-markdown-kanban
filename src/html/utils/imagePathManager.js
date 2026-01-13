@@ -964,10 +964,8 @@ function toggleDiagramMenu(container, diagramType) {
 
         switch (action) {
             case 'edit-diagram': {
-                const block = container.closest('.wysiwyg-diagram-block');
-                const editButton = block?.querySelector('.wysiwyg-edit-btn[data-action="diagram"]');
-                if (editButton) {
-                    editButton.click();
+                if (typeof window.toggleWysiwygDiagramEdit === 'function') {
+                    window.toggleWysiwygDiagramEdit(container);
                 }
                 break;
             }
