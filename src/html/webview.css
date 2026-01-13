@@ -2913,7 +2913,7 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack {
-	/* transform-style: preserve-3d; */
+	transform-style: preserve-3d;
   display: grid;
   grid-template: 1fr / 1fr;
   position: relative;
