@@ -2029,10 +2029,42 @@ body.section-height-limited .task-section figure img {
   flex-direction: column;
   gap: 6px;
   position: relative;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-block:not(.is-editing) .wysiwyg-diagram {
   display: none;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-block.is-editing,
+.task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview,
+.task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram-preview {
+  grid-column: 1;
+  height: 240px;
+  max-height: 240px;
+  overflow: auto;
+  border-right: 1px solid var(--vscode-panel-border);
+  padding-right: 8px;
+}
+
+.task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram,
+.task-overlay-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram {
+  grid-column: 2;
+  height: 240px;
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  border-left: 1px solid var(--vscode-panel-border);
+  padding-left: 8px;
 }
 
 .task-description-wysiwyg .wysiwyg-diagram-block.is-editing .wysiwyg-diagram::before,
@@ -2178,7 +2210,7 @@ body.section-height-limited .task-section figure img {
 
 .task-description-wysiwyg .wysiwyg-diagram-preview,
 .task-overlay-wysiwyg .wysiwyg-diagram-preview {
-  margin: 0 3px;
+  margin: 0;
   display: block;
 }
 
@@ -6182,6 +6214,9 @@ figcaption {
   flex-direction: column;
   gap: 6px;
   position: relative;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .task-overlay-wysiwyg .wysiwyg-diagram-block:not(.is-editing) .wysiwyg-diagram {
