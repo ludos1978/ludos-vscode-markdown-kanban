@@ -2287,11 +2287,28 @@ function showFileDropDialogue(options) {
         return false;
     };
 
-    if (fileDropApplyAllAction) {
-        if (runAction(fileDropApplyAllAction)) {
-            return;
+    const isApplyAllActionAvailable = (action) => {
+        switch (action) {
+            case 'link':
+                return linkAvailable;
+            case 'copy':
+                return canCopy;
+            case 'search':
+            case 'open':
+            case 'cancel':
+                return true;
+            default:
+                return false;
         }
-        fileDropApplyAllAction = null;
+    };
+
+    if (fileDropApplyAllAction) {
+        if (isApplyAllActionAvailable(fileDropApplyAllAction)) {
+            if (runAction(fileDropApplyAllAction)) {
+                return;
+            }
+            fileDropApplyAllAction = null;
+        }
     }
 
     let applyAllCheckbox = null;
