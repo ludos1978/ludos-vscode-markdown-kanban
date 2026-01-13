@@ -126,6 +126,9 @@
 - [ ] In overlay dual mode, insert an image snippet, choose a file via the file search, and confirm the link updates in the markdown pane.
 - [ ] In overlay WYSIWYG, fix a broken image via Search for File and confirm the path updates in the editor immediately.
 - [ ] In overlay WYSIWYG, fix a broken image with URL-encoded characters (spaces/colons) and confirm the path replacement applies in the editor draft without closing the overlay.
+- [ ] In inline markdown edit, use the burger menu on a broken image to search/browse a file and confirm the editor value updates immediately without losing unsaved edits.
+- [ ] In inline WYSIWYG edit, use the burger menu on a broken image to search/browse a file and confirm the ProseMirror content updates immediately.
+- [ ] In overlay dual mode, use the burger menu on a broken image in the preview and confirm both preview and draft update.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.

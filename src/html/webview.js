@@ -3211,6 +3211,7 @@ if (!webviewEventListenersInitialized) {
                     // Support both formats: individual properties OR column object
                     const colData = message.column || message;
                     const incomingTaskCount = Array.isArray(colData.tasks) ? colData.tasks.length : null;
+                    const previousTitle = column.title ?? '';
 
                     window.kanbanDebug.log('[kanban.webview.updateColumnContent.received]', {
                         columnId: message.columnId,
@@ -3285,8 +3286,11 @@ if (!webviewEventListenersInitialized) {
                         const newTitle = message.columnTitle !== undefined ? message.columnTitle : colData.title;
 
                         if (newTitle !== undefined) {
-                            editor.element.value = newTitle || '';
-                            editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                            const currentValue = editor.element?.value ?? '';
+                            if (currentValue === (previousTitle ?? '')) {
+                                editor.element.value = newTitle || '';
+                                editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                            }
                         }
                     }
 
@@ -3383,6 +3387,7 @@ if (!webviewEventListenersInitialized) {
                 let foundTask = null;
                 let foundColumn = null;
                 let previousDescription = null;
+                let previousTitle = null;
 
                 for (const column of window.cachedBoard.columns) {
                     const task = column.tasks.find(t => t.id === message.taskId);
@@ -3390,6 +3395,7 @@ if (!webviewEventListenersInitialized) {
                         foundTask = task;
                         foundColumn = column;
                         previousDescription = task.description ?? '';
+                        previousTitle = task.title ?? '';
                         break;
                     }
                 }
@@ -3436,13 +3442,27 @@ if (!webviewEventListenersInitialized) {
 
                         if (editor.type === 'task-title' && (message.taskTitle !== undefined || taskData.title !== undefined)) {
                             const newTitle = message.taskTitle !== undefined ? message.taskTitle : taskData.title;
-                            editor.element.value = newTitle || '';
-                            editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                            const currentValue = editor.element?.value ?? '';
+                            if (currentValue === (previousTitle ?? '')) {
+                                editor.element.value = newTitle || '';
+                                editor.originalValue = newTitle || ''; // Update originalValue to prevent stale revert
+                            }
                         }
 
                         if (editor.type === 'task-description' && taskData.description !== undefined) {
-                            editor.element.value = taskData.description || '';
-                            editor.originalValue = taskData.description || ''; // Update originalValue to prevent stale revert
+                            const currentValue = editor.wysiwyg?.getMarkdown?.() ?? editor.element?.value ?? '';
+                            if (currentValue === (previousDescription ?? '')) {
+                                if (editor.wysiwyg && typeof editor.wysiwyg.setMarkdown === 'function') {
+                                    editor.wysiwyg.setMarkdown(taskData.description || '');
+                                }
+                                if (editor.element) {
+                                    editor.element.value = taskData.description || '';
+                                    if (!editor.wysiwyg) {
+                                        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+                                    }
+                                }
+                                editor.originalValue = taskData.description || ''; // Update originalValue to prevent stale revert
+                            }
                         }
                     }
 
@@ -3742,32 +3762,7 @@ if (!webviewEventListenersInitialized) {
             break;
         case 'pathReplaced':
             {
-                const originalPath = message.actualPath || message.originalPath;
-                if (originalPath && message.newPath) {
-                    updatePathInDOM(originalPath, message.newPath, 'replace');
-                }
-                const overlayEditor = window.taskOverlayEditor;
-                const overlayTaskRef = overlayEditor?.getTaskRef?.();
-                const isOverlayEditingTask = overlayEditor?.isVisible?.()
-                    && overlayTaskRef?.taskId === message.taskId
-                    && overlayTaskRef?.columnId === message.columnId;
-                if (isOverlayEditingTask && typeof overlayEditor?.getDraft === 'function' && typeof overlayEditor?.updateDraft === 'function') {
-                    const draft = overlayEditor.getDraft() || '';
-                    const candidates = [
-                        message.actualPath,
-                        message.originalPath
-                    ].filter(Boolean);
-                    let nextDraft = draft;
-                    candidates.forEach((candidate) => {
-                        if (!candidate) { return; }
-                        if (nextDraft.includes(candidate)) {
-                            nextDraft = nextDraft.split(candidate).join(message.newPath);
-                        }
-                    });
-                    if (nextDraft !== draft) {
-                        overlayEditor.updateDraft(nextDraft);
-                    }
-                }
+                applyPathReplacementToEditors(message);
             }
             break;
 
@@ -3946,6 +3941,130 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
             hasCurrentEditor: !!(window.taskEditor && window.taskEditor.currentEditor)
         });
     }
+}
+
+function encodePathSegments(pathValue) {
+    if (typeof pathValue !== 'string') { return ''; }
+    const normalized = pathValue.replace(/\\/g, '/');
+    return normalized.split('/').map(segment => segment ? encodeURIComponent(segment) : '').join('/');
+}
+
+function buildPathReplacementCandidates(message) {
+    const candidates = new Set();
+    const addCandidate = (value) => {
+        if (!value || typeof value !== 'string') { return; }
+        candidates.add(value);
+        const normalized = value.replace(/\\/g, '/');
+        if (normalized !== value) {
+            candidates.add(normalized);
+        }
+        try {
+            const decoded = decodeURIComponent(value);
+            if (decoded && decoded !== value) {
+                candidates.add(decoded);
+            }
+        } catch {
+            // ignore invalid decoding
+        }
+        const encoded = encodePathSegments(value);
+        if (encoded && encoded !== value) {
+            candidates.add(encoded);
+        }
+    };
+
+    addCandidate(message.actualPath);
+    addCandidate(message.originalPath);
+
+    return Array.from(candidates).filter(Boolean);
+}
+
+function replacePathCandidates(text, candidates, newPath) {
+    if (typeof text !== 'string' || !text || !Array.isArray(candidates) || !newPath) {
+        return text;
+    }
+    let next = text;
+    candidates.forEach((candidate) => {
+        if (!candidate || !next.includes(candidate)) { return; }
+        next = next.split(candidate).join(newPath);
+    });
+    return next;
+}
+
+function applyPathReplacementToOverlay(message, candidates) {
+    const overlayEditor = window.taskOverlayEditor;
+    if (!overlayEditor?.isVisible?.() || typeof overlayEditor.getDraft !== 'function' || typeof overlayEditor.updateDraft !== 'function') {
+        return false;
+    }
+    if (message.isColumnTitle) {
+        return false;
+    }
+    const overlayRef = overlayEditor.getTaskRef?.();
+    const hasContext = Boolean(message.taskId && message.columnId);
+    const matchesContext = hasContext
+        ? (overlayRef?.taskId === message.taskId && overlayRef?.columnId === message.columnId)
+        : true;
+    const draft = overlayEditor.getDraft() || '';
+    if (!matchesContext && !candidates.some(candidate => draft.includes(candidate))) {
+        return false;
+    }
+    const nextDraft = replacePathCandidates(draft, candidates, message.newPath);
+    if (nextDraft && nextDraft !== draft) {
+        overlayEditor.updateDraft(nextDraft);
+        return true;
+    }
+    return false;
+}
+
+function applyPathReplacementToInlineEditor(message, candidates) {
+    const editor = window.taskEditor?.currentEditor;
+    if (!editor) { return false; }
+    const editorValue = editor.wysiwyg?.getMarkdown?.() ?? editor.element?.value ?? '';
+    const hasContext = Boolean(message.taskId && message.columnId);
+    const matchesTask = hasContext && editor.taskId === message.taskId && editor.columnId === message.columnId;
+    const matchesColumn = message.isColumnTitle && editor.type === 'column-title' && editor.columnId === message.columnId;
+    const matchesContext = matchesTask || matchesColumn;
+
+    if (!matchesContext && !candidates.some(candidate => editorValue.includes(candidate))) {
+        return false;
+    }
+
+    const nextValue = replacePathCandidates(editorValue || '', candidates, message.newPath);
+    if (!nextValue || nextValue === editorValue) {
+        return false;
+    }
+
+    if (editor.wysiwyg && typeof editor.wysiwyg.setMarkdown === 'function') {
+        editor.wysiwyg.setMarkdown(nextValue);
+    }
+    if (editor.element) {
+        editor.element.value = nextValue;
+        if (!editor.wysiwyg) {
+            editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+    if (Object.prototype.hasOwnProperty.call(editor, 'originalValue')) {
+        editor.originalValue = nextValue;
+    }
+    return true;
+}
+
+function applyPathReplacementToCachedBoard(candidates, newPath) {
+    if (typeof updatePathInDOM !== 'function') { return; }
+    candidates.forEach((candidate) => {
+        if (!candidate || candidate === newPath) { return; }
+        updatePathInDOM(candidate, newPath, 'replace');
+    });
+}
+
+function applyPathReplacementToEditors(message) {
+    const candidates = buildPathReplacementCandidates(message);
+    if (candidates.length === 0 || !message.newPath) {
+        return false;
+    }
+    const overlayUpdated = applyPathReplacementToOverlay(message, candidates);
+    const inlineUpdated = applyPathReplacementToInlineEditor(message, candidates);
+    applyPathReplacementToCachedBoard(candidates, message.newPath);
+    return overlayUpdated || inlineUpdated;
 }
 
 function performEditorUndo() {
