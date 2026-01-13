@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.97.171",
+  "version": "0.97.172",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -44,6 +44,21 @@
           "enumDescriptions": [
             "Generate relative paths from the current document",
             "Generate absolute file system paths"
+          ]
+        },
+        "markdown-kanban.mediaIndexScanScope": {
+          "type": "string",
+          "enum": [
+            "mediaFolders",
+            "contentFolders",
+            "allWorkspaces"
+          ],
+          "default": "allWorkspaces",
+          "description": "Where the MediaIndex scans for media files used for duplicate detection during file drops.",
+          "enumDescriptions": [
+            "Only scan the Media folders for the main file and included markdown files",
+            "Scan the folders containing the main file and included markdown files (including subfolders)",
+            "Scan all workspace folders"
           ]
         },
         "markdown-kanban.templates.showBar": {

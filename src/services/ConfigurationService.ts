@@ -11,6 +11,7 @@ export interface KanbanConfiguration {
     backupLocation: string;
     openLinksInNewTab: boolean;
     pathGeneration: 'relative' | 'absolute';
+    mediaIndexScanScope: 'mediaFolders' | 'contentFolders' | 'allWorkspaces';
     whitespace: string;
     maxRowHeight: number;
     tagColors: { [key: string]: string };
@@ -72,6 +73,7 @@ export class ConfigurationService {
         backupLocation: 'same-folder',
         openLinksInNewTab: false,
         pathGeneration: 'absolute' as 'relative' | 'absolute',
+        mediaIndexScanScope: 'allWorkspaces',
         whitespace: '4px',
         maxRowHeight: 0,
         taskMinHeight: 'auto',

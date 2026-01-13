@@ -21,7 +21,7 @@ import {
 } from '../core/bridge/MessageTypes';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { FileSearchService, TrackedFileData } from '../fileSearchService';
-import { WorkspaceMediaIndex } from '../services/WorkspaceMediaIndex';
+import { WorkspaceMediaIndex, MediaIndexScanOptions, MediaIndexScanScope } from '../services/WorkspaceMediaIndex';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
 import { showError, showWarning, showInfo } from '../services/NotificationService';
@@ -307,8 +307,9 @@ export class ClipboardCommands extends SwitchBasedCommand {
             if (fileHash) {
                 const mediaIndex = WorkspaceMediaIndex.getInstance();
                 if (mediaIndex) {
+                    const scanOptions = this._getMediaIndexScanOptions(context);
                     // Lazy initialization - scan on first use (shows cancellable progress)
-                    await mediaIndex.ensureIndexed();
+                    await mediaIndex.ensureIndexed(scanOptions);
 
                     if (mediaIndex.isInitialized()) {
                         const matches = mediaIndex.findByHash(fileHash);
@@ -662,6 +663,12 @@ export class ClipboardCommands extends SwitchBasedCommand {
     }
 
     // ============= HELPER METHODS =============
+
+    private _getMediaIndexScanOptions(context: CommandContext): MediaIndexScanOptions {
+        const scope = configService.getConfig('mediaIndexScanScope', 'allWorkspaces') as MediaIndexScanScope;
+        const registry = context.getFileRegistry ? context.getFileRegistry() : undefined;
+        return WorkspaceMediaIndex.buildScanOptions(scope, registry);
+    }
 
     private _getCurrentFilePaths(context: CommandContext): { currentFilePath: string; directory: string; fileName: string; baseFileName: string } {
         const document = context.fileManager.getDocument();

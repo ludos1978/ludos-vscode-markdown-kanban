@@ -16,6 +16,14 @@ import initSqlJs, { Database } from 'sql.js';
 import { DOTTED_EXTENSIONS } from '../shared/fileTypeDefinitions';
 import { DRAWIO_EXTENSIONS, EXCALIDRAW_EXTENSIONS } from '../constants/FileExtensions';
 import { logger } from '../utils/logger';
+import type { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
+
+export type MediaIndexScanScope = 'mediaFolders' | 'contentFolders' | 'allWorkspaces';
+
+export interface MediaIndexScanOptions {
+    scope: MediaIndexScanScope;
+    roots?: string[];
+}
 
 export type MediaType = 'image' | 'video' | 'audio' | 'document' | 'diagram';
 
@@ -36,6 +44,7 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
     private hasScanned = false;
     private isScanning = false;
     private scanCancellation: vscode.CancellationTokenSource | null = null;
+    private lastScanSignature: string | null = null;
 
     private static readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB
 
@@ -64,6 +73,39 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
 
     constructor(extensionPath: string) {
         this.extensionPath = extensionPath;
+    }
+
+    static buildScanOptions(scope: MediaIndexScanScope, registry?: MarkdownFileRegistry): MediaIndexScanOptions {
+        if (scope === 'allWorkspaces') {
+            return { scope };
+        }
+
+        if (!registry) {
+            return { scope: 'allWorkspaces' };
+        }
+
+        const roots = new Set<string>();
+        const files = [];
+        const mainFile = registry.getMainFile();
+        if (mainFile) {
+            files.push(mainFile.getPath());
+        }
+        registry.getIncludeFiles().forEach(file => files.push(file.getPath()));
+
+        files.forEach((filePath) => {
+            const directory = path.dirname(filePath);
+            const baseFileName = path.basename(filePath).replace(/\.[^/.]+$/, '');
+            if (scope === 'mediaFolders') {
+                const mediaFolder = path.join(directory, `${baseFileName}-MEDIA`);
+                if (fs.existsSync(mediaFolder)) {
+                    roots.add(mediaFolder);
+                }
+            } else if (scope === 'contentFolders') {
+                roots.add(directory);
+            }
+        });
+
+        return { scope, roots: Array.from(roots) };
     }
 
     static getInstance(extensionPath?: string): WorkspaceMediaIndex | null {
@@ -125,6 +167,13 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
                 CREATE INDEX IF NOT EXISTS idx_hash ON media_files(hash);
                 CREATE INDEX IF NOT EXISTS idx_type ON media_files(type);
             `);
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS media_index_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+            `);
+            this.lastScanSignature = this.getMeta('scanSignature');
 
             this.save();
             this.initialized = true;
@@ -169,13 +218,50 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         }
     }
 
+    private getMeta(key: string): string | null {
+        if (!this.db) return null;
+        try {
+            const stmt = this.db.prepare('SELECT value FROM media_index_meta WHERE key = ?');
+            stmt.bind([key]);
+            if (stmt.step()) {
+                const row = stmt.getAsObject() as { value?: string };
+                stmt.free();
+                return typeof row.value === 'string' ? row.value : null;
+            }
+            stmt.free();
+        } catch (error) {
+            console.error('[WorkspaceMediaIndex] Error reading metadata:', error);
+        }
+        return null;
+    }
+
+    private setMeta(key: string, value: string): void {
+        if (!this.db) return;
+        try {
+            this.db.run('INSERT OR REPLACE INTO media_index_meta (key, value) VALUES (?, ?)', [key, value]);
+            this.save();
+        } catch (error) {
+            console.error('[WorkspaceMediaIndex] Error writing metadata:', error);
+        }
+    }
+
+    private buildScanSignature(options: MediaIndexScanOptions): string {
+        const workspaceFolders = (vscode.workspace.workspaceFolders || []).map(folder => path.resolve(folder.uri.fsPath));
+        const roots = (options.roots || []).map(root => path.resolve(root)).sort();
+        return JSON.stringify({
+            scope: options.scope,
+            roots,
+            workspaceFolders: workspaceFolders.sort()
+        });
+    }
+
     /**
      * Ensure the index has been scanned at least once.
      * This is called lazily on first use (e.g., when searching for duplicates).
      * Shows a progress notification that can be cancelled.
      */
-    async ensureIndexed(): Promise<void> {
-        if (this.hasScanned || this.isScanning) {
+    async ensureIndexed(options: MediaIndexScanOptions = { scope: 'allWorkspaces' }): Promise<void> {
+        if (this.isScanning) {
             return;
         }
 
@@ -187,23 +273,28 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             return;
         }
 
-        // Check if we have existing data in the database
+        const signature = this.buildScanSignature(options);
         const stats = this.getStats();
-        if (stats.totalFiles > 0) {
-            // Database already has data from a previous session
+        const hasData = stats.totalFiles > 0;
+        const signatureMatches = this.lastScanSignature === signature;
+
+        if (hasData && signatureMatches) {
             this.hasScanned = true;
             logger.debug(`[WorkspaceMediaIndex] Using existing index with ${stats.totalFiles} files`);
             return;
         }
 
-        // Need to scan - show progress notification
-        await this.scanWithProgress();
+        if (hasData && !signatureMatches) {
+            this.clear();
+        }
+
+        await this.scanWithProgress(options, signature);
     }
 
     /**
      * Scan workspace with a cancellable progress notification
      */
-    async scanWithProgress(): Promise<number> {
+    async scanWithProgress(options: MediaIndexScanOptions = { scope: 'allWorkspaces' }, signature?: string): Promise<number> {
         if (this.isScanning) {
             logger.debug('[WorkspaceMediaIndex] Scan already in progress');
             return 0;
@@ -225,11 +316,14 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
                         this.scanCancellation?.cancel();
                     });
 
-                    return await this.scanWorkspace(progress, this.scanCancellation!.token);
+                    return await this.scanWorkspace(progress, this.scanCancellation!.token, options);
                 }
             );
 
             this.hasScanned = true;
+            const nextSignature = signature || this.buildScanSignature(options);
+            this.lastScanSignature = nextSignature;
+            this.setMeta('scanSignature', nextSignature);
             return result;
         } finally {
             this.isScanning = false;
@@ -426,10 +520,10 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
      */
     async scanWorkspace(
         progress?: vscode.Progress<{ message?: string; increment?: number }>,
-        cancellationToken?: vscode.CancellationToken
+        cancellationToken?: vscode.CancellationToken,
+        options: MediaIndexScanOptions = { scope: 'allWorkspaces' }
     ): Promise<number> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder || !this.db) return 0;
+        if (!this.db) return 0;
 
         // Build glob pattern from all media extensions
         const extensions = Array.from(WorkspaceMediaIndex.MEDIA_EXTENSIONS.keys())
@@ -445,11 +539,30 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
         ];
 
         const exclude = '**/node_modules/**';
+        const roots = (options.roots || []).filter(root => root && fs.existsSync(root));
+        const useWorkspacePatterns = options.scope === 'allWorkspaces';
+        if (!useWorkspacePatterns && roots.length === 0) {
+            logger.debug('[WorkspaceMediaIndex] No scan roots available for scope', options.scope);
+            return 0;
+        }
+
+        const includePatterns: (string | vscode.RelativePattern)[] = [];
+        if (useWorkspacePatterns) {
+            includePatterns.push(...patterns);
+        } else {
+            roots.forEach((root) => {
+                const rootUri = vscode.Uri.file(root);
+                patterns.forEach((pattern) => {
+                    includePatterns.push(new vscode.RelativePattern(rootUri, pattern));
+                });
+            });
+        }
 
         let totalUpdated = 0;
         let totalFiles = 0;
+        const seenFiles = new Set<string>();
 
-        for (const pattern of patterns) {
+        for (const pattern of includePatterns) {
             // Check for cancellation before starting each pattern
             if (cancellationToken?.isCancellationRequested) {
                 logger.debug('[WorkspaceMediaIndex] Scan cancelled');
@@ -457,8 +570,6 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
             }
 
             const files = await vscode.workspace.findFiles(pattern, exclude, undefined, cancellationToken);
-            totalFiles += files.length;
-
             for (let i = 0; i < files.length; i++) {
                 // Check for cancellation periodically
                 if (cancellationToken?.isCancellationRequested) {
@@ -466,7 +577,14 @@ export class WorkspaceMediaIndex implements vscode.Disposable {
                     return totalUpdated;
                 }
 
-                const updated = this.updateFile(files[i].fsPath);
+                const filePath = files[i].fsPath;
+                if (seenFiles.has(filePath)) {
+                    continue;
+                }
+                seenFiles.add(filePath);
+                totalFiles += 1;
+
+                const updated = this.updateFile(filePath);
                 if (updated) totalUpdated++;
 
                 if (progress && i % 50 === 0) {

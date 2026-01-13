@@ -10,7 +10,8 @@
  */
 
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
-import { WorkspaceMediaIndex } from '../services/WorkspaceMediaIndex';
+import { WorkspaceMediaIndex, MediaIndexScanScope } from '../services/WorkspaceMediaIndex';
+import { configService } from '../services/ConfigurationService';
 
 /**
  * Process Commands Handler
@@ -39,8 +40,8 @@ export class ProcessCommands extends SwitchBasedCommand {
             await this.handleGetProcessesStatus();
             return this.success();
         },
-        'requestMediaIndexScan': async (_msg, _ctx) => {
-            await this.handleRequestMediaIndexScan();
+        'requestMediaIndexScan': async (_msg, ctx) => {
+            await this.handleRequestMediaIndexScan(ctx);
             return this.success();
         },
         'cancelMediaIndexScan': async (_msg, _ctx) => {
@@ -81,7 +82,7 @@ export class ProcessCommands extends SwitchBasedCommand {
      * Handle request to start media index scan
      * Starts scan with progress notification
      */
-    private async handleRequestMediaIndexScan(): Promise<void> {
+    private async handleRequestMediaIndexScan(context: CommandContext): Promise<void> {
         const mediaIndex = WorkspaceMediaIndex.getInstance();
         if (!mediaIndex) {
             console.warn('[ProcessCommands] MediaIndex not available');
@@ -97,8 +98,11 @@ export class ProcessCommands extends SwitchBasedCommand {
                 await mediaIndex.initialize();
             }
 
+            const scope = configService.getConfig('mediaIndexScanScope', 'allWorkspaces') as MediaIndexScanScope;
+            const registry = context.getFileRegistry ? context.getFileRegistry() : undefined;
+            const scanOptions = WorkspaceMediaIndex.buildScanOptions(scope, registry);
             // Start scan with progress
-            const filesIndexed = await mediaIndex.scanWithProgress();
+            const filesIndexed = await mediaIndex.scanWithProgress(scanOptions);
             const stats = mediaIndex.getStats();
 
             this.postMessage({

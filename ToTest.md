@@ -133,6 +133,9 @@
 - [ ] Alt+clicking images also opens in VS Code first (image preview) and falls back to system default if VS Code cannot open it.
 - [ ] File drop dialog always shows the same options; “Link existing file” is disabled when no hash match exists and “Copy file to Media folder” is available for both file objects and file URIs.
 - [ ] Drop a file, choose “Copy file to Media folder,” then drop the same file again and confirm “Link existing file” is enabled (hash index updated).
+- [ ] Set `markdown-kanban.mediaIndexScanScope` to `mediaFolders`, trigger “Scan Media Index,” and confirm only `*-MEDIA` folders for main + included markdown files are indexed.
+- [ ] Set `markdown-kanban.mediaIndexScanScope` to `contentFolders`, trigger “Scan Media Index,” and confirm files in the main/include folders and subfolders are indexed.
+- [ ] Set `markdown-kanban.mediaIndexScanScope` to `allWorkspaces`, trigger “Scan Media Index,” and confirm files across all workspace folders are indexed.
 - [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
 - [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
 - [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
