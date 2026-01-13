@@ -1,180 +1,68 @@
 # ToTest
 
+## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Review `TODOs-codex.md` and confirm the markdown-it feature list is complete for the overlay editor.
-- [ ] Review `TODOs-codex.md` and confirm the design pattern + plan integration sections align with the overlay editor architecture.
-- [ ] Review `TODOs-codex.md` and confirm the final implementation plan steps are complete and ordered correctly.
-- [ ] Trigger the overlay editor entrypoint and confirm the shell renders (header, body panes) without blocking normal board interaction.
-- [ ] Verify tag menus still list active tags correctly for columns and tasks, including custom groups and active-tag overrides.
-- [ ] Scroll the board with stacked columns and confirm the view no longer jumps to the top while console stays free of forced reflow warnings during layout updates.
-- [ ] While scrolled in multi-row mode, enter and exit a task description edit and confirm the board does not jump to the top while the cursor positions (no large scroll debug spikes).
-- [ ] With a tall board (multi-row), enter/exit edit and confirm scroll anchoring does not pull the view (no unexpected scroll offsets).
-- [ ] Enter/exit edit while scrolled near the bottom and confirm the board height lock prevents any temporary jump (no clamp to near-top).
-- [ ] With a long board, enter edit and confirm the scroll position stays stable immediately (no transient jump before restore).
-- [ ] Enter/exit edit and confirm scroll lock keeps the board stable even during layout/visibility changes (no instant drop before restore).
-- [ ] Enter edit on a very tall description and confirm the description container preserves its height (no board scroll clamp).
-- [ ] With debug enabled, reproduce the edit scroll issue and confirm `[SCROLL-EVENT]`, `[SCROLL-RESTORE]`, or `[FOCUS-SCROLL]` logs show which element moved (including stack traces).
-- [ ] Trigger a board re-render (e.g., switch files or refresh) while editing and confirm focus is restored only after rendering completes.
-- [ ] Press Cmd+S once while the board is focused and confirm only one save request is issued (no repeated save logs).
-- [ ] Attempt to save when the board has no columns and confirm a single error message appears without repeated save failures in logs.
-- [ ] Clear all columns (empty board), press Cmd+S, and confirm the save succeeds without validation errors.
-- [ ] Toggle the debug button (version menu) and confirm regular logs stop when debug is disabled while `WebviewBridge` warnings and errors still appear in the console when debug mode is on.
-- [ ] Verify task menu actions still execute (move top/up/down/bottom, move to column list, and sort options).
-- [ ] Verify video/audio embeds resolve multiple <source> tags correctly (relative, absolute, include-based paths) and keep the path menu overlay.
-- [ ] Verify image/PDF/diagram placeholders still render and resolve paths in includes and main files.
-- [ ] Open the search panel and export options to confirm hidden sections toggle visible as expected.
-- [ ] Close the kanban panel (or switch files) several times and confirm no "Unbound disposable context" errors appear in the extension host logs, indicating FileRegistryChangeHandler disposes cleanly.
-- [x] Start dragging a task, press Esc (or cancel drag), and confirm it snaps back with no stuck drag state.
-- [ ] Drag a task outside the board and re-enter to confirm drop indicators recover (no stuck "left view" state). -> this FAILS
-- [ ] Drag clipboard/empty/diagram cards onto the board and confirm indicators show and drag state resets (no lingering drag highlights).
-- [ ] Drag internal columns/tasks and confirm external file drop indicators do not appear.
-- [ ] Drag a task within the board and confirm external file handling stays inactive.
-- [ ] Drag external files over the board, drop to create cards, then leave or drop outside; confirm indicators and highlights clear.
-- [ ] Drag template/empty/clipboard columns onto the board and confirm drop zones, creation, and drag cleanup behave normally.
-- [ ] Drop external files or clipboard cards and confirm tasks are created without console errors about drop feedback cleanup.
-- [ ] Verify column headers are rendered through markdown-it so markup (e.g., `## Title`) displays as rich text and include badges still appear instead of raw markdown.
-- [ ] Drag a diagram card (Excalidraw/Draw.io) and confirm the filename prompt is centered, validates invalid characters, and creates the task after confirmation.
-- [x] Trigger the file search modal (broken link flow) and confirm it opens/closes without console errors.
-- [x] Open the diagram filename prompt and confirm it is at least 200px wide and centered.
-- [x] Open the diagram filename prompt and confirm the input field spans the modal width.
-- [ ] Reorder a column within the same row and confirm the column order updates without losing any columns.
-- [ ] Move a column between rows and confirm the #row tag updates correctly in the column title.
-- [ ] Insert an empty column before/after another column and confirm #row/#stack tags match the target row/stack.
-- [ ] Run a text search with HTML-like characters in titles/descriptions and confirm the search panel renders results without broken markup.
-- [ ] Open the file search modal with a path containing special characters (&, <, >, quotes) and confirm it renders safely.
-- [ ] Drag a column and confirm before/between/after drop zones appear and accept the drop.
-- [ ] Open the extension settings and confirm remaining options are grouped by how often a user would change them (frequent first, advanced last).
-- [ ] Toggle the new Marp settings visibility option in the file bar menu and verify the global Marp burger plus column/task Marp submenu items hide/show accordingly, confirm the document-level preference stays sticky (reopen or switch back to the board) via the new `setFilePreference` storage, and ensure no `setPreference` errors appear in the console.
-- [ ] Adjust the font size control from the file bar menu (or settings) so the board text scales, confirm the preference is stored under `markdown-kanban.fontSize`, and check the console for the absence of `setPreference` errors when switching values.
-- [ ] Open any burger menu (e.g., task or column actions) and confirm the dropdown uses the configured minimum width (≈200px) so items do not overflow, then open a submenu and verify the repositioned panel stays within the screen bounds.
-- [ ] Verify the submenu's arrow and surrounding area stay totally within the dropdown background so there are no floating pointers or clipped highlights.
-- [ ] Toggle the new Show special characters option in the file bar menu and confirm spaces, tabs, newline, and carriage return indicators appear and disappear on task titles and descriptions.
-- [ ] While editing a task title or description, press Shift+Tab from a mid-line cursor and confirm it removes a tab or two spaces at the cursor position (not just at the line start).
-- [ ] With the special characters toggle enabled, confirm no markers are visible while viewing tasks normally, and that they appear only after entering edit mode (then disappear again when editing ends).
-- [ ] Enable the show-special-characters toggle while editing and verify the glyph overlay is limited to the currently active editor, not leaking onto other display-only text fields or other editors.
-- [ ] With show-special-characters enabled, make sure the caret stays aligned with the visible characters/mapping glyphs (any padding/font differences should be copied from the edit field).
-- [ ] Select text, press *, _, ~, [, (, or { and confirm the editor adds the matching start/end characters around the selection while keeping it highlighted; with no selection the keys should just insert their character.
-- [ ] In the WYSIWYG editor, select text and press *, _, ~, [, (, or { and confirm the selection stays highlighted and gets wrapped with the matching characters.
-- [ ] On keyboard layouts where ~ is a dead key (e.g., Alt+N then Space), confirm ~ inserts normally with no selection, wraps selected text when pressed with a selection, and does not insert an extra ~ afterward.
-- [ ] In WYSIWYG, apply a mark (bold/italic/etc) to a selection and then type after it; new text should be unstyled (mark does not stay sticky).
-- [ ] Open the debug overlay and confirm the main file path shown comes from the registry (matches the real file), and that Force Save All reports an error if no main file is registered.
-- [ ] Use Reload All Included Files and confirm include files reload from disk and the file list stays correct in the debug overlay.
-- [ ] Review docs/wysiwyg-mapping.md and confirm all markdown-it plugins/custom syntaxes are captured in the mapping plan.
-- [ ] Review the Token -> Node/Mark and Serializer mapping tables in docs/wysiwyg-mapping.md for completeness.
-- [ ] Review src/wysiwyg/spec.ts for schema coverage and token mapping alignment with markdown-it tokens.
-- [ ] Review src/wysiwyg/tokenParser.ts token tree parsing for correct block/inline mapping (marks, containers, includes, tags, media, and html tokens).
-- [ ] Review src/wysiwyg/serializer.ts output for headings, lists, tables, includes, containers, and marks (em/strong/underline/strike/mark/sub/sup/ins/link/abbr).
-- [ ] Run unit tests for Wysiwyg parser/serializer (`WysiwygParserSerializer.test.ts`) and confirm outputs match expected markdown.
-- [ ] Run unit tests for `buildWysiwygSchemaSpec` and confirm text/doc node normalization in `WysiwygSchemaBuilder.test.ts`.
-- [ ] Run unit tests for markdown-it adapter (`WysiwygMarkdownItAdapter.test.ts`) covering tags, temporal prefix, wiki links, and include blocks.
-- [ ] Run unit tests for WYSIWYG pipeline (`WysiwygPipeline.test.ts`) and confirm round-trip output stays stable for tags + temporal prefix.
-- [ ] Enable WYSIWYG editing and confirm task descriptions open with the ProseMirror editor, save back to markdown, and keep include/tag/wiki link nodes visible.
-- [ ] Enable WYSIWYG editing and confirm the editor UI actually renders (no blank/hidden editor) and no missing `wysiwyg-editor.js` asset errors appear in the webview console.
-- [ ] With WYSIWYG editing active, verify arrow keys, Enter, and Tab behave normally inside the editor and are not intercepted by the textarea handlers.
-- [ ] Compare rendered vs WYSIWYG task descriptions and confirm line spacing, list indentation, and padding align closely with the rendered view.
-- [ ] Compare task description display vs edit/WYSIWYG line-height for plain text and multiline content (no visible jump when toggling edit).
-- [ ] Compare paragraph spacing in task descriptions between display and WYSIWYG edit mode (p margins should match, including top/bottom spacing).
-- [ ] Toggle small-card-fonts (layout preset) and confirm task description display + edit/WYSIWYG font styling (size/ligatures) match.
-- [ ] In WYSIWYG, double-click an image/audio/video placeholder and confirm the source path can be edited and saves back to markdown.
-- [ ] In WYSIWYG, edit a diagram/mermaid code block directly and confirm updates persist on save.
-- [ ] In WYSIWYG, click the Edit button on include/media/diagram nodes and confirm the correct edit UI opens or focus moves into the code block.
-- [ ] In WYSIWYG, images render with the same burger menu as the display view and the menu actions work (open, reveal, convert path, delete).
-- [ ] In WYSIWYG, images with relative paths display correctly (resolved against the main file/include dir) and still open the path menu using the original path.
-- [ ] In WYSIWYG, typing text before/after an inline image keeps the image rendered (no fallback to raw markdown).
-- [ ] In WYSIWYG, mermaid/plantuml fences render a preview alongside the editable code block.
-- [ ] In WYSIWYG, draw.io/excalidraw/pdf image references render the diagram preview (not just the raw filename).
-- [ ] In WYSIWYG, typing list markers ("- " or "1. ") converts to lists immediately, and headings convert on "# " input.
-- [ ] In WYSIWYG, typing #tag/@person/@2025-01-01/!temporal followed by space converts into tag chips immediately.
-- [ ] In WYSIWYG, typing markdown image/link/include/wiki syntax and then continuing to type still keeps the node rendered.
-- [ ] In WYSIWYG, typing an image/link/include/wiki tag and then a space should not leave stray ")" characters in the text.
-- [ ] In WYSIWYG, typing space or text right after a selected image keeps the image (does not replace it).
-- [ ] In WYSIWYG, draw.io/excalidraw embeds render as image previews with the same burger menu/behavior as normal images.
-- [ ] In WYSIWYG, draw.io/excalidraw placeholders render immediately (no stuck gray boxes).
-- [ ] In WYSIWYG, draw.io/excalidraw placeholders resolve after a short delay (render queue kicks in reliably).
-- [ ] In WYSIWYG, diagram image previews align with display mode and entering edit does not scroll the board to the top.
-- [ ] In WYSIWYG, video/audio embeds render as media elements with the same path menu behavior as the display view.
-- [ ] In WYSIWYG, media-only lines (image/video/audio) render as block embeds matching display mode while inline images stay inline within text.
-- [ ] In WYSIWYG, diagram previews update while typing without excessive re-rendering (debounce works).
-- [ ] In WYSIWYG, diagram fences default to preview-only (no code block), and the Edit button toggles the code block without changing the preview sizing.
-- [ ] In display mode, audio embeds show the same path menu behavior as videos and handle missing files with a placeholder.
-- [ ] Right burger menu: toggling “Enable WYSIWYG editor” switches between WYSIWYG and plain textarea for the current description.
-- [ ] Reload the board and confirm WYSIWYG is disabled by default (textarea editor), then enable it from the right burger menu and confirm it persists.
-- [ ] In WYSIWYG multicolumn blocks, the add/remove buttons appear as small +/- overlays (top corners) without changing layout height.
-- [ ] In WYSIWYG multicolumn blocks, the +/- overlays stay above images (no overlap/behind) and do not clip.
-- [ ] In WYSIWYG multicolumn blocks, image sizing (width/height) matches the display-mode columns for the same content.
-- [ ] In WYSIWYG, image-only paragraphs (markdown-it-image-figures/figure tokens) still render as images instead of disappearing.
-- [ ] In WYSIWYG, multicolumn blocks render as side-by-side columns with visible separators, and Add/Remove Column buttons update the column count (saved back to ---: :--: :--- markers).
-- [ ] In WYSIWYG, typing markdown image/link/include/wiki-link syntax converts immediately to rich nodes, and Backspace right after the node converts back to raw markdown text.
-- [ ] In WYSIWYG, Tab inserts two spaces (and indents all selected lines), Shift+Tab unindents selected lines or removes spaces before the cursor, and Alt+Enter saves the edit without Tab ending editing.
-- [ ] Task burger menu: selecting “Edit task (overlay)” opens the overlay editor shell without console errors.
-- [ ] Overlay editor panel stays within 80% of viewport width/height (no overflow beyond 80vw/80vh).
-- [ ] Overlay editor mode buttons (Markdown/Dual/WYSIWYG) toggle visibility of the correct panes.
-- [ ] Overlay editor dual mode shows a visible separator between markdown and preview panes.
-- [ ] Overlay editor toolbar actions (tools, mode toggles, font scale, save) still respond after the refactor.
-- [ ] Overlay editor save uses the current task data (no failure after switching modes or reopening).
-- [ ] Overlay editor closes via Escape/Alt+Enter even after multiple open/close cycles (no duplicate handlers).
-- [ ] Overlay editor WYSIWYG still syncs draft text when switching modes or saving.
-- [ ] Overlay editor: switching between Markdown/Dual/WYSIWYG preserves the exact draft (no divergent content).
-- [ ] Overlay editor highlights the active mode button (Markdown/Dual/WYSIWYG).
-- [ ] Overlay editor WYSIWYG tools bar spans full width without forced multi-row wrapping.
-- [ ] Inline task description editing grows the card height as you type (no text overlapping the next card).
-- [ ] Inline task description edit field stays within the card width and wraps long paths (no overflow).
-- [ ] Overlay editor body has a 10px gap between panes and textarea fits within its pane.
-- [ ] Overlay editor WYSIWYG media stays within the pane (no overflow beyond container).
-- [ ] Overlay editor WYSIWYG multicolumn blocks render as columns (---: :--: :---).
-- [ ] File search modal appears above the overlay editor (not behind it).
-- [ ] In overlay dual mode, insert an image snippet, choose a file via the file search, and confirm the link updates in the markdown pane.
-- [ ] In overlay WYSIWYG, fix a broken image via Search for File and confirm the path updates in the editor immediately.
-- [ ] In overlay WYSIWYG, fix a broken image with URL-encoded characters (spaces/colons) and confirm the path replacement applies in the editor draft without closing the overlay.
-- [ ] In inline markdown edit, use the burger menu on a broken image to search/browse a file and confirm the editor value updates immediately without losing unsaved edits.
-- [ ] In inline WYSIWYG edit, use the burger menu on a broken image to search/browse a file and confirm the ProseMirror content updates immediately.
-- [ ] In overlay dual mode, use the burger menu on a broken image in the preview and confirm both preview and draft update.
-- [ ] Burger menu Open on images/diagrams opens in VS Code first (draw.io/excalidraw/image preview), and falls back to system default when no VS Code editor is available.
-- [ ] Alt+clicking images also opens in VS Code first (image preview) and falls back to system default if VS Code cannot open it.
-- [ ] File drop dialog always shows the same options; “Link existing file” is disabled when no hash match exists and “Copy file to Media folder” is available for both file objects and file URIs.
-- [ ] Drop a file, choose “Copy file to Media folder,” then drop the same file again and confirm “Link existing file” is enabled (hash index updated).
-- [ ] Set `markdown-kanban.mediaIndexScanScope` to `mediaFolders`, trigger “Scan Media Index,” and confirm only `*-MEDIA` folders for main + included markdown files are indexed.
-- [ ] Set `markdown-kanban.mediaIndexScanScope` to `contentFolders`, trigger “Scan Media Index,” and confirm files in the main/include folders and subfolders are indexed.
-- [ ] Set `markdown-kanban.mediaIndexScanScope` to `allWorkspaces`, trigger “Scan Media Index,” and confirm files across all workspace folders are indexed.
-- [ ] Overlay editor settings menu opens via the ⋯ button and updates font scale for the textarea.
-- [ ] Overlay editor closes via Escape, Alt+Enter, and clicking the backdrop (no close button in the header).
-- [ ] Right burger menu: toggling “Enable overlay editor” persists across reloads and updates the overlay default mode/font scale when changed.
-- [ ] With overlay editor enabled, clicking a task description opens the overlay instead of inline editing.
-- [ ] Overlay editor dual mode renders preview using markdown-it pipeline and updates on input.
-- [ ] Overlay editor Save updates the task description and re-renders only that task (no full board refresh).
-- [ ] Overlay editor: dropping external files inserts markdown links at the cursor in the active editor mode.
-- [ ] Overlay editor WYSIWYG mode accepts dropped files and inserts markdown links at the cursor.
-- [ ] Task burger menu: “Edit task (overlay)” is the first item and opens the overlay.
-- [ ] Overlay tools pane: buttons and insert menu add markdown snippets into the active editor mode.
-- [ ] Overlay tools pane: mark buttons toggle formatting in WYSIWYG mode (bold/italic/underline/strike/mark/sub/sup/code).
-- [ ] Overlay tools pane: formatting buttons reflect the active mark when the cursor is inside styled text.
-- [ ] Overlay tools pane includes buttons for multicolumn, include, wiki link, and footnote.
-- [ ] Overlay insert menu no longer lists multicolumn, include, wiki link, or footnote.
-- [ ] In overlay WYSIWYG, large images never exceed 80% of the editor pane height.
-- [ ] In overlay WYSIWYG, when a task starts or ends with an image, you can still type before and after it.
-- [ ] In overlay WYSIWYG, clicking below the last line places the cursor at the end of the content.
-- [ ] Review `FEATURES.md` for accuracy after the latest feature list update.
-- [ ] Confirm the extension version shows 0.98.1 after the build.
-- [ ] In overlay WYSIWYG, PlantUML fences render to SVG (no endless "Rendering PlantUML diagram..." placeholder).
-- [ ] In overlay WYSIWYG, you can insert text before/after mermaid or plantuml diagram blocks (text does not get trapped inside the fence).
-- [ ] In WYSIWYG, focusing the editor does not draw an extra focus outline around the edit area.
-- [ ] In WYSIWYG, mermaid/plantuml blocks show clear ```lang ... ``` boundaries while editing, the burger menu includes the Edit action (no standalone Edit button), and edit mode shows split columns (code left, preview right) inside the diagram block with borders and no height clamp.
-- [ ] In overlay WYSIWYG, selecting text and pressing Link inserts `[text](url)` with the selection placed in the text or url portion based on filename/path detection, and keeps that portion selected.
-- [ ] In WYSIWYG, every block type (media, include, hr, table, list, multicolumn, code, container) allows inserting new text blocks before and after it.
-- [ ] In WYSIWYG, clicking the left/right half of an image block lets you type on the same line (image becomes inline, cursor before/after).
-- [ ] In WYSIWYG, typing while an image block is selected inserts text on the same line after the image (image stays inline).
-- [ ] In WYSIWYG, inline nodes (images/include/wiki links/tags/footnotes) leave a small horizontal gap so the caret is visible on both sides.
-- [ ] Task burger menu: clicking “Edit task (overlay)” opens the overlay editor without missing asset warnings.
-- [ ] In all editors (inline, overlay markdown, overlay WYSIWYG), VS Code keybindings like Meta+1 still trigger their configured commands/snippets.
-- [ ] Exiting task edit (inline or overlay) does not re-render unchanged draw.io/excalidraw diagrams; visuals reuse cached renders unless the source file changed.
-- [ ] Overlay editor: clicking the backdrop saves the current draft before closing (no data loss).
-- [ ] Overlay editor: Escape, Alt+Enter, Save button, and backdrop click always save changes (no exit path discards edits).
-- [ ] VS Code keybindings with snippet args (e.g., Meta+1) insert snippet text in inline editor, inline WYSIWYG, and overlay editor.
-- [ ] VS Code keybindings with modifiers work in overlay WYSIWYG even when the editor consumes key events (capture phase).
-- [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "snippet": "..." }` and confirm it inserts even when VS Code would normally capture Cmd+1.
-- [ ] Bind Meta+1 to `markdown-kanban.insertSnippet` with `{ "name": "Markdown Marp Table Separator Left" }` and confirm snippet names resolve from user/workspace snippet files.
-- [ ] On initial webview load, cached shortcuts populate and Meta+1 (or other Meta+digit) snippet keybindings insert the configured snippet without requiring a second keypress.
-- [ ] If bound, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm text undo/redo works via the editor undo/redo commands.
-- [ ] Without explicit keybindings, press Cmd+Z/Cmd+Shift+Z in inline edit and confirm native undo/redo works (including QWERTZ layouts where key code reports KeyY).
-- [ ] Inline undo/redo restores cursor position and supports multiple steps even after snippet insertion (manual undo stack).
-- [ ] With inline WYSIWYG enabled, trigger a snippet insertion and confirm it inserts at the cursor in the ProseMirror editor.
+- [ ] Confirm the extension version shows 0.98.2 after the build.
+
+## Docs & Reviews
+- [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
+- [ ] Review `FEATURES.md` for accuracy after the latest updates.
+- [ ] Review docs/wysiwyg-mapping.md mapping tables + spec files for completeness.
+
+## Board, Scroll & Save
+- [ ] Scroll stability in multi-row/stacked boards during edit enter/exit (no jump, no forced reflow warnings, height lock holds, tall descriptions stable).
+- [ ] Debug logs identify the moving element when scroll issues are reproduced.
+- [ ] Focus restore after re-render completes (no early focus steal).
+- [ ] Cmd+S issues a single save; empty board saves without repeated errors.
+
+## Menus & UI
+- [ ] Debug toggle works; task menu actions still execute.
+- [ ] Burger menu min width and submenu positioning stay on-screen with no clipped arrows.
+- [ ] Search panel and export options toggle visibility correctly.
+- [ ] Tag menus list active tags correctly (including custom groups and overrides).
+- [ ] Font size and Marp settings toggles persist without `setPreference` errors.
+- [ ] Show special characters toggle only affects the active editor and preserves caret alignment.
+
+## Drag & Drop
+- [ ] Drag cancel + cleanup (Esc snaps back, indicators clear, no stuck states). Note: re-enter drop indicators should recover (currently failing).
+- [ ] Internal vs external drag indicators remain isolated (no external indicators during internal drag).
+- [ ] Drop sources (clipboard/empty/diagram/tasks/columns/templates) create items and clean up highlights.
+- [ ] Column drag drop zones appear before/between/after and accept drops.
+- [ ] Column move/insert updates #row/#stack tags correctly.
+- [ ] Column headers render via markdown-it (no raw markdown).
+- [ ] Diagram filename prompt is centered, wide enough, validates input.
+
+## File Search & Path Replacement
+- [ ] File search modal opens/closes cleanly and handles special characters safely.
+- [ ] Broken file menus update paths in all editors (inline markdown, inline WYSIWYG, overlay preview/markdown/WYSIWYG).
+- [ ] Burger menu Open + Alt+click open in VS Code first, fallback to system editor when needed.
+
+## File Import & Media Index
+- [ ] File import dialog shows consistent options and updates the hash DB after copy.
+- [ ] MediaIndex scan scopes work: `mediaFolders`, `contentFolders`, `allWorkspaces`.
+
+## WYSIWYG Core
+- [ ] Editor renders, saves back to markdown, and respects arrow/Enter/Tab behaviors.
+- [ ] Selection wrapping (* _ ~ [ ( {) works; dead-key tilde behaves correctly.
+- [ ] Marks are not sticky after applying (typing continues unstyled).
+- [ ] Display vs WYSIWYG spacing/line-height/paragraph margins match, including small-card-fonts.
+
+## WYSIWYG Nodes & Media
+- [ ] Images/videos/audio/PDF/diagram previews render with path menus and resolve relative/include paths.
+- [ ] Inline vs block media behaves correctly; typing before/after images keeps them rendered.
+- [ ] Diagram fences show preview + editable code block; debounce works; Edit toggles correctly.
+- [ ] Draw.io/Excalidraw previews render and update without stuck placeholders.
+- [ ] Multicolumn blocks render correctly with +/- overlays, image sizing matches display mode.
+- [ ] Tags/person/date/temporal chips convert on typing and stay stable after edits.
+- [ ] Include/wiki/link nodes render and can be edited in-place.
+
+## Overlay Editor
+- [ ] Entry opens without errors; mode toggles (Markdown/Dual/WYSIWYG) preserve exact draft.
+- [ ] Save/close behavior works via Save, Escape, Alt+Enter, backdrop click (no data loss).
+- [ ] Layout constraints: 80% size, 10px pane gap, tools bar full width.
+- [ ] Overlay WYSIWYG: file drops insert links; large images stay within 80% height; clicking below last line moves caret to end; text before/after start/end images works.
+- [ ] Overlay settings menu updates font scale and preferences persist; overlay enable + default mode stick across reloads.
+
+## Keybindings & Undo
+- [ ] VS Code keybindings/snippets work in inline/overlay/WYSIWYG (Meta+1, snippet name/content, capture phase).
+- [ ] Undo/redo works via commands and native stack; cursor restores after snippet insertions.
