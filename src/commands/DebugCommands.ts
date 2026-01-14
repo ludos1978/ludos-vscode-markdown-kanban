@@ -227,6 +227,8 @@ export class DebugCommands extends SwitchBasedCommand {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
             let frontendSnapshot: FrontendSnapshotInfo | null = null;
+            let normalizedRegistryMainHash: string | null = null;
+            let normalizedRegistryMainLength: number | null = null;
             if (frontendBoard && fileRegistry.getMainFile()) {
                 try {
                     const registryMain = fileRegistry.getMainFile();
@@ -234,12 +236,19 @@ export class DebugCommands extends SwitchBasedCommand {
                     const frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
                     const registryHash = this.computeHash(registryContent);
                     const frontendHash = this.computeHash(frontendContent);
+                    const normalizedRegistry = this.normalizeMainContent(registryContent, registryMain?.getPath());
+                    if (normalizedRegistry) {
+                        normalizedRegistryMainHash = this.computeHash(normalizedRegistry.content);
+                        normalizedRegistryMainLength = normalizedRegistry.content.length;
+                    }
+                    const compareHash = normalizedRegistryMainHash ?? registryHash;
+                    const compareLength = normalizedRegistryMainLength ?? registryContent.length;
                     frontendSnapshot = {
                         hash: frontendHash.substring(0, 8),
                         contentLength: frontendContent.length,
-                        matchesRegistry: registryHash === frontendHash,
-                        diffChars: Math.abs(frontendContent.length - registryContent.length),
-                        registryLength: registryContent.length
+                        matchesRegistry: compareHash === frontendHash,
+                        diffChars: Math.abs(frontendContent.length - compareLength),
+                        registryLength: compareLength
                     };
                 } catch (error) {
                     console.warn('[DebugCommands] Failed to generate frontend snapshot hash:', error);
@@ -279,6 +288,14 @@ export class DebugCommands extends SwitchBasedCommand {
                 const frontendHash = frontendContent ? this.computeHash(frontendContent) : null;
 
                 const canonicalSavedMatch = savedHash ? canonicalHash === savedHash : true;
+                let frontendRegistryMatch = frontendHash ? frontendHash === canonicalHash : null;
+                let frontendRegistryDiff = frontendContent ? Math.abs(frontendContent.length - canonicalContent.length) : null;
+                if (file.getFileType() === 'main' && normalizedRegistryMainHash && frontendHash) {
+                    frontendRegistryMatch = frontendHash === normalizedRegistryMainHash;
+                    if (frontendContent && normalizedRegistryMainLength !== null) {
+                        frontendRegistryDiff = Math.abs(frontendContent.length - normalizedRegistryMainLength);
+                    }
+                }
                 const allMatch = canonicalSavedMatch;
 
                 if (allMatch) {
@@ -300,8 +317,8 @@ export class DebugCommands extends SwitchBasedCommand {
                     savedHash: savedHash?.substring(0, 8) ?? null,
                     frontendHash: frontendHash ? frontendHash.substring(0, 8) : null,
                     frontendContentLength: frontendContent ? frontendContent.length : null,
-                    frontendRegistryMatch: frontendHash ? frontendHash === canonicalHash : null,
-                    frontendRegistryDiff: frontendContent ? Math.abs(frontendContent.length - canonicalContent.length) : null,
+                    frontendRegistryMatch: frontendRegistryMatch,
+                    frontendRegistryDiff: frontendRegistryDiff,
                     frontendAvailable: !!frontendContent
                 });
             }
@@ -475,6 +492,19 @@ export class DebugCommands extends SwitchBasedCommand {
             console.warn(`[DebugCommands] ${fileType} include has inconsistent frontend content: ${relativePath}`);
         }
         return contents[0];
+    }
+
+    private normalizeMainContent(content: string, mainFilePath?: string): { content: string } | null {
+        try {
+            const parsed = MarkdownKanbanParser.parseMarkdown(content, undefined, undefined, mainFilePath);
+            if (!parsed.board?.valid) {
+                return null;
+            }
+            return { content: MarkdownKanbanParser.generateMarkdown(parsed.board) };
+        } catch (error) {
+            console.warn('[DebugCommands] Failed to normalize registry content:', error);
+            return null;
+        }
     }
 
     private normalizePath(filePath: string): string {

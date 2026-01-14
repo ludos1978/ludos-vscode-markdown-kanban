@@ -21,6 +21,7 @@
 - [ ] Debug overlay shows the same current filename as the file info bar after long background time.
 - [ ] Debug overlay uses registry hashes as canonical baseline and compares to saved file only.
 - [ ] Debug overlay shows a frontend snapshot vs registry indicator (non-canonical) in Verify Sync results.
+- [ ] Main file frontend snapshot matches registry after initial load when only formatting/order differs.
 - [ ] Sync details section shows the frontend snapshot hash line after running Verify Sync.
 - [ ] Expanding sync details with no prior verification auto-runs Verify Sync.
 - [ ] File states summary shows the frontend snapshot hash after Verify Sync.
