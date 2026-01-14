@@ -524,6 +524,19 @@
         elements.previewWrap.innerHTML = rendered;
     }
 
+    function toggleMarkdownTaskCheckboxByIndex(text, targetIndex) {
+        let currentIndex = 0;
+        return text.replace(/(^|\n)([ \t]*[-*+]\s+\[)( |x|X)(\])(?=\s|$)/g, (match, lineStart, prefix, stateChar, close) => {
+            const isTarget = currentIndex === targetIndex;
+            currentIndex += 1;
+            if (!isTarget) {
+                return match;
+            }
+            const nextState = stateChar.toLowerCase() === 'x' ? ' ' : 'x';
+            return `${lineStart}${prefix}${nextState}${close}`;
+        });
+    }
+
     function normalizeDraft(value) {
         return typeof value === 'string' ? value : '';
     }
@@ -536,6 +549,29 @@
             button.classList.toggle('active', isActive);
             button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
+    }
+
+    function handlePreviewCheckboxClick(event) {
+        const target = event.target;
+        if (!target || !elements.previewWrap || state.mode !== 'dual') {
+            return;
+        }
+        const checkbox = target.closest?.('.md-task-checkbox');
+        if (!checkbox || !elements.previewWrap.contains(checkbox)) {
+            return;
+        }
+        const index = Number.parseInt(checkbox.getAttribute('data-checkbox-index') || '', 10);
+        if (!Number.isFinite(index)) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const draft = state.draft || '';
+        const nextDraft = toggleMarkdownTaskCheckboxByIndex(draft, index);
+        if (nextDraft !== draft) {
+            setState({ draft: nextDraft }, { renderPreview: true, immediatePreview: true });
+            syncDraftToActiveAdapter();
+        }
     }
 
     function updatePreview(options = {}) {
@@ -899,6 +935,10 @@
                 setMode('wysiwyg', { persist: true });
             }
         });
+
+        if (elements.previewWrap) {
+            elements.previewWrap.addEventListener('click', handlePreviewCheckboxClick);
+        }
 
         if (elements.titleInput) {
             elements.titleInput.addEventListener('input', () => {

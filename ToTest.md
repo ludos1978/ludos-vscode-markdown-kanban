@@ -46,6 +46,7 @@
 ## File Search & Path Replacement
 - [ ] File search modal opens/closes cleanly and handles special characters safely.
 - [ ] Broken file menus update paths in all editors (inline markdown, inline WYSIWYG, overlay preview/markdown/WYSIWYG).
+- [ ] Overlay dual preview: search-for-file replaces the markdown draft + preview.
 - [ ] Burger menu Open + Alt+click open in VS Code first, fallback to system editor when needed.
 - [ ] External file drops onto include-backed tasks (including with overlay open) copy into the include file’s media folder and link correctly.
 
@@ -77,6 +78,7 @@
 - [ ] Layout constraints: 80% size, 10px pane gap, tools bar full width.
 - [ ] Task title is editable in the overlay header and saves with the task.
 - [ ] Overlay WYSIWYG: file drops insert links; large images stay within 80% height; clicking below last line moves caret to end; text before/after start/end images works.
+- [ ] Overlay dual preview: task list checkboxes toggle and update the markdown draft.
 - [ ] Overlay settings menu updates font scale and preferences persist; overlay enable + default mode stick across reloads.
 
 ## Keybindings & Undo

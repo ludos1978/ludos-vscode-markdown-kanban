@@ -3977,6 +3977,7 @@ function buildPathReplacementCandidates(message) {
 
     addCandidate(message.actualPath);
     addCandidate(message.originalPath);
+    addCandidate(message.filePath);
 
     return Array.from(candidates).filter(Boolean);
 }
