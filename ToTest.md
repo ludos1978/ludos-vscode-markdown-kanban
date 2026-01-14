@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.11 after the build.
+- [ ] Confirm the extension version shows 0.99.12 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -23,6 +23,7 @@
 - [ ] Debug overlay shows a frontend snapshot vs registry indicator (non-canonical) in Verify Sync results.
 - [ ] Sync details section shows the frontend snapshot hash line after running Verify Sync.
 - [ ] Expanding sync details with no prior verification auto-runs Verify Sync.
+- [ ] File states summary shows the frontend snapshot hash after Verify Sync.
 - [ ] Task title/description clicks still enter edit mode.
 
 ## Menus & UI

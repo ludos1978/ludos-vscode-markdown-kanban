@@ -9,6 +9,41 @@ let trackedFilesData = {};
 let lastTrackedFilesDataHash = null;
 let refreshCount = 0;
 let debugOverlaySticky = false; // New: sticky/pin state
+let debugNoticeTimer = null;
+
+function showDebugOverlayNotice(message, type = 'info', timeoutMs = 3000) {
+    const existing = document.getElementById('debug-overlay-toast');
+    const toast = existing || document.createElement('div');
+    if (!existing) {
+        toast.id = 'debug-overlay-toast';
+        toast.style.position = 'fixed';
+        toast.style.top = '12px';
+        toast.style.right = '12px';
+        toast.style.zIndex = '100000';
+        toast.style.padding = '8px 12px';
+        toast.style.borderRadius = '6px';
+        toast.style.fontSize = '12px';
+        toast.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+        toast.style.pointerEvents = 'none';
+        document.body.appendChild(toast);
+    }
+    const colors = {
+        info: { bg: '#2f6feb', fg: '#fff' },
+        warn: { bg: '#d29922', fg: '#1b1f23' },
+        error: { bg: '#d1242f', fg: '#fff' }
+    };
+    const theme = colors[type] || colors.info;
+    toast.style.background = theme.bg;
+    toast.style.color = theme.fg;
+    toast.textContent = message;
+    toast.style.display = 'block';
+    if (debugNoticeTimer) {
+        clearTimeout(debugNoticeTimer);
+    }
+    debugNoticeTimer = setTimeout(() => {
+        toast.style.display = 'none';
+    }, timeoutMs);
+}
 
 // Hover behavior state
 let hoverShowTimer = null;
@@ -29,7 +64,7 @@ function showDebugOverlay() {
     // Check if vscode is available
     if (typeof window.vscode === 'undefined') {
         console.error('[DebugOverlay] vscode API not available, cannot request debug info');
-        alert('Debug overlay error: vscode API not available');
+        showDebugOverlayNotice('Debug overlay error: vscode API not available', 'error');
         return;
     }
 
@@ -722,7 +757,14 @@ function createFileStatesSummary(allFiles) {
     const externalChanges = allFiles.filter(f => f.hasExternalChanges).length;
     const bothChanges = allFiles.filter(f => f.hasInternalChanges && f.hasExternalChanges).length;
     const cleanFiles = allFiles.filter(f => !f.hasInternalChanges && !f.hasExternalChanges).length;
+    const frontendSnapshot = lastVerificationResults?.frontendSnapshot;
     const now = new Date().toLocaleTimeString();
+    let frontendValue = 'Not verified';
+    let frontendClass = 'status-unknown';
+    if (frontendSnapshot) {
+        frontendValue = `${frontendSnapshot.hash} (${frontendSnapshot.contentLength} chars)`;
+        frontendClass = frontendSnapshot.matchesRegistry ? 'status-good' : 'status-warn';
+    }
 
     return `
         <div class="file-states-stats">
@@ -746,6 +788,10 @@ function createFileStatesSummary(allFiles) {
                 <div class="stat-item">
                     <span class="stat-label">Both:</span>
                     <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Frontend Snapshot:</span>
+                    <span class="stat-value ${frontendClass}">${frontendValue}</span>
                 </div>
             </div>
             <div class="debug-timestamp">Updated: ${now}</div>
@@ -1196,7 +1242,7 @@ function forceWriteAllContent() {
     }
 
     if (!window.vscode) {
-        alert('Error: vscode API not available');
+        showDebugOverlayNotice('Error: vscode API not available', 'error');
         return;
     }
 
@@ -1272,7 +1318,7 @@ function confirmForceWrite() {
     window.vscode.postMessage({ type: 'forceWriteAllContent' });
 
     // Show progress indicator
-    alert('Force write in progress... Please wait.');
+    showDebugOverlayNotice('Force write in progress... Please wait.', 'info', 5000);
 }
 
 /**
@@ -1281,7 +1327,7 @@ function confirmForceWrite() {
 function verifyContentSync(silent = false) {
     if (!window.vscode) {
         if (!silent) {
-            alert('Error: vscode API not available');
+            showDebugOverlayNotice('Error: vscode API not available', 'error');
         }
         return;
     }
@@ -1296,7 +1342,7 @@ function verifyContentSync(silent = false) {
 
     // Show loading indicator only if not silent
     if (!silent) {
-        alert('Verifying content synchronization... Please wait.');
+        showDebugOverlayNotice('Verifying content synchronization... Please wait.', 'info', 5000);
     }
 }
 
@@ -1491,14 +1537,14 @@ function initializeDebugOverlay() {
                         `Files written: ${message.filesWritten}\n` +
                         `Backup created: ${message.backupCreated ? 'Yes' : 'No'}\n` +
                         `${message.backupPath ? `Backup: ${message.backupPath}` : ''}`;
-                    alert(resultMsg);
+                    showDebugOverlayNotice('Force write completed successfully.', 'info', 6000);
 
                     // Refresh overlay
                     refreshDebugOverlay();
                 } else {
                     const errorMsg = `Force write failed!\n\n` +
                         `Errors:\n${message.errors.join('\n')}`;
-                    alert(errorMsg);
+                    showDebugOverlayNotice('Force write failed. Check console for details.', 'error', 6000);
                 }
                 break;
 
