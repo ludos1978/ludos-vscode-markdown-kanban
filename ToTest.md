@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.6 after the build.
+- [ ] Confirm the extension version shows 0.99.7 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -18,6 +18,7 @@
 - [ ] If main file context is missing, show the file context error overlay and block saving until file is reselected.
 - [ ] Registry clear/unregister triggers the file context error overlay immediately.
 - [ ] Returning to VS Code after being in the background refreshes file info (no stale filename).
+- [ ] Debug overlay shows the same current filename as the file info bar after long background time.
 - [ ] Task title/description clicks still enter edit mode.
 
 ## Menus & UI

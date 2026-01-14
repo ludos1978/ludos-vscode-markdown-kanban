@@ -82,6 +82,10 @@ export interface PanelCommandAccess {
     setDebugMode?(enabled: boolean): void;
     getDebugMode?(): boolean;
 
+    // Main file context
+    getCanonicalMainFilePath?(): string | undefined;
+    refreshMainFileContext?(source?: 'load' | 'save' | 'other'): Promise<boolean>;
+
     // Services access - flexible types for private method access
     _fileService?: FileServiceAccess;
     _conflictResolver?: ConflictResolver;

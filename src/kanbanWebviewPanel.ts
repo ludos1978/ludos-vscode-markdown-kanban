@@ -226,6 +226,20 @@ export class KanbanWebviewPanel {
     public getPanelId(): string { return this._context.panelId; }
     public getPanel(): vscode.WebviewPanel { return this._panel; }
     public hasUnsavedChanges(): boolean { return this._fileRegistry.getMainFile()?.hasUnsavedChanges() || false; }
+    public getCanonicalMainFilePath(): string | undefined {
+        const uriString = this._context.lastDocumentUri || this._context.trackedDocumentUri;
+        if (uriString) {
+            try {
+                return vscode.Uri.parse(uriString).fsPath;
+            } catch {
+                // Fall through to registry lookup.
+            }
+        }
+        return this._fileRegistry.getMainFile()?.getPath();
+    }
+    public refreshMainFileContext(source: 'load' | 'save' | 'other' = 'other'): Promise<boolean> {
+        return this._ensureMainFileContext(source);
+    }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext, initialDebugMode: boolean) {
         this._panel = panel;
@@ -245,7 +259,7 @@ export class KanbanWebviewPanel {
         this._fileManager = new FileManager(
             this._panel.webview,
             extensionUri,
-            () => this._fileRegistry?.getMainFile()?.getPath()
+            () => this.getCanonicalMainFilePath()
         );
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();

@@ -360,10 +360,12 @@ export class DebugCommands extends SwitchBasedCommand {
 
     private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<TrackedFilesDebugInfo> {
         const document = context.fileManager.getDocument();
+        const panel = context.getWebviewPanel?.() as PanelCommandAccess | undefined;
+        await panel?.refreshMainFileContext?.('other');
         const fileRegistry = this.getFileRegistry();
         const mainFile = fileRegistry?.getMainFile();
 
-        const mainFilePath = mainFile?.getPath() || 'Unknown';
+        const mainFilePath = panel?.getCanonicalMainFilePath?.() || mainFile?.getPath() || 'Unknown';
 
         const mainFileInfo = {
             path: mainFilePath,
