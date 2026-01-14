@@ -348,6 +348,20 @@ export class KanbanWebviewPanel {
                 type: 'mediaFilesChanged', changedFiles: files.map(f => ({ path: f.path, absolutePath: f.absolutePath, type: f.type }))
             })
         });
+
+        this._disposables.push(this._fileRegistry.onDidChangeRegistry((event) => {
+            if (event.type === 'main-removed' || event.type === 'cleared') {
+                const lastUri = this._context.lastDocumentUri;
+                const fallbackPath = event.mainPath
+                    || this._fileManager.getDocument()?.uri.fsPath
+                    || (lastUri ? vscode.Uri.parse(lastUri).fsPath : undefined);
+                this._setFileContextMissing(true, 'main-file-missing', 'other', fallbackPath);
+                return;
+            }
+            if (event.type === 'main-registered') {
+                this._setFileContextMissing(false);
+            }
+        }));
     }
 
     private _setupDocumentCloseListener() {

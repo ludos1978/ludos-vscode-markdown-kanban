@@ -19,6 +19,12 @@ import { logger } from '../utils/logger';
  *
  * This registry is per-panel (not a singleton) to support multiple kanban panels.
  */
+export interface RegistryChangeEvent {
+    type: 'main-registered' | 'main-removed' | 'cleared';
+    mainPath?: string;
+    timestamp: Date;
+}
+
 export class MarkdownFileRegistry implements vscode.Disposable {
     // ============= FILE STORAGE =============
     private _files: Map<string, MarkdownFile> = new Map();        // Path -> File
@@ -30,6 +36,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     // ============= CHANGE EVENTS =============
     private _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
     public readonly onDidChange = this._onDidChange.event;
+    private _onDidChangeRegistry = new vscode.EventEmitter<RegistryChangeEvent>();
+    public readonly onDidChangeRegistry = this._onDidChangeRegistry.event;
 
     // ============= PANEL REFERENCE (for stopping edit mode during conflicts) =============
     private _messageHandler?: IMessageHandler; // MessageHandler reference for requestStopEditing()
@@ -42,6 +50,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
     constructor(panelContext: PanelContext) {
         this._disposables.push(this._onDidChange);
+        this._disposables.push(this._onDidChangeRegistry);
         this._fileSaveService = panelContext.fileSaveService;
     }
 
@@ -138,6 +147,14 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         });
 
         this._disposables.push(subscription);
+
+        if (file.getFileType() === 'main') {
+            this._onDidChangeRegistry.fire({
+                type: 'main-registered',
+                mainPath: file.getPath(),
+                timestamp: new Date()
+            });
+        }
     }
 
     /**
@@ -160,12 +177,21 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         // Dispose the file
         file.dispose();
+
+        if (file.getFileType() === 'main') {
+            this._onDidChangeRegistry.fire({
+                type: 'main-removed',
+                mainPath: file.getPath(),
+                timestamp: new Date()
+            });
+        }
     }
 
     /**
      * Clear all files from the registry
      */
     public clear(): void {
+        const mainFile = this.getMainFile();
 
         // Dispose all files
         for (const file of this._files.values()) {
@@ -175,6 +201,14 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         this._files.clear();
         this._filesByRelativePath.clear();
         this._registrationCache.clear();
+
+        if (mainFile) {
+            this._onDidChangeRegistry.fire({
+                type: 'cleared',
+                mainPath: mainFile.getPath(),
+                timestamp: new Date()
+            });
+        }
     }
 
     // ============= RETRIEVAL =============
