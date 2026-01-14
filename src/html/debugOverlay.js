@@ -1363,15 +1363,11 @@ function verifyContentSync(silent = false) {
     }
 
     const frontendSnapshot = window.currentBoard || window.cachedBoard;
-    const includeCache = typeof window.getIncludeCacheSnapshot === 'function'
-        ? window.getIncludeCacheSnapshot()
-        : null;
 
     // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
         type: 'verifyContentSync',
-        frontendBoard: frontendSnapshot,
-        includeCache: includeCache
+        frontendBoard: frontendSnapshot
     });
 
     // Show loading indicator only if not silent

@@ -14,10 +14,11 @@
  */
 
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
-import { getErrorMessage } from '../utils/stringUtils';
+import { getErrorMessage, safeDecodeURIComponent } from '../utils/stringUtils';
 import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
 import { MarkdownKanbanParser } from '../markdownParser';
 import { KanbanBoard } from '../board/KanbanTypes';
+import { IncludeFile } from '../files/IncludeFile';
 import * as fs from 'fs';
 import { SetDebugModeMessage } from '../core/bridge/MessageTypes';
 
@@ -131,7 +132,7 @@ export class DebugCommands extends SwitchBasedCommand {
 
     protected handlers: Record<string, MessageHandler> = {
         'forceWriteAllContent': (_msg, ctx) => this.handleForceWriteAllContent(ctx),
-        'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, (msg as any).includeCache, ctx),
+        'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, ctx),
         'getTrackedFilesDebugInfo': (_msg, ctx) => this.handleGetTrackedFilesDebugInfo(ctx),
         'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx),
         'setDebugMode': (msg, ctx) => this.handleSetDebugMode(msg as SetDebugModeMessage, ctx)
@@ -206,7 +207,6 @@ export class DebugCommands extends SwitchBasedCommand {
 
     private async handleVerifyContentSync(
         frontendBoard: unknown,
-        includeCache: Record<string, string> | undefined,
         _context: CommandContext
     ): Promise<CommandResult> {
         if (!this.getPanel()) {
@@ -227,8 +227,6 @@ export class DebugCommands extends SwitchBasedCommand {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
             let frontendSnapshot: FrontendSnapshotInfo | null = null;
-            const includeCacheNormalized = this.normalizeIncludeCache(includeCache);
-
             if (frontendBoard && fileRegistry.getMainFile()) {
                 try {
                     const registryMain = fileRegistry.getMainFile();
@@ -269,11 +267,10 @@ export class DebugCommands extends SwitchBasedCommand {
                     } catch (error) {
                         console.warn('[DebugCommands] Failed to generate frontend main markdown:', error);
                     }
-                } else if (file.getFileType() !== 'main' && includeCacheNormalized) {
-                    frontendContent = this.resolveIncludeFrontendContent(
-                        includeCacheNormalized,
-                        file.getPath(),
-                        file.getRelativePath()
+                } else if (file.getFileType() !== 'main' && frontendBoard) {
+                    frontendContent = this.resolveIncludeFrontendContentFromBoard(
+                        frontendBoard as KanbanBoard,
+                        file as IncludeFile
                     );
                 }
 
@@ -394,49 +391,90 @@ export class DebugCommands extends SwitchBasedCommand {
         return hash.toString(16);
     }
 
-    private normalizeIncludeCache(cache?: Record<string, string>): Map<string, string> | null {
-        if (!cache || Object.keys(cache).length === 0) {
+    private resolveIncludeFrontendContentFromBoard(
+        frontendBoard: KanbanBoard,
+        file: IncludeFile
+    ): string | null {
+        const fileType = file.getFileType();
+        if (fileType === 'include-regular') {
             return null;
         }
-        const normalized = new Map<string, string>();
-        for (const [key, value] of Object.entries(cache)) {
-            const normKey = this.normalizePath(key);
-            normalized.set(normKey, value);
-            normalized.set(key, value);
-        }
-        return normalized;
-    }
 
-    private resolveIncludeFrontendContent(
-        cache: Map<string, string>,
-        absolutePath: string,
-        relativePath: string
-    ): string | null {
-        const candidates = new Set<string>();
-        const normalizedAbsolute = this.normalizePath(absolutePath);
-        const normalizedRelative = this.normalizePath(relativePath);
-        if (absolutePath) candidates.add(absolutePath);
-        if (relativePath) candidates.add(relativePath);
-        if (normalizedAbsolute) candidates.add(normalizedAbsolute);
-        if (normalizedRelative) candidates.add(normalizedRelative);
-        const baseName = normalizedRelative.split('/').pop() || normalizedAbsolute.split('/').pop();
-        if (baseName) candidates.add(baseName);
+        const candidates = this.buildIncludePathCandidates(file.getRelativePath(), file.getPath());
 
-        for (const candidate of candidates) {
-            const cached = cache.get(candidate);
-            if (cached !== undefined) {
-                return cached;
+        if (fileType === 'include-column') {
+            const matches = frontendBoard.columns.filter(column =>
+                column.includeFiles?.some(includePath => this.matchesIncludePath(includePath, candidates))
+            );
+            if (matches.length === 0) {
+                return null;
             }
+            const contents = matches.map(column => file.generateFromTasks(column.tasks));
+            return this.ensureConsistentIncludeContent(contents, 'include-column', file.getRelativePath());
         }
 
-        if (baseName) {
-            for (const [key, value] of cache.entries()) {
-                if (key === baseName || key.endsWith(`/${baseName}`)) {
-                    return value;
+        if (fileType === 'include-task') {
+            const matches: string[] = [];
+            for (const column of frontendBoard.columns) {
+                for (const task of column.tasks) {
+                    if (task.includeFiles?.some(includePath => this.matchesIncludePath(includePath, candidates))) {
+                        matches.push(task.description || '');
+                    }
                 }
             }
+            if (matches.length === 0) {
+                return null;
+            }
+            return this.ensureConsistentIncludeContent(matches, 'include-task', file.getRelativePath());
         }
+
         return null;
+    }
+
+    private buildIncludePathCandidates(relativePath: string, absolutePath: string): Set<string> {
+        const candidates = new Set<string>();
+        const decodedRelative = safeDecodeURIComponent(relativePath || '');
+        const decodedAbsolute = safeDecodeURIComponent(absolutePath || '');
+        const normalizedRelative = this.normalizePath(decodedRelative);
+        const normalizedAbsolute = this.normalizePath(decodedAbsolute);
+
+        if (relativePath) candidates.add(relativePath);
+        if (absolutePath) candidates.add(absolutePath);
+        if (decodedRelative) candidates.add(decodedRelative);
+        if (decodedAbsolute) candidates.add(decodedAbsolute);
+        if (normalizedRelative) candidates.add(normalizedRelative);
+        if (normalizedAbsolute) candidates.add(normalizedAbsolute);
+
+        const baseName = normalizedRelative.split('/').pop() || normalizedAbsolute.split('/').pop();
+        if (baseName) {
+            candidates.add(baseName);
+        }
+
+        return candidates;
+    }
+
+    private matchesIncludePath(includePath: string, candidates: Set<string>): boolean {
+        const decoded = safeDecodeURIComponent(includePath || '');
+        const normalized = this.normalizePath(decoded);
+        if (candidates.has(includePath) || candidates.has(decoded) || candidates.has(normalized)) {
+            return true;
+        }
+        const baseName = normalized.split('/').pop();
+        if (baseName && candidates.has(baseName)) {
+            return true;
+        }
+        return false;
+    }
+
+    private ensureConsistentIncludeContent(contents: string[], fileType: string, relativePath: string): string {
+        if (contents.length === 0) {
+            return '';
+        }
+        const unique = new Set(contents);
+        if (unique.size > 1) {
+            console.warn(`[DebugCommands] ${fileType} include has inconsistent frontend content: ${relativePath}`);
+        }
+        return contents[0];
     }
 
     private normalizePath(filePath: string): string {
