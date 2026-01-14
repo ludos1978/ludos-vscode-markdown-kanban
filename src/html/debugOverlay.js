@@ -1276,7 +1276,8 @@ function verifyContentSync(silent = false) {
 
     // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
-        type: 'verifyContentSync'
+        type: 'verifyContentSync',
+        frontendBoard: window.currentBoard
     });
 
     // Show loading indicator only if not silent
@@ -1316,6 +1317,17 @@ function showVerificationResults(results) {
                         </div>
                     </div>
                     <div class="verification-details">
+                        ${results.frontendSnapshot ? `
+                        <div class="verification-summary" style="margin-bottom: 12px;">
+                            <div class="summary-stat ${results.frontendSnapshot.matchesRegistry ? 'status-good' : 'status-warn'}">
+                                <span class="stat-label">Frontend Snapshot (non-canonical) vs Registry:</span>
+                                <span class="stat-value">
+                                    ${results.frontendSnapshot.hash} (${results.frontendSnapshot.contentLength} chars)
+                                    ${results.frontendSnapshot.matchesRegistry ? '✅' : `⚠️ differs by ${results.frontendSnapshot.diffChars} chars`}
+                                </span>
+                            </div>
+                        </div>
+                        ` : ''}
                         <strong>File Details:</strong>
                         <div class="file-results-list">
                             ${results.fileResults.map(file => `

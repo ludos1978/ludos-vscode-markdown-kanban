@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.8 after the build.
+- [ ] Confirm the extension version shows 0.99.9 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -20,6 +20,7 @@
 - [ ] Returning to VS Code after being in the background refreshes file info (no stale filename).
 - [ ] Debug overlay shows the same current filename as the file info bar after long background time.
 - [ ] Debug overlay uses registry hashes as canonical baseline and compares to saved file only.
+- [ ] Debug overlay shows a frontend snapshot vs registry indicator (non-canonical) in Verify Sync results.
 - [ ] Task title/description clicks still enter edit mode.
 
 ## Menus & UI

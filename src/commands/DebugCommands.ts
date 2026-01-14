@@ -16,6 +16,8 @@
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
+import { MarkdownKanbanParser } from '../markdownParser';
+import { KanbanBoard } from '../board/KanbanTypes';
 import * as fs from 'fs';
 import { SetDebugModeMessage } from '../core/bridge/MessageTypes';
 
@@ -92,6 +94,14 @@ interface TrackedFilesDebugInfo {
         isUnsavedInEditor: boolean;
         baseline: string;
     };
+}
+
+interface FrontendSnapshotInfo {
+    hash: string;
+    contentLength: number;
+    matchesRegistry: boolean;
+    diffChars: number;
+    registryLength: number;
 }
 
 /**
@@ -189,7 +199,7 @@ export class DebugCommands extends SwitchBasedCommand {
         return this.success();
     }
 
-    private async handleVerifyContentSync(_frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
+    private async handleVerifyContentSync(frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
         if (!this.getPanel()) {
             return this.success();
         }
@@ -207,6 +217,26 @@ export class DebugCommands extends SwitchBasedCommand {
             const fileResults: FileVerificationResult[] = [];
             let matchingFiles = 0;
             let mismatchedFiles = 0;
+            let frontendSnapshot: FrontendSnapshotInfo | null = null;
+
+            if (frontendBoard && fileRegistry.getMainFile()) {
+                try {
+                    const registryMain = fileRegistry.getMainFile();
+                    const registryContent = registryMain?.getContent() ?? '';
+                    const frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
+                    const registryHash = this.computeHash(registryContent);
+                    const frontendHash = this.computeHash(frontendContent);
+                    frontendSnapshot = {
+                        hash: frontendHash.substring(0, 8),
+                        contentLength: frontendContent.length,
+                        matchesRegistry: registryHash === frontendHash,
+                        diffChars: Math.abs(frontendContent.length - registryContent.length),
+                        registryLength: registryContent.length
+                    };
+                } catch (error) {
+                    console.warn('[DebugCommands] Failed to generate frontend snapshot hash:', error);
+                }
+            }
 
             for (const file of allFiles) {
                 let canonicalContent: string;
@@ -255,6 +285,7 @@ export class DebugCommands extends SwitchBasedCommand {
                 mismatchedFiles: mismatchedFiles,
                 missingFiles: 0,
                 fileResults: fileResults,
+                frontendSnapshot: frontendSnapshot,
                 summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
             });
         } catch (error) {
