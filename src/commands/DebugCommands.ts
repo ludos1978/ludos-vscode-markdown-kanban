@@ -42,6 +42,8 @@ interface FileVerificationResult {
     frontendContentLength?: number | null;
     frontendRegistryMatch?: boolean | null;
     frontendRegistryDiff?: number | null;
+    frontendMatchesRaw?: boolean | null;
+    frontendMatchesNormalized?: boolean | null;
     frontendAvailable?: boolean;
 }
 
@@ -115,6 +117,7 @@ interface FrontendSnapshotInfo {
     registryNormalizedHash?: string;
     registryNormalizedLength?: number;
     registryIsNormalized?: boolean;
+    matchKind?: 'raw' | 'normalized' | 'none';
 }
 
 /**
@@ -254,6 +257,11 @@ export class DebugCommands extends SwitchBasedCommand {
                     }
                     const compareHash = normalizedRegistryMainHash ?? registryHash;
                     const compareLength = normalizedRegistryMainLength ?? registryContent.length;
+                    const matchesRaw = frontendHash === registryHash;
+                    const matchesNormalized = normalizedRegistryMainHash ? frontendHash === normalizedRegistryMainHash : false;
+                    const matchKind: 'raw' | 'normalized' | 'none' = matchesRaw
+                        ? 'raw'
+                        : (matchesNormalized ? 'normalized' : 'none');
                     frontendSnapshot = {
                         hash: frontendHash.substring(0, 8),
                         contentLength: frontendContent.length,
@@ -264,7 +272,8 @@ export class DebugCommands extends SwitchBasedCommand {
                         registryRawLength: registryRawMainLength ?? undefined,
                         registryNormalizedHash: normalizedRegistryMainHash?.substring(0, 8) ?? undefined,
                         registryNormalizedLength: normalizedRegistryMainLength ?? undefined,
-                        registryIsNormalized: normalizedRegistryMainHash !== null
+                        registryIsNormalized: normalizedRegistryMainHash !== null,
+                        matchKind: matchKind
                     };
                 } catch (error) {
                     console.warn('[DebugCommands] Failed to generate frontend snapshot hash:', error);
@@ -306,11 +315,14 @@ export class DebugCommands extends SwitchBasedCommand {
                 const canonicalSavedMatch = savedHash ? canonicalHash === savedHash : true;
                 let frontendRegistryMatch = frontendHash ? frontendHash === canonicalHash : null;
                 let frontendRegistryDiff = frontendContent ? Math.abs(frontendContent.length - canonicalContent.length) : null;
+                let frontendMatchesRaw = frontendHash ? frontendHash === canonicalHash : null;
+                let frontendMatchesNormalized: boolean | null = null;
                 if (file.getFileType() === 'main' && normalizedRegistryMainHash && frontendHash) {
                     frontendRegistryMatch = frontendHash === normalizedRegistryMainHash;
                     if (frontendContent && normalizedRegistryMainLength !== null) {
                         frontendRegistryDiff = Math.abs(frontendContent.length - normalizedRegistryMainLength);
                     }
+                    frontendMatchesNormalized = frontendHash === normalizedRegistryMainHash;
                 }
                 const allMatch = canonicalSavedMatch;
 
@@ -341,6 +353,8 @@ export class DebugCommands extends SwitchBasedCommand {
                     frontendContentLength: frontendContent ? frontendContent.length : null,
                     frontendRegistryMatch: frontendRegistryMatch,
                     frontendRegistryDiff: frontendRegistryDiff,
+                    frontendMatchesRaw: frontendMatchesRaw,
+                    frontendMatchesNormalized: frontendMatchesNormalized,
                     frontendAvailable: !!frontendContent
                 });
             }

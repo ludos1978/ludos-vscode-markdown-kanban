@@ -996,6 +996,7 @@ function createFileStatesList(allFiles) {
                         let frontendIcon = '⚪';
                         let frontendClass = 'sync-unknown';
                         let frontendDisplay = '⚪ Not verified';
+                        let frontendMatchLabel = '';
 
                         // Registry data (canonical)
                         let registryHash = 'N/A';
@@ -1015,14 +1016,20 @@ function createFileStatesList(allFiles) {
                             if (syncStatus.frontendHash && syncStatus.frontendContentLength !== null && syncStatus.frontendContentLength !== undefined) {
                                 frontendHash = syncStatus.frontendHash;
                                 frontendChars = syncStatus.frontendContentLength;
-                                if (syncStatus.frontendRegistryMatch === true) {
+                                if (syncStatus.frontendMatchesRaw === true) {
                                     frontendIcon = '✅';
                                     frontendClass = 'sync-good';
+                                    frontendMatchLabel = 'raw';
+                                } else if (syncStatus.frontendMatchesNormalized === true) {
+                                    frontendIcon = '⚠️';
+                                    frontendClass = 'sync-warn';
+                                    frontendMatchLabel = 'normalized';
                                 } else if (syncStatus.frontendRegistryMatch === false) {
                                     frontendIcon = '⚠️';
                                     frontendClass = 'sync-warn';
                                 }
-                                frontendDisplay = `${frontendIcon} ${frontendHash}<br><span class="char-count">${frontendChars} chars</span>`;
+                                const matchText = frontendMatchLabel ? `<br><span class="char-count">match: ${frontendMatchLabel}</span>` : '';
+                                frontendDisplay = `${frontendIcon} ${frontendHash}<br><span class="char-count">${frontendChars} chars</span>${matchText}`;
                             } else if (syncStatus.frontendAvailable === false) {
                                 frontendDisplay = '❓ Not available';
                             }
