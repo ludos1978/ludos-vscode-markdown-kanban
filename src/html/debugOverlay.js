@@ -762,7 +762,8 @@ function createFileStatesSummary(allFiles) {
     let frontendValue = 'Not verified';
     let frontendClass = 'status-unknown';
     if (frontendSnapshot) {
-        frontendValue = `${frontendSnapshot.hash} (${frontendSnapshot.contentLength} chars)`;
+        const registryLabel = frontendSnapshot.registryIsNormalized ? ' (normalized)' : '';
+        frontendValue = `${frontendSnapshot.hash} (${frontendSnapshot.contentLength} chars)${registryLabel}`;
         frontendClass = frontendSnapshot.matchesRegistry ? 'status-good' : 'status-warn';
     }
 
@@ -892,6 +893,7 @@ function createSyncDetailsSection() {
             <div class="sync-details-note">
                 <strong>Frontend snapshot (non-canonical):</strong>
                 ${lastVerificationResults.frontendSnapshot.hash} (${lastVerificationResults.frontendSnapshot.contentLength} chars)
+                ${lastVerificationResults.frontendSnapshot.registryIsNormalized ? '<span class="char-count">normalized registry</span>' : ''}
                 ${lastVerificationResults.frontendSnapshot.matchesRegistry
                     ? '✅ matches registry'
                     : `⚠️ differs by ${lastVerificationResults.frontendSnapshot.diffChars} chars`}
@@ -911,7 +913,9 @@ function createSyncDetailsSection() {
                         <div class="sync-file-stats">
                             <div class="sync-file-stat baseline-stat">
                                 <span class="sync-file-stat-label">📋 Registry (Baseline):</span>
-                                <span class="sync-file-stat-value">${file.canonicalHash} (${file.canonicalContentLength} chars)</span>
+                                <span class="sync-file-stat-value">
+                                    ${file.registryNormalizedHash ? `${file.registryNormalizedHash} (${file.registryNormalizedLength} chars)<br><span class="char-count">raw ${file.canonicalHash} (${file.canonicalContentLength} chars)</span>` : `${file.canonicalHash} (${file.canonicalContentLength} chars)`}
+                                </span>
                             </div>
                             ${file.savedHash ? `
                                 <div class="sync-file-stat">
@@ -997,6 +1001,7 @@ function createFileStatesList(allFiles) {
                         let registryHash = 'N/A';
                         let registryChars = '?';
                         let registryDisplay = '⚪ Not verified';
+                        let registryTitle = '';
 
                         // Saved file data and sync status
                         let savedHash = 'N/A';
@@ -1023,9 +1028,19 @@ function createFileStatesList(allFiles) {
                             }
 
                             // Registry data (always available from verification)
-                            registryHash = syncStatus.canonicalHash || 'N/A';
-                            registryChars = syncStatus.canonicalContentLength || 0;
-                            registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
+                            const registryNormalized = syncStatus.registryNormalizedHash
+                                && syncStatus.registryNormalizedLength !== null
+                                && syncStatus.registryNormalizedLength !== undefined;
+                            if (registryNormalized) {
+                                registryHash = syncStatus.registryNormalizedHash;
+                                registryChars = syncStatus.registryNormalizedLength;
+                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span><br><span class="char-count">raw ${syncStatus.canonicalHash} (${syncStatus.canonicalContentLength} chars)</span>`;
+                                registryTitle = `Normalized registry hash. Raw: ${syncStatus.canonicalHash}`;
+                            } else {
+                                registryHash = syncStatus.canonicalHash || 'N/A';
+                                registryChars = syncStatus.canonicalContentLength || 0;
+                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
+                            }
 
                             // Saved file data and sync
                             if (syncStatus.savedHash) {
@@ -1068,7 +1083,7 @@ function createFileStatesList(allFiles) {
                                     </div>
                                 </td>
                                 <td class="col-frontend">
-                                    <div class="hash-display">
+                                    <div class="hash-display" title="${registryTitle}">
                                         ${registryDisplay}
                                     </div>
                                 </td>

@@ -36,6 +36,8 @@ interface FileVerificationResult {
     canonicalSavedDiff: number | null;
     canonicalHash: string;
     savedHash: string | null;
+    registryNormalizedHash?: string | null;
+    registryNormalizedLength?: number | null;
     frontendHash?: string | null;
     frontendContentLength?: number | null;
     frontendRegistryMatch?: boolean | null;
@@ -108,6 +110,11 @@ interface FrontendSnapshotInfo {
     matchesRegistry: boolean;
     diffChars: number;
     registryLength: number;
+    registryRawHash?: string;
+    registryRawLength?: number;
+    registryNormalizedHash?: string;
+    registryNormalizedLength?: number;
+    registryIsNormalized?: boolean;
 }
 
 /**
@@ -229,6 +236,8 @@ export class DebugCommands extends SwitchBasedCommand {
             let frontendSnapshot: FrontendSnapshotInfo | null = null;
             let normalizedRegistryMainHash: string | null = null;
             let normalizedRegistryMainLength: number | null = null;
+            let registryRawMainHash: string | null = null;
+            let registryRawMainLength: number | null = null;
             if (frontendBoard && fileRegistry.getMainFile()) {
                 try {
                     const registryMain = fileRegistry.getMainFile();
@@ -236,6 +245,8 @@ export class DebugCommands extends SwitchBasedCommand {
                     const frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
                     const registryHash = this.computeHash(registryContent);
                     const frontendHash = this.computeHash(frontendContent);
+                    registryRawMainHash = registryHash;
+                    registryRawMainLength = registryContent.length;
                     const normalizedRegistry = this.normalizeMainContent(registryContent, registryMain?.getPath());
                     if (normalizedRegistry) {
                         normalizedRegistryMainHash = this.computeHash(normalizedRegistry.content);
@@ -248,7 +259,12 @@ export class DebugCommands extends SwitchBasedCommand {
                         contentLength: frontendContent.length,
                         matchesRegistry: compareHash === frontendHash,
                         diffChars: Math.abs(frontendContent.length - compareLength),
-                        registryLength: compareLength
+                        registryLength: compareLength,
+                        registryRawHash: registryRawMainHash?.substring(0, 8) ?? undefined,
+                        registryRawLength: registryRawMainLength ?? undefined,
+                        registryNormalizedHash: normalizedRegistryMainHash?.substring(0, 8) ?? undefined,
+                        registryNormalizedLength: normalizedRegistryMainLength ?? undefined,
+                        registryIsNormalized: normalizedRegistryMainHash !== null
                     };
                 } catch (error) {
                     console.warn('[DebugCommands] Failed to generate frontend snapshot hash:', error);
@@ -315,6 +331,12 @@ export class DebugCommands extends SwitchBasedCommand {
                     canonicalSavedDiff: savedFileContent ? Math.abs(canonicalContent.length - savedFileContent.length) : null,
                     canonicalHash: canonicalHash.substring(0, 8),
                     savedHash: savedHash?.substring(0, 8) ?? null,
+                    registryNormalizedHash: file.getFileType() === 'main' && normalizedRegistryMainHash
+                        ? normalizedRegistryMainHash.substring(0, 8)
+                        : null,
+                    registryNormalizedLength: file.getFileType() === 'main' && normalizedRegistryMainLength !== null
+                        ? normalizedRegistryMainLength
+                        : null,
                     frontendHash: frontendHash ? frontendHash.substring(0, 8) : null,
                     frontendContentLength: frontendContent ? frontendContent.length : null,
                     frontendRegistryMatch: frontendRegistryMatch,
