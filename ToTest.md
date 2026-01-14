@@ -15,6 +15,7 @@
 - [ ] With debug enabled, verify PERF-DEBUG logs show stack layout timings >50ms (scope, columns) to help pinpoint reflow sources.
 - [ ] Focus restore after re-render completes (no early focus steal).
 - [ ] Cmd+S issues a single save; empty board saves without repeated errors.
+- [ ] Task title/description clicks still enter edit mode.
 
 ## Menus & UI
 - [ ] Debug toggle works; task menu actions still execute.
@@ -37,7 +38,6 @@
 - [ ] Sticky column titles render above column content in stacked columns.
 - [ ] Column stack headers stay above lower column content with translateZ layering.
 - [ ] File search modal logs a warning instead of throwing if the overlay is missing.
-- [ ] Task description clicks open the editor; no checkbox toggle behavior.
 - [ ] Column drag drop zones appear before/between/after and accept drops.
 - [ ] Column move/insert updates #row/#stack tags correctly.
 - [ ] Column headers render via markdown-it (no raw markdown).
