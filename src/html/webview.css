@@ -6064,6 +6064,71 @@ figcaption {
   z-index: 10000;
 }
 
+.file-context-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: calc(var(--z-modal-overlay) + 2);
+}
+
+.file-context-overlay.visible {
+  display: flex;
+}
+
+.file-context-dialog {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  max-width: 520px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.file-context-title {
+  margin: 0;
+  font-size: 1.05em;
+}
+
+.file-context-message,
+.file-context-path {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.file-context-path {
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+.file-context-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.file-context-btn {
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.file-context-btn.primary {
+  background: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
 /* Task overlay editor (structure-only styles) */
 .task-overlay-editor {
   position: fixed;

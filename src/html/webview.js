@@ -11,6 +11,8 @@ window.cachedShortcuts = window.cachedShortcuts || {};
 let currentFileInfo = null;
 let currentBoard = null;
 window.currentBoard = currentBoard; // Expose to window for debug overlay verification
+let fileContextErrorState = null;
+window.fileContextErrorActive = false;
 // Note: lastClipboardCheck, clipboardCardData, CLIPBOARD_CHECK_THROTTLE are declared in clipboardHandler.js
 
 // Note: window.tagColors is set by backend in boardUpdate message
@@ -2618,6 +2620,15 @@ if (!webviewEventListenersInitialized) {
             }
             
             updateFileInfoBar();
+            if (currentFileInfo && currentFileInfo.filePath) {
+                hideFileContextErrorOverlay();
+            }
+            break;
+        case 'fileContextError':
+            showFileContextErrorOverlay(message);
+            break;
+        case 'fileContextRestored':
+            hideFileContextErrorOverlay();
             break;
         case 'resetClosePromptFlag':
             closePromptActive = false;
@@ -4879,6 +4890,69 @@ function updateFileInfoBar() {
     // Update undo/redo buttons when file info changes
     updateUndoRedoButtons();
 }
+
+function showFileContextErrorOverlay(message = {}) {
+    const reason = message.reason || fileContextErrorState?.reason || 'main-file-missing';
+    const source = message.source || fileContextErrorState?.source || 'other';
+    const filePath = message.filePath || fileContextErrorState?.filePath || '';
+
+    fileContextErrorState = { reason, source, filePath };
+    window.fileContextErrorActive = true;
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState('error');
+    }
+
+    let overlay = document.getElementById('file-context-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'file-context-overlay';
+        overlay.className = 'file-context-overlay';
+        overlay.innerHTML = `
+            <div class="file-context-dialog">
+                <h3 class="file-context-title">File Context Lost</h3>
+                <p class="file-context-message"></p>
+                <div class="file-context-path"></div>
+                <div class="file-context-actions">
+                    <button type="button" class="file-context-btn primary" id="file-context-select-btn">Select File</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const selectBtn = overlay.querySelector('#file-context-select-btn');
+        if (selectBtn) {
+            selectBtn.addEventListener('click', () => {
+                if (typeof selectFile === 'function') {
+                    selectFile();
+                }
+            });
+        }
+    }
+
+    const messageEl = overlay.querySelector('.file-context-message');
+    const pathEl = overlay.querySelector('.file-context-path');
+    if (messageEl) {
+        const sourceLabel = source === 'save' ? 'while saving' : (source === 'load' ? 'while loading' : 'during editing');
+        messageEl.textContent = `The main kanban file is not registered (${sourceLabel}). Saving is disabled until the file is reconnected.`;
+    }
+    if (pathEl) {
+        pathEl.textContent = filePath ? `File: ${filePath}` : 'File: Unknown';
+    }
+
+    overlay.classList.add('visible');
+}
+
+function hideFileContextErrorOverlay() {
+    const overlay = document.getElementById('file-context-overlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+    }
+    fileContextErrorState = null;
+    window.fileContextErrorActive = false;
+}
+
+window.showFileContextErrorOverlay = showFileContextErrorOverlay;
+window.hideFileContextErrorOverlay = hideFileContextErrorOverlay;
 
 function selectFile() {
     // Save current state before potentially switching files

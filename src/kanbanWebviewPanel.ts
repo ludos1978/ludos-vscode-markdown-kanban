@@ -81,6 +81,7 @@ export class KanbanWebviewPanel {
     private _fileRegistryChangeHandler: FileRegistryChangeHandler | null = null;
     private _unsavedChangesService: UnsavedChangesService | null = null;
     private _webviewUpdateService: WebviewUpdateService | null = null;
+    private _fileContextMissing: boolean = false;
 
     public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
@@ -470,6 +471,7 @@ export class KanbanWebviewPanel {
             logger.debug('[KanbanWebviewPanel.loadMarkdownFile] fileService.loadMarkdownFile completed');
             this._restoreStateFromFileService();
             await this._initializeBoardFromDocument(document);
+            await this._ensureMainFileContext('load');
             logger.debug('[KanbanWebviewPanel.loadMarkdownFile] DONE - board valid:', this.getBoard()?.valid);
         });
     }
@@ -480,6 +482,10 @@ export class KanbanWebviewPanel {
     }
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
+        const hasMainFile = await this._ensureMainFileContext('save');
+        if (!hasMainFile) {
+            return;
+        }
         await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
         this._restoreStateFromFileService();
     }
@@ -493,6 +499,59 @@ export class KanbanWebviewPanel {
         if (!this._boardInitHandler) return;
         const result = await this._boardInitHandler.initializeFromDocument(document, this._mediaTracker);
         this._mediaTracker = result.mediaTracker;
+    }
+
+    private async _ensureMainFileContext(source: 'load' | 'save' | 'other'): Promise<boolean> {
+        const existingMainFile = this._fileRegistry.getMainFile();
+        if (existingMainFile) {
+            this._setFileContextMissing(false);
+            return true;
+        }
+
+        const document = this._fileManager.getDocument();
+        if (document && this._boardInitHandler) {
+            try {
+                const result = await this._boardInitHandler.initializeFromDocument(document, this._mediaTracker);
+                this._mediaTracker = result.mediaTracker;
+            } catch (error) {
+                console.error('[KanbanWebviewPanel] Failed to reinitialize main file context:', error);
+            }
+        }
+
+        const recoveredMainFile = this._fileRegistry.getMainFile();
+        const reason = recoveredMainFile ? undefined : (document ? 'main-file-missing' : 'document-missing');
+        this._setFileContextMissing(!recoveredMainFile, reason, source, document?.uri.fsPath);
+        return !!recoveredMainFile;
+    }
+
+    private _setFileContextMissing(
+        isMissing: boolean,
+        reason?: string,
+        source: 'load' | 'save' | 'other' = 'other',
+        documentPath?: string
+    ): void {
+        if (this._fileContextMissing === isMissing) {
+            return;
+        }
+
+        this._fileContextMissing = isMissing;
+        if (!this._webviewBridge) {
+            return;
+        }
+
+        if (isMissing) {
+            const fallbackPath = documentPath || this._fileManager.getDocument()?.uri.fsPath || '';
+            this._webviewBridge.send({
+                type: 'fileContextError',
+                reason: reason || 'main-file-missing',
+                source,
+                filePath: fallbackPath
+            });
+        } else {
+            this._webviewBridge.send({
+                type: 'fileContextRestored'
+            });
+        }
     }
 
     public setEditingInProgress(isEditing: boolean): void { this._context.setEditingInProgress(isEditing); }

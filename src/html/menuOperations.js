@@ -2674,6 +2674,12 @@ function saveCachedBoard() {
     if (!window.cachedBoard) {
         return;
     }
+    if (window.fileContextErrorActive) {
+        if (typeof window.showFileContextErrorOverlay === 'function') {
+            window.showFileContextErrorOverlay();
+        }
+        return;
+    }
 
     // Log each column's includeMode status
     if (window.cachedBoard.columns) {

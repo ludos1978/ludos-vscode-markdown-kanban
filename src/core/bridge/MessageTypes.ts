@@ -152,6 +152,23 @@ export interface FileInfoMessage extends BaseMessage {
 }
 
 /**
+ * File context error - main file missing or document unavailable
+ */
+export interface FileContextErrorMessage extends BaseMessage {
+    type: 'fileContextError';
+    reason: string;
+    source: 'load' | 'save' | 'other';
+    filePath?: string;
+}
+
+/**
+ * File context restored notification
+ */
+export interface FileContextRestoredMessage extends BaseMessage {
+    type: 'fileContextRestored';
+}
+
+/**
  * Operation started notification
  */
 export interface OperationStartedMessage extends BaseMessage {
@@ -1878,6 +1895,8 @@ export type OutgoingMessage =
     | PathReplacedMessage
     | UndoRedoStatusMessage
     | FileInfoMessage
+    | FileContextErrorMessage
+    | FileContextRestoredMessage
     | OperationStartedMessage
     | OperationProgressMessage
     | OperationCompletedMessage
