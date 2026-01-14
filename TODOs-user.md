@@ -1,6 +1,12 @@
+- [ ] the pinned headers are not on top anymore! why is translateZ not working anymore to fixate column-title them above the column-content?
+
+where do these errors come from!?! """index.html?id=e4f173f8-016d-4a6e-9943-14652bba3660&parentId=37&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69 Uncaught TypeError: Cannot read properties of null (reading 'classList')
+    at index.html?id=e4f173f8-016d-4a6e-9943-14652bba3660&parentId=37&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69:122"""
+
+
 - why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?
 
-- [ ] we need a better style for the task item in markdown. it should allow being toggled outside the edit mode (and modify the data)!
+- [ ] we need a better style for the task item "- [ ]" and "- [x]" in markdown. it should allow being toggled outside the edit mode (and modify the data)!
 
 
 editor view:
