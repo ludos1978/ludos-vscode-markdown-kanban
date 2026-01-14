@@ -43,6 +43,13 @@ export const wysiwygSchemaSpec: WysiwygSchemaSpec = {
             attrs: { order: { default: 1 } }
         },
         list_item: { group: 'block', content: 'block+' },
+        task_checkbox: {
+            inline: true,
+            group: 'inline',
+            atom: true,
+            selectable: false,
+            attrs: { checked: { default: false } }
+        },
         code_block: {
             group: 'block',
             content: 'text*',

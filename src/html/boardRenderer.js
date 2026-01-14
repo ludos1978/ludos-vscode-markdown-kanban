@@ -2489,6 +2489,16 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
 }
 
 function handleDescriptionClick(event, element, taskId, columnId) {
+    const checkbox = event.target?.closest?.('.md-task-checkbox');
+    if (checkbox) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof window.toggleTaskDescriptionCheckbox === 'function') {
+            window.toggleTaskDescriptionCheckbox(checkbox, taskId, columnId);
+        }
+        return;
+    }
+
     // DEBUG: Log scroll position at the VERY START of click handling
     if (window.kanbanDebug?.enabled) {
         const container = document.getElementById('kanban-container');
@@ -2540,6 +2550,63 @@ function handleDescriptionClick(event, element, taskId, columnId) {
     } else {
         console.error('editDescription is not a function:', typeof window.editDescription);
     }
+}
+
+function toggleTaskDescriptionCheckbox(checkboxEl, taskId, columnId) {
+    if (!checkboxEl || !taskId || !columnId) {
+        return;
+    }
+
+    const checkboxIndex = Number.parseInt(checkboxEl.getAttribute('data-checkbox-index'), 10);
+    if (!Number.isFinite(checkboxIndex)) {
+        return;
+    }
+
+    const found = window.menuUtils?.findTaskInBoard
+        ? window.menuUtils.findTaskInBoard(taskId, columnId)
+        : null;
+    if (!found || !found.task) {
+        return;
+    }
+
+    const task = found.task;
+    const originalDescription = typeof task.description === 'string' ? task.description : '';
+    const updatedDescription = toggleMarkdownTaskCheckbox(originalDescription, checkboxIndex);
+    if (updatedDescription === originalDescription) {
+        return;
+    }
+
+    task.description = updatedDescription;
+
+    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    const displayElement = taskElement?.querySelector?.('.task-description-display');
+    if (displayElement) {
+        let renderedHtml = renderMarkdown(updatedDescription, task.includeContext);
+        if (typeof window.wrapTaskSections === 'function') {
+            renderedHtml = window.wrapTaskSections(renderedHtml);
+        }
+        displayElement.innerHTML = renderedHtml;
+    }
+
+    vscode.postMessage({
+        type: 'editTask',
+        taskId: taskId,
+        columnId: columnId,
+        taskData: task
+    });
+}
+
+function toggleMarkdownTaskCheckbox(text, targetIndex) {
+    let currentIndex = 0;
+    return text.replace(/(^|\n)([ \t]*[-*+]\s+\[)( |x|X)(\])(?=\s|$)/g, (match, lineStart, prefix, state, close) => {
+        const isTarget = currentIndex === targetIndex;
+        currentIndex += 1;
+        if (!isTarget) {
+            return match;
+        }
+        const nextState = state.toLowerCase() === 'x' ? ' ' : 'x';
+        return `${lineStart}${prefix}${nextState}${close}`;
+    });
 }
 
 // getTagConfig, generateTagStyles moved to utils/tagStyleManager.js
@@ -2794,6 +2861,7 @@ function injectStackableBars(targetElement = null) {
 window.handleColumnTitleClick = handleColumnTitleClick;
 window.handleTaskTitleClick = handleTaskTitleClick;
 window.handleDescriptionClick = handleDescriptionClick;
+window.toggleTaskDescriptionCheckbox = toggleTaskDescriptionCheckbox;
 
 window.getActiveTagsInTitle = getActiveTagsInTitle;
 window.generateTagMenuItems = generateTagMenuItems;

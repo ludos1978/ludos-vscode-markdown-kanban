@@ -59,6 +59,7 @@
 - [ ] Selection wrapping (* _ ~ [ ( {) works; dead-key tilde behaves correctly.
 - [ ] Marks are not sticky after applying (typing continues unstyled).
 - [ ] Display vs WYSIWYG spacing/line-height/paragraph margins match, including small-card-fonts.
+- [ ] Task list checkboxes render/toggle in WYSIWYG and save back to markdown (raw [ ] stays only in markdown mode).
 
 ## WYSIWYG Nodes & Media
 - [ ] Images/videos/audio/PDF/diagram previews render with path menus and resolve relative/include paths.

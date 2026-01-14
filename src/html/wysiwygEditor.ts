@@ -587,7 +587,7 @@ function normalizeMediaBlocks(state: EditorState) {
     const targets: Array<{ pos: number; size: number; nodes: ProseMirrorNode[] }> = [];
     const selectionFrom = state.selection.from;
     const selectionTo = state.selection.to;
-    state.doc.descendants((node, pos) => {
+    state.doc.descendants((node: ProseMirrorNode, pos: number) => {
         if (node.type.name !== 'paragraph') {
             return;
         }
@@ -695,6 +695,81 @@ function normalizeBlockBoundaries(state: EditorState): Transaction | null {
     return tr;
 }
 
+function normalizeTaskCheckboxes(state: EditorState): Transaction | null {
+    const checkboxNode = state.schema.nodes.task_checkbox;
+    const paragraph = state.schema.nodes.paragraph;
+    const listItem = state.schema.nodes.list_item;
+    if (!checkboxNode || !paragraph || !listItem) {
+        return null;
+    }
+
+    const targets: Array<{ from: number; to: number; nodes: ProseMirrorNode[] }> = [];
+
+    state.doc.descendants((node, pos) => {
+        if (node.type !== listItem) {
+            return;
+        }
+        let paragraphNode: ProseMirrorNode | null = null;
+        let paragraphPos = 0;
+        node.forEach((child: ProseMirrorNode, offset: number) => {
+            if (!paragraphNode && child.type === paragraph) {
+                paragraphNode = child;
+                paragraphPos = pos + 1 + offset;
+            }
+        });
+        if (!paragraphNode) {
+            return;
+        }
+        const paragraphValue = paragraphNode as ProseMirrorNode;
+
+        let firstInline: { node: ProseMirrorNode; pos: number } | null = null;
+        let inlineOffset = 0;
+        for (let i = 0; i < paragraphValue.childCount; i += 1) {
+            const child = paragraphValue.child(i);
+            if (child.type === checkboxNode) {
+                firstInline = { node: child, pos: paragraphPos + 1 + inlineOffset };
+                break;
+            }
+            if (child.isText && (child.text || '').trim() === '') {
+                inlineOffset += child.nodeSize;
+                continue;
+            }
+            firstInline = { node: child, pos: paragraphPos + 1 + inlineOffset };
+            break;
+        }
+
+        const inlineTarget: { node: ProseMirrorNode; pos: number } | null = firstInline;
+        if (!inlineTarget || inlineTarget.node.type === checkboxNode || !inlineTarget.node.isText) {
+            return;
+        }
+
+        const text = inlineTarget.node.text || '';
+        const match = text.match(/^\[( |x|X)\]\s+/);
+        if (!match) {
+            return;
+        }
+
+        const checked = match[1].toLowerCase() === 'x';
+        const rest = text.slice(match[0].length);
+        const replacement: ProseMirrorNode[] = [checkboxNode.create({ checked })];
+        if (rest) {
+            replacement.push(state.schema.text(rest, inlineTarget.node.marks));
+        }
+        targets.push({ from: inlineTarget.pos, to: inlineTarget.pos + inlineTarget.node.nodeSize, nodes: replacement });
+    });
+
+    if (targets.length === 0) {
+        return null;
+    }
+
+    let tr = state.tr;
+    for (let i = targets.length - 1; i >= 0; i -= 1) {
+        const target = targets[i];
+        tr = tr.replaceWith(target.from, target.to, target.nodes);
+    }
+    return tr;
+}
+
 function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
     let state = EditorState.create({ schema, doc });
     const mediaTr = normalizeMediaBlocks(state);
@@ -704,6 +779,10 @@ function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirror
     const boundaryTr = normalizeBlockBoundaries(state);
     if (boundaryTr) {
         state = state.apply(boundaryTr);
+    }
+    const checkboxTr = normalizeTaskCheckboxes(state);
+    if (checkboxTr) {
+        state = state.apply(checkboxTr);
     }
     return state.doc;
 }
@@ -732,6 +811,17 @@ function convertMediaBlockToInline(view: EditorView, nodePos: number, placeAfter
     tr = tr.setSelection(TextSelection.create(tr.doc, selectionPos));
     view.dispatch(tr);
     view.focus();
+    return true;
+}
+
+function toggleTaskCheckbox(view: EditorView, nodePos: number, node: ProseMirrorNode): boolean {
+    if (!node || node.type.name !== 'task_checkbox') {
+        return false;
+    }
+    const checked = Boolean(node.attrs?.checked);
+    const nextAttrs = { ...node.attrs, checked: !checked };
+    const tr = view.state.tr.setNodeMarkup(nodePos, undefined, nextAttrs);
+    view.dispatch(tr);
     return true;
 }
 
@@ -1546,6 +1636,11 @@ export class WysiwygEditor {
                 if (!target) {
                     return false;
                 }
+                if (node?.type?.name === 'task_checkbox') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return toggleTaskCheckbox(view, nodePos, node);
+                }
                 const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
                 if (imageMenuButton) {
                     const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
@@ -1639,6 +1734,7 @@ export class WysiwygEditor {
                 let newState = this.view.state.apply(transaction);
                 let normalized = null;
                 let boundaryNormalized = null;
+                let checkboxNormalized = null;
                 if (transaction.docChanged) {
                     normalized = normalizeMediaBlocks(newState);
                     if (normalized) {
@@ -1648,8 +1744,12 @@ export class WysiwygEditor {
                     if (boundaryNormalized) {
                         newState = newState.apply(boundaryNormalized);
                     }
+                    checkboxNormalized = normalizeTaskCheckboxes(newState);
+                    if (checkboxNormalized) {
+                        newState = newState.apply(checkboxNormalized);
+                    }
                 }
-                const docChanged = transaction.docChanged || Boolean(normalized) || Boolean(boundaryNormalized);
+                const docChanged = transaction.docChanged || Boolean(normalized) || Boolean(boundaryNormalized) || Boolean(checkboxNormalized);
                 this.view.updateState(newState);
                 const selectionChanged = transaction.selectionSet || transaction.storedMarksSet || transaction.docChanged;
 

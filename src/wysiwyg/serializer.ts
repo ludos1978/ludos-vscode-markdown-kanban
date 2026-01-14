@@ -13,6 +13,7 @@ const inlineNodeTypes = new Set([
     'person_tag',
     'temporal_tag',
     'media_inline',
+    'task_checkbox',
     'html_block',
     'footnote'
 ]);
@@ -134,6 +135,8 @@ function serializeInlineNode(node: WysiwygNode, config: Required<WysiwygSerializ
                 return `${config.temporalPrefix}${node.attrs?.value ?? ''}`;
             case 'media_inline':
                 return serializeMediaInline(node);
+            case 'task_checkbox':
+                return `[${node.attrs?.checked ? 'x' : ' '}] `;
             case 'html_block':
                 return serializeHtmlNode(node);
             case 'footnote':

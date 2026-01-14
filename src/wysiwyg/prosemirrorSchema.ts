@@ -28,6 +28,18 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
             return (node) => ['ol', node.attrs.order ? { start: node.attrs.order } : {}, 0];
         case 'list_item':
             return () => ['li', 0];
+        case 'task_checkbox':
+            return (node) => {
+                const checked = Boolean(node.attrs.checked);
+                const attrs = {
+                    class: `wysiwyg-task-checkbox${checked ? ' checked' : ''}`,
+                    'data-checked': checked ? 'true' : 'false',
+                    role: 'checkbox',
+                    'aria-checked': checked ? 'true' : 'false',
+                    contenteditable: 'false'
+                };
+                return ['span', attrs];
+            };
         case 'code_block':
             return () => ['pre', ['code', 0]];
         case 'horizontal_rule':
