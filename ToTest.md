@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.98.29 after the build.
+- [ ] Confirm the extension version shows 0.99.3 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -78,6 +78,7 @@
 - [ ] Save/close behavior works via Save, Escape, Alt+Enter, backdrop click (no data loss).
 - [ ] Layout constraints: 80% size, 10px pane gap, tools bar full width.
 - [ ] Task title is editable in the overlay header and saves with the task.
+- [ ] Overlay title input spans ~50% of the header width without crowding actions.
 - [ ] Overlay WYSIWYG: file drops insert links; large images stay within 80% height; clicking below last line moves caret to end; text before/after start/end images works.
 - [ ] Overlay dual preview: task list checkboxes toggle and update the markdown draft.
 - [ ] Overlay settings menu updates font scale and preferences persist; overlay enable + default mode stick across reloads.

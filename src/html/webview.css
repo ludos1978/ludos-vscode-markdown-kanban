@@ -6112,9 +6112,15 @@ figcaption {
   gap: 8px;
 }
 
+.task-overlay-header-left {
+  flex: 1;
+}
+
 .task-overlay-title-input {
   min-width: 160px;
-  max-width: 320px;
+  width: 50%;
+  max-width: none;
+  flex: 0 0 50%;
   padding: 4px 8px;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
