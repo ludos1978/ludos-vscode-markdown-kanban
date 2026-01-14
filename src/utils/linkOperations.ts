@@ -73,6 +73,9 @@ export class LinkOperations {
      */
     public static replaceSingleLink(text: string, originalPath: string, encodedNewPath: string, targetIndex: number = 0): string {
         if (!text) { return text; }
+        if (!originalPath || !originalPath.trim()) {
+            return this.replaceEmptyLink(text, encodedNewPath, targetIndex);
+        }
 
         // Escape special regex characters in the original path
         const escapedPath = escapeRegExp(originalPath);
@@ -137,6 +140,125 @@ export class LinkOperations {
 
         // No matches found
         return text;
+    }
+
+    /**
+     * Replace an empty-path link occurrence (e.g., ![]()) with the new path.
+     * This avoids zero-length regex replacements when originalPath is empty.
+     */
+    private static replaceEmptyLink(text: string, encodedNewPath: string, targetIndex: number = 0): string {
+        if (!text) { return text; }
+
+        const patterns: { regex: RegExp; type: LinkMatchType }[] = [
+            // Image: ![alt]()
+            { regex: /(!\[[^\]]*\]\(\s*\))/g, type: 'image' },
+            // Regular link: [text]() - but not images (negative lookbehind for !)
+            { regex: /(^|[^!])(\[[^\]]+\]\(\s*\))/gm, type: 'link' },
+            // Wiki link: [[ ]] or [[|alias]]
+            { regex: /(\[\[[^\]]*\]\])/g, type: 'wiki' },
+            // Auto link: < >
+            { regex: /(<\s*>)/g, type: 'auto' },
+            // Include: !!!include()!!!
+            { regex: /(!!!include\(\s*\)!!!)/g, type: 'include' }
+        ];
+
+        const allMatches: LinkMatchInfo[] = [];
+
+        for (const pattern of patterns) {
+            let match;
+            const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+            while ((match = regex.exec(text)) !== null) {
+                if (pattern.type === 'wiki') {
+                    const wikiLink = match[1];
+                    const inner = wikiLink.slice(2, -2);
+                    const pipeIndex = inner.indexOf('|');
+                    const pathPart = pipeIndex >= 0 ? inner.slice(0, pipeIndex) : inner;
+                    if (pathPart.trim().length > 0) {
+                        if (match.index === regex.lastIndex) {
+                            regex.lastIndex++;
+                        }
+                        continue;
+                    }
+                }
+                if (pattern.type === 'auto') {
+                    const autoLink = match[1];
+                    const inner = autoLink.slice(1, -1);
+                    if (inner.trim().length > 0) {
+                        if (match.index === regex.lastIndex) {
+                            regex.lastIndex++;
+                        }
+                        continue;
+                    }
+                }
+
+                allMatches.push({
+                    match: match,
+                    start: match.index,
+                    end: match.index + match[0].length,
+                    type: pattern.type,
+                    fullMatch: match[0]
+                });
+
+                if (match.index === regex.lastIndex) {
+                    regex.lastIndex++;
+                }
+            }
+        }
+
+        allMatches.sort((a, b) => a.start - b.start);
+
+        if (targetIndex >= 0 && targetIndex < allMatches.length) {
+            return this.replaceEmptyMatchAtPosition(text, allMatches[targetIndex], encodedNewPath);
+        } else if (allMatches.length > 0) {
+            return this.replaceEmptyMatchAtPosition(text, allMatches[0], encodedNewPath);
+        }
+
+        return text;
+    }
+
+    /**
+     * Replace a specific empty-path match at its exact position with the new path.
+     */
+    private static replaceEmptyMatchAtPosition(text: string, matchInfo: LinkMatchInfo, encodedNewPath: string): string {
+        const { match, type, start, end } = matchInfo;
+        let replacement = '';
+
+        switch (type) {
+            case 'image': {
+                const imageLink = match[1];
+                replacement = imageLink.replace(/\(\s*\)/, `(${encodedNewPath})`);
+                break;
+            }
+            case 'link': {
+                const before = match[1];
+                const regularLink = match[2];
+                const newLink = regularLink.replace(/\(\s*\)/, `(${encodedNewPath})`);
+                replacement = `${before}${newLink}`;
+                break;
+            }
+            case 'wiki': {
+                const wikiLink = match[1];
+                const inner = wikiLink.slice(2, -2);
+                const pipeIndex = inner.indexOf('|');
+                const alias = pipeIndex >= 0 ? inner.slice(pipeIndex + 1) : '';
+                replacement = alias.length > 0
+                    ? `[[${encodedNewPath}|${alias}]]`
+                    : `[[${encodedNewPath}]]`;
+                break;
+            }
+            case 'auto': {
+                replacement = `<${encodedNewPath}>`;
+                break;
+            }
+            case 'include': {
+                replacement = `!!!include(${encodedNewPath})!!!`;
+                break;
+            }
+            default:
+                return text;
+        }
+
+        return text.slice(0, start) + replacement + text.slice(end);
     }
 
     /**

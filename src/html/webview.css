@@ -1638,6 +1638,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: inherit;
 }
 
+.md-task-checkbox,
 .task-description-display .md-task-checkbox,
 .wysiwyg-task-checkbox {
   display: inline-flex;
@@ -1654,6 +1655,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   cursor: pointer;
 }
 
+.md-task-checkbox.checked,
 .task-description-display .md-task-checkbox.checked,
 .wysiwyg-task-checkbox.checked,
 .wysiwyg-task-checkbox[data-checked="true"] {
@@ -1661,6 +1663,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   border-color: var(--vscode-button-background);
 }
 
+.md-task-checkbox.checked::after,
 .task-description-display .md-task-checkbox.checked::after,
 .wysiwyg-task-checkbox.checked::after,
 .wysiwyg-task-checkbox[data-checked="true"]::after {
@@ -1669,6 +1672,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   line-height: 1;
 }
 
+.md-task-checkbox:hover,
 .task-description-display .md-task-checkbox:hover,
 .wysiwyg-task-checkbox:hover {
   border-color: var(--vscode-focusBorder);

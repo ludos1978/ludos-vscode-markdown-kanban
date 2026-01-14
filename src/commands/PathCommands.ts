@@ -712,44 +712,77 @@ export class PathCommands extends SwitchBasedCommand {
         let foundFile: MarkdownFile | null = null;
         let foundContent: string = '';
         let actualOldPath = oldPath; // The path variant that was actually found
+        let uniqueVariants: string[] = [];
+
+        const hasOldPath = typeof oldPath === 'string' && oldPath.trim().length > 0;
+
+        if (!hasOldPath) {
+            let targetFile: MarkdownFile | null = mainFile;
+
+            if (taskId && columnId && currentBoard) {
+                const column = currentBoard.columns.find(c => c.id === columnId);
+                const task = column?.tasks.find(t => t.id === taskId);
+                const includeFilePath = task?.includeContext?.includeFilePath;
+                if (includeFilePath) {
+                    const includeFile = fileRegistry.get(includeFilePath) ||
+                        fileRegistry.getByRelativePath(path.relative(path.dirname(mainFile.getPath()), includeFilePath));
+                    if (includeFile) {
+                        targetFile = includeFile;
+                    } else {
+                        logger.debug('[PathCommands] Include file not found for empty path replacement:', includeFilePath);
+                        return this.failure('Include file not found for empty path replacement');
+                    }
+                }
+            }
+
+            if (!targetFile) {
+                logger.debug('[PathCommands] No target file resolved for empty path replacement.');
+                return this.failure('No target file resolved for empty path replacement');
+            }
+
+            foundFile = targetFile;
+            foundContent = targetFile.getContent();
+        }
 
         // Build path variants to handle encoding mismatches between frontend and file content
-        const pathVariants: string[] = [oldPath];
+        if (hasOldPath) {
+            const pathVariants: string[] = [oldPath];
 
-        // Add encoded version (in case frontend sent decoded but file has encoded)
-        const encodedPath = encodeFilePath(oldPath);
-        if (encodedPath !== oldPath) {
-            pathVariants.push(encodedPath);
-        }
-
-        // Add decoded version (in case frontend sent encoded but file has decoded)
-        try {
-            const decodedPath = decodeURIComponent(oldPath);
-            if (decodedPath !== oldPath) {
-                pathVariants.push(decodedPath);
+            // Add encoded version (in case frontend sent decoded but file has encoded)
+            const encodedPath = encodeFilePath(oldPath);
+            if (encodedPath !== oldPath) {
+                pathVariants.push(encodedPath);
             }
-        } catch {
-            // Invalid percent-encoding in oldPath - ignore decode variant
-        }
 
-        // Remove duplicates
-        const uniqueVariants = [...new Set(pathVariants.filter(p => p))];
-
-        for (const pathVariant of uniqueVariants) {
-            const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(escapedPath, 'g');
-
-            for (const file of allFiles) {
-                const content = file.getContent();
-                if (regex.test(content)) {
-                    foundFile = file;
-                    foundContent = content;
-                    actualOldPath = pathVariant;
-                    break;
+            // Add decoded version (in case frontend sent encoded but file has decoded)
+            try {
+                const decodedPath = decodeURIComponent(oldPath);
+                if (decodedPath !== oldPath) {
+                    pathVariants.push(decodedPath);
                 }
-                regex.lastIndex = 0;
+            } catch {
+                // Invalid percent-encoding in oldPath - ignore decode variant
             }
-            if (foundFile) break;
+
+            // Remove duplicates
+            uniqueVariants = [...new Set(pathVariants.filter(p => p))];
+
+            for (const pathVariant of uniqueVariants) {
+                const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(escapedPath, 'g');
+
+                for (const file of allFiles) {
+                    const content = file.getContent();
+                    if (regex.test(content)) {
+                        foundFile = file;
+                        foundContent = content;
+                        actualOldPath = pathVariant;
+                        break;
+                    }
+                    regex.lastIndex = 0;
+                }
+                if (foundFile) break;
+            }
         }
 
         if (!foundFile) {

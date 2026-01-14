@@ -3954,6 +3954,8 @@ function encodePathSegments(pathValue) {
 
 function buildPathReplacementCandidates(message) {
     const candidates = new Set();
+    const originalPath = typeof message.actualPath === 'string' ? message.actualPath : message.originalPath;
+    const hasOriginalPath = typeof originalPath === 'string' && originalPath.trim().length > 0;
     const addCandidate = (value) => {
         if (!value || typeof value !== 'string') { return; }
         candidates.add(value);
@@ -3977,7 +3979,9 @@ function buildPathReplacementCandidates(message) {
 
     addCandidate(message.actualPath);
     addCandidate(message.originalPath);
-    addCandidate(message.filePath);
+    if (hasOriginalPath) {
+        addCandidate(message.filePath);
+    }
 
     return Array.from(candidates).filter(Boolean);
 }
@@ -3992,6 +3996,104 @@ function replacePathCandidates(text, candidates, newPath) {
         next = next.split(candidate).join(newPath);
     });
     return next;
+}
+
+function replaceEmptyPathInText(text, newPath, targetIndex = 0) {
+    if (typeof text !== 'string' || !text || !newPath) {
+        return text;
+    }
+
+    const patterns = [
+        { regex: /(!\[[^\]]*\]\(\s*\))/g, type: 'image' },
+        { regex: /(^|[^!])(\[[^\]]+\]\(\s*\))/gm, type: 'link' },
+        { regex: /(\[\[[^\]]*\]\])/g, type: 'wiki' },
+        { regex: /(<\s*>)/g, type: 'auto' },
+        { regex: /(!!!include\(\s*\)!!!)/g, type: 'include' }
+    ];
+
+    const matches = [];
+    patterns.forEach((pattern) => {
+        const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            if (pattern.type === 'wiki') {
+                const inner = match[1].slice(2, -2);
+                const pipeIndex = inner.indexOf('|');
+                const pathPart = pipeIndex >= 0 ? inner.slice(0, pipeIndex) : inner;
+                if (pathPart.trim().length > 0) {
+                    if (match.index === regex.lastIndex) {
+                        regex.lastIndex++;
+                    }
+                    continue;
+                }
+            }
+            if (pattern.type === 'auto') {
+                const inner = match[1].slice(1, -1);
+                if (inner.trim().length > 0) {
+                    if (match.index === regex.lastIndex) {
+                        regex.lastIndex++;
+                    }
+                    continue;
+                }
+            }
+
+            matches.push({
+                match,
+                start: match.index,
+                end: match.index + match[0].length,
+                type: pattern.type
+            });
+
+            if (match.index === regex.lastIndex) {
+                regex.lastIndex++;
+            }
+        }
+    });
+
+    matches.sort((a, b) => a.start - b.start);
+    if (matches.length === 0) {
+        return text;
+    }
+
+    const target = targetIndex >= 0 && targetIndex < matches.length ? matches[targetIndex] : matches[0];
+    let replacement = '';
+
+    switch (target.type) {
+        case 'image': {
+            const imageLink = target.match[1];
+            replacement = imageLink.replace(/\(\s*\)/, `(${newPath})`);
+            break;
+        }
+        case 'link': {
+            const before = target.match[1];
+            const regularLink = target.match[2];
+            const newLink = regularLink.replace(/\(\s*\)/, `(${newPath})`);
+            replacement = `${before}${newLink}`;
+            break;
+        }
+        case 'wiki': {
+            const wikiLink = target.match[1];
+            const inner = wikiLink.slice(2, -2);
+            const pipeIndex = inner.indexOf('|');
+            const alias = pipeIndex >= 0 ? inner.slice(pipeIndex + 1) : '';
+            replacement = alias.length > 0
+                ? `[[${newPath}|${alias}]]`
+                : `[[${newPath}]]`;
+            break;
+        }
+        case 'auto': {
+            replacement = `<${newPath}>`;
+            break;
+        }
+        case 'include': {
+            replacement = `!!!include(${newPath})!!!`;
+            break;
+        }
+        default:
+            return text;
+    }
+
+    return text.slice(0, target.start) + replacement + text.slice(target.end);
 }
 
 function applyPathReplacementToOverlay(message, candidates) {
@@ -4012,6 +4114,31 @@ function applyPathReplacementToOverlay(message, candidates) {
         return false;
     }
     const nextDraft = replacePathCandidates(draft, candidates, message.newPath);
+    if (nextDraft && nextDraft !== draft) {
+        overlayEditor.updateDraft(nextDraft);
+        return true;
+    }
+    return false;
+}
+
+function applyEmptyPathReplacementToOverlay(message, newPath) {
+    const overlayEditor = window.taskOverlayEditor;
+    if (!overlayEditor?.isVisible?.() || typeof overlayEditor.getDraft !== 'function' || typeof overlayEditor.updateDraft !== 'function') {
+        return false;
+    }
+    if (message.isColumnTitle) {
+        return false;
+    }
+    const overlayRef = overlayEditor.getTaskRef?.();
+    const hasContext = Boolean(message.taskId && message.columnId);
+    const matchesContext = hasContext
+        ? (overlayRef?.taskId === message.taskId && overlayRef?.columnId === message.columnId)
+        : true;
+    const draft = overlayEditor.getDraft() || '';
+    if (!matchesContext) {
+        return false;
+    }
+    const nextDraft = replaceEmptyPathInText(draft, newPath, 0);
     if (nextDraft && nextDraft !== draft) {
         overlayEditor.updateDraft(nextDraft);
         return true;
@@ -4052,6 +4179,39 @@ function applyPathReplacementToInlineEditor(message, candidates) {
     return true;
 }
 
+function applyEmptyPathReplacementToInlineEditor(message, newPath) {
+    const editor = window.taskEditor?.currentEditor;
+    if (!editor) { return false; }
+    const editorValue = editor.wysiwyg?.getMarkdown?.() ?? editor.element?.value ?? '';
+    const hasContext = Boolean(message.taskId && message.columnId);
+    const matchesTask = hasContext && editor.taskId === message.taskId && editor.columnId === message.columnId;
+    const matchesColumn = message.isColumnTitle && editor.type === 'column-title' && editor.columnId === message.columnId;
+    const matchesContext = matchesTask || matchesColumn;
+
+    if (!matchesContext) {
+        return false;
+    }
+
+    const nextValue = replaceEmptyPathInText(editorValue || '', newPath, 0);
+    if (!nextValue || nextValue === editorValue) {
+        return false;
+    }
+
+    if (editor.wysiwyg && typeof editor.wysiwyg.setMarkdown === 'function') {
+        editor.wysiwyg.setMarkdown(nextValue);
+    }
+    if (editor.element) {
+        editor.element.value = nextValue;
+        if (!editor.wysiwyg) {
+            editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+    if (Object.prototype.hasOwnProperty.call(editor, 'originalValue')) {
+        editor.originalValue = nextValue;
+    }
+    return true;
+}
+
 function applyPathReplacementToCachedBoard(candidates, newPath) {
     if (typeof updatePathInDOM !== 'function') { return; }
     candidates.forEach((candidate) => {
@@ -4061,6 +4221,18 @@ function applyPathReplacementToCachedBoard(candidates, newPath) {
 }
 
 function applyPathReplacementToEditors(message) {
+    if (!message?.newPath) {
+        return false;
+    }
+
+    const originalPath = typeof message.actualPath === 'string' ? message.actualPath : message.originalPath;
+    const hasOriginalPath = typeof originalPath === 'string' && originalPath.trim().length > 0;
+    if (!hasOriginalPath) {
+        const overlayUpdated = applyEmptyPathReplacementToOverlay(message, message.newPath);
+        const inlineUpdated = applyEmptyPathReplacementToInlineEditor(message, message.newPath);
+        return overlayUpdated || inlineUpdated;
+    }
+
     const candidates = buildPathReplacementCandidates(message);
     if (candidates.length === 0 || !message.newPath) {
         return false;
