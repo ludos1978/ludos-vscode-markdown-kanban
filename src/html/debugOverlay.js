@@ -839,6 +839,15 @@ function createSyncDetailsSection() {
             <div class="sync-details-note">
                 <strong>Registry is the baseline</strong> - comparing Registry → Saved File
             </div>
+            ${lastVerificationResults.frontendSnapshot ? `
+            <div class="sync-details-note">
+                <strong>Frontend snapshot (non-canonical):</strong>
+                ${lastVerificationResults.frontendSnapshot.hash} (${lastVerificationResults.frontendSnapshot.contentLength} chars)
+                ${lastVerificationResults.frontendSnapshot.matchesRegistry
+                    ? '✅ matches registry'
+                    : `⚠️ differs by ${lastVerificationResults.frontendSnapshot.diffChars} chars`}
+            </div>
+            ` : ''}
             <div class="sync-details-files">
                 ${lastVerificationResults.fileResults.map(file => {
                     const savedMatch = file.savedHash ? file.canonicalSavedMatch : null;
