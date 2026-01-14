@@ -29,6 +29,7 @@
 - [ ] Verify Sync shows frontend hashes for column/task includes without using the markdown-it include cache.
 - [ ] File states table shows normalized registry hash for the main file, with raw hash visible.
 - [ ] Main file frontend row shows whether it matches raw or normalized registry hash.
+- [ ] Main file saved-file row shows normalized hash with raw hash beneath when available.
 - [ ] Missing include rows in File States are highlighted with warning background.
 - [ ] Task title/description clicks still enter edit mode.
 

@@ -38,6 +38,8 @@ interface FileVerificationResult {
     savedHash: string | null;
     registryNormalizedHash?: string | null;
     registryNormalizedLength?: number | null;
+    savedNormalizedHash?: string | null;
+    savedNormalizedLength?: number | null;
     frontendHash?: string | null;
     frontendContentLength?: number | null;
     frontendRegistryMatch?: boolean | null;
@@ -284,6 +286,8 @@ export class DebugCommands extends SwitchBasedCommand {
                 let canonicalContent: string;
                 let savedFileContent: string | null = null;
                 let frontendContent: string | null = null;
+                let savedNormalizedHash: string | null = null;
+                let savedNormalizedLength: number | null = null;
 
                 try {
                     if (fs.existsSync(file.getPath())) {
@@ -324,6 +328,13 @@ export class DebugCommands extends SwitchBasedCommand {
                     }
                     frontendMatchesNormalized = frontendHash === normalizedRegistryMainHash;
                 }
+                if (file.getFileType() === 'main' && savedFileContent) {
+                    const normalizedSaved = this.normalizeMainContent(savedFileContent, file.getPath());
+                    if (normalizedSaved) {
+                        savedNormalizedHash = this.computeHash(normalizedSaved.content);
+                        savedNormalizedLength = normalizedSaved.content.length;
+                    }
+                }
                 const allMatch = canonicalSavedMatch;
 
                 if (allMatch) {
@@ -355,6 +366,8 @@ export class DebugCommands extends SwitchBasedCommand {
                     frontendRegistryDiff: frontendRegistryDiff,
                     frontendMatchesRaw: frontendMatchesRaw,
                     frontendMatchesNormalized: frontendMatchesNormalized,
+                    savedNormalizedHash: savedNormalizedHash ? savedNormalizedHash.substring(0, 8) : null,
+                    savedNormalizedLength: savedNormalizedLength,
                     frontendAvailable: !!frontendContent
                 });
             }

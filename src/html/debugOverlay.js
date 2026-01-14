@@ -921,7 +921,7 @@ function createSyncDetailsSection() {
                                 <div class="sync-file-stat">
                                     <span class="sync-file-stat-label">Saved File:</span>
                                     <span class="sync-file-stat-value ${savedMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
-                                        ${file.savedHash} (${file.savedContentLength} chars)
+                                        ${file.savedNormalizedHash ? `${file.savedNormalizedHash} (${file.savedNormalizedLength} chars)<br><span class="char-count">raw ${file.savedHash} (${file.savedContentLength} chars)</span>` : `${file.savedHash} (${file.savedContentLength} chars)`}
                                         ${savedMatch ? '✅ synced' : `⚠️ differs by ${file.canonicalSavedDiff} chars`}
                                     </span>
                                 </div>
@@ -1061,7 +1061,15 @@ function createFileStatesList(allFiles) {
                                     savedIcon = '⚠️';
                                     savedClass = 'sync-warn';
                                 }
-                                savedDisplay = `${savedIcon} ${savedHash}<br><span class="char-count">${savedChars} chars</span>`;
+
+                                const savedNormalized = syncStatus.savedNormalizedHash
+                                    && syncStatus.savedNormalizedLength !== null
+                                    && syncStatus.savedNormalizedLength !== undefined;
+                                if (savedNormalized) {
+                                    savedDisplay = `${savedIcon} ${syncStatus.savedNormalizedHash}<br><span class="char-count">${syncStatus.savedNormalizedLength} chars</span><br><span class="char-count">raw ${savedHash} (${savedChars} chars)</span>`;
+                                } else {
+                                    savedDisplay = `${savedIcon} ${savedHash}<br><span class="char-count">${savedChars} chars</span>`;
+                                }
                             } else {
                                 savedDisplay = '❓ Not available';
                             }
