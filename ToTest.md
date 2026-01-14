@@ -30,6 +30,7 @@
 - [ ] File states table shows normalized registry hash for the main file, with raw hash visible.
 - [ ] Main file frontend row shows whether it matches raw or normalized registry hash.
 - [ ] Main file saved-file row shows normalized hash with raw hash beneath when available.
+- [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Missing include rows in File States are highlighted with warning background.
 - [ ] Task title/description clicks still enter edit mode.
 

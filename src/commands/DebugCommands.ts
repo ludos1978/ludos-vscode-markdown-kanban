@@ -288,6 +288,8 @@ export class DebugCommands extends SwitchBasedCommand {
                 let frontendContent: string | null = null;
                 let savedNormalizedHash: string | null = null;
                 let savedNormalizedLength: number | null = null;
+                let normalizedRegistryContent: string | null = null;
+                let normalizedSavedContent: string | null = null;
 
                 try {
                     if (fs.existsSync(file.getPath())) {
@@ -312,6 +314,11 @@ export class DebugCommands extends SwitchBasedCommand {
                     );
                 }
 
+                if (file.getFileType() === 'main') {
+                    const normalizedRegistry = this.normalizeMainContent(canonicalContent, file.getPath());
+                    normalizedRegistryContent = normalizedRegistry?.content ?? null;
+                }
+
                 const canonicalHash = this.computeHash(canonicalContent);
                 const savedHash = savedFileContent !== null ? this.computeHash(savedFileContent) : null;
                 const frontendHash = frontendContent ? this.computeHash(frontendContent) : null;
@@ -333,6 +340,7 @@ export class DebugCommands extends SwitchBasedCommand {
                     if (normalizedSaved) {
                         savedNormalizedHash = this.computeHash(normalizedSaved.content);
                         savedNormalizedLength = normalizedSaved.content.length;
+                        normalizedSavedContent = normalizedSaved.content;
                     }
                 }
                 const allMatch = canonicalSavedMatch;
@@ -370,6 +378,18 @@ export class DebugCommands extends SwitchBasedCommand {
                     savedNormalizedLength: savedNormalizedLength,
                     frontendAvailable: !!frontendContent
                 });
+
+                if (file.getFileType() === 'main' && frontendContent) {
+                    const panelDebug = panel?.getDebugMode?.() ?? false;
+                    if (panelDebug) {
+                        this.logContentDiff('[DebugCommands] main.raw vs normalized', canonicalContent, normalizedRegistryContent);
+                        if (savedFileContent) {
+                            this.logContentDiff('[DebugCommands] main.saved raw vs normalized', savedFileContent, normalizedSavedContent);
+                        }
+                        this.logContentDiff('[DebugCommands] main.frontend vs normalized', frontendContent, normalizedRegistryContent);
+                        this.logContentDiff('[DebugCommands] main.frontend vs saved raw', frontendContent, savedFileContent);
+                    }
+                }
             }
 
             this.postMessage({
@@ -553,7 +573,46 @@ export class DebugCommands extends SwitchBasedCommand {
         } catch (error) {
             console.warn('[DebugCommands] Failed to normalize registry content:', error);
             return null;
+       }
+    }
+
+    private logContentDiff(label: string, left: string | null, right: string | null): void {
+        if (left === null || right === null) {
+            return;
         }
+        if (left === right) {
+            return;
+        }
+        const diff = this.getFirstDiffSnippet(left, right);
+        if (!diff) {
+            return;
+        }
+        console.log(label, {
+            leftLength: left.length,
+            rightLength: right.length,
+            diffIndex: diff.index,
+            leftSnippet: diff.leftSnippet,
+            rightSnippet: diff.rightSnippet
+        });
+    }
+
+    private getFirstDiffSnippet(left: string, right: string, context = 40): { index: number; leftSnippet: string; rightSnippet: string } | null {
+        const minLen = Math.min(left.length, right.length);
+        let index = 0;
+        while (index < minLen && left.charCodeAt(index) === right.charCodeAt(index)) {
+            index++;
+        }
+        if (index === minLen && left.length === right.length) {
+            return null;
+        }
+        const start = Math.max(0, index - context);
+        const leftEnd = Math.min(left.length, index + context);
+        const rightEnd = Math.min(right.length, index + context);
+        return {
+            index,
+            leftSnippet: JSON.stringify(left.slice(start, leftEnd)),
+            rightSnippet: JSON.stringify(right.slice(start, rightEnd))
+        };
     }
 
     private normalizePath(filePath: string): string {
