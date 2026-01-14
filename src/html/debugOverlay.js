@@ -837,13 +837,12 @@ function createSyncDetailsSection() {
                 </div>
             </div>
             <div class="sync-details-note">
-                <strong>Frontend is the baseline</strong> - comparing Frontend → Backend and Frontend → Saved File
+                <strong>Registry is the baseline</strong> - comparing Registry → Saved File
             </div>
             <div class="sync-details-files">
                 ${lastVerificationResults.fileResults.map(file => {
-                    const backendMatch = file.frontendBackendMatch;
-                    const savedMatch = file.savedHash ? file.frontendSavedMatch : null;
-                    const allMatch = backendMatch && (savedMatch === null || savedMatch);
+                    const savedMatch = file.savedHash ? file.canonicalSavedMatch : null;
+                    const allMatch = savedMatch === null ? true : savedMatch;
 
                     return `
                     <div class="sync-file-detail ${allMatch ? 'sync-match' : 'sync-mismatch'}">
@@ -853,22 +852,15 @@ function createSyncDetailsSection() {
                         </div>
                         <div class="sync-file-stats">
                             <div class="sync-file-stat baseline-stat">
-                                <span class="sync-file-stat-label">📋 Frontend (Baseline):</span>
-                                <span class="sync-file-stat-value">${file.frontendHash} (${file.frontendContentLength} chars)</span>
-                            </div>
-                            <div class="sync-file-stat">
-                                <span class="sync-file-stat-label">Backend:</span>
-                                <span class="sync-file-stat-value ${backendMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
-                                    ${file.backendHash} (${file.backendContentLength} chars)
-                                    ${backendMatch ? '✅ synced' : `⚠️ differs by ${file.frontendBackendDiff} chars`}
-                                </span>
+                                <span class="sync-file-stat-label">📋 Registry (Baseline):</span>
+                                <span class="sync-file-stat-value">${file.canonicalHash} (${file.canonicalContentLength} chars)</span>
                             </div>
                             ${file.savedHash ? `
                                 <div class="sync-file-stat">
                                     <span class="sync-file-stat-label">Saved File:</span>
                                     <span class="sync-file-stat-value ${savedMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
                                         ${file.savedHash} (${file.savedContentLength} chars)
-                                        ${savedMatch ? '✅ synced' : `⚠️ differs by ${file.frontendSavedDiff} chars`}
+                                        ${savedMatch ? '✅ synced' : `⚠️ differs by ${file.canonicalSavedDiff} chars`}
                                     </span>
                                 </div>
                             ` : '<div class="sync-file-stat"><span class="sync-file-stat-label">Saved File:</span><span class="sync-file-stat-value sync-unknown-indicator">Not available</span></div>'}
@@ -921,8 +913,7 @@ function createFileStatesList(allFiles) {
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
-                        <th class="col-frontend" title="Frontend board state">Frontend</th>
-                        <th class="col-backend" title="Backend cache state">Backend</th>
+                        <th class="col-frontend" title="Registry content">Registry</th>
                         <th class="col-saved" title="Saved file on disk">Saved File</th>
                         <th class="col-actions">Save/Load</th>
                         <th class="col-image">Image</th>
@@ -935,17 +926,10 @@ function createFileStatesList(allFiles) {
                         // Get sync status from verification results
                         const syncStatus = getFileSyncStatus(file.path);
 
-                        // Frontend data
-                        let frontendHash = 'N/A';
-                        let frontendChars = '?';
-                        let frontendDisplay = '⚪ Not verified';
-
-                        // Backend data and sync status
-                        let backendHash = 'N/A';
-                        let backendChars = '?';
-                        let backendIcon = '⚪';
-                        let backendClass = 'sync-unknown';
-                        let backendDisplay = '⚪ Not verified';
+                        // Registry data (canonical)
+                        let registryHash = 'N/A';
+                        let registryChars = '?';
+                        let registryDisplay = '⚪ Not verified';
 
                         // Saved file data and sync status
                         let savedHash = 'N/A';
@@ -955,30 +939,17 @@ function createFileStatesList(allFiles) {
                         let savedDisplay = '⚪ Not verified';
 
                         if (syncStatus) {
-                            // Frontend data (always available from verification)
-                            frontendHash = syncStatus.frontendHash || 'N/A';
-                            frontendChars = syncStatus.frontendContentLength || 0;
-                            frontendDisplay = `${frontendHash}<br><span class="char-count">${frontendChars} chars</span>`;
-
-                            // Backend data and sync
-                            backendHash = syncStatus.backendHash || 'N/A';
-                            backendChars = syncStatus.backendContentLength || 0;
-
-                            if (syncStatus.frontendBackendMatch) {
-                                backendIcon = '✅';
-                                backendClass = 'sync-good';
-                            } else {
-                                backendIcon = '⚠️';
-                                backendClass = 'sync-warn';
-                            }
-                            backendDisplay = `${backendIcon} ${backendHash}<br><span class="char-count">${backendChars} chars</span>`;
+                            // Registry data (always available from verification)
+                            registryHash = syncStatus.canonicalHash || 'N/A';
+                            registryChars = syncStatus.canonicalContentLength || 0;
+                            registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
 
                             // Saved file data and sync
                             if (syncStatus.savedHash) {
                                 savedHash = syncStatus.savedHash;
                                 savedChars = syncStatus.savedContentLength || 0;
 
-                                if (syncStatus.frontendSavedMatch) {
+                                if (syncStatus.canonicalSavedMatch) {
                                     savedIcon = '✅';
                                     savedClass = 'sync-good';
                                 } else {
@@ -1010,12 +981,7 @@ function createFileStatesList(allFiles) {
                                 </td>
                                 <td class="col-frontend">
                                     <div class="hash-display">
-                                        ${frontendDisplay}
-                                    </div>
-                                </td>
-                                <td class="col-backend">
-                                    <div class="hash-display ${backendClass}">
-                                        ${backendDisplay}
+                                        ${registryDisplay}
                                     </div>
                                 </td>
                                 <td class="col-saved">
@@ -1048,11 +1014,11 @@ function createFileStatesList(allFiles) {
                     <div class="legend-items">
                         <div class="legend-item">
                             <span class="legend-icon">✅</span>
-                            <span class="legend-text">Matches Frontend</span>
+                            <span class="legend-text">Matches Registry</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-icon">⚠️</span>
-                            <span class="legend-text">Differs from Frontend</span>
+                            <span class="legend-text">Differs from Registry</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-icon">⚪</span>
@@ -1244,7 +1210,7 @@ function showForceWriteConfirmation() {
                     <p>Use this ONLY when:</p>
                     <ul>
                         <li>Normal save is not working</li>
-                        <li>You suspect frontend/backend are out of sync</li>
+                        <li>You suspect registry/saved content are out of sync</li>
                         <li>You need emergency recovery</li>
                     </ul>
                     <p><strong>A backup will be created before writing.</strong></p>
@@ -1298,7 +1264,7 @@ function confirmForceWrite() {
 }
 
 /**
- * Verify content synchronization between frontend and backend
+ * Verify content synchronization between registry and saved file
  */
 function verifyContentSync(silent = false) {
     if (!window.vscode) {
@@ -1308,10 +1274,9 @@ function verifyContentSync(silent = false) {
         return;
     }
 
-    // Send verification request to backend WITH actual frontend board data
+    // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
-        type: 'verifyContentSync',
-        frontendBoard: window.currentBoard  // Send the actual frontend board state
+        type: 'verifyContentSync'
     });
 
     // Show loading indicator only if not silent
@@ -1362,11 +1327,9 @@ function showVerificationResults(results) {
                                             `⚠️ Differences detected`}
                                     </div>
                                     <div class="file-result-hashes">
-                                        <div>Frontend: ${file.frontendHash} (${file.frontendContentLength} chars)</div>
-                                        <div>Backend: ${file.backendHash} (${file.backendContentLength} chars)
-                                            ${file.frontendBackendMatch ? '✅' : '⚠️ differs by ' + file.frontendBackendDiff}</div>
+                                        <div>Registry: ${file.canonicalHash} (${file.canonicalContentLength} chars)</div>
                                         ${file.savedHash ? `<div>Saved: ${file.savedHash} (${file.savedContentLength} chars)
-                                            ${file.backendSavedMatch ? '✅' : '⚠️ differs by ' + file.backendSavedDiff}</div>` : ''}
+                                            ${file.canonicalSavedMatch ? '✅' : '⚠️ differs by ' + file.canonicalSavedDiff}</div>` : ''}
                                     </div>
                                 </div>
                             `).join('')}
@@ -1525,5 +1488,3 @@ function initializeDebugOverlay() {
         }
     });
 }
-
-

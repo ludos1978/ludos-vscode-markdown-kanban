@@ -1424,7 +1424,7 @@ export interface ForceWriteAllContentMessage extends BaseMessage {
  */
 export interface VerifyContentSyncMessage extends BaseMessage {
     type: 'verifyContentSync';
-    frontendBoard: unknown;
+    frontendBoard?: unknown;
 }
 
 /**

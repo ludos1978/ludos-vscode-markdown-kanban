@@ -3,7 +3,7 @@
  *
  * Handles debug and diagnostic operations for the kanban board:
  * - forceWriteAllContent: Emergency force write of all files
- * - verifyContentSync: Verify content synchronization between frontend/backend
+ * - verifyContentSync: Verify content synchronization between registry and saved file
  * - getTrackedFilesDebugInfo: Get debug info about tracked files
  * - clearTrackedFilesCache: Clear tracked file caches
  *
@@ -16,8 +16,6 @@
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
-import { MarkdownKanbanParser } from '../markdownParser';
-import { KanbanBoard } from '../board/KanbanTypes';
 import * as fs from 'fs';
 import { SetDebugModeMessage } from '../core/bridge/MessageTypes';
 
@@ -29,17 +27,11 @@ interface FileVerificationResult {
     relativePath: string;
     isMainFile: boolean;
     matches: boolean;
-    frontendBackendMatch: boolean;
-    backendSavedMatch: boolean;
-    frontendSavedMatch: boolean;
-    frontendContentLength: number;
-    backendContentLength: number;
+    canonicalSavedMatch: boolean;
+    canonicalContentLength: number;
     savedContentLength: number | null;
-    frontendBackendDiff: number;
-    backendSavedDiff: number | null;
-    frontendSavedDiff: number | null;
-    frontendHash: string;
-    backendHash: string;
+    canonicalSavedDiff: number | null;
+    canonicalHash: string;
     savedHash: string | null;
 }
 
@@ -197,15 +189,14 @@ export class DebugCommands extends SwitchBasedCommand {
         return this.success();
     }
 
-    private async handleVerifyContentSync(frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
+    private async handleVerifyContentSync(_frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
         if (!this.getPanel()) {
             return this.success();
         }
 
         try {
-            if (!frontendBoard) {
-                throw new Error('Frontend board data not provided');
-            }
+            const panel = this.getPanel() as PanelCommandAccess | undefined;
+            await panel?.refreshMainFileContext?.('other');
 
             const fileRegistry = this.getFileRegistry();
             if (!fileRegistry) {
@@ -217,11 +208,8 @@ export class DebugCommands extends SwitchBasedCommand {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
 
-            const backendBoard = this.getCurrentBoard();
-
             for (const file of allFiles) {
-                let backendContent: string;
-                let frontendContent: string;
+                let canonicalContent: string;
                 let savedFileContent: string | null = null;
 
                 try {
@@ -230,23 +218,13 @@ export class DebugCommands extends SwitchBasedCommand {
                     console.error(`[DebugCommands] Could not read saved file ${file.getPath()}:`, error);
                 }
 
-                if (file.getFileType() === 'main') {
-                    frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
-                    backendContent = backendBoard
-                        ? MarkdownKanbanParser.generateMarkdown(backendBoard)
-                        : file.getContent();
-                } else {
-                    backendContent = file.getContent();
-                    frontendContent = backendContent;
-                }
+                canonicalContent = file.getContent();
 
-                const backendHash = this.computeHash(backendContent);
-                const frontendHash = this.computeHash(frontendContent);
+                const canonicalHash = this.computeHash(canonicalContent);
                 const savedHash = savedFileContent !== null ? this.computeHash(savedFileContent) : null;
 
-                const frontendBackendMatch = backendHash === frontendHash;
-                const backendSavedMatch = savedHash ? backendHash === savedHash : true;
-                const allMatch = frontendBackendMatch && backendSavedMatch;
+                const canonicalSavedMatch = savedHash ? canonicalHash === savedHash : true;
+                const allMatch = canonicalSavedMatch;
 
                 if (allMatch) {
                     matchingFiles++;
@@ -259,17 +237,11 @@ export class DebugCommands extends SwitchBasedCommand {
                     relativePath: file.getRelativePath(),
                     isMainFile: file.getFileType() === 'main',
                     matches: allMatch,
-                    frontendBackendMatch,
-                    backendSavedMatch,
-                    frontendSavedMatch: savedHash ? frontendHash === savedHash : true,
-                    frontendContentLength: frontendContent.length,
-                    backendContentLength: backendContent.length,
+                    canonicalSavedMatch,
+                    canonicalContentLength: canonicalContent.length,
                     savedContentLength: savedFileContent?.length ?? null,
-                    frontendBackendDiff: Math.abs(frontendContent.length - backendContent.length),
-                    backendSavedDiff: savedFileContent ? Math.abs(backendContent.length - savedFileContent.length) : null,
-                    frontendSavedDiff: savedFileContent ? Math.abs(frontendContent.length - savedFileContent.length) : null,
-                    frontendHash: frontendHash.substring(0, 8),
-                    backendHash: backendHash.substring(0, 8),
+                    canonicalSavedDiff: savedFileContent ? Math.abs(canonicalContent.length - savedFileContent.length) : null,
+                    canonicalHash: canonicalHash.substring(0, 8),
                     savedHash: savedHash?.substring(0, 8) ?? null
                 });
             }
