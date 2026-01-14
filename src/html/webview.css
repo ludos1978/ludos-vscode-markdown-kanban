@@ -6851,6 +6851,10 @@ figcaption {
     background: rgba(135, 206, 235, 0.05);
 }
 
+.files-table tbody tr.missing-file {
+    background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.12));
+}
+
 .files-table td {
     padding: var(--vscode-whitespace);
     vertical-align: middle;

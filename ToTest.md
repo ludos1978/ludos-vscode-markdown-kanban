@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.13 after the build.
+- [ ] Confirm the extension version shows 0.99.14 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -25,6 +25,7 @@
 - [ ] Expanding sync details with no prior verification auto-runs Verify Sync.
 - [ ] File states summary shows the frontend snapshot hash after Verify Sync.
 - [ ] File states table shows per-file frontend hash (non-canonical) after Verify Sync.
+- [ ] Missing include rows in File States are highlighted with warning background.
 - [ ] Task title/description clicks still enter edit mode.
 
 ## Menus & UI

@@ -981,6 +981,7 @@ function createFileStatesList(allFiles) {
                 <tbody>
                     ${allFiles.map(file => {
                         const mainFileClass = file.isMainFile ? 'main-file' : '';
+                        const missingFileClass = file.exists === false ? ' missing-file' : '';
 
                         // Get sync status from verification results
                         const syncStatus = getFileSyncStatus(file.path);
@@ -1051,7 +1052,7 @@ function createFileStatesList(allFiles) {
                         const truncatedDirPath = truncatePath(dirPath, 10);
 
                         return `
-                            <tr class="file-row ${mainFileClass}" data-file-path="${file.path}">
+                            <tr class="file-row ${mainFileClass}${missingFileClass}" data-file-path="${file.path}">
                                 <td class="col-file">
                                     <div class="file-directory-path" title="${file.path}">
                                         ${truncatedDirPath}
