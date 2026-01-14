@@ -442,6 +442,20 @@ export class KanbanWebviewPanel {
                 console.error(`[PANEL] Error handling message ${message.type}:`, error);
             }
         }, null, this._disposables);
+
+        this._disposables.push(vscode.window.onDidChangeWindowState((state) => {
+            if (state.focused) {
+                void this._refreshFileContextOnFocus();
+            }
+        }));
+    }
+
+    private async _refreshFileContextOnFocus(): Promise<void> {
+        if (!this._panel || !this._panel.visible) {
+            return;
+        }
+        this._fileManager.sendFileInfo();
+        await this._ensureMainFileContext('other');
     }
 
     private _handleWebviewReady(): void {
@@ -517,12 +531,28 @@ export class KanbanWebviewPanel {
 
     private async _ensureMainFileContext(source: 'load' | 'save' | 'other'): Promise<boolean> {
         const existingMainFile = this._fileRegistry.getMainFile();
-        if (existingMainFile) {
+        const document = this._fileManager.getDocument();
+
+        if (existingMainFile && document && existingMainFile.getPath() !== document.uri.fsPath && this._boardInitHandler) {
+            logger.warn('[KanbanWebviewPanel] Main file path mismatch, reinitializing context', {
+                registryPath: existingMainFile.getPath(),
+                documentPath: document.uri.fsPath,
+                source
+            });
+            try {
+                const result = await this._boardInitHandler.initializeFromDocument(document, this._mediaTracker);
+                this._mediaTracker = result.mediaTracker;
+            } catch (error) {
+                console.error('[KanbanWebviewPanel] Failed to reinitialize main file context (path mismatch):', error);
+            }
+        }
+
+        const updatedMainFile = this._fileRegistry.getMainFile();
+        if (updatedMainFile) {
             this._setFileContextMissing(false);
             return true;
         }
 
-        const document = this._fileManager.getDocument();
         if (document && this._boardInitHandler) {
             try {
                 const result = await this._boardInitHandler.initializeFromDocument(document, this._mediaTracker);
