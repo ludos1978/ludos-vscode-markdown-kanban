@@ -35,6 +35,11 @@ interface FileVerificationResult {
     canonicalSavedDiff: number | null;
     canonicalHash: string;
     savedHash: string | null;
+    frontendHash?: string | null;
+    frontendContentLength?: number | null;
+    frontendRegistryMatch?: boolean | null;
+    frontendRegistryDiff?: number | null;
+    frontendAvailable?: boolean;
 }
 
 /**
@@ -126,7 +131,7 @@ export class DebugCommands extends SwitchBasedCommand {
 
     protected handlers: Record<string, MessageHandler> = {
         'forceWriteAllContent': (_msg, ctx) => this.handleForceWriteAllContent(ctx),
-        'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, ctx),
+        'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, (msg as any).includeCache, ctx),
         'getTrackedFilesDebugInfo': (_msg, ctx) => this.handleGetTrackedFilesDebugInfo(ctx),
         'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx),
         'setDebugMode': (msg, ctx) => this.handleSetDebugMode(msg as SetDebugModeMessage, ctx)
@@ -199,7 +204,11 @@ export class DebugCommands extends SwitchBasedCommand {
         return this.success();
     }
 
-    private async handleVerifyContentSync(frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
+    private async handleVerifyContentSync(
+        frontendBoard: unknown,
+        includeCache: Record<string, string> | undefined,
+        _context: CommandContext
+    ): Promise<CommandResult> {
         if (!this.getPanel()) {
             return this.success();
         }
@@ -218,6 +227,7 @@ export class DebugCommands extends SwitchBasedCommand {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
             let frontendSnapshot: FrontendSnapshotInfo | null = null;
+            const includeCacheNormalized = this.normalizeIncludeCache(includeCache);
 
             if (frontendBoard && fileRegistry.getMainFile()) {
                 try {
@@ -241,6 +251,7 @@ export class DebugCommands extends SwitchBasedCommand {
             for (const file of allFiles) {
                 let canonicalContent: string;
                 let savedFileContent: string | null = null;
+                let frontendContent: string | null = null;
 
                 try {
                     if (fs.existsSync(file.getPath())) {
@@ -252,8 +263,23 @@ export class DebugCommands extends SwitchBasedCommand {
 
                 canonicalContent = file.getContent();
 
+                if (file.getFileType() === 'main' && frontendBoard) {
+                    try {
+                        frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
+                    } catch (error) {
+                        console.warn('[DebugCommands] Failed to generate frontend main markdown:', error);
+                    }
+                } else if (file.getFileType() !== 'main' && includeCacheNormalized) {
+                    frontendContent = this.resolveIncludeFrontendContent(
+                        includeCacheNormalized,
+                        file.getPath(),
+                        file.getRelativePath()
+                    );
+                }
+
                 const canonicalHash = this.computeHash(canonicalContent);
                 const savedHash = savedFileContent !== null ? this.computeHash(savedFileContent) : null;
+                const frontendHash = frontendContent ? this.computeHash(frontendContent) : null;
 
                 const canonicalSavedMatch = savedHash ? canonicalHash === savedHash : true;
                 const allMatch = canonicalSavedMatch;
@@ -274,7 +300,12 @@ export class DebugCommands extends SwitchBasedCommand {
                     savedContentLength: savedFileContent?.length ?? null,
                     canonicalSavedDiff: savedFileContent ? Math.abs(canonicalContent.length - savedFileContent.length) : null,
                     canonicalHash: canonicalHash.substring(0, 8),
-                    savedHash: savedHash?.substring(0, 8) ?? null
+                    savedHash: savedHash?.substring(0, 8) ?? null,
+                    frontendHash: frontendHash ? frontendHash.substring(0, 8) : null,
+                    frontendContentLength: frontendContent ? frontendContent.length : null,
+                    frontendRegistryMatch: frontendHash ? frontendHash === canonicalHash : null,
+                    frontendRegistryDiff: frontendContent ? Math.abs(frontendContent.length - canonicalContent.length) : null,
+                    frontendAvailable: !!frontendContent
                 });
             }
 
@@ -361,6 +392,55 @@ export class DebugCommands extends SwitchBasedCommand {
             hash = hash & hash;
         }
         return hash.toString(16);
+    }
+
+    private normalizeIncludeCache(cache?: Record<string, string>): Map<string, string> | null {
+        if (!cache || Object.keys(cache).length === 0) {
+            return null;
+        }
+        const normalized = new Map<string, string>();
+        for (const [key, value] of Object.entries(cache)) {
+            const normKey = this.normalizePath(key);
+            normalized.set(normKey, value);
+            normalized.set(key, value);
+        }
+        return normalized;
+    }
+
+    private resolveIncludeFrontendContent(
+        cache: Map<string, string>,
+        absolutePath: string,
+        relativePath: string
+    ): string | null {
+        const candidates = new Set<string>();
+        const normalizedAbsolute = this.normalizePath(absolutePath);
+        const normalizedRelative = this.normalizePath(relativePath);
+        if (absolutePath) candidates.add(absolutePath);
+        if (relativePath) candidates.add(relativePath);
+        if (normalizedAbsolute) candidates.add(normalizedAbsolute);
+        if (normalizedRelative) candidates.add(normalizedRelative);
+        const baseName = normalizedRelative.split('/').pop() || normalizedAbsolute.split('/').pop();
+        if (baseName) candidates.add(baseName);
+
+        for (const candidate of candidates) {
+            const cached = cache.get(candidate);
+            if (cached !== undefined) {
+                return cached;
+            }
+        }
+
+        if (baseName) {
+            for (const [key, value] of cache.entries()) {
+                if (key === baseName || key.endsWith(`/${baseName}`)) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private normalizePath(filePath: string): string {
+        return filePath.replace(/\\/g, '/').replace(/^\.\//, '');
     }
 
     private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<TrackedFilesDebugInfo> {

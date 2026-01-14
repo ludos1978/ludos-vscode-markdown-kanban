@@ -971,6 +971,7 @@ function createFileStatesList(allFiles) {
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
+                        <th class="col-frontend" title="Frontend view (non-canonical)">Frontend</th>
                         <th class="col-frontend" title="Registry content">Registry</th>
                         <th class="col-saved" title="Saved file on disk">Saved File</th>
                         <th class="col-actions">Save/Load</th>
@@ -983,6 +984,13 @@ function createFileStatesList(allFiles) {
 
                         // Get sync status from verification results
                         const syncStatus = getFileSyncStatus(file.path);
+
+                        // Frontend data (non-canonical)
+                        let frontendHash = 'N/A';
+                        let frontendChars = '?';
+                        let frontendIcon = '⚪';
+                        let frontendClass = 'sync-unknown';
+                        let frontendDisplay = '⚪ Not verified';
 
                         // Registry data (canonical)
                         let registryHash = 'N/A';
@@ -997,6 +1005,22 @@ function createFileStatesList(allFiles) {
                         let savedDisplay = '⚪ Not verified';
 
                         if (syncStatus) {
+                            // Frontend data (if available)
+                            if (syncStatus.frontendHash && syncStatus.frontendContentLength !== null && syncStatus.frontendContentLength !== undefined) {
+                                frontendHash = syncStatus.frontendHash;
+                                frontendChars = syncStatus.frontendContentLength;
+                                if (syncStatus.frontendRegistryMatch === true) {
+                                    frontendIcon = '✅';
+                                    frontendClass = 'sync-good';
+                                } else if (syncStatus.frontendRegistryMatch === false) {
+                                    frontendIcon = '⚠️';
+                                    frontendClass = 'sync-warn';
+                                }
+                                frontendDisplay = `${frontendIcon} ${frontendHash}<br><span class="char-count">${frontendChars} chars</span>`;
+                            } else if (syncStatus.frontendAvailable === false) {
+                                frontendDisplay = '❓ Not available';
+                            }
+
                             // Registry data (always available from verification)
                             registryHash = syncStatus.canonicalHash || 'N/A';
                             registryChars = syncStatus.canonicalContentLength || 0;
@@ -1035,6 +1059,11 @@ function createFileStatesList(allFiles) {
                                     </div>
                                     <div class="file-name-clickable" onclick="openFile('${file.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${file.path}">
                                         ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
+                                    </div>
+                                </td>
+                                <td class="col-frontend">
+                                    <div class="hash-display">
+                                        ${frontendDisplay}
                                     </div>
                                 </td>
                                 <td class="col-frontend">
@@ -1333,11 +1362,15 @@ function verifyContentSync(silent = false) {
     }
 
     const frontendSnapshot = window.currentBoard || window.cachedBoard;
+    const includeCache = typeof window.getIncludeCacheSnapshot === 'function'
+        ? window.getIncludeCacheSnapshot()
+        : null;
 
     // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
         type: 'verifyContentSync',
-        frontendBoard: frontendSnapshot
+        frontendBoard: frontendSnapshot,
+        includeCache: includeCache
     });
 
     // Show loading indicator only if not silent

@@ -19,6 +19,15 @@
 
   // Cache for file contents to avoid repeated requests
   const fileCache = new Map();
+  if (typeof globalThis !== 'undefined') {
+    globalThis.getIncludeCacheSnapshot = () => {
+      const snapshot = {};
+      for (const [key, value] of fileCache.entries()) {
+        snapshot[key] = value;
+      }
+      return snapshot;
+    };
+  }
   const pendingRequests = new Set();
 
   // Helper function to detect if path is absolute
