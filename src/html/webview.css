@@ -2913,7 +2913,7 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack {
-	transform-style: preserve-3d;
+	/* transform-style: preserve-3d; */
   display: grid;
   grid-template: 1fr / 1fr;
   position: relative;
@@ -2925,7 +2925,6 @@ button.file-bar-menu-item {
   grid-row: 1;
   grid-column: 1;
   align-self: start;
-  transform-style: preserve-3d;
 }
 
 /* Only expanded columns overlay with pointer-events */
