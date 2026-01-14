@@ -243,7 +243,9 @@ export class DebugCommands extends SwitchBasedCommand {
                 let savedFileContent: string | null = null;
 
                 try {
-                    savedFileContent = fs.readFileSync(file.getPath(), 'utf8');
+                    if (fs.existsSync(file.getPath())) {
+                        savedFileContent = fs.readFileSync(file.getPath(), 'utf8');
+                    }
                 } catch (error) {
                     console.error(`[DebugCommands] Could not read saved file ${file.getPath()}:`, error);
                 }

@@ -794,6 +794,9 @@ function getFileSyncStatus(filePath) {
  */
 function toggleSyncDetails() {
     syncDetailsExpanded = !syncDetailsExpanded;
+    if (syncDetailsExpanded && !lastVerificationResults) {
+        verifyContentSync(true);
+    }
     updateFileStatesContent();
 }
 
@@ -1283,10 +1286,12 @@ function verifyContentSync(silent = false) {
         return;
     }
 
+    const frontendSnapshot = window.currentBoard || window.cachedBoard;
+
     // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
         type: 'verifyContentSync',
-        frontendBoard: window.currentBoard
+        frontendBoard: frontendSnapshot
     });
 
     // Show loading indicator only if not silent
