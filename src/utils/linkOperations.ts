@@ -82,11 +82,12 @@ export class LinkOperations {
 
         // Define all patterns we need to check
         const titlePattern = `(?:\\s+(?:\"[^\"]*\"|'[^']*'|\\([^)]*\\)))?`;
+        const destPattern = `(?:<${escapedPath}>|${escapedPath})`;
         const patterns: { regex: RegExp; type: LinkMatchType }[] = [
             // Image: ![alt](path "title")
-            { regex: new RegExp(`(!\\[[^\\]]*\\]\\(${escapedPath}${titlePattern}\\))`, 'g'), type: 'image' },
+            { regex: new RegExp(`(!\\[[^\\]]*\\]\\(\\s*${destPattern}${titlePattern}\\s*\\))`, 'g'), type: 'image' },
             // Regular link: [text](path "title") - but not images (negative lookbehind for !)
-            { regex: new RegExp(`(^|[^!])(\\[[^\\]]+\\]\\(${escapedPath}${titlePattern}\\))`, 'gm'), type: 'link' },
+            { regex: new RegExp(`(^|[^!])(\\[[^\\]]+\\]\\(\\s*${destPattern}${titlePattern}\\s*\\))`, 'gm'), type: 'link' },
             // Wiki link: [[path]] or [[path|alias]]
             { regex: new RegExp(`(\\[\\[\\s*${escapedPath}(?:\\|[^\\]]*)?\\]\\])`, 'g'), type: 'wiki' },
             // Auto link: <path>

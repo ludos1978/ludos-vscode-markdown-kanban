@@ -715,6 +715,21 @@ export class PathCommands extends SwitchBasedCommand {
         let uniqueVariants: string[] = [];
 
         const hasOldPath = typeof oldPath === 'string' && oldPath.trim().length > 0;
+        const normalizeSlashes = (value: string) => value.replace(/\\/g, '/');
+        const stripDotPrefix = (value: string) => value.startsWith('./') ? value.slice(2) : value;
+        const addDotPrefix = (value: string) => {
+            if (value.startsWith('./') || value.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(value)) {
+                return value;
+            }
+            return `./${value}`;
+        };
+        const decodeHtmlEntities = (value: string) => value
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, '\'')
+            .replace(/&apos;/g, '\'')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&');
 
         if (!hasOldPath) {
             let targetFile: MarkdownFile | null = mainFile;
@@ -764,8 +779,18 @@ export class PathCommands extends SwitchBasedCommand {
                 // Invalid percent-encoding in oldPath - ignore decode variant
             }
 
+            const expandedVariants: string[] = [];
+            for (const variant of pathVariants) {
+                if (!variant) continue;
+                const normalized = normalizeSlashes(variant);
+                const htmlDecoded = decodeHtmlEntities(normalized);
+                const stripped = stripDotPrefix(htmlDecoded);
+                const withDot = addDotPrefix(stripped);
+                expandedVariants.push(variant, normalized, htmlDecoded, stripped, withDot);
+            }
+
             // Remove duplicates
-            uniqueVariants = [...new Set(pathVariants.filter(p => p))];
+            uniqueVariants = [...new Set(expandedVariants.filter(p => p))];
 
             const hasLinkMatch = (content: string, candidate: string): boolean => {
                 const probe = '__KANBAN_PATH_PROBE__';
