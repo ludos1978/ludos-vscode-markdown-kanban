@@ -789,6 +789,11 @@ function createFileStatesSummary(allFiles) {
                     <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
                 </div>
             </div>
+            <div class="file-states-actions">
+                <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
+                    🔍 Verify Sync
+                </button>
+            </div>
             <div class="debug-timestamp">Updated: ${now}</div>
         </div>
     `;
@@ -937,11 +942,6 @@ function createSyncDetailsSection() {
 function createFileStatesList(allFiles) {
     return `
         <div class="files-table-container">
-            <div class="files-table-actions">
-                <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
-                    🔍 Verify Sync
-                </button>
-            </div>
             <table class="files-table">
                 <thead>
                     <tr>

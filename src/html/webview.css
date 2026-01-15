@@ -6732,6 +6732,10 @@ figcaption {
     gap: 8px;
 }
 
+.file-states-actions {
+    margin-left: auto;
+}
+
 .watcher-list, .include-list {
     padding: 8px;
 }
@@ -6848,7 +6852,7 @@ figcaption {
 }
 
 .files-table thead tr.files-table-actions th.action-cell {
-    text-align: center;
+    text-align: left;
 }
 
 .files-table tbody tr {
@@ -6873,28 +6877,28 @@ figcaption {
 }
 
 .col-file {
-    width: 32%;
+    width: 58%;
 }
 
 .col-frontend,
 .col-backend,
 .col-saved {
-    width: 12%;
+    width: 6%;
 }
 
 .col-save,
 .col-reload,
 .col-relative,
 .col-absolute {
-    width: 8%;
+    width: 6%;
 }
 
 .col-image {
-    width: 12%;
+    width: 6%;
 }
 
 .action-cell {
-    text-align: center;
+    text-align: left;
 }
 
 .sync-status-icon.sync-good {
@@ -7003,6 +7007,12 @@ figcaption {
     min-width: 0;
     height: 24px;
     transition: opacity 0.15s ease;
+}
+
+.files-table .action-btn {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
 }
 
 .action-btn:hover {
