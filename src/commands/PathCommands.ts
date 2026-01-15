@@ -24,6 +24,7 @@ import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showInfo, showWarning } from '../services/NotificationService';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { findColumn, findColumnContainingTask } from '../actions/helpers';
 import { logger } from '../utils/logger';
 
 /**
@@ -679,6 +680,8 @@ export class PathCommands extends SwitchBasedCommand {
         isColumnTitle?: boolean,
         pathFormat: PathFormat = 'auto'
     ): Promise<CommandResult> {
+        await this._syncEditingState(context);
+
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
             return this.failure('File registry not available');
@@ -988,6 +991,46 @@ export class PathCommands extends SwitchBasedCommand {
             newPath: newPath,
             filePath: foundFile.getRelativePath()
         });
+    }
+
+    private async _syncEditingState(context: CommandContext): Promise<void> {
+        const capturedEdit = await context.requestStopEditing();
+        if (!capturedEdit || capturedEdit.value === undefined) {
+            return;
+        }
+
+        const board = context.getCurrentBoard();
+        if (!board || !board.valid) {
+            return;
+        }
+
+        let updated = false;
+
+        if ((capturedEdit.type === 'task-title' || capturedEdit.type === 'task-description') && capturedEdit.taskId) {
+            const column = capturedEdit.columnId
+                ? findColumn(board, capturedEdit.columnId)
+                : findColumnContainingTask(board, capturedEdit.taskId);
+            const task = column?.tasks.find(t => t.id === capturedEdit.taskId);
+            if (task) {
+                if (capturedEdit.type === 'task-title') {
+                    task.title = capturedEdit.value;
+                } else {
+                    task.description = capturedEdit.value;
+                }
+                updated = true;
+            }
+        } else if (capturedEdit.type === 'column-title' && capturedEdit.columnId) {
+            const column = findColumn(board, capturedEdit.columnId);
+            if (column) {
+                column.title = capturedEdit.value;
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            context.emitBoardChanged(board, 'edit');
+            await context.onBoardUpdate();
+        }
     }
 
     /**
