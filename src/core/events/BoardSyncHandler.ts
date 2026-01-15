@@ -173,7 +173,9 @@ export class BoardSyncHandler {
                 for (const relativePath of column.includeFiles) {
                     const decodedPath = safeDecodeURIComponent(relativePath);
                     const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
-                        || this._deps.fileRegistry.get(decodedPath);
+                        || this._deps.fileRegistry.get(decodedPath)
+                        || this._deps.fileRegistry.getByRelativePath(relativePath)
+                        || this._deps.fileRegistry.get(relativePath);
                     if (!file) {
                         if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                             console.warn('[kanban.BoardSyncHandler.undoRedo.includeColumnMissing]', {
@@ -254,7 +256,9 @@ export class BoardSyncHandler {
                     for (const relativePath of task.includeFiles) {
                         const decodedPath = safeDecodeURIComponent(relativePath);
                         const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
-                            || this._deps.fileRegistry.get(decodedPath);
+                            || this._deps.fileRegistry.get(decodedPath)
+                            || this._deps.fileRegistry.getByRelativePath(relativePath)
+                            || this._deps.fileRegistry.get(relativePath);
                         if (!file) {
                             if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                                 console.warn('[kanban.BoardSyncHandler.undoRedo.includeTaskMissing]', {

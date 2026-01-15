@@ -390,17 +390,19 @@ export class KanbanFileService {
             }
 
             if (scope === 'includes' || scope === 'all') {
-                const includeFiles = force
-                    ? this.fileRegistry.getIncludeFiles().filter(f => f.exists())
-                    : this.fileRegistry.getFilesWithUnsavedChanges()
-                        .filter(f => f.getFileType() !== 'main')
-                        .filter(f => f.exists());
+                const includeCandidates = this.fileRegistry.getIncludeFiles()
+                    .filter(f => f.exists())
+                    .filter(f => f.getFileType() !== 'include-regular');
+                const forceIncludeSave = force || syncIncludes;
+                const includeFiles = forceIncludeSave
+                    ? includeCandidates
+                    : includeCandidates.filter(f => f.hasUnsavedChanges());
 
                 if (includeFiles.length > 0) {
                     const saveResults = await Promise.allSettled(
                         includeFiles.map(f => this._fileSaveService.saveFile(f, undefined, {
                             source,
-                            force,
+                            force: forceIncludeSave,
                             skipReloadDetection: true,
                             skipValidation
                         }))
