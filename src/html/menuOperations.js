@@ -2714,6 +2714,7 @@ function saveCachedBoard() {
     if (boardToSave) {
         // Update our cached state to include the in-progress edits
         window.cachedBoard = JSON.parse(JSON.stringify(boardToSave));
+        window.currentBoard = window.cachedBoard;
         window.savedBoardState = JSON.parse(JSON.stringify(boardToSave));
 
         // Update editor state if we had in-progress edits

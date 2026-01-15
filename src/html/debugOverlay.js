@@ -1409,7 +1409,7 @@ function verifyContentSync(silent = false) {
         return;
     }
 
-    const frontendSnapshot = window.currentBoard || window.cachedBoard;
+    const frontendSnapshot = window.cachedBoard || window.currentBoard;
 
     // Send verification request to backend (registry is canonical)
     window.vscode.postMessage({
@@ -1419,7 +1419,7 @@ function verifyContentSync(silent = false) {
 
     // Show loading indicator only if not silent
     if (!silent) {
-        showDebugOverlayNotice('Verifying content synchronization... Please wait.', 'info', 5000);
+        showDebugOverlayNotice('Verifying content synchronization.', 'info', 500);
     }
 }
 

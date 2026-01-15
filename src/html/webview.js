@@ -3186,6 +3186,8 @@ if (!webviewEventListenersInitialized) {
             // 4. finalizeColumnDrop() which calls normalizeAllStackTags()
             if (message.board) {
                 window.cachedBoard = message.board;
+                currentBoard = window.cachedBoard;
+                window.currentBoard = currentBoard;
                 if (typeof window.renderBoard === 'function') {
                     window.renderBoard();
                 }

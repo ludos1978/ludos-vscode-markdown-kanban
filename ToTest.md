@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.46 after the build.
+- [ ] Confirm the extension version shows 0.99.47 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -32,6 +32,7 @@
 - [ ] Main file saved-file status reflects normalized hash when available (tooltip).
 - [ ] File States Overview updates after backend boardUpdate without reopening.
 - [ ] Editing a task/column triggers a File States hash refresh without manual Verify Sync.
+- [ ] Verify Sync uses the latest cached board after Cmd/Ctrl+S (no stale currentBoard mismatch).
 - [ ] File States Overview action buttons use text labels and all-file actions appear in table header row.
 - [ ] File States Overview table shows separate columns for Save/Reload/Relative/Absolute/Image with aligned header actions.
 - [ ] Verify Sync lives in the File States header row and action buttons align left with equal sizes.
