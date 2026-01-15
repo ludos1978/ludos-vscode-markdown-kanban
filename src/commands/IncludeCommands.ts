@@ -452,7 +452,14 @@ export class IncludeCommands extends SwitchBasedCommand {
                     throw new Error('File registry not available');
                 }
 
-                const file = fileRegistry.get(filePath);
+                const document = context.fileManager.getDocument();
+                const absolutePath = path.isAbsolute(filePath) || !document
+                    ? filePath
+                    : path.join(path.dirname(document.uri.fsPath), filePath);
+
+                const file = fileRegistry.get(filePath)
+                    || fileRegistry.getByRelativePath(filePath)
+                    || fileRegistry.get(absolutePath);
                 if (!file) {
                     throw new Error(`File not found in registry: ${filePath}`);
                 }

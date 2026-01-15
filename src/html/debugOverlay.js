@@ -764,6 +764,7 @@ function createFileStatesSummary(allFiles) {
     const bothChanges = allFiles.filter(f => f.hasInternalChanges && f.hasExternalChanges).length;
     const cleanFiles = allFiles.filter(f => !f.hasInternalChanges && !f.hasExternalChanges).length;
     const now = new Date().toLocaleTimeString();
+    const syncSummary = getFileSyncSummary();
 
     return `
         <div class="file-states-stats">
@@ -789,6 +790,10 @@ function createFileStatesSummary(allFiles) {
                     <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
                 </div>
             </div>
+            <div class="file-sync-summary">
+                ${syncSummary.cache}
+                ${syncSummary.file}
+            </div>
             <div class="file-states-actions">
                 <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
                     🔍 Verify Sync
@@ -797,6 +802,53 @@ function createFileStatesSummary(allFiles) {
             <div class="debug-timestamp">Updated: ${now}</div>
         </div>
     `;
+}
+
+function getFileSyncSummary() {
+    if (!lastVerificationResults || !lastVerificationResults.fileResults) {
+        return {
+            cache: '<div class="sync-summary"><span class="sync-summary-label">Cache:</span><span class="sync-summary-item sync-unknown">⚪ Not verified</span></div>',
+            file: '<div class="sync-summary"><span class="sync-summary-label">File:</span><span class="sync-summary-item sync-unknown">⚪ Not verified</span></div>'
+        };
+    }
+
+    const cache = { match: 0, diff: 0, unknown: 0 };
+    const file = { match: 0, diff: 0, unknown: 0 };
+
+    lastVerificationResults.fileResults.forEach(result => {
+        if (result.frontendRegistryMatch === null || result.frontendRegistryMatch === undefined) {
+            cache.unknown++;
+        } else if (result.frontendRegistryMatch) {
+            cache.match++;
+        } else {
+            cache.diff++;
+        }
+
+        if (result.savedHash === null || result.savedHash === undefined) {
+            file.unknown++;
+        } else if (result.canonicalSavedMatch) {
+            file.match++;
+        } else {
+            file.diff++;
+        }
+    });
+
+    const cacheItems = [
+        `<span class="sync-summary-item sync-good">✅ ${cache.match}</span>`,
+        `<span class="sync-summary-item sync-warn">⚠️ ${cache.diff}</span>`,
+        cache.unknown > 0 ? `<span class="sync-summary-item sync-unknown">⚪ ${cache.unknown}</span>` : ''
+    ].filter(Boolean).join('');
+
+    const fileItems = [
+        `<span class="sync-summary-item sync-good">✅ ${file.match}</span>`,
+        `<span class="sync-summary-item sync-warn">⚠️ ${file.diff}</span>`,
+        file.unknown > 0 ? `<span class="sync-summary-item sync-unknown">⚪ ${file.unknown}</span>` : ''
+    ].filter(Boolean).join('');
+
+    return {
+        cache: `<div class="sync-summary"><span class="sync-summary-label">Cache:</span>${cacheItems}</div>`,
+        file: `<div class="sync-summary"><span class="sync-summary-label">File:</span>${fileItems}</div>`
+    };
 }
 
 /**
@@ -970,7 +1022,9 @@ function createFileStatesList(allFiles) {
                         <th class="col-absolute action-cell">
                             <button onclick="convertAllPaths('absolute')" class="action-btn" title="Convert all paths to absolute format">Absolute</button>
                         </th>
-                        <th class="col-image"></th>
+                        <th class="col-image action-cell">
+                            <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️ Reload</button>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
