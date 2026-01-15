@@ -1,8 +1,6 @@
+- [ ] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
+
 - [ ] the pinned headers are not on top anymore! why is translateZ not working anymore to fixate column-title them above the column-content?
-
-where do these errors come from!?! """index.html?id=e4f173f8-016d-4a6e-9943-14652bba3660&parentId=37&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69 Uncaught TypeError: Cannot read properties of null (reading 'classList')
-    at index.html?id=e4f173f8-016d-4a6e-9943-14652bba3660&parentId=37&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69:122"""
-
 
 - why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?
 
