@@ -6820,7 +6820,8 @@ figcaption {
 
 .files-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 8px 6px;
     font-size: 13px;
     margin-top: 8px;
     table-layout: fixed;

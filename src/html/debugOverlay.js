@@ -1058,7 +1058,7 @@ function createFileStatesList(allFiles) {
                                         ${!file.isMainFile ? `<span class="include-type-label ${file.type || 'include'}">[${getIncludeTypeShortLabel(file.type)}]</span>` : ''}
                                     </div>
                                     <div class="file-name-clickable" onclick="openFile('${file.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${file.path}">
-                                        ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
+                                        ${file.isMainFile ? '📄' : '📎'} ${file.name}
                                     </div>
                                 </td>
                                 <td class="col-frontend">
