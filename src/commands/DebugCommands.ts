@@ -587,12 +587,20 @@ export class DebugCommands extends SwitchBasedCommand {
         if (!diff) {
             return;
         }
+        const leftLine = this.getLineAtIndex(left, diff.index);
+        const rightLine = this.getLineAtIndex(right, diff.index);
         console.log(label, {
             leftLength: left.length,
             rightLength: right.length,
             diffIndex: diff.index,
             leftSnippet: diff.leftSnippet,
-            rightSnippet: diff.rightSnippet
+            rightSnippet: diff.rightSnippet,
+            leftLine: leftLine ? { line: leftLine.line, text: JSON.stringify(leftLine.text) } : null,
+            rightLine: rightLine ? { line: rightLine.line, text: JSON.stringify(rightLine.text) } : null,
+            leftTrailing: this.getTrailingBlankInfo(left),
+            rightTrailing: this.getTrailingBlankInfo(right),
+            leftTailLines: this.getTailLines(left, 3),
+            rightTailLines: this.getTailLines(right, 3)
         });
     }
 
@@ -613,6 +621,54 @@ export class DebugCommands extends SwitchBasedCommand {
             leftSnippet: JSON.stringify(left.slice(start, leftEnd)),
             rightSnippet: JSON.stringify(right.slice(start, rightEnd))
         };
+    }
+
+    private getLineAtIndex(content: string, index: number): { line: number; text: string } | null {
+        if (index < 0 || index > content.length) {
+            return null;
+        }
+        let line = 1;
+        let lastBreak = -1;
+        for (let i = 0; i < index; i++) {
+            if (content.charCodeAt(i) === 10) {
+                line++;
+                lastBreak = i;
+            }
+        }
+        const nextBreak = content.indexOf('\n', index);
+        const lineEnd = nextBreak === -1 ? content.length : nextBreak;
+        const lineText = content.slice(lastBreak + 1, lineEnd);
+        return { line, text: lineText };
+    }
+
+    private getTrailingBlankInfo(content: string): { trailingBlankLines: number; trailingIndentBlankLines: number; trailingWhitespaceChars: number } {
+        const lines = content.split('\n');
+        let trailingBlankLines = 0;
+        let trailingIndentBlankLines = 0;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            if (line.trim() === '') {
+                trailingBlankLines++;
+                if (line === '  ') {
+                    trailingIndentBlankLines++;
+                }
+            } else {
+                break;
+            }
+        }
+        const match = content.match(/\s+$/);
+        const trailingWhitespaceChars = match ? match[0].length : 0;
+        return {
+            trailingBlankLines,
+            trailingIndentBlankLines,
+            trailingWhitespaceChars
+        };
+    }
+
+    private getTailLines(content: string, count: number): string[] {
+        const lines = content.split('\n');
+        const tail = lines.slice(Math.max(0, lines.length - count));
+        return tail.map(line => JSON.stringify(line));
     }
 
     private normalizePath(filePath: string): string {
