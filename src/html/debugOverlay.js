@@ -920,14 +920,14 @@ function createSyncDetailsSection() {
                             <div class="sync-file-stat baseline-stat">
                                 <span class="sync-file-stat-label">📋 Registry (Baseline):</span>
                                 <span class="sync-file-stat-value">
-                                    ${file.registryNormalizedHash ? `${file.registryNormalizedHash} (${file.registryNormalizedLength} chars)<br><span class="char-count">raw ${file.canonicalHash} (${file.canonicalContentLength} chars)</span>` : `${file.canonicalHash} (${file.canonicalContentLength} chars)`}
+                                    ${file.registryNormalizedHash ? `${file.registryNormalizedHash} (${file.registryNormalizedLength} chars)` : `${file.canonicalHash} (${file.canonicalContentLength} chars)`}
                                 </span>
                             </div>
                             ${file.savedHash ? `
                                 <div class="sync-file-stat">
                                     <span class="sync-file-stat-label">Saved File:</span>
                                     <span class="sync-file-stat-value ${savedMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
-                                        ${file.savedNormalizedHash ? `${file.savedNormalizedHash} (${file.savedNormalizedLength} chars)<br><span class="char-count">raw ${file.savedHash} (${file.savedContentLength} chars)</span>` : `${file.savedHash} (${file.savedContentLength} chars)`}
+                                        ${file.savedNormalizedHash ? `${file.savedNormalizedHash} (${file.savedNormalizedLength} chars)` : `${file.savedHash} (${file.savedContentLength} chars)`}
                                         ${savedMatch ? '✅ synced' : `⚠️ differs by ${file.canonicalSavedDiff} chars`}
                                     </span>
                                 </div>
@@ -1047,8 +1047,8 @@ function createFileStatesList(allFiles) {
                             if (registryNormalized) {
                                 registryHash = syncStatus.registryNormalizedHash;
                                 registryChars = syncStatus.registryNormalizedLength;
-                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span><br><span class="char-count">raw ${syncStatus.canonicalHash} (${syncStatus.canonicalContentLength} chars)</span>`;
-                                registryTitle = `Normalized registry hash. Raw: ${syncStatus.canonicalHash}`;
+                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
+                                registryTitle = `Normalized registry hash.`;
                             } else {
                                 registryHash = syncStatus.canonicalHash || 'N/A';
                                 registryChars = syncStatus.canonicalContentLength || 0;
@@ -1072,7 +1072,7 @@ function createFileStatesList(allFiles) {
                                     && syncStatus.savedNormalizedLength !== null
                                     && syncStatus.savedNormalizedLength !== undefined;
                                 if (savedNormalized) {
-                                    savedDisplay = `${savedIcon} ${syncStatus.savedNormalizedHash}<br><span class="char-count">${syncStatus.savedNormalizedLength} chars</span><br><span class="char-count">raw ${savedHash} (${savedChars} chars)</span>`;
+                                    savedDisplay = `${savedIcon} ${syncStatus.savedNormalizedHash}<br><span class="char-count">${syncStatus.savedNormalizedLength} chars</span>`;
                                 } else {
                                     savedDisplay = `${savedIcon} ${savedHash}<br><span class="char-count">${savedChars} chars</span>`;
                                 }

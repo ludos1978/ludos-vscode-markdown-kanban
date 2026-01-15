@@ -27,9 +27,9 @@
 - [ ] File states summary shows the frontend snapshot hash after Verify Sync.
 - [ ] File states table shows per-file frontend hash (non-canonical) after Verify Sync.
 - [ ] Verify Sync shows frontend hashes for column/task includes without using the markdown-it include cache.
-- [ ] File states table shows normalized registry hash for the main file, with raw hash visible.
+- [ ] File states table shows normalized registry hash for the main file.
 - [ ] Main file frontend row shows whether it matches raw or normalized registry hash.
-- [ ] Main file saved-file row shows normalized hash with raw hash beneath when available.
+- [ ] Main file saved-file row shows normalized hash when available.
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).
