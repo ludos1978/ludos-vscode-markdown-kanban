@@ -764,8 +764,6 @@ function createFileStatesSummary(allFiles) {
     const bothChanges = allFiles.filter(f => f.hasInternalChanges && f.hasExternalChanges).length;
     const cleanFiles = allFiles.filter(f => !f.hasInternalChanges && !f.hasExternalChanges).length;
     const now = new Date().toLocaleTimeString();
-    const syncSummary = getFileSyncSummary();
-
     return `
         <div class="file-states-stats">
             <div class="stat-group">
@@ -790,10 +788,6 @@ function createFileStatesSummary(allFiles) {
                     <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
                 </div>
             </div>
-            <div class="file-sync-summary">
-                ${syncSummary.cache}
-                ${syncSummary.file}
-            </div>
             <div class="file-states-actions">
                 <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
                     🔍 Verify Sync
@@ -804,16 +798,16 @@ function createFileStatesSummary(allFiles) {
     `;
 }
 
-function getFileSyncSummary() {
+function getFileSyncSummaryCounts() {
     if (!lastVerificationResults || !lastVerificationResults.fileResults) {
         return {
-            cache: '<div class="sync-summary"><span class="sync-summary-label">Cache:</span><span class="sync-summary-item sync-unknown">⚪ Not verified</span></div>',
-            file: '<div class="sync-summary"><span class="sync-summary-label">File:</span><span class="sync-summary-item sync-unknown">⚪ Not verified</span></div>'
+            cache: { match: 0, diff: 0, unknown: 0, verified: false },
+            file: { match: 0, diff: 0, unknown: 0, verified: false }
         };
     }
 
-    const cache = { match: 0, diff: 0, unknown: 0 };
-    const file = { match: 0, diff: 0, unknown: 0 };
+    const cache = { match: 0, diff: 0, unknown: 0, verified: true };
+    const file = { match: 0, diff: 0, unknown: 0, verified: true };
 
     lastVerificationResults.fileResults.forEach(result => {
         if (result.frontendRegistryMatch === null || result.frontendRegistryMatch === undefined) {
@@ -833,22 +827,21 @@ function getFileSyncSummary() {
         }
     });
 
-    const cacheItems = [
-        `<span class="sync-summary-item sync-good">✅ ${cache.match}</span>`,
-        `<span class="sync-summary-item sync-warn">⚠️ ${cache.diff}</span>`,
-        cache.unknown > 0 ? `<span class="sync-summary-item sync-unknown">⚪ ${cache.unknown}</span>` : ''
-    ].filter(Boolean).join('');
+    return { cache, file };
+}
 
-    const fileItems = [
-        `<span class="sync-summary-item sync-good">✅ ${file.match}</span>`,
-        `<span class="sync-summary-item sync-warn">⚠️ ${file.diff}</span>`,
-        file.unknown > 0 ? `<span class="sync-summary-item sync-unknown">⚪ ${file.unknown}</span>` : ''
-    ].filter(Boolean).join('');
-
-    return {
-        cache: `<div class="sync-summary"><span class="sync-summary-label">Cache:</span>${cacheItems}</div>`,
-        file: `<div class="sync-summary"><span class="sync-summary-label">File:</span>${fileItems}</div>`
-    };
+function renderSyncSummaryCompact(summary, label) {
+    if (!summary.verified) {
+        return `<span class="sync-summary-compact sync-unknown">${label}: ⚪</span>`;
+    }
+    return `
+        <span class="sync-summary-compact">
+            <span class="sync-summary-label">${label}:</span>
+            <span class="sync-summary-item sync-good">✅ ${summary.match}</span>
+            <span class="sync-summary-item sync-warn">⚠️ ${summary.diff}</span>
+            <span class="sync-summary-item sync-unknown">⚪ ${summary.unknown}</span>
+        </span>
+    `;
 }
 
 /**
@@ -1007,9 +1000,12 @@ function createFileStatesList(allFiles) {
                         <th class="col-image">Image</th>
                     </tr>
                     <tr class="files-table-actions">
+                        ${(() => {
+                            const summary = getFileSyncSummaryCounts();
+                            return `
                         <th class="col-file all-files-label">All Files</th>
-                        <th class="col-frontend"></th>
-                        <th class="col-saved"></th>
+                        <th class="col-frontend sync-summary-cell">${renderSyncSummaryCompact(summary.cache, 'Cache')}</th>
+                        <th class="col-saved sync-summary-cell">${renderSyncSummaryCompact(summary.file, 'File')}</th>
                         <th class="col-save action-cell">
                             <button onclick="forceWriteAllContent()" class="action-btn save-btn" title="Force save all files">💾 Save All</button>
                         </th>
@@ -1025,6 +1021,8 @@ function createFileStatesList(allFiles) {
                         <th class="col-image action-cell">
                             <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️ Reload</button>
                         </th>
+                            `;
+                        })()}
                     </tr>
                 </thead>
                 <tbody>

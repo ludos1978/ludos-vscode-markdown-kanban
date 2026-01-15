@@ -6736,30 +6736,24 @@ figcaption {
     margin-left: auto;
 }
 
-.file-sync-summary {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 160px;
-}
-
-.sync-summary {
-    display: flex;
+.sync-summary-compact {
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 4px;
+    font-size: 10px;
     color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
 }
 
-.sync-summary-label {
+.sync-summary-compact .sync-summary-label {
     font-weight: 600;
     color: var(--vscode-foreground);
 }
 
-.sync-summary-item {
+.sync-summary-compact .sync-summary-item {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
 .watcher-list, .include-list {
@@ -6888,6 +6882,11 @@ figcaption {
     text-transform: uppercase;
     font-size: 10px;
     letter-spacing: 0.08em;
+}
+
+.files-table thead tr.files-table-actions th.sync-summary-cell {
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 .files-table tbody tr {
