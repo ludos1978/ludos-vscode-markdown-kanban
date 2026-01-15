@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.47 after the build.
+- [ ] Confirm the extension version shows 0.99.48 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -38,6 +38,8 @@
 - [ ] Verify Sync lives in the File States header row and action buttons align left with equal sizes.
 - [ ] File States Overview columns have visible spacing between them without truncating filenames.
 - [ ] File States Overview header labels show Cache/File and an "All Files" marker on the action row.
+- [ ] File States Overview header shows Verify Sync + Updated timestamp next to the title.
+- [ ] File States Overview no longer shows Total/Clean/Internal/External/Both stats line.
 - [ ] File States Overview top stats show Cache/File sync counts with icons; reload images button appears in header row.
 - [ ] Include files update frontend cache immediately after board edits (no stale include content on quick edit/save/edit).
 - [ ] Cache/File sync summary shows in the All Files header row and fits without wrapping.

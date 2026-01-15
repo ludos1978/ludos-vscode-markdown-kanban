@@ -316,6 +316,7 @@ function updateFileStatesContent() {
     // Batch DOM updates to reduce reflow
     requestAnimationFrame(() => {
         const allFiles = createAllFilesArray();
+        const now = new Date().toLocaleTimeString();
 
         // Update summary stats (includes timestamp now)
         const summaryElement = debugOverlayElement.querySelector('.file-states-summary');
@@ -324,6 +325,11 @@ function updateFileStatesContent() {
             if (summaryElement.innerHTML !== newSummaryHTML) {
                 summaryElement.innerHTML = newSummaryHTML;
             }
+        }
+
+        const timestampElement = debugOverlayElement.querySelector('.debug-header-meta .debug-timestamp');
+        if (timestampElement) {
+            timestampElement.textContent = `Updated: ${now}`;
         }
 
         // Update file list (only if content changed)
@@ -342,10 +348,17 @@ function updateFileStatesContent() {
  * Create the HTML content for the debug overlay
  */
 function createDebugOverlayContent() {
+    const now = new Date().toLocaleTimeString();
     return `
         <div class="debug-panel">
             <div class="debug-header">
                 <h3>ⓘ File States Overview</h3>
+                <div class="debug-header-meta">
+                    <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
+                        🔍 Verify Sync
+                    </button>
+                    <span class="debug-timestamp">Updated: ${now}</span>
+                </div>
                 <div class="debug-controls">
                     <button onclick="toggleDebugOverlaySticky()" class="debug-btn debug-pin-btn">
                         📌 Pin
@@ -758,44 +771,7 @@ function createAllFilesArray() {
  * Create summary of file states
  */
 function createFileStatesSummary(allFiles) {
-    const totalFiles = allFiles.length;
-    const internalChanges = allFiles.filter(f => f.hasInternalChanges).length;
-    const externalChanges = allFiles.filter(f => f.hasExternalChanges).length;
-    const bothChanges = allFiles.filter(f => f.hasInternalChanges && f.hasExternalChanges).length;
-    const cleanFiles = allFiles.filter(f => !f.hasInternalChanges && !f.hasExternalChanges).length;
-    const now = new Date().toLocaleTimeString();
-    return `
-        <div class="file-states-stats">
-            <div class="stat-group">
-                <div class="stat-item">
-                    <span class="stat-label">Total Files:</span>
-                    <span class="stat-value">${totalFiles}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Clean:</span>
-                    <span class="stat-value ${cleanFiles > 0 ? 'status-good' : 'status-unknown'}">${cleanFiles}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Internal Changes:</span>
-                    <span class="stat-value ${internalChanges > 0 ? 'status-warn' : 'status-good'}">${internalChanges}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">External Changes:</span>
-                    <span class="stat-value ${externalChanges > 0 ? 'status-warn' : 'status-good'}">${externalChanges}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Both:</span>
-                    <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
-                </div>
-            </div>
-            <div class="file-states-actions">
-                <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
-                    🔍 Verify Sync
-                </button>
-            </div>
-            <div class="debug-timestamp">Updated: ${now}</div>
-        </div>
-    `;
+    return '';
 }
 
 function getFileSyncSummaryCounts() {
