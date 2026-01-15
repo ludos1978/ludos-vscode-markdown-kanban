@@ -260,6 +260,9 @@ export class UICommands extends SwitchBasedCommand {
         // Replace the current board with the new one from the frontend
         context.setBoard(board);
 
+        // Ensure include files are synchronized before saving
+        context.emitBoardChanged(board, 'edit');
+
         // Save to markdown file
         // After save, _baseline is updated to match _content, so hasUnsavedChanges() returns false automatically
         await context.onSaveToMarkdown();
