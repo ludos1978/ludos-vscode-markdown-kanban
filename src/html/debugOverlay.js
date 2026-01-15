@@ -763,15 +763,7 @@ function createFileStatesSummary(allFiles) {
     const externalChanges = allFiles.filter(f => f.hasExternalChanges).length;
     const bothChanges = allFiles.filter(f => f.hasInternalChanges && f.hasExternalChanges).length;
     const cleanFiles = allFiles.filter(f => !f.hasInternalChanges && !f.hasExternalChanges).length;
-    const frontendSnapshot = lastVerificationResults?.frontendSnapshot;
     const now = new Date().toLocaleTimeString();
-    let frontendValue = 'Not verified';
-    let frontendClass = 'status-unknown';
-    if (frontendSnapshot) {
-        const registryLabel = frontendSnapshot.registryIsNormalized ? ' (normalized)' : '';
-        frontendValue = `${frontendSnapshot.hash} (${frontendSnapshot.contentLength} chars)${registryLabel}`;
-        frontendClass = frontendSnapshot.matchesRegistry ? 'status-good' : 'status-warn';
-    }
 
     return `
         <div class="file-states-stats">
@@ -795,10 +787,6 @@ function createFileStatesSummary(allFiles) {
                 <div class="stat-item">
                     <span class="stat-label">Both:</span>
                     <span class="stat-value ${bothChanges > 0 ? 'status-bad' : 'status-good'}">${bothChanges}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Frontend Snapshot:</span>
-                    <span class="stat-value ${frontendClass}">${frontendValue}</span>
                 </div>
             </div>
             <div class="debug-timestamp">Updated: ${now}</div>
@@ -895,16 +883,6 @@ function createSyncDetailsSection() {
             <div class="sync-details-note">
                 <strong>Registry is the baseline</strong> - comparing Registry → Saved File
             </div>
-            ${lastVerificationResults.frontendSnapshot ? `
-            <div class="sync-details-note">
-                <strong>Frontend snapshot (non-canonical):</strong>
-                ${lastVerificationResults.frontendSnapshot.hash} (${lastVerificationResults.frontendSnapshot.contentLength} chars)
-                ${lastVerificationResults.frontendSnapshot.registryIsNormalized ? '<span class="char-count">normalized registry</span>' : ''}
-                ${lastVerificationResults.frontendSnapshot.matchesRegistry
-                    ? '✅ matches registry'
-                    : `⚠️ differs by ${lastVerificationResults.frontendSnapshot.diffChars} chars`}
-            </div>
-            ` : ''}
             <div class="sync-details-files">
                 ${lastVerificationResults.fileResults.map(file => {
                     const savedMatch = file.savedHash ? file.canonicalSavedMatch : null;
@@ -981,8 +959,7 @@ function createFileStatesList(allFiles) {
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
-                        <th class="col-frontend" title="Frontend view (non-canonical)">Frontend</th>
-                        <th class="col-frontend" title="Registry content">Registry</th>
+                        <th class="col-frontend" title="Frontend vs registry (non-canonical)">Frontend</th>
                         <th class="col-saved" title="Saved file on disk">Saved File</th>
                         <th class="col-actions">Save/Load</th>
                         <th class="col-image">Image</th>
@@ -997,68 +974,51 @@ function createFileStatesList(allFiles) {
                         const syncStatus = getFileSyncStatus(file.path);
 
                         // Frontend data (non-canonical)
-                        let frontendHash = 'N/A';
-                        let frontendChars = '?';
                         let frontendIcon = '⚪';
                         let frontendClass = 'sync-unknown';
                         let frontendDisplay = '⚪ Not verified';
-                        let frontendMatchLabel = '';
+                        let frontendTitle = '';
 
                         // Registry data (canonical)
                         let registryHash = 'N/A';
                         let registryChars = '?';
-                        let registryDisplay = '⚪ Not verified';
-                        let registryTitle = '';
 
                         // Saved file data and sync status
-                        let savedHash = 'N/A';
-                        let savedChars = '?';
                         let savedIcon = '⚪';
                         let savedClass = 'sync-unknown';
                         let savedDisplay = '⚪ Not verified';
+                        let savedTitle = '';
 
                         if (syncStatus) {
                             // Frontend data (if available)
+                            const registryNormalized = syncStatus.registryNormalizedHash
+                                && syncStatus.registryNormalizedLength !== null
+                                && syncStatus.registryNormalizedLength !== undefined;
+                            registryHash = registryNormalized ? syncStatus.registryNormalizedHash : (syncStatus.canonicalHash || 'N/A');
+                            registryChars = registryNormalized ? syncStatus.registryNormalizedLength : (syncStatus.canonicalContentLength || 0);
+
                             if (syncStatus.frontendHash && syncStatus.frontendContentLength !== null && syncStatus.frontendContentLength !== undefined) {
-                                frontendHash = syncStatus.frontendHash;
-                                frontendChars = syncStatus.frontendContentLength;
                                 if (syncStatus.frontendMatchesRaw === true) {
                                     frontendIcon = '✅';
                                     frontendClass = 'sync-good';
-                                    frontendMatchLabel = 'raw';
                                 } else if (syncStatus.frontendMatchesNormalized === true) {
                                     frontendIcon = '⚠️';
                                     frontendClass = 'sync-warn';
-                                    frontendMatchLabel = 'normalized';
                                 } else if (syncStatus.frontendRegistryMatch === false) {
                                     frontendIcon = '⚠️';
                                     frontendClass = 'sync-warn';
                                 }
-                                const matchText = frontendMatchLabel ? `<br><span class="char-count">match: ${frontendMatchLabel}</span>` : '';
-                                frontendDisplay = `${frontendIcon} ${frontendHash}<br><span class="char-count">${frontendChars} chars</span>${matchText}`;
+                                frontendDisplay = frontendIcon;
+                                frontendTitle = `Frontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nRegistry: ${registryHash} (${registryChars} chars)`;
                             } else if (syncStatus.frontendAvailable === false) {
-                                frontendDisplay = '❓ Not available';
-                            }
-
-                            // Registry data (always available from verification)
-                            const registryNormalized = syncStatus.registryNormalizedHash
-                                && syncStatus.registryNormalizedLength !== null
-                                && syncStatus.registryNormalizedLength !== undefined;
-                            if (registryNormalized) {
-                                registryHash = syncStatus.registryNormalizedHash;
-                                registryChars = syncStatus.registryNormalizedLength;
-                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
-                                registryTitle = `Normalized registry hash.`;
-                            } else {
-                                registryHash = syncStatus.canonicalHash || 'N/A';
-                                registryChars = syncStatus.canonicalContentLength || 0;
-                                registryDisplay = `${registryHash}<br><span class="char-count">${registryChars} chars</span>`;
+                                frontendDisplay = '❓';
+                                frontendTitle = 'Frontend hash not available';
                             }
 
                             // Saved file data and sync
                             if (syncStatus.savedHash) {
-                                savedHash = syncStatus.savedHash;
-                                savedChars = syncStatus.savedContentLength || 0;
+                                const savedHashValue = syncStatus.savedNormalizedHash || syncStatus.savedHash;
+                                const savedCharsValue = syncStatus.savedNormalizedLength ?? (syncStatus.savedContentLength || 0);
 
                                 if (syncStatus.canonicalSavedMatch) {
                                     savedIcon = '✅';
@@ -1068,16 +1028,11 @@ function createFileStatesList(allFiles) {
                                     savedClass = 'sync-warn';
                                 }
 
-                                const savedNormalized = syncStatus.savedNormalizedHash
-                                    && syncStatus.savedNormalizedLength !== null
-                                    && syncStatus.savedNormalizedLength !== undefined;
-                                if (savedNormalized) {
-                                    savedDisplay = `${savedIcon} ${syncStatus.savedNormalizedHash}<br><span class="char-count">${syncStatus.savedNormalizedLength} chars</span>`;
-                                } else {
-                                    savedDisplay = `${savedIcon} ${savedHash}<br><span class="char-count">${savedChars} chars</span>`;
-                                }
+                                savedDisplay = savedIcon;
+                                savedTitle = `Registry: ${registryHash} (${registryChars} chars)\nSaved: ${savedHashValue} (${savedCharsValue} chars)`;
                             } else {
-                                savedDisplay = '❓ Not available';
+                                savedDisplay = '❓';
+                                savedTitle = 'Saved file not available';
                             }
                         }
 
@@ -1099,17 +1054,12 @@ function createFileStatesList(allFiles) {
                                     </div>
                                 </td>
                                 <td class="col-frontend">
-                                    <div class="hash-display">
+                                    <div class="hash-display ${frontendClass}" title="${frontendTitle}">
                                         ${frontendDisplay}
                                     </div>
                                 </td>
-                                <td class="col-frontend">
-                                    <div class="hash-display" title="${registryTitle}">
-                                        ${registryDisplay}
-                                    </div>
-                                </td>
                                 <td class="col-saved">
-                                    <div class="hash-display ${savedClass}">
+                                    <div class="hash-display ${savedClass}" title="${savedTitle}">
                                         ${savedDisplay}
                                     </div>
                                 </td>
