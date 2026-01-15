@@ -767,19 +767,20 @@ export class PathCommands extends SwitchBasedCommand {
             // Remove duplicates
             uniqueVariants = [...new Set(pathVariants.filter(p => p))];
 
-            for (const pathVariant of uniqueVariants) {
-                const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(escapedPath, 'g');
+            const hasLinkMatch = (content: string, candidate: string): boolean => {
+                const probe = '__KANBAN_PATH_PROBE__';
+                return LinkOperations.replaceSingleLink(content, candidate, probe, 0) !== content;
+            };
 
+            for (const pathVariant of uniqueVariants) {
                 for (const file of allFiles) {
                     const content = file.getContent();
-                    if (regex.test(content)) {
+                    if (hasLinkMatch(content, pathVariant)) {
                         foundFile = file;
                         foundContent = content;
                         actualOldPath = pathVariant;
                         break;
                     }
-                    regex.lastIndex = 0;
                 }
                 if (foundFile) break;
             }
@@ -821,13 +822,11 @@ export class PathCommands extends SwitchBasedCommand {
         const newContent = LinkOperations.replaceSingleLink(foundContent, actualOldPath, newPath, 0);
 
         if (newContent === foundContent) {
-            // Fallback to direct replacement
-            const escapedActualOldPath = actualOldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const fallbackRegex = new RegExp(escapedActualOldPath, 'g');
-            foundFile.setContent(foundContent.replace(fallbackRegex, newPath), false);
-        } else {
-            foundFile.setContent(newContent, false);
+            logger.debug('[PathCommands] No link/include match found for path replacement:', actualOldPath);
+            return this.failure('Old path not found in any link/include');
         }
+
+        foundFile.setContent(newContent, false);
 
         // If path was found in an include file, always do full refresh
         // This ensures include content is properly re-parsed after the path change

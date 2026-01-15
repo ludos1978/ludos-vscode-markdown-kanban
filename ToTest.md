@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.49 after the build.
+- [ ] Confirm the extension version shows 0.99.50 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -84,6 +84,7 @@
 - [ ] File search modal opens/closes cleanly and handles special characters safely.
 - [ ] Broken file menus update paths in all editors (inline markdown, inline WYSIWYG, overlay preview/markdown/WYSIWYG).
 - [ ] Include paths with URL-encoded spaces resolve on disk (no false “broken include” badges).
+- [ ] Path replacement only updates actual link/include targets (no substring replacements).
 - [ ] Empty image/link targets (e.g. `![]()` / `[]()`) are replaced correctly in inline, overlay, and dual preview editors.
 - [ ] Overlay dual preview: search-for-file replaces the markdown draft + preview.
 - [ ] Burger menu Open + Alt+click open in VS Code first, fallback to system editor when needed.
