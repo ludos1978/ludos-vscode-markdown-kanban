@@ -251,19 +251,23 @@ export class MarkdownKanbanParser {
 
         // Collect description from any indented content
         if (currentTask && collectingDescription) {
-          let descLine = line;
-          // remove the first leading spaces if there
           if (line.startsWith('  ')) {
-            descLine = line.substring(2);
+            let descLine = line.substring(2);
+            // Store description (frontend will handle include processing)
+            if (!currentTask.description) {
+              currentTask.description = descLine;
+            } else {
+              currentTask.description += '\n' + descLine;
+            }
+            continue;
           }
 
-          // Store description (frontend will handle include processing)
-          if (!currentTask.description) {
-            currentTask.description = descLine;
-          } else {
-            currentTask.description += '\n' + descLine;
+          // Unindented blank line ends the description (prevents trailing blank lines from becoming indented)
+          if (trimmedLine === '') {
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
+            collectingDescription = false;
+            continue;
           }
-          continue;
         }
 
         if (trimmedLine === '') {
