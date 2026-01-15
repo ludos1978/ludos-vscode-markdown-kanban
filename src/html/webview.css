@@ -6841,14 +6841,10 @@ figcaption {
 .files-table {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 14px 10px;
+    border-spacing: 4px;
     font-size: 13px;
     margin-top: 8px;
     table-layout: fixed;
-}
-
-.file-row {
-    height: 44px;
 }
 
 .files-table thead {
@@ -6865,18 +6861,19 @@ figcaption {
     white-space: nowrap;
 }
 
-.files-table thead tr.files-table-actions th {
+.files-table tbody tr.files-table-actions td {
     background: var(--vscode-editor-background);
     font-weight: 500;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--vscode-panel-border);
 }
 
-.files-table thead tr.files-table-actions th.action-cell {
+.files-table tbody tr.files-table-actions td.action-cell {
     text-align: left;
 }
 
-.files-table thead tr.files-table-actions th.all-files-label {
+.files-table tbody tr.files-table-actions td.all-files-label {
     color: var(--vscode-descriptionForeground);
     font-weight: 600;
     text-transform: uppercase;
@@ -6884,7 +6881,7 @@ figcaption {
     letter-spacing: 0.08em;
 }
 
-.files-table thead tr.files-table-actions th.sync-summary-cell {
+.files-table tbody tr.files-table-actions td.sync-summary-cell {
     padding-top: 2px;
     padding-bottom: 2px;
 }
@@ -6905,36 +6902,35 @@ figcaption {
     background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.12));
 }
 
-.files-table td {
-    padding: var(--vscode-whitespace);
+.files-table td,
+.files-table-actions td {
     vertical-align: middle;
 }
 
 .col-file {
     width: 58%;
-}
-
-.col-frontend,
-.col-backend,
-.col-saved {
-    width: 6%;
+    min-width: 200px;
+    text-align: left;
 }
 
 .col-save,
 .col-reload,
 .col-relative,
-.col-absolute {
-    width: 6%;
-}
-
+.col-absolute,
+.col-frontend,
+.col-backend,
+.col-saved,
 .col-image {
-    width: 6%;
+    width: 8%;
+    min-width: 40px;
+    max-width: 50px;
+    text-align: center;
 }
 
 .action-cell {
-    text-align: left;
     padding-left: 2px;
     padding-right: 2px;
+    text-align: center;
 }
 
 .sync-status-icon.sync-good {
@@ -7032,7 +7028,7 @@ figcaption {
     background: var(--button-background);
     border: var(--button-border);
     color: var(--button-foreground);
-    padding: 4px 8px;
+    /* padding: 4px 8px; */
     border-radius: 4px;
     cursor: pointer;
     font-size: 11px;
@@ -7042,14 +7038,14 @@ figcaption {
     justify-content: center;
     min-width: 0;
     height: 24px;
+    width: 30px;
     transition: opacity 0.15s ease;
 }
 
-.files-table .action-btn {
+/* .files-table .action-btn {
     width: 100%;
-    justify-content: flex-start;
     gap: 6px;
-}
+} */
 
 .action-btn:hover {
     opacity: 0.8;

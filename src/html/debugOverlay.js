@@ -830,16 +830,15 @@ function getFileSyncSummaryCounts() {
     return { cache, file };
 }
 
-function renderSyncSummaryCompact(summary, label) {
+function renderSyncSummaryCompact(summary) {
     if (!summary.verified) {
-        return `<span class="sync-summary-compact sync-unknown">${label}: ⚪</span>`;
+        return `<span class="sync-summary-compact sync-unknown">⚪</span>`;
     }
     return `
         <span class="sync-summary-compact">
-            <span class="sync-summary-label">${label}:</span>
-            <span class="sync-summary-item sync-good">✅ ${summary.match}</span>
-            <span class="sync-summary-item sync-warn">⚠️ ${summary.diff}</span>
-            <span class="sync-summary-item sync-unknown">⚪ ${summary.unknown}</span>
+            <span class="sync-summary-item sync-good">✅ <br> ${summary.match}</span>
+            <span class="sync-summary-item sync-warn">⚠️ <br> ${summary.diff}</span>
+            <span class="sync-summary-item sync-unknown">⚪ <br> ${summary.unknown}</span>
         </span>
     `;
 }
@@ -999,33 +998,33 @@ function createFileStatesList(allFiles) {
                         <th class="col-absolute">Absolute</th>
                         <th class="col-image">Image</th>
                     </tr>
-                    <tr class="files-table-actions">
-                        ${(() => {
-                            const summary = getFileSyncSummaryCounts();
-                            return `
-                        <th class="col-file all-files-label">All Files</th>
-                        <th class="col-frontend sync-summary-cell">${renderSyncSummaryCompact(summary.cache, 'Cache')}</th>
-                        <th class="col-saved sync-summary-cell">${renderSyncSummaryCompact(summary.file, 'File')}</th>
-                        <th class="col-save action-cell">
-                            <button onclick="forceWriteAllContent()" class="action-btn save-btn" title="Force save all files">💾 Save All</button>
-                        </th>
-                        <th class="col-reload action-cell">
-                            <button onclick="reloadAllIncludedFiles()" class="action-btn reload-btn" title="Reload all included files from disk">↻ Reload All</button>
-                        </th>
-                        <th class="col-relative action-cell">
-                            <button onclick="convertAllPaths('relative')" class="action-btn" title="Convert all paths to relative format">Relative</button>
-                        </th>
-                        <th class="col-absolute action-cell">
-                            <button onclick="convertAllPaths('absolute')" class="action-btn" title="Convert all paths to absolute format">Absolute</button>
-                        </th>
-                        <th class="col-image action-cell">
-                            <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️ Reload</button>
-                        </th>
-                            `;
-                        })()}
-                    </tr>
                 </thead>
                 <tbody>
+                    ${(() => {
+                        const summary = getFileSyncSummaryCounts();
+                        return `
+                            <tr class="files-table-actions">
+                                <td class="col-file all-files-label">All Files</td>
+                                <td class="col-frontend sync-summary-cell">${renderSyncSummaryCompact(summary.cache)}</td>
+                                <td class="col-saved sync-summary-cell">${renderSyncSummaryCompact(summary.file)}</td>
+                                <td class="col-save action-cell">
+                                    <button onclick="forceWriteAllContent()" class="action-btn save-btn" title="Force save all files">💾</button>
+                                </td>
+                                <td class="col-reload action-cell">
+                                    <button onclick="reloadAllIncludedFiles()" class="action-btn reload-btn" title="Reload all included files from disk">↻</button>
+                                </td>
+                                <td class="col-relative action-cell">
+                                    <button onclick="convertAllPaths('relative')" class="action-btn" title="Convert all paths to relative format">Rel</button>
+                                </td>
+                                <td class="col-absolute action-cell">
+                                    <button onclick="convertAllPaths('absolute')" class="action-btn" title="Convert all paths to absolute format">Abs</button>
+                                </td>
+                                <td class="col-image action-cell">
+                                    <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️</button>
+                                </td>
+                            </tr>
+                        `;
+                    })()}
                     ${allFiles.map(file => {
                         const mainFileClass = file.isMainFile ? 'main-file' : '';
                         const missingFileClass = file.exists === false ? ' missing-file' : '';
@@ -1124,19 +1123,19 @@ function createFileStatesList(allFiles) {
                                     </div>
                                 </td>
                                 <td class="col-save action-cell">
-                                    <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾 Save</button>
+                                    <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
                                 </td>
                                 <td class="col-reload action-cell">
-                                    <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">↻ Reload</button>
+                                    <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">↻</button>
                                 </td>
                                 <td class="col-relative action-cell">
-                                    <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'relative')" class="action-btn" title="Convert paths to relative format">Relative</button>
+                                    <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'relative')" class="action-btn" title="Convert paths to relative format">Rel</button>
                                 </td>
                                 <td class="col-absolute action-cell">
-                                    <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'absolute')" class="action-btn" title="Convert paths to absolute format">Absolute</button>
+                                    <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'absolute')" class="action-btn" title="Convert paths to absolute format">Abs</button>
                                 </td>
                                 <td class="col-image action-cell">
-                                    <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️ Image</button>
+                                    <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️</button>
                                 </td>
                             </tr>
                         `;
