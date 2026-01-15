@@ -20,6 +20,7 @@ import { MarkdownKanbanParser } from '../markdownParser';
 import { KanbanBoard } from '../board/KanbanTypes';
 import { IncludeFile } from '../files/IncludeFile';
 import * as fs from 'fs';
+import * as path from 'path';
 import { SetDebugModeMessage } from '../core/bridge/MessageTypes';
 
 /**
@@ -565,7 +566,8 @@ export class DebugCommands extends SwitchBasedCommand {
 
     private normalizeMainContent(content: string, mainFilePath?: string): { content: string } | null {
         try {
-            const parsed = MarkdownKanbanParser.parseMarkdown(content, undefined, undefined, mainFilePath);
+            const basePath = mainFilePath ? path.dirname(mainFilePath) : undefined;
+            const parsed = MarkdownKanbanParser.parseMarkdown(content, basePath, undefined, mainFilePath);
             if (!parsed.board?.valid) {
                 return null;
             }

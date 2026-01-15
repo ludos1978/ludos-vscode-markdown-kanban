@@ -40,7 +40,11 @@ export function toForwardSlashes(filePath: string): string {
  */
 export function normalizePathForLookup(filePath: string): string {
     if (!filePath) return '';
-    return toForwardSlashes(filePath.trim().toLowerCase());
+    let normalized = toForwardSlashes(filePath.trim().toLowerCase());
+    while (normalized.startsWith('./')) {
+        normalized = normalized.slice(2);
+    }
+    return normalized;
 }
 
 /**
