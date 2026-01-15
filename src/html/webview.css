@@ -6724,7 +6724,7 @@ figcaption {
     align-items: center;
     gap: 16px;
     margin-bottom: 6px;
-    padding: 4px;
+    padding: 8px 4px;
 }
 
 .stat-group {
@@ -6821,7 +6821,7 @@ figcaption {
 .files-table {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 8px 6px;
+    border-spacing: 12px 8px;
     font-size: 13px;
     margin-top: 8px;
     table-layout: fixed;
@@ -6854,6 +6854,14 @@ figcaption {
 
 .files-table thead tr.files-table-actions th.action-cell {
     text-align: left;
+}
+
+.files-table thead tr.files-table-actions th.all-files-label {
+    color: var(--vscode-descriptionForeground);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
 }
 
 .files-table tbody tr {
@@ -6900,6 +6908,8 @@ figcaption {
 
 .action-cell {
     text-align: left;
+    padding-left: 2px;
+    padding-right: 2px;
 }
 
 .sync-status-icon.sync-good {

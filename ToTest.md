@@ -36,6 +36,7 @@
 - [ ] File States Overview table shows separate columns for Save/Reload/Relative/Absolute/Image with aligned header actions.
 - [ ] Verify Sync lives in the File States header row and action buttons align left with equal sizes.
 - [ ] File States Overview columns have visible spacing between them without truncating filenames.
+- [ ] File States Overview header labels show Cache/File and an "All Files" marker on the action row.
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).

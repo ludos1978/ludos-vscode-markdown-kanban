@@ -946,8 +946,8 @@ function createFileStatesList(allFiles) {
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
-                        <th class="col-frontend" title="Frontend vs registry (non-canonical)">Frontend</th>
-                        <th class="col-saved" title="Saved file on disk">Saved File</th>
+                        <th class="col-frontend" title="Frontend vs registry (non-canonical)">Cache</th>
+                        <th class="col-saved" title="Saved file on disk">File</th>
                         <th class="col-save">Save</th>
                         <th class="col-reload">Reload</th>
                         <th class="col-relative">Relative</th>
@@ -955,7 +955,7 @@ function createFileStatesList(allFiles) {
                         <th class="col-image">Image</th>
                     </tr>
                     <tr class="files-table-actions">
-                        <th class="col-file"></th>
+                        <th class="col-file all-files-label">All Files</th>
                         <th class="col-frontend"></th>
                         <th class="col-saved"></th>
                         <th class="col-save action-cell">
