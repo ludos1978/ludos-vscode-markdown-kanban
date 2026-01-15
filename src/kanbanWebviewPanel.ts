@@ -655,6 +655,12 @@ export class KanbanWebviewPanel {
         this._context.scopedEventBus.emit('board:changed', { board, trigger });
     }
 
+    public async syncIncludesFromBoard(board: KanbanBoard, trigger: BoardChangeTrigger = 'edit'): Promise<void> {
+        if (this._boardSyncHandler) {
+            await this._boardSyncHandler.syncIncludesFromBoard(board, trigger);
+        }
+    }
+
     /** Emit board:loaded event - triggers media tracking for include files */
     public emitBoardLoaded(board: KanbanBoard): void {
         this._context.scopedEventBus.emit('board:loaded', { board });

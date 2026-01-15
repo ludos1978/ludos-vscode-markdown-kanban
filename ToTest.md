@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.99.14 after the build.
+- [ ] Confirm the extension version shows 0.99.41 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -41,6 +41,8 @@
 - [ ] Include files update frontend cache immediately after board edits (no stale include content on quick edit/save/edit).
 - [ ] Cache/File sync summary shows in the All Files header row and fits without wrapping.
 - [ ] Cmd/Ctrl+S saves include-backed files updated via board edits (no stale include content after save).
+- [ ] Cmd/Ctrl+S and individual file saves both persist include changes using the unified save pipeline.
+- [ ] Individual include save works after a recent Cmd/Ctrl+S (no skipped save due to in-flight lock).
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).

@@ -14,6 +14,7 @@ import { PanelContext, WebviewManager } from './panel';
 import { BoardStore } from './core/stores';
 import { DOCUMENT_CHANGE_DEBOUNCE_MS } from './constants/TimeoutConstants';
 import { showError, showWarning, showInfo } from './services/NotificationService';
+import { SaveOptions } from './files/SaveOptions';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -36,6 +37,19 @@ export interface KanbanFileServiceDeps {
     getPanelInstance: () => any;
     getWebviewManager: () => WebviewManager | null;
     sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>;
+}
+
+export type SaveScope = 'main' | 'includes' | 'all' | { filePath: string };
+
+export interface SaveUnifiedOptions {
+    board?: KanbanBoard;
+    scope?: SaveScope;
+    force?: boolean;
+    source?: SaveOptions['source'];
+    syncIncludes?: boolean;
+    updateBaselines?: boolean;
+    updateUi?: boolean;
+    skipValidation?: boolean;
 }
 
 /**
@@ -313,87 +327,180 @@ export class KanbanFileService {
      * Save board to markdown file using unified FileSaveService
      */
     public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true): Promise<void> {
-        if (this._saveToMarkdownInFlight) {
+        await this.saveUnified({
+            scope: 'all',
+            source: 'ui-edit',
+            syncIncludes: true,
+            updateBaselines: true,
+            updateUi: true
+        });
+    }
+
+    /**
+     * Unified save pipeline for all save operations (Cmd+S, individual save, save includes)
+     */
+    public async saveUnified(options: SaveUnifiedOptions = {}): Promise<void> {
+        const scope = options.scope ?? 'all';
+        const requiresExclusive = scope === 'all' || scope === 'main';
+
+        if (requiresExclusive && this._saveToMarkdownInFlight) {
             return this._saveToMarkdownInFlight;
         }
 
-        const savePromise = (async () => {
-            // Check for main file and valid board (document is NOT required - panel can stay open without it)
-            const mainFile = this.fileRegistry.getMainFile();
-            const board = this.board();
-            if (!mainFile || !board || !board.valid) {
-                console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - mainFile: ${!!mainFile}, board: ${!!board}, valid: ${board?.valid}`);
+        const runSave = async () => {
+            const board = options.board ?? this.board() ?? undefined;
+            const force = options.force ?? false;
+            const source = options.source ?? 'ui-edit';
+            const syncIncludes = options.syncIncludes ?? (scope === 'all' || scope === 'includes');
+            const updateBaselines = options.updateBaselines ?? true;
+            const updateUi = options.updateUi ?? true;
+            const skipValidation = options.skipValidation ?? false;
+            let savedMainFile = false;
+
+            const needsBoard = scope === 'main' || scope === 'all' || syncIncludes;
+            if (needsBoard && (!board || !board.valid)) {
+                console.warn(`[KanbanFileService.saveUnified] Cannot save - board missing or invalid (scope=${typeof scope === 'string' ? scope : 'file'})`);
                 return;
             }
 
-            // Set flag to skip undo detection during save (prevents false "undo" detection)
-            this._isSavingDocument = true;
-
-            // Generate markdown content
-            const markdown = MarkdownKanbanParser.generateMarkdown(board);
-
-            try {
-                // Use FileSaveService for unified save handling
-                await this._fileSaveService.saveFile(mainFile, markdown);
-            } finally {
-                // Reset flag after save completes
-                // The flag prevents false "undo" detection during our own save operation
-                this._isSavingDocument = false;
-            }
-            // Save include files that have unsaved changes
-            // NOTE: Only save files that exist() - don't save broken includes (would create the file/folder)
-            const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges()
-                .filter(f => f.getFileType() !== 'main')
-                .filter(f => f.exists());
-            if (unsavedIncludes.length > 0) {
-                // Save each include file individually, handling validation errors gracefully
-                const saveResults = await Promise.allSettled(
-                    unsavedIncludes.map(f => this._fileSaveService.saveFile(f))
-                );
-
-                // Log any files that failed to save due to validation
-                const failures = saveResults
-                    .map((result, index) => ({ result, file: unsavedIncludes[index] }))
-                    .filter(({ result }) => result.status === 'rejected');
-
-                if (failures.length > 0) {
-                    failures.forEach(({ result, file }) => {
-                        const error = (result as PromiseRejectedResult).reason;
-                        console.warn(`[KanbanFileService] Skipping save for ${file.getPath()}: ${error.message || error}`);
-                    });
+            if (syncIncludes && board) {
+                const panelInstance = this.getPanelInstance();
+                if (panelInstance?.syncIncludesFromBoard) {
+                    await panelInstance.syncIncludesFromBoard(board, 'edit');
                 }
             }
 
-            // Update state after successful save (reuse mainFile from line 482)
-            const latestBoard = this.board();
-            if (latestBoard) {
-                // CRITICAL: Pass updateBaseline=true since we just saved to disk
-                mainFile.updateFromBoard(latestBoard, true, true);
-                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
-            }
+            if (scope === 'main' || scope === 'all') {
+                const mainFile = this.fileRegistry.getMainFile();
+                if (!mainFile) {
+                    console.warn('[KanbanFileService.saveUnified] No main file registered');
+                    return;
+                }
+                if (board) {
+                    mainFile.setCachedBoardFromWebview(board);
+                }
 
-            // Notify frontend that save is complete (may fail if webview is disposed during close)
-            const panelInstance = this.panel();
-            if (panelInstance) {
+                this._isSavingDocument = true;
                 try {
-                    panelInstance.webview.postMessage({
-                        type: 'saveCompleted',
-                        success: true
+                    const markdown = MarkdownKanbanParser.generateMarkdown(board!);
+                    await this._fileSaveService.saveFile(mainFile, markdown, {
+                        source,
+                        force,
+                        skipReloadDetection: true,
+                        skipValidation
                     });
-                } catch (e) {
-                    // Webview may be disposed during panel close - save already succeeded
+                } finally {
+                    this._isSavingDocument = false;
+                }
+
+                if (updateBaselines && board) {
+                    mainFile.updateFromBoard(board, true, true);
+                }
+                savedMainFile = true;
+            }
+
+            if (scope === 'includes' || scope === 'all') {
+                const includeFiles = force
+                    ? this.fileRegistry.getIncludeFiles().filter(f => f.exists())
+                    : this.fileRegistry.getFilesWithUnsavedChanges()
+                        .filter(f => f.getFileType() !== 'main')
+                        .filter(f => f.exists());
+
+                if (includeFiles.length > 0) {
+                    const saveResults = await Promise.allSettled(
+                        includeFiles.map(f => this._fileSaveService.saveFile(f, undefined, {
+                            source,
+                            force,
+                            skipReloadDetection: true,
+                            skipValidation
+                        }))
+                    );
+
+                    const failures = saveResults
+                        .map((result, index) => ({ result, file: includeFiles[index] }))
+                        .filter(({ result }) => result.status === 'rejected');
+
+                    if (failures.length > 0) {
+                        failures.forEach(({ result, file }) => {
+                            const error = (result as PromiseRejectedResult).reason;
+                            console.warn(`[KanbanFileService] Skipping save for ${file.getPath()}: ${error.message || error}`);
+                        });
+                    }
                 }
             }
-        })();
 
-        this._saveToMarkdownInFlight = savePromise;
-        try {
-            await savePromise;
-        } finally {
-            if (this._saveToMarkdownInFlight === savePromise) {
-                this._saveToMarkdownInFlight = null;
+            if (typeof scope === 'object' && scope.filePath) {
+                const file = this._resolveFileFromRegistry(scope.filePath);
+                if (!file) {
+                    throw new Error(`File not found in registry: ${scope.filePath}`);
+                }
+
+                if (file.getFileType() === 'main') {
+                    await this.saveUnified({
+                        board,
+                        scope: 'main',
+                        force,
+                        source,
+                        syncIncludes,
+                        updateBaselines,
+                        updateUi,
+                        skipValidation
+                    });
+                    return;
+                }
+
+                await this._fileSaveService.saveFile(file, undefined, {
+                    source,
+                    force,
+                    skipReloadDetection: true,
+                    skipValidation
+                });
             }
+
+            if (updateUi && savedMainFile) {
+                const panelInstance = this.panel();
+                if (panelInstance) {
+                    try {
+                        panelInstance.webview.postMessage({
+                            type: 'saveCompleted',
+                            success: true
+                        });
+                    } catch (e) {
+                        // Webview may be disposed during panel close - save already succeeded
+                    }
+                }
+            }
+        };
+
+        if (requiresExclusive) {
+            const savePromise = runSave();
+            this._saveToMarkdownInFlight = savePromise;
+            try {
+                await savePromise;
+            } finally {
+                if (this._saveToMarkdownInFlight === savePromise) {
+                    this._saveToMarkdownInFlight = null;
+                }
+            }
+            return;
         }
+
+        if (this._saveToMarkdownInFlight) {
+            await this._saveToMarkdownInFlight;
+        }
+
+        await runSave();
+    }
+
+    private _resolveFileFromRegistry(filePath: string) {
+        const document = this.fileManager.getDocument();
+        const absolutePath = path.isAbsolute(filePath) || !document
+            ? filePath
+            : path.join(path.dirname(document.uri.fsPath), filePath);
+
+        return this.fileRegistry.get(filePath)
+            || this.fileRegistry.getByRelativePath(filePath)
+            || this.fileRegistry.get(absolutePath);
     }
 
 

@@ -15,7 +15,7 @@
  */
 
 import * as vscode from 'vscode';
-import { eventBus, BoardChangedEvent, BoardLoadedEvent, createEvent } from './index';
+import { eventBus, BoardChangedEvent, BoardLoadedEvent, BoardChangeTrigger, createEvent } from './index';
 import { KanbanBoard, MarkdownKanbanParser } from '../../markdownParser';
 import { BoardStore } from '../stores';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
@@ -148,6 +148,13 @@ export class BoardSyncHandler {
             this._deps.backupManager.createBackup(document, { label: 'auto' })
                 .catch(error => console.error('[BoardSyncHandler] Backup failed:', error));
         }
+    }
+
+    /**
+     * Sync include files from a board snapshot (used before manual save).
+     */
+    public async syncIncludesFromBoard(board: KanbanBoard, trigger: BoardChangeTrigger = 'edit'): Promise<void> {
+        await this._propagateEditsToIncludeFiles(board, trigger);
     }
 
     /**

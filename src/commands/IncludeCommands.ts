@@ -23,7 +23,6 @@ import {
     RequestEditTaskIncludeFileNameMessage
 } from '../core/bridge/MessageTypes';
 import { PathResolver } from '../services/PathResolver';
-import { MarkdownKanbanParser } from '../markdownParser';
 import { ExportService } from '../services/export/ExportService';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
@@ -397,78 +396,17 @@ export class IncludeCommands extends SwitchBasedCommand {
         try {
             if (isMainFile) {
                 const fileService = panelAccess._fileService;
-                const board = fileService?.board();
-
-                if (!board || !board.valid) {
-                    throw new Error('Invalid board state');
+                if (!fileService || typeof fileService.saveUnified !== 'function') {
+                    throw new Error('File service not available');
                 }
 
-                const markdown = MarkdownKanbanParser.generateMarkdown(board);
-
-                const fileRegistry = this.getFileRegistry();
-                const mainFile = fileRegistry?.getMainFile();
-                if (!mainFile) {
-                    throw new Error('Main file not found in registry');
-                }
-
-                await context.fileSaveService.saveFile(mainFile, markdown, { force: forceSave });
-                mainFile.updateFromBoard(board, true, true);
-
-                // Trigger marpWatch export if active
-                const autoExportSettings = context.getAutoExportSettings();
-                if (autoExportSettings?.marpWatch) {
-                    let document = context.fileManager.getDocument();
-                    const filePathForReopen = context.fileManager.getFilePath();
-
-                    if (!document && filePathForReopen) {
-                        try {
-                            document = await vscode.workspace.openTextDocument(filePathForReopen);
-                        } catch (error) {
-                            console.error(`[IncludeCommands] Failed to reopen document:`, error);
-                        }
-                    }
-
-                    if (document) {
-                        try {
-                            const webviewPanel = context.getWebviewPanel();
-                            const mermaidService = context.getMermaidExportService();
-                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
-                        } catch (error) {
-                            console.error('[IncludeCommands] MarpWatch export failed:', error);
-                        }
-                    }
-                }
-
-                this.postMessage({
-                    type: 'individualFileSaved',
-                    filePath: filePath,
-                    isMainFile: true,
-                    success: true,
-                    forceSave: forceSave
-                });
-            } else {
-                const fileRegistry = this.getFileRegistry();
-                if (!fileRegistry) {
-                    throw new Error('File registry not available');
-                }
-
-                const document = context.fileManager.getDocument();
-                const absolutePath = path.isAbsolute(filePath) || !document
-                    ? filePath
-                    : path.join(path.dirname(document.uri.fsPath), filePath);
-
-                const file = fileRegistry.get(filePath)
-                    || fileRegistry.getByRelativePath(filePath)
-                    || fileRegistry.get(absolutePath);
-                if (!file) {
-                    throw new Error(`File not found in registry: ${filePath}`);
-                }
-
-                await context.fileSaveService.saveFile(file, undefined, {
-                    skipReloadDetection: true,
+                await fileService.saveUnified({
+                    scope: 'main',
+                    force: forceSave,
                     source: 'ui-edit',
-                    skipValidation: false,
-                    force: forceSave
+                    syncIncludes: false,
+                    updateBaselines: true,
+                    updateUi: false
                 });
 
                 // Trigger marpWatch export if active
@@ -487,7 +425,55 @@ export class IncludeCommands extends SwitchBasedCommand {
 
                     if (document) {
                         const fileService = panelAccess._fileService;
-                        const board = fileService?.board();
+                        const board = fileService?.board?.();
+                        try {
+                            const webviewPanel = context.getWebviewPanel();
+                            const mermaidService = context.getMermaidExportService();
+                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
+                        } catch (error) {
+                            console.error('[IncludeCommands] MarpWatch export failed:', error);
+                        }
+                    }
+                }
+
+                this.postMessage({
+                    type: 'individualFileSaved',
+                    filePath: filePath,
+                    isMainFile: true,
+                    success: true,
+                    forceSave: forceSave
+                });
+            } else {
+                const fileService = panelAccess._fileService;
+                if (!fileService || typeof fileService.saveUnified !== 'function') {
+                    throw new Error('File service not available');
+                }
+
+                await fileService.saveUnified({
+                    scope: { filePath },
+                    force: forceSave,
+                    source: 'ui-edit',
+                    syncIncludes: true,
+                    updateUi: false
+                });
+
+                // Trigger marpWatch export if active
+                const autoExportSettings = context.getAutoExportSettings();
+                if (autoExportSettings?.marpWatch) {
+                    let document = context.fileManager.getDocument();
+                    const filePathForReopen = context.fileManager.getFilePath();
+
+                    if (!document && filePathForReopen) {
+                        try {
+                            document = await vscode.workspace.openTextDocument(filePathForReopen);
+                        } catch (error) {
+                            console.error(`[IncludeCommands] Failed to reopen document:`, error);
+                        }
+                    }
+
+                    if (document) {
+                        const fileService = panelAccess._fileService;
+                        const board = fileService?.board?.();
 
                         try {
                             const webviewPanel = context.getWebviewPanel();
