@@ -2317,6 +2317,9 @@ if (!webviewEventListenersInitialized) {
             }
             currentBoard = window.cachedBoard;
             window.currentBoard = currentBoard; // Expose to window for debug overlay verification
+            if (typeof window.requestDebugOverlaySyncRefresh === 'function') {
+                window.requestDebugOverlaySyncRefresh();
+            }
 
             // Clean up any duplicate row tags
             cleanupRowTagsWithContext();

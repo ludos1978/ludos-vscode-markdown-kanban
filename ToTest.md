@@ -30,6 +30,7 @@
 - [ ] File states table shows icon-only frontend/saved status; hover reveals hashes.
 - [ ] Main file frontend status reflects raw/normalized match in tooltip.
 - [ ] Main file saved-file status reflects normalized hash when available (tooltip).
+- [ ] File States Overview updates after backend boardUpdate without reopening.
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).
