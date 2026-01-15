@@ -6819,6 +6819,7 @@ figcaption {
     border-collapse: collapse;
     font-size: 13px;
     margin-top: 8px;
+    table-layout: fixed;
 }
 
 .file-row {
@@ -6837,6 +6838,17 @@ figcaption {
     background: var(--vscode-list-inactiveSelectionBackground);
     font-size: 12px;
     white-space: nowrap;
+}
+
+.files-table thead tr.files-table-actions th {
+    background: var(--vscode-editor-background);
+    font-weight: 500;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.files-table thead tr.files-table-actions th.action-cell {
+    text-align: center;
 }
 
 .files-table tbody tr {
@@ -6861,19 +6873,28 @@ figcaption {
 }
 
 .col-file {
-    width: 20%;
+    width: 32%;
 }
 
 .col-frontend,
 .col-backend,
 .col-saved {
-    width: 20%;
-}
-.col-actions {
     width: 12%;
 }
-.col-image {
+
+.col-save,
+.col-reload,
+.col-relative,
+.col-absolute {
     width: 8%;
+}
+
+.col-image {
+    width: 12%;
+}
+
+.action-cell {
+    text-align: center;
 }
 
 .sync-status-icon.sync-good {
@@ -6961,24 +6982,25 @@ figcaption {
 
 .action-buttons {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     justify-content: left;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .action-btn {
     background: var(--button-background);
     border: var(--button-border);
     color: var(--button-foreground);
-    padding: 4px 6px;
+    padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 11px;
     white-space: nowrap;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
+    min-width: 0;
     height: 24px;
     transition: opacity 0.15s ease;
 }
@@ -6988,22 +7010,21 @@ figcaption {
 }
 
 .save-btn {
-    background: transparent;
-    border: none;
-    color: var(--vscode-gitDecoration-addedResourceForeground);
+    background: var(--button-background);
+    border: var(--button-border);
+    color: var(--button-foreground);
 }
 
 .reload-btn {
-    background: transparent;
-    border: none;
-    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+    background: var(--button-background);
+    border: var(--button-border);
+    color: var(--button-foreground);
 }
 
 .reload-images-btn {
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    opacity: 0.7;
+    background: var(--button-background);
+    border: var(--button-border);
+    color: var(--button-foreground);
 }
 
 /* Icon Legend styles */
