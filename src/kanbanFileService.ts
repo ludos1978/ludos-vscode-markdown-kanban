@@ -8,7 +8,7 @@ import { BackupManager } from './services/BackupManager';
 import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
-import { getErrorMessage } from './utils/stringUtils';
+import { getErrorMessage, safeDecodeURIComponent } from './utils/stringUtils';
 import { logger } from './utils/logger';
 import { PanelContext, WebviewManager } from './panel';
 import { BoardStore } from './core/stores';
@@ -785,10 +785,11 @@ export class KanbanFileService {
             // Check column includes
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
+                    const decodedPath = safeDecodeURIComponent(relativePath);
                     // Resolve the absolute path
-                    const absolutePath = path.isAbsolute(relativePath)
-                        ? relativePath
-                        : path.resolve(basePath, relativePath);
+                    const absolutePath = path.isAbsolute(decodedPath)
+                        ? decodedPath
+                        : path.resolve(basePath, decodedPath);
 
                     const fileExists = fs.existsSync(absolutePath);
                     logger.debug(`[KanbanFileService] Initial load include check: column=${column.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);
@@ -806,9 +807,10 @@ export class KanbanFileService {
             for (const task of column.tasks || []) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        const absolutePath = path.isAbsolute(relativePath)
-                            ? relativePath
-                            : path.resolve(basePath, relativePath);
+                        const decodedPath = safeDecodeURIComponent(relativePath);
+                        const absolutePath = path.isAbsolute(decodedPath)
+                            ? decodedPath
+                            : path.resolve(basePath, decodedPath);
 
                         const fileExists = fs.existsSync(absolutePath);
                         logger.debug(`[KanbanFileService] Initial load include check: task=${task.id}, relativePath=${relativePath}, absolutePath=${absolutePath}, exists=${fileExists}`);

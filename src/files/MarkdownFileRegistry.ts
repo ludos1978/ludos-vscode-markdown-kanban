@@ -450,7 +450,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                     const mainFileDir = path.dirname(mainFile.getPath());
                     const absolutePath = file
                         ? file.getPath()
-                        : path.resolve(mainFileDir, relativePath);
+                        : path.resolve(mainFileDir, decodedPath);
                     const fileExistsOnDisk = fs.existsSync(absolutePath);
 
                     logger.debug(`[MarkdownFileRegistry] generateBoard() - Column include check: relativePath=${relativePath}, absolutePath=${absolutePath}, fileInRegistry=${!!file}, fileExistsOnDisk=${fileExistsOnDisk}, cachedExists=${file?.exists()}`);
@@ -500,7 +500,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         // exists on disk but isn't registered yet
                         const absolutePath = file
                             ? file.getPath()
-                            : path.resolve(path.dirname(mainFile.getPath()), relativePath);
+                            : path.resolve(path.dirname(mainFile.getPath()), decodedPath);
                         const fileExistsOnDisk = fs.existsSync(absolutePath);
 
                         if (fileExistsOnDisk) {
