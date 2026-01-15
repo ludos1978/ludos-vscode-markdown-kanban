@@ -2537,6 +2537,9 @@ function markUnsavedChanges() {
             cachedBoard: boardToSend // Send the current board data
         });
     }
+    if (typeof window.requestDebugOverlaySyncRefresh === 'function') {
+        window.requestDebugOverlaySyncRefresh();
+    }
 }
 
 /**

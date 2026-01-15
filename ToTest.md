@@ -33,6 +33,7 @@
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).
+- [ ] File States Overview updates frontend/non-raw hashes live while editing (no manual Verify Sync needed).
 - [ ] Missing include rows in File States are highlighted with warning background.
 - [ ] Task title/description clicks still enter edit mode.
 

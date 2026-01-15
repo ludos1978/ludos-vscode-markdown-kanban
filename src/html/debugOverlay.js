@@ -10,6 +10,8 @@ let lastTrackedFilesDataHash = null;
 let refreshCount = 0;
 let debugOverlaySticky = false; // New: sticky/pin state
 let debugNoticeTimer = null;
+let syncVerifyTimer = null;
+const SYNC_VERIFY_DEBOUNCE_MS = 300;
 
 function showDebugOverlayNotice(message, type = 'info', timeoutMs = 3000) {
     const existing = document.getElementById('debug-overlay-toast');
@@ -134,6 +136,10 @@ function hideDebugOverlay() {
 
     // Stop auto-refresh
     stopAutoRefresh();
+    if (syncVerifyTimer) {
+        clearTimeout(syncVerifyTimer);
+        syncVerifyTimer = null;
+    }
 
     if (debugOverlayElement) {
         debugOverlayElement.remove();
@@ -1406,6 +1412,19 @@ function verifyContentSync(silent = false) {
     }
 }
 
+function requestDebugOverlaySyncRefresh() {
+    if (!debugOverlayVisible || !window.vscode) {
+        return;
+    }
+    if (syncVerifyTimer) {
+        clearTimeout(syncVerifyTimer);
+    }
+    syncVerifyTimer = setTimeout(() => {
+        syncVerifyTimer = null;
+        verifyContentSync(true);
+    }, SYNC_VERIFY_DEBOUNCE_MS);
+}
+
 /**
  * Show verification results
  */
@@ -1536,6 +1555,7 @@ function initializeDebugOverlay() {
     window.cancelDebugOverlayShow = cancelDebugOverlayShow;
     window.hideDebugOverlayDelayed = hideDebugOverlayDelayed;
     window.openFile = openFile;
+    window.requestDebugOverlaySyncRefresh = requestDebugOverlaySyncRefresh;
 
     // Store original manual refresh function
     if (typeof window.manualRefresh === 'function') {
