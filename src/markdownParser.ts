@@ -251,6 +251,22 @@ export class MarkdownKanbanParser {
 
         // Collect description from any indented content
         if (currentTask && collectingDescription) {
+          if (trimmedLine === '' && !line.startsWith('  ')) {
+            // Skip blank separator lines before a new task/column/footer/YAML or end of file
+            let nextIndex = i + 1;
+            while (nextIndex < lines.length && lines[nextIndex].trim() === '') {
+              nextIndex++;
+            }
+            const nextLine = nextIndex < lines.length ? lines[nextIndex] : null;
+            const isStructuralBoundary = nextLine === null
+              || nextLine.startsWith('## ')
+              || nextLine.startsWith('- ')
+              || nextLine.startsWith('%%')
+              || nextLine.startsWith('---');
+            if (isStructuralBoundary) {
+              continue;
+            }
+          }
           let descLine = line;
           // remove the first leading spaces if there
           if (line.startsWith('  ')) {
