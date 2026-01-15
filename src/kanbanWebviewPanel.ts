@@ -337,7 +337,8 @@ export class KanbanWebviewPanel {
     private _registerHandlers(): void {
         this._boardSyncHandler = new BoardSyncHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, getMediaTracker: () => this._mediaTracker,
-            backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument(), panelContext: this._context
+            backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument(), panelContext: this._context,
+            getWebviewBridge: () => this._webviewBridge
         });
         this._fileSyncHandler = new FileSyncHandler({
             fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,

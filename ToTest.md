@@ -38,6 +38,7 @@
 - [ ] File States Overview columns have visible spacing between them without truncating filenames.
 - [ ] File States Overview header labels show Cache/File and an "All Files" marker on the action row.
 - [ ] File States Overview top stats show Cache/File sync counts with icons; reload images button appears in header row.
+- [ ] Include files update frontend cache immediately after board edits (no stale include content on quick edit/save/edit).
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
 - [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).

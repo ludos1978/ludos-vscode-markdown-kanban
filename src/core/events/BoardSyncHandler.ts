@@ -26,6 +26,7 @@ import { sortColumnsByRow } from '../../utils/columnUtils';
 import { safeDecodeURIComponent } from '../../utils/stringUtils';
 import { PanelContext } from '../../panel/PanelContext';
 import { logger } from '../../utils/logger';
+import { WebviewBridge } from '../bridge';
 
 /**
  * Dependencies required by BoardSyncHandler
@@ -37,6 +38,7 @@ export interface BoardSyncDependencies {
     backupManager: BackupManager;
     getDocument: () => vscode.TextDocument | undefined;
     panelContext: PanelContext;  // Panel context for scoped event bus
+    getWebviewBridge: () => WebviewBridge | null;
 }
 
 export class BoardSyncHandler {
@@ -83,6 +85,7 @@ export class BoardSyncHandler {
     private async _handleBoardChanged(event: BoardChangedEvent): Promise<void> {
         const { board } = event.data;
         const isDebug = this._deps.panelContext.debugMode;
+        const webviewBridge = this._deps.getWebviewBridge();
 
         if (!this._deps.fileRegistry.isReady()) {
             return;
@@ -156,6 +159,7 @@ export class BoardSyncHandler {
      */
     private async _propagateEditsToIncludeFiles(board: KanbanBoard, trigger?: string): Promise<void> {
         const isDebug = this._deps.panelContext.debugMode;
+        const webviewBridge = this._deps.getWebviewBridge();
         // Update column include files with current task content
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
@@ -204,6 +208,14 @@ export class BoardSyncHandler {
                             });
                         }
                         includeFile.setContent(content, false);
+                        if (webviewBridge) {
+                            webviewBridge.sendBatched({
+                                type: 'updateIncludeContent',
+                                filePath: relativePath,
+                                content: content,
+                                error: includeFile.exists() ? undefined : `File not found: ${relativePath}`
+                            });
+                        }
 
                         const includePath = includeFile.getPath();
                         const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
@@ -267,15 +279,23 @@ export class BoardSyncHandler {
 
                         // Only update if content differs from current cached content
                         if (fullContent !== currentContent) {
-                            if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
-                                logger.debug('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
-                                    trigger,
-                                    taskId: task.id,
-                                    includePath: includeFile.getPath(),
-                                    contentLength: fullContent.length
-                                });
-                            }
-                            includeFile.setTaskDescription(fullContent);
+                        if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
+                            logger.debug('[kanban.BoardSyncHandler.undoRedo.includeTaskUpdate]', {
+                                trigger,
+                                taskId: task.id,
+                                includePath: includeFile.getPath(),
+                                contentLength: fullContent.length
+                            });
+                        }
+                        includeFile.setTaskDescription(fullContent);
+                        if (webviewBridge) {
+                            webviewBridge.sendBatched({
+                                type: 'updateIncludeContent',
+                                filePath: relativePath,
+                                content: fullContent,
+                                error: includeFile.exists() ? undefined : `File not found: ${relativePath}`
+                            });
+                        }
 
                             const includePath = includeFile.getPath();
                             const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
