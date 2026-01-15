@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.100.2 after the build.
+- [ ] Confirm the extension version shows 0.100.3 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -85,6 +85,7 @@
 - [ ] Broken file menus update paths in all editors (inline markdown, inline WYSIWYG, overlay preview/markdown/WYSIWYG).
 - [ ] Include paths with URL-encoded spaces resolve on disk (no false “broken include” badges).
 - [ ] Column/task includes with ./ or absolute paths register as COLINC/TASKINC and show cache hashes after load (no false missing warnings in Verify Sync).
+- [ ] Search-for-file replaces image/link paths that include a quoted title (e.g. `![alt](path "title")`).
 - [ ] Path replacement only updates actual link/include targets (no substring replacements).
 - [ ] Empty image/link targets (e.g. `![]()` / `[]()`) are replaced correctly in inline, overlay, and dual preview editors.
 - [ ] Overlay dual preview: search-for-file replaces the markdown draft + preview.
