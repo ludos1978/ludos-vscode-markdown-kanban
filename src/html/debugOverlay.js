@@ -942,17 +942,17 @@ function createFileStatesList(allFiles) {
                     🔍 Verify Sync
                 </button>
                 <button onclick="forceWriteAllContent()" class="debug-btn" title="Force write all files (emergency recovery)">
-                    ⚠️ Force Save All
+                    Save All
                 </button>
                 <button onclick="reloadAllIncludedFiles()" class="debug-btn" title="Reload all included files from disk">
-                    🔄 Reload All
+                    Reload All
                 </button>
                 <span class="debug-btn-separator">|</span>
                 <button onclick="convertAllPaths('relative')" class="debug-btn" title="Convert all paths to relative format">
-                    📁 All to Relative
+                    Relative
                 </button>
                 <button onclick="convertAllPaths('absolute')" class="debug-btn" title="Convert all paths to absolute format">
-                    📂 All to Absolute
+                    Absolute
                 </button>
             </div>
             <table class="files-table">
@@ -963,6 +963,20 @@ function createFileStatesList(allFiles) {
                         <th class="col-saved" title="Saved file on disk">Saved File</th>
                         <th class="col-actions">Save/Load</th>
                         <th class="col-image">Image</th>
+                    </tr>
+                    <tr class="files-table-actions">
+                        <th class="col-file"></th>
+                        <th class="col-frontend"></th>
+                        <th class="col-saved"></th>
+                        <th class="col-actions">
+                            <div class="action-buttons">
+                                <button onclick="forceWriteAllContent()" class="action-btn save-btn" title="Force save all files">Save All</button>
+                                <button onclick="reloadAllIncludedFiles()" class="action-btn reload-btn" title="Reload all included files from disk">Reload All</button>
+                                <button onclick="convertAllPaths('relative')" class="action-btn" title="Convert all paths to relative format">Relative</button>
+                                <button onclick="convertAllPaths('absolute')" class="action-btn" title="Convert all paths to absolute format">Absolute</button>
+                            </div>
+                        </th>
+                        <th class="col-image"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1065,15 +1079,15 @@ function createFileStatesList(allFiles) {
                                 </td>
                                 <td class="col-actions">
                                     <div class="action-buttons">
-                                        <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
-                                        <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">🔄</button>
-                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'relative')" class="action-btn" title="Convert paths to relative format">📁</button>
-                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'absolute')" class="action-btn" title="Convert paths to absolute format">📂</button>
+                                        <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">Save</button>
+                                        <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">Reload</button>
+                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'relative')" class="action-btn" title="Convert paths to relative format">Relative</button>
+                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'absolute')" class="action-btn" title="Convert paths to absolute format">Absolute</button>
                                     </div>
                                 </td>
                                 <td class="col-image">
                                     <div class="action-buttons">
-                                        <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️</button>
+                                        <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">Image</button>
                                     </div>
                                 </td>
                             </tr>
