@@ -251,23 +251,19 @@ export class MarkdownKanbanParser {
 
         // Collect description from any indented content
         if (currentTask && collectingDescription) {
+          let descLine = line;
+          // remove the first leading spaces if there
           if (line.startsWith('  ')) {
-            let descLine = line.substring(2);
-            // Store description (frontend will handle include processing)
-            if (!currentTask.description) {
-              currentTask.description = descLine;
-            } else {
-              currentTask.description += '\n' + descLine;
-            }
-            continue;
+            descLine = line.substring(2);
           }
 
-          // Unindented blank line ends the description (prevents trailing blank lines from becoming indented)
-          if (trimmedLine === '') {
-            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
-            collectingDescription = false;
-            continue;
+          // Store description (frontend will handle include processing)
+          if (!currentTask.description) {
+            currentTask.description = descLine;
+          } else {
+            currentTask.description += '\n' + descLine;
           }
+          continue;
         }
 
         if (trimmedLine === '') {
@@ -499,13 +495,7 @@ export class MarkdownKanbanParser {
             const descriptionToUse = task.description ?? '';
             if (descriptionToUse) {
               const descriptionLines = descriptionToUse.split('\n');
-              // Filter out the last element if it's empty (happens when description ends with \n)
-              // This prevents adding extra blank lines
-              const linesToWrite = descriptionLines[descriptionLines.length - 1] === ''
-                ? descriptionLines.slice(0, -1)
-                : descriptionLines;
-
-              for (const descLine of linesToWrite) {
+              for (const descLine of descriptionLines) {
                 markdown += `  ${descLine}\n`;
               }
             }

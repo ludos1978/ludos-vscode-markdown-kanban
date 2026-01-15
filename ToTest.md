@@ -32,7 +32,7 @@
 - [ ] Main file saved-file row shows normalized hash with raw hash beneath when available.
 - [ ] Verify Sync (debug enabled) logs first-diff snippets for main file raw/normalized/front-end mismatches.
 - [ ] Verify Sync logs include line numbers + trailing blank-line counts for main file diffs.
-- [ ] Save/load is idempotent when the file ends with unindented blank lines (no new indented blanks added).
+- [ ] Save/load is idempotent for trailing blank lines in descriptions (indented and unindented cases).
 - [ ] Missing include rows in File States are highlighted with warning background.
 - [ ] Task title/description clicks still enter edit mode.
 
