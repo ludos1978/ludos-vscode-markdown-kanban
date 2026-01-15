@@ -324,19 +324,6 @@ export class KanbanFileService {
     }
 
     /**
-     * Save board to markdown file using unified FileSaveService
-     */
-    public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true): Promise<void> {
-        await this.saveUnified({
-            scope: 'all',
-            source: 'ui-edit',
-            syncIncludes: true,
-            updateBaselines: true,
-            updateUi: true
-        });
-    }
-
-    /**
      * Unified save pipeline for all save operations (Cmd+S, individual save, save includes)
      */
     public async saveUnified(options: SaveUnifiedOptions = {}): Promise<void> {

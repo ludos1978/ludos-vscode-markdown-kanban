@@ -524,12 +524,18 @@ export class KanbanWebviewPanel {
         await this._webviewUpdateService?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }
 
-    public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
+    public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true) {
         const hasMainFile = await this._ensureMainFileContext('save');
         if (!hasMainFile) {
             return;
         }
-        await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
+        await this._fileService.saveUnified({
+            scope: 'all',
+            source: 'ui-edit',
+            syncIncludes: true,
+            updateBaselines: true,
+            updateUi: true
+        });
         this._restoreStateFromFileService();
     }
 
