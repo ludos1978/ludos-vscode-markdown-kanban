@@ -352,6 +352,9 @@ export class KanbanFileService {
 
             if (syncIncludes && board) {
                 const panelInstance = this.getPanelInstance();
+                if (panelInstance?.syncIncludeFilesWithBoard) {
+                    panelInstance.syncIncludeFilesWithBoard(board);
+                }
                 if (panelInstance?.syncIncludesFromBoard) {
                     await panelInstance.syncIncludesFromBoard(board, 'edit');
                 }
