@@ -2,7 +2,7 @@
 
 ## Build & Release
 - [ ] Run `./build.sh` and confirm it completes (production build + vsce package).
-- [ ] Confirm the extension version shows 0.100.5 after the build.
+- [ ] Confirm the extension version shows 0.100.6 after the build.
 
 ## Docs & Reviews
 - [ ] Review `TODOs-codex.md` (markdown-it feature list, design pattern + plan integration, final implementation steps).
@@ -87,6 +87,7 @@
 - [ ] Column/task includes with ./ or absolute paths register as COLINC/TASKINC and show cache hashes after load (no false missing warnings in Verify Sync).
 - [ ] Search-for-file replaces image/link paths that include a quoted title or bracketed destination (e.g. `![alt](path "title")`, `![alt](<path>)`).
 - [ ] Search-for-file works while an inline/overlay editor is open (edits are captured before replacement).
+- [ ] Search-for-file selecting the same file as the current path completes without errors (no-op replacement).
 - [ ] Path replacement only updates actual link/include targets (no substring replacements).
 - [ ] Empty image/link targets (e.g. `![]()` / `[]()`) are replaced correctly in inline, overlay, and dual preview editors.
 - [ ] Overlay dual preview: search-for-file replaces the markdown draft + preview.

@@ -850,6 +850,35 @@ export class PathCommands extends SwitchBasedCommand {
         const newContent = LinkOperations.replaceSingleLink(foundContent, actualOldPath, newPath, 0);
 
         if (newContent === foundContent) {
+            const normalizedOld = this.normalizePath(replacementOldPath);
+            const normalizedNew = this.normalizePath(newPath);
+            if (normalizedOld === normalizedNew) {
+                logger.debug('[PathCommands] Path already matches selected file (no-op replacement):', replacementOldPath);
+                this.postMessage({
+                    type: 'imagePathReplaced',
+                    oldPath: oldPath,
+                    newPath: newPath,
+                    filePath: foundFile.getRelativePath()
+                });
+                this.postMessage({
+                    type: 'pathReplaced',
+                    originalPath: oldPath,
+                    actualPath: actualOldPath,
+                    newPath: newPath,
+                    taskId: taskId,
+                    columnId: columnId,
+                    isColumnTitle: isColumnTitle,
+                    filePath: foundFile.getRelativePath()
+                });
+                showInfo('Selected file already matches the current path.');
+                return this.success({
+                    replaced: false,
+                    unchanged: true,
+                    oldPath: oldPath,
+                    newPath: newPath,
+                    filePath: foundFile.getRelativePath()
+                });
+            }
             logger.debug('[PathCommands] No link/include match found for path replacement:', actualOldPath);
             return this.failure('Old path not found in any link/include');
         }
