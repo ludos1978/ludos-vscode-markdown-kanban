@@ -1245,8 +1245,10 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         if (updated) {
+            // Only emit board changed, don't trigger onBoardUpdate()
+            // The caller (_replacePathInFiles) will handle the webview update
+            // after completing the path replacement, avoiding a double update
             context.emitBoardChanged(board, 'edit');
-            await context.onBoardUpdate();
         }
     }
 

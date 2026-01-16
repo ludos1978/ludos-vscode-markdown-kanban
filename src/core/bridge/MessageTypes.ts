@@ -45,6 +45,8 @@ export interface ResponseMessage extends BaseMessage {
 export interface BoardUpdateMessage extends BaseMessage {
     type: 'boardUpdate';
     board: KanbanBoard;
+    // Main file path for image resolution (must be set before rendering starts)
+    mainFilePath?: string;
     // Core view settings
     columnBorder: string;
     taskBorder: string;

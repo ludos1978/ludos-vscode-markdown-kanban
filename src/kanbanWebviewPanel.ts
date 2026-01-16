@@ -91,6 +91,8 @@ export class KanbanWebviewPanel {
         if (!this._panel || !this.getBoard()) return;
         this._context.setWebviewReady(false);
         this._panel.webview.html = this._webviewManager.generateHtml();
+        // Send file info before board update so currentFilePath is set for image path resolution
+        this._fileManager.sendFileInfo();
         this.sendBoardUpdate(false, true);
     }
 

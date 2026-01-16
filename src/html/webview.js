@@ -2271,6 +2271,16 @@ if (!webviewEventListenersInitialized) {
                     timestamp: performance.now()
                 });
             }
+
+            // CRITICAL: Set currentFilePath BEFORE any rendering starts
+            // This is needed for image path resolution in markdown content.
+            // We set it here (not in updateFileInfo) because boardUpdate processing
+            // is synchronous and can take hundreds of milliseconds, during which
+            // updateFileInfo may be queued but not yet processed.
+            if (message.mainFilePath) {
+                window.currentFilePath = message.mainFilePath;
+            }
+
             const previousBoard = window.cachedBoard;
 
             // Clear card focus when board is updated

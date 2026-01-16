@@ -319,8 +319,10 @@ export class KanbanFileService {
             }
         }
 
-        await this.sendBoardUpdate(false, forceReload);
+        // Send file info BEFORE board update so that window.currentFilePath is set
+        // when the board renders - this is needed for relative path resolution in images
         this.fileManager.sendFileInfo();
+        await this.sendBoardUpdate(false, forceReload);
     }
 
     /**

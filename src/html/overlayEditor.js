@@ -892,7 +892,16 @@
                 return;
             }
             if (event.key === 'Enter' && event.altKey) {
-                requestClose('save');
+                // In title input: Alt+Enter moves focus to content editor
+                // In content area: Alt+Enter saves and closes
+                if (document.activeElement === elements.titleInput) {
+                    event.preventDefault();
+                    if (activeAdapter && typeof activeAdapter.focus === 'function') {
+                        activeAdapter.focus();
+                    }
+                } else {
+                    requestClose('save');
+                }
             }
         }, true);
 

@@ -147,10 +147,15 @@ export class WebviewUpdateService {
         const viewConfig = configService.getBoardViewConfig(layoutPresets);
         this._applyDocumentMarpPreference(viewConfig);
 
+        // Get main file path for image resolution in webview
+        const mainFile = this._deps.fileRegistry.getMainFile();
+        const mainFilePath = mainFile?.getPath();
+
         // BoardUpdateMessage type matches getBoardViewConfig() output
         const message = {
             type: 'boardUpdate' as const,
             board: board,
+            ...(mainFilePath && { mainFilePath }),
             ...(viewConfig as Partial<BoardUpdateMessage>),
             // Optional fields for full board loads
             ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),

@@ -475,7 +475,13 @@ class TaskEditor {
                 }
             } else if (e.key === 'Enter' && e.altKey) {
                 e.preventDefault();
-                this.save();
+                // In task title: Alt+Enter transitions to description editing
+                // In other fields: Alt+Enter saves
+                if (element.classList.contains('task-title-edit')) {
+                    this.transitionToDescription();
+                } else {
+                    this.save();
+                }
             } else if (e.key === 'Enter' && !e.shiftKey) {
                 if (element.classList.contains('task-title-edit') ||
                     element.classList.contains('column-title-edit')) {
