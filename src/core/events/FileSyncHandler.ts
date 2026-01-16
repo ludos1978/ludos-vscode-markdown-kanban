@@ -77,6 +77,7 @@ export class FileSyncHandler {
 
         // Subscribe to focus:gained for external change detection
         this._unsubscribeFocus = scopedBus.on<Record<string, never>>('focus:gained', async () => {
+            console.log('[FileSyncHandler] focus:gained event received - calling reloadExternallyModifiedFiles');
             await this.reloadExternallyModifiedFiles({ force: false, skipDuringInitialLoad: true });
         });
     }
@@ -94,6 +95,9 @@ export class FileSyncHandler {
      */
     public async reloadExternallyModifiedFiles(options: FileSyncOptions): Promise<FileSyncResult> {
         const { force, skipDuringInitialLoad = false, skipBoardUpdate = false } = options;
+        const stack = new Error().stack?.split('\n').slice(1, 5).join('\n') || 'no stack';
+        console.log('[FileSyncHandler.reloadExternallyModifiedFiles] START', { force, skipDuringInitialLoad, skipBoardUpdate });
+        console.log('[FileSyncHandler.reloadExternallyModifiedFiles] CALLER:\n' + stack);
 
         const result: FileSyncResult = {
             includeFilesChanged: false,
@@ -125,6 +129,12 @@ export class FileSyncHandler {
 
             // Step 3: Send updates to webview
             if (result.includeFilesChanged || force) {
+                console.log('[FileSyncHandler] Sending board update', {
+                    includeFilesChanged: result.includeFilesChanged,
+                    force,
+                    skipBoardUpdate,
+                    changedFiles: result.changedIncludeFiles
+                });
                 if (skipBoardUpdate) {
                     // During initial load, loadMarkdownFile() already sent the board update.
                     // We only need to send include content, not another full board update.
@@ -138,6 +148,7 @@ export class FileSyncHandler {
                     }
                 } else {
                     // Normal path: send full board update (includes include content)
+                    console.log('[FileSyncHandler] Calling sendBoardUpdate(false, true)');
                     this._deps.boardStore.invalidateCache();
                     this._deps.sendBoardUpdate(false, true);
 

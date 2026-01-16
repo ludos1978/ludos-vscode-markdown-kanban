@@ -139,6 +139,8 @@ export class KanbanFileService {
      * Ensure board is loaded and send update to webview
      */
     public async ensureBoardAndSendUpdate(): Promise<void> {
+        const stack = new Error().stack?.split('\n').slice(1, 6).join('\n') || 'no stack';
+        logger.debug('[KanbanFileService.ensureBoardAndSendUpdate] START - CALLER:\n' + stack);
         if (this.fileManager.getDocument()) {
             try {
                 const document = this.fileManager.getDocument()!;
@@ -164,7 +166,9 @@ export class KanbanFileService {
             }
         }
 
+        logger.debug('[KanbanFileService.ensureBoardAndSendUpdate] Calling sendBoardUpdate');
         await this.sendBoardUpdate();
+        logger.debug('[KanbanFileService.ensureBoardAndSendUpdate] DONE');
     }
 
     /**

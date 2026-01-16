@@ -25,6 +25,7 @@ import {
     DOTTED_EXTENSIONS
 } from '../constants/FileExtensions';
 import { getMediaCachePath } from '../constants/FileNaming';
+import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 interface MediaFileEntry {
     mtime: number;
@@ -162,7 +163,7 @@ export class MediaTracker {
         let cleanPath = relativePath;
 
         // Remove URL encoding
-        cleanPath = decodeURIComponent(cleanPath);
+        cleanPath = safeDecodeURIComponent(cleanPath);
 
         // Handle paths that start with ./
         if (cleanPath.startsWith('./')) {

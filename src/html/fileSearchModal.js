@@ -198,6 +198,16 @@ const fileSearchModal = (function() {
     function close() {
         isVisible = false;
         overlay.classList.remove('visible');
+
+        // Unlock container dimensions if they were locked for this operation
+        if (window._pendingDimensionUnlock) {
+            console.log('[DimensionLock] fileSearch cancelled: unlocking dimensions');
+            if (typeof window.unlockContainerDimensions === 'function') {
+                window.unlockContainerDimensions();
+            }
+            window._pendingDimensionUnlock = null;
+        }
+
         vscode.postMessage({ type: 'fileSearchCancelled' });
     }
 

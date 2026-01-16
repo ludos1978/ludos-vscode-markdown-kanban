@@ -115,6 +115,7 @@ export class FileRegistryChangeHandler {
 
             this._deps.invalidateBoardCache();
             // Use sendBoardUpdate to ensure image mappings are regenerated
+            console.log('[FileRegistryChangeHandler._handleMainFileReloaded] About to call sendBoardUpdate(false, true)');
             await this._deps.sendBoardUpdate(false, true);
         }
     }

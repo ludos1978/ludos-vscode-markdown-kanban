@@ -435,14 +435,28 @@ export class KanbanWebviewPanel {
         this._panel.onDidDispose(() => this._handlePanelClose(), null, this._disposables);
 
         this._panel.onDidChangeViewState(async e => {
+            logger.debug('[KanbanWebviewPanel.onDidChangeViewState] visibility changed:', e.webviewPanel.visible);
             if (e.webviewPanel.visible) {
                 KanbanWebviewPanel.lastActivePanel = this;
                 this._fileManager.sendFileInfo();
                 this.syncDirtyItems();
                 await this.refreshConfiguration();
+                logger.debug('[KanbanWebviewPanel.onDidChangeViewState] About to emit focus:gained');
                 this._context.scopedEventBus.emit('focus:gained', {});
 
-                if (this._fileManager.getDocument() && (!this.getBoard() || !this._context.initialized)) {
+                const hasDocument = !!this._fileManager.getDocument();
+                const hasBoard = !!this.getBoard();
+                const isInitialized = this._context.initialized;
+                const willEnsureBoard = hasDocument && (!hasBoard || !isInitialized);
+
+                logger.debug('[KanbanWebviewPanel.onDidChangeViewState] Panel became visible', {
+                    hasDocument,
+                    hasBoard,
+                    isInitialized,
+                    willEnsureBoard
+                });
+
+                if (willEnsureBoard) {
                     this._ensureBoardAndSendUpdate();
                 }
             }
@@ -504,6 +518,8 @@ export class KanbanWebviewPanel {
     }
 
     private async _ensureBoardAndSendUpdate() {
+        const stack = new Error().stack?.split('\n').slice(1, 5).join('\n') || 'no stack';
+        logger.debug('[KanbanWebviewPanel._ensureBoardAndSendUpdate] CALLED - CALLER:\n' + stack);
         await this._fileService.ensureBoardAndSendUpdate();
         this._restoreStateFromFileService();
     }
@@ -522,6 +538,8 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
+        const stack = new Error().stack?.split('\n').slice(1, 6).join('\n') || 'no stack';
+        logger.debug('[KanbanWebviewPanel.sendBoardUpdate] CALLER TRACE:\n' + stack);
         logger.debug('[KanbanWebviewPanel.sendBoardUpdate] webviewReady:', this._context.webviewReady, 'hasService:', !!this._webviewUpdateService);
         await this._webviewUpdateService?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }

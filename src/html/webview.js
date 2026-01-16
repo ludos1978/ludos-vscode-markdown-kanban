@@ -18,6 +18,10 @@ window.fileContextErrorActive = false;
 // Note: window.tagColors is set by backend in boardUpdate message
 // Do NOT initialize to {} here - it prevents actual config from loading!
 let baseBuildVersion = '';
+
+// Track recent targeted updates to skip redundant full renders
+let lastTargetedUpdateTime = 0;
+const TARGETED_UPDATE_SKIP_WINDOW = 500; // ms to skip full render after targeted update
 window.kanbanDebug = window.kanbanDebug || {
     enabled: false,
     log: (...args) => {
@@ -2602,18 +2606,51 @@ if (!webviewEventListenersInitialized) {
             const isEditing = window.taskEditor && window.taskEditor.currentEditor;
 
 
+            // Check if a targeted update was recently done - skip full render if so
+            const timeSinceTargetedUpdate = Date.now() - lastTargetedUpdateTime;
+            const skipDueToRecentTargetedUpdate = timeSinceTargetedUpdate < TARGETED_UPDATE_SKIP_WINDOW;
+
             if (!isEditing && !shouldSkipRender) {
-                // Only render if not editing and not explicitly skipping
-                if (typeof window.renderBoard === 'function') {
-                    window.renderBoard();
+                // Log the decision
+                console.log('[RENDER-DEBUG] boardUpdate decision', {
+                    isFullRefresh: message.isFullRefresh,
+                    applyDefaultFolding: message.applyDefaultFolding,
+                    hasSkipRender: Boolean(message.skipRender || message.board?.skipRender),
+                    columnCount: message.board?.columns?.length ?? 0,
+                    timeSinceTargetedUpdate: timeSinceTargetedUpdate,
+                    skipDueToRecentTargetedUpdate: skipDueToRecentTargetedUpdate,
+                    willRender: !skipDueToRecentTargetedUpdate || message.isFullRefresh
+                });
+
+                // Only do full render if:
+                // 1. It's a full refresh (explicit reload) OR
+                // 2. No recent targeted update was done
+                if (!skipDueToRecentTargetedUpdate || message.isFullRefresh) {
+                    if (typeof window.renderBoard === 'function') {
+                        window.renderBoard();
+                    }
+
+                    // Apply default folding if this is from an external change
+                    if (message.applyDefaultFolding) {
+                        setTimeout(() => {
+                            applyDefaultFoldingToNewDocument();
+                        }, 100); // Wait for render to complete
+                    }
+                } else {
+                    console.log('[RENDER-DEBUG] Skipping full render due to recent targeted update');
                 }
-                
-                // Apply default folding if this is from an external change
-                if (message.applyDefaultFolding) {
-                    setTimeout(() => {
-                        applyDefaultFoldingToNewDocument();
-                    }, 100); // Wait for render to complete
-                }
+            }
+
+            // Unlock container dimensions if they were locked for a file operation
+            // This must happen regardless of render decisions (editing, skipRender, etc.)
+            if (window._pendingDimensionUnlock) {
+                console.log('[DimensionLock] boardUpdate: unlocking, operation:', window._pendingDimensionUnlock.operation);
+                requestAnimationFrame(() => {
+                    if (typeof window.unlockContainerDimensions === 'function') {
+                        window.unlockContainerDimensions();
+                    }
+                    window._pendingDimensionUnlock = null;
+                });
             }
             break;
         case 'updateFileInfo':
@@ -3395,6 +3432,13 @@ if (!webviewEventListenersInitialized) {
                             itemType: 'column',
                             itemId: message.columnId
                         });
+
+                        // Record targeted update timestamp to skip redundant full renders
+                        lastTargetedUpdateTime = Date.now();
+                        console.log('[TARGETED-UPDATE] updateColumnContent completed', {
+                            columnId: message.columnId,
+                            timestamp: lastTargetedUpdateTime
+                        });
                     } else {
 
                         // OPTIMIZATION 1: Tell backend this render was skipped
@@ -3533,6 +3577,14 @@ if (!webviewEventListenersInitialized) {
                             type: 'renderCompleted',
                             itemType: 'task',
                             itemId: message.taskId
+                        });
+
+                        // Record targeted update timestamp to skip redundant full renders
+                        lastTargetedUpdateTime = Date.now();
+                        console.log('[TARGETED-UPDATE] updateTaskContent completed', {
+                            taskId: message.taskId,
+                            columnId: foundColumn.id,
+                            timestamp: lastTargetedUpdateTime
                         });
                     } else {
 

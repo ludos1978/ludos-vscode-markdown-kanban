@@ -19,6 +19,118 @@
 let updateStackLayoutTimer = null;
 let pendingStackElement = null;
 
+// ============================================================================
+// CENTRALIZED DIMENSION LOCK SYSTEM
+// ============================================================================
+
+/**
+ * Active dimension locks - maps element to its original styles
+ * This allows multiple systems to lock dimensions without conflict
+ */
+const activeDimensionLocks = new Map();
+
+/**
+ * Lock an element's dimensions to its current size.
+ * Prevents layout shifts during DOM updates.
+ * @param {HTMLElement} element - Element to lock
+ * @returns {Object|null} Lock object for unlocking, or null if element invalid
+ */
+function lockElementDimensions(element) {
+    if (!element) return null;
+
+    // If already locked, return existing lock
+    if (activeDimensionLocks.has(element)) {
+        return activeDimensionLocks.get(element);
+    }
+
+    const rect = element.getBoundingClientRect();
+    const lock = {
+        element,
+        originalStyles: {
+            width: element.style.width,
+            height: element.style.height,
+            minWidth: element.style.minWidth,
+            minHeight: element.style.minHeight
+        },
+        lockedAt: Date.now()
+    };
+
+    // Fix dimensions to current values
+    element.style.width = rect.width + 'px';
+    element.style.height = rect.height + 'px';
+    element.style.minWidth = rect.width + 'px';
+    element.style.minHeight = rect.height + 'px';
+
+    activeDimensionLocks.set(element, lock);
+    return lock;
+}
+
+/**
+ * Unlock an element's dimensions, restoring original styles.
+ * @param {Object|HTMLElement} lockOrElement - Lock object from lockElementDimensions, or the element itself
+ */
+function unlockElementDimensions(lockOrElement) {
+    if (!lockOrElement) return;
+
+    // Support both lock object and direct element reference
+    const element = lockOrElement.element || lockOrElement;
+    const lock = activeDimensionLocks.get(element);
+
+    if (!lock) return;
+
+    // Restore original styles
+    element.style.width = lock.originalStyles.width;
+    element.style.height = lock.originalStyles.height;
+    element.style.minWidth = lock.originalStyles.minWidth;
+    element.style.minHeight = lock.originalStyles.minHeight;
+
+    activeDimensionLocks.delete(element);
+}
+
+/**
+ * Lock the main kanban container's dimensions.
+ * Use this before operations that might cause layout shifts.
+ * @returns {Object|null} Lock object
+ */
+function lockContainerDimensions() {
+    const container = document.getElementById('kanban-container');
+    if (!container) return null;
+
+    console.log('[DimensionLock] Locking container dimensions');
+    return lockElementDimensions(container);
+}
+
+/**
+ * Unlock the main kanban container's dimensions.
+ */
+function unlockContainerDimensions() {
+    const container = document.getElementById('kanban-container');
+    if (container) {
+        console.log('[DimensionLock] Unlocking container dimensions');
+        unlockElementDimensions(container);
+    }
+}
+
+/**
+ * Check if an element is currently dimension-locked.
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+function isElementDimensionLocked(element) {
+    return activeDimensionLocks.has(element);
+}
+
+// Export dimension lock functions globally
+window.lockElementDimensions = lockElementDimensions;
+window.unlockElementDimensions = unlockElementDimensions;
+window.lockContainerDimensions = lockContainerDimensions;
+window.unlockContainerDimensions = unlockContainerDimensions;
+window.isElementDimensionLocked = isElementDimensionLocked;
+
+// ============================================================================
+// SCROLL ELEMENT UTILITIES
+// ============================================================================
+
 function describeScrollElement(element) {
     if (!element) return null;
     const columnId = element.getAttribute ? element.getAttribute('data-column-id') : null;
@@ -156,8 +268,38 @@ function applyStackedColumnStyles(columnId = null) {
     const container = document.getElementById('kanban-container');
     const board = document.getElementById('kanban-board');
     const scrollPositions = [];
+    const dimensionLocks = [];
 
+    // Capture and fix dimensions to prevent layout shift during reflow
+    const lockDimensions = (element) => {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        const originalStyles = {
+            element,
+            width: element.style.width,
+            height: element.style.height,
+            minWidth: element.style.minWidth,
+            minHeight: element.style.minHeight
+        };
+        // Fix dimensions to current values
+        element.style.width = rect.width + 'px';
+        element.style.height = rect.height + 'px';
+        element.style.minWidth = rect.width + 'px';
+        element.style.minHeight = rect.height + 'px';
+        return originalStyles;
+    };
+
+    const unlockDimensions = (lock) => {
+        if (!lock || !lock.element) return;
+        lock.element.style.width = lock.width;
+        lock.element.style.height = lock.height;
+        lock.element.style.minWidth = lock.minWidth;
+        lock.element.style.minHeight = lock.minHeight;
+    };
+
+    // Lock dimensions before capturing scroll positions
     if (container) {
+        dimensionLocks.push(lockDimensions(container));
         scrollPositions.push({
             element: container,
             left: container.scrollLeft,
@@ -165,6 +307,7 @@ function applyStackedColumnStyles(columnId = null) {
         });
     }
     if (board) {
+        dimensionLocks.push(lockDimensions(board));
         scrollPositions.push({
             element: board,
             left: board.scrollLeft,
@@ -185,7 +328,8 @@ function applyStackedColumnStyles(columnId = null) {
     enforceFoldModesForStacks(targetStack);
     updateStackLayoutCore(targetStack);
 
-    const restoreScroll = () => {
+    const restoreScrollAndDimensions = () => {
+        // First restore scroll positions
         scrollPositions.forEach(({ element, left, top }) => {
             if (typeof window.logViewMovement === 'function') {
                 window.logViewMovement('applyStackedColumnStyles.restore', {
@@ -197,10 +341,12 @@ function applyStackedColumnStyles(columnId = null) {
             element.scrollLeft = left;
             element.scrollTop = top;
         });
+        // Then unlock dimensions so layout can flow naturally
+        dimensionLocks.forEach(unlockDimensions);
     };
 
     // Restore after the layout pass settles to avoid scroll jumps.
-    requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
+    requestAnimationFrame(() => requestAnimationFrame(restoreScrollAndDimensions));
 }
 
 // ============================================================================
@@ -386,7 +532,80 @@ function updateStackLayoutDebounced(stackElement = null) {
     }
 
     updateStackLayoutTimer = setTimeout(() => {
-        updateStackLayoutCore(pendingStackElement);
+        // Use applyStackedColumnStyles for proper scroll/dimension preservation
+        // when updating all stacks, otherwise call core directly for single-stack updates
+        if (pendingStackElement === null) {
+            // Updating all stacks - use the high-level orchestrator
+            applyStackedColumnStyles(null);
+        } else {
+            // Single stack update - still preserve scroll/dimensions
+            const container = document.getElementById('kanban-container');
+            const board = document.getElementById('kanban-board');
+            const scrollPositions = [];
+            const dimensionLocks = [];
+
+            const lockDimensions = (element) => {
+                if (!element) return null;
+                const rect = element.getBoundingClientRect();
+                return {
+                    element,
+                    width: element.style.width,
+                    height: element.style.height,
+                    minWidth: element.style.minWidth,
+                    minHeight: element.style.minHeight,
+                    setWidth: rect.width + 'px',
+                    setHeight: rect.height + 'px'
+                };
+            };
+
+            if (container) {
+                const lock = lockDimensions(container);
+                if (lock) {
+                    container.style.width = lock.setWidth;
+                    container.style.height = lock.setHeight;
+                    container.style.minWidth = lock.setWidth;
+                    container.style.minHeight = lock.setHeight;
+                    dimensionLocks.push(lock);
+                }
+                scrollPositions.push({
+                    element: container,
+                    left: container.scrollLeft,
+                    top: container.scrollTop
+                });
+            }
+            if (board) {
+                const lock = lockDimensions(board);
+                if (lock) {
+                    board.style.width = lock.setWidth;
+                    board.style.height = lock.setHeight;
+                    board.style.minWidth = lock.setWidth;
+                    board.style.minHeight = lock.setHeight;
+                    dimensionLocks.push(lock);
+                }
+                scrollPositions.push({
+                    element: board,
+                    left: board.scrollLeft,
+                    top: board.scrollTop
+                });
+            }
+
+            updateStackLayoutCore(pendingStackElement);
+
+            // Restore after layout settles
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                scrollPositions.forEach(({ element, left, top }) => {
+                    element.scrollLeft = left;
+                    element.scrollTop = top;
+                });
+                dimensionLocks.forEach(lock => {
+                    if (!lock || !lock.element) return;
+                    lock.element.style.width = lock.width;
+                    lock.element.style.height = lock.height;
+                    lock.element.style.minWidth = lock.minWidth;
+                    lock.element.style.minHeight = lock.minHeight;
+                });
+            }));
+        }
         updateStackLayoutTimer = null;
         pendingStackElement = null;
     }, 150); // 150ms debounce delay
@@ -438,7 +657,9 @@ function updateStackLayoutCore(stackElement = null) {
 
             // Measure actual content heights
             const columnData = [];
+            const measureTimings = perfEnabled ? [] : null;
             columns.forEach((col, idx) => {
+                const colMeasureStart = perfEnabled ? performance.now() : 0;
                 const isVerticallyFolded = col.classList.contains('collapsed-vertical');
                 const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
 
@@ -447,20 +668,45 @@ function updateStackLayoutCore(stackElement = null) {
                 const header = col.querySelector('.column-title');
                 const footer = col.querySelector('.column-footer');
 
-                // Measure heights directly from DOM
+                // Measure heights directly from DOM - these trigger forced reflow if DOM was modified
+                const t1 = perfEnabled ? performance.now() : 0;
                 const columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
+                const t2 = perfEnabled ? performance.now() : 0;
                 const headerHeight = header ? header.offsetHeight : 0;
+                const t3 = perfEnabled ? performance.now() : 0;
                 const footerHeight = footer ? footer.offsetHeight : 0;
+                const t4 = perfEnabled ? performance.now() : 0;
 
-            // Measure the actual content height on column-content for accurate measurement
-            const columnContent = col.querySelector('.column-content');
+                // Measure the actual content height on column-content for accurate measurement
+                const columnContent = col.querySelector('.column-content');
                 const contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
+                const t5 = perfEnabled ? performance.now() : 0;
 
                 const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
                 const footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
+                const t6 = perfEnabled ? performance.now() : 0;
 
                 const columnMargin = col.querySelector('.column-margin');
                 const marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
+                const t7 = perfEnabled ? performance.now() : 0;
+
+                if (perfEnabled && measureTimings) {
+                    const colTotal = t7 - colMeasureStart;
+                    // Only log if this column took >5ms (likely caused the reflow)
+                    if (colTotal > 5) {
+                        const colId = col.getAttribute('data-column-id') || `col-${idx}`;
+                        measureTimings.push({
+                            colId,
+                            columnHeader: Math.round((t2 - t1) * 10) / 10,
+                            header: Math.round((t3 - t2) * 10) / 10,
+                            footer: Math.round((t4 - t3) * 10) / 10,
+                            content: Math.round((t5 - t4) * 10) / 10,
+                            footerBars: Math.round((t6 - t5) * 10) / 10,
+                            margin: Math.round((t7 - t6) * 10) / 10,
+                            total: Math.round(colTotal * 10) / 10
+                        });
+                    }
+                }
 
                 const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
 
@@ -482,6 +728,11 @@ function updateStackLayoutCore(stackElement = null) {
                 });
             });
             measuredColumns += columns.length;
+
+            // Log detailed measurement timings if any column took >5ms
+            if (perfEnabled && measureTimings && measureTimings.length > 0) {
+                console.log('[PERF-DEBUG] Forced reflow measurements (columns >5ms):', measureTimings);
+            }
 
             // All columns (including both horizontally and vertically folded) are included in stacking calculations
             const expandedColumns = columnData;
@@ -823,6 +1074,77 @@ function setupStackedColumnScrollHandler(columnsData) {
 }
 
 // ============================================================================
+// SCROLL/DIMENSION PRESERVATION WRAPPER
+// ============================================================================
+
+/**
+ * Wrapper for immediate layout updates that preserves scroll position and dimensions
+ * @param {HTMLElement} stackElement - Specific stack to update, or null for all stacks
+ */
+function updateStackLayoutWithPreservation(stackElement = null) {
+    const container = document.getElementById('kanban-container');
+    const board = document.getElementById('kanban-board');
+    const scrollPositions = [];
+    const dimensionLocks = [];
+
+    const lockDimensions = (element) => {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        const lock = {
+            element,
+            width: element.style.width,
+            height: element.style.height,
+            minWidth: element.style.minWidth,
+            minHeight: element.style.minHeight
+        };
+        // Fix dimensions to current values
+        element.style.width = rect.width + 'px';
+        element.style.height = rect.height + 'px';
+        element.style.minWidth = rect.width + 'px';
+        element.style.minHeight = rect.height + 'px';
+        return lock;
+    };
+
+    const unlockDimensions = (lock) => {
+        if (!lock || !lock.element) return;
+        lock.element.style.width = lock.width;
+        lock.element.style.height = lock.height;
+        lock.element.style.minWidth = lock.minWidth;
+        lock.element.style.minHeight = lock.minHeight;
+    };
+
+    // Lock dimensions and capture scroll positions
+    if (container) {
+        dimensionLocks.push(lockDimensions(container));
+        scrollPositions.push({
+            element: container,
+            left: container.scrollLeft,
+            top: container.scrollTop
+        });
+    }
+    if (board) {
+        dimensionLocks.push(lockDimensions(board));
+        scrollPositions.push({
+            element: board,
+            left: board.scrollLeft,
+            top: board.scrollTop
+        });
+    }
+
+    // Run the core layout update
+    updateStackLayoutCore(stackElement);
+
+    // Restore after layout settles
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        scrollPositions.forEach(({ element, left, top }) => {
+            element.scrollLeft = left;
+            element.scrollTop = top;
+        });
+        dimensionLocks.forEach(unlockDimensions);
+    }));
+}
+
+// ============================================================================
 // WINDOW EXPORTS
 // ============================================================================
 
@@ -839,16 +1161,16 @@ window.applyStackedColumnStyles = applyStackedColumnStyles;
 // Stack reorganization
 window.reorganizeStacksForColumn = reorganizeStacksForColumn;
 
-// Core layout engine - debounced version is default for external callers
+// Core layout engine - all exported functions now preserve scroll/dimensions
 window.updateStackLayout = updateStackLayoutDebounced;
-window.updateStackLayoutImmediate = updateStackLayoutCore;
+window.updateStackLayoutImmediate = updateStackLayoutWithPreservation;
 window.updateStackLayoutDebounced = updateStackLayoutDebounced;
 
-// Legacy aliases
+// Legacy aliases - all use preservation wrapper
 window.recalculateStackHeights = updateStackLayoutDebounced;
 window.recalculateStackHeightsDebounced = updateStackLayoutDebounced;
-window.recalculateStackHeightsImmediate = updateStackLayoutCore;
-window.recalculateAllStackHeights = () => updateStackLayoutCore(null); // null = all stacks
+window.recalculateStackHeightsImmediate = updateStackLayoutWithPreservation;
+window.recalculateAllStackHeights = () => updateStackLayoutWithPreservation(null); // null = all stacks
 
 // Scroll handler
 window.setupStackedColumnScrollHandler = setupStackedColumnScrollHandler;

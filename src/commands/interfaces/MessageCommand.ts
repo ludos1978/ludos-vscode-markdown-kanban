@@ -353,8 +353,11 @@ export abstract class BaseMessageCommand implements MessageCommand {
      * @param context - Command context
      */
     protected async refreshBoard(context: CommandContext): Promise<void> {
+        console.log('[MessageCommand.refreshBoard] START - invalidating cache and calling onBoardUpdate');
         context.boardStore.invalidateCache();
+        console.log('[MessageCommand.refreshBoard] Cache invalidated, calling onBoardUpdate');
         await context.onBoardUpdate();
+        console.log('[MessageCommand.refreshBoard] onBoardUpdate completed');
     }
 
     /**

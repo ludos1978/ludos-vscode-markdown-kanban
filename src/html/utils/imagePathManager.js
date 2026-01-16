@@ -210,6 +210,18 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
  * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
 function searchForFile(filePath, taskId, columnId, isColumnTitle) {
+    // Lock container dimensions to prevent scroll position loss during board update
+    // This uses the centralized dimension lock system from stackLayoutManager.js
+    if (typeof window.lockContainerDimensions === 'function') {
+        window.lockContainerDimensions();
+        // Store flag so boardUpdate knows to unlock after render
+        window._pendingDimensionUnlock = {
+            operation: 'searchForFile',
+            timestamp: Date.now()
+        };
+        console.log('[DimensionLock] searchForFile: locked container dimensions');
+    }
+
     closeAllPathMenus();
 
     if (taskId === 'undefined' || taskId === 'null' || taskId === '') {

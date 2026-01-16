@@ -563,12 +563,7 @@ export class FileSearchWebview {
                 const foundPath = match[2] || match[4];
                 if (!foundPath) continue;
 
-                let decodedPath: string;
-                try {
-                    decodedPath = decodeURIComponent(foundPath);
-                } catch {
-                    decodedPath = foundPath;
-                }
+                const decodedPath = safeDecodeURIComponent(foundPath);
 
                 const foundDir = path.dirname(decodedPath);
                 const normalizedFoundDir = this._normalizeDirForComparison(foundDir);
@@ -628,12 +623,7 @@ export class FileSearchWebview {
                 const foundPath = match[2] || match[4];
                 if (!foundPath) continue;
 
-                let decodedPath: string;
-                try {
-                    decodedPath = decodeURIComponent(foundPath);
-                } catch {
-                    decodedPath = foundPath;
-                }
+                const decodedPath = safeDecodeURIComponent(foundPath);
 
                 const foundDir = path.dirname(decodedPath);
                 const normalizedFoundDir = this._normalizeDirForComparison(foundDir);

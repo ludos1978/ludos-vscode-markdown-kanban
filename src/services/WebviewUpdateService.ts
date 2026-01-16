@@ -83,6 +83,8 @@ export class WebviewUpdateService {
      */
     public async sendBoardUpdate(options: BoardUpdateOptions = {}): Promise<void> {
         const { applyDefaultFolding = false, isFullRefresh = false } = options;
+        const stack = new Error().stack?.split('\n').slice(1, 8).join('\n') || 'no stack';
+        logger.debug('[WebviewUpdateService.sendBoardUpdate] CALLER STACK:\n' + stack);
         logger.debug('[WebviewUpdateService.sendBoardUpdate] START - webviewReady:', this._deps.panelContext.webviewReady, 'hasPanel:', this._deps.hasPanel(), 'isFullRefresh:', isFullRefresh, 'applyDefaultFolding:', applyDefaultFolding);
 
         if (!this._deps.hasPanel()) {

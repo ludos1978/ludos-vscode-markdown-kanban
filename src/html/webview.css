@@ -6114,19 +6114,30 @@ figcaption {
   gap: 10px;
 }
 
+/* Unified button style matching file-search-btn */
 .file-context-btn {
-  border: 1px solid var(--vscode-panel-border);
-  background: var(--vscode-button-secondaryBackground, transparent);
-  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
+  transition: all 0.15s;
+  background: var(--vscode-button-secondaryBackground, #3c3c3c);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.file-context-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
 }
 
 .file-context-btn.primary {
-  background: var(--vscode-button-background);
-  border-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background, #007acc);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.file-context-btn.primary:hover {
+  background: var(--vscode-button-hoverBackground, #0062a3);
 }
 
 /* Task overlay editor (structure-only styles) */
@@ -8424,7 +8435,9 @@ body.font-size-5x .task-description-wysiwyg {
     border-color: var(--vscode-focusBorder, #007acc);
 }
 
-.file-search-toggle-btn {
+/* Unified toggle button styles for file search */
+.file-search-toggle-btn,
+.file-search-preview-toggle {
     padding: 6px 10px;
     font-size: 12px;
     font-family: var(--vscode-font-family);
@@ -8436,13 +8449,16 @@ body.font-size-5x .task-description-wysiwyg {
     transition: all 0.15s;
 }
 
-.file-search-toggle-btn:hover {
+.file-search-toggle-btn:hover,
+.file-search-preview-toggle:hover {
     background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
 }
 
-.file-search-toggle-btn.active {
+.file-search-toggle-btn.active,
+.file-search-preview-toggle.active {
     background: var(--vscode-button-background, #007acc);
     color: var(--vscode-button-foreground, #ffffff);
+    border-color: var(--vscode-button-background, #007acc);
 }
 
 .file-search-results {
@@ -8800,7 +8816,10 @@ body.font-size-5x .task-description-wysiwyg {
     font-size: 11px;
 }
 
-.file-search-btn {
+/* Unified file search button styles - each variant is self-contained */
+.file-search-btn,
+.file-search-btn-primary,
+.file-search-btn-secondary {
     padding: 8px 16px;
     font-size: 13px;
     font-family: var(--vscode-font-family);
@@ -8808,6 +8827,17 @@ body.font-size-5x .task-description-wysiwyg {
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
+}
+
+.file-search-btn,
+.file-search-btn-secondary {
+    background: var(--vscode-button-secondaryBackground, #3c3c3c);
+    color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.file-search-btn:hover,
+.file-search-btn-secondary:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
 }
 
 .file-search-btn-primary {
@@ -8819,47 +8849,20 @@ body.font-size-5x .task-description-wysiwyg {
     background: var(--vscode-button-hoverBackground, #0062a3);
 }
 
-.file-search-btn-primary:disabled {
+.file-search-btn:disabled,
+.file-search-btn-primary:disabled,
+.file-search-btn-secondary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.file-search-btn-secondary {
-    background: var(--vscode-button-secondaryBackground, #3c3c3c);
-    color: var(--vscode-button-secondaryForeground, #cccccc);
-}
-
-.file-search-btn-secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
-}
-
-/* Preview Toggle Button */
+/* Preview Toggle Button - layout-specific overrides (base styles in unified toggle rule) */
 .file-search-preview-toggle {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-family: var(--vscode-font-family);
-    border: 1px solid var(--vscode-button-secondaryBorder, #454545);
-    background: var(--vscode-button-secondaryBackground, #3a3d41);
-    color: var(--vscode-descriptionForeground, #969696);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
     margin-right: auto;
     margin-left: 16px;
-}
-
-.file-search-preview-toggle:hover {
-    background: var(--vscode-button-secondaryHoverBackground, #45494e);
-    color: var(--vscode-button-secondaryForeground, #cccccc);
-}
-
-.file-search-preview-toggle.active {
-    background: var(--vscode-button-background, #007acc);
-    color: var(--vscode-button-foreground, #ffffff);
-    border-color: var(--vscode-button-background, #007acc);
 }
 
 .file-search-preview-toggle .preview-icon {

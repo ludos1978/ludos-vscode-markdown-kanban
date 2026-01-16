@@ -14,7 +14,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { PathConversionService, ConversionResult } from '../services/PathConversionService';
-import { getErrorMessage, encodeFilePath } from '../utils/stringUtils';
+import { getErrorMessage, encodeFilePath, safeDecodeURIComponent } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
 import { safeFileUri } from '../utils/uriUtils';
@@ -367,6 +367,7 @@ export class PathCommands extends SwitchBasedCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const oldPath = message.filePath;
+        logger.debug('[PathCommands.handleSearchForFile] START', { oldPath, taskId: message.taskId, columnId: message.columnId });
 
         // Get the main file's directory for the search
         const fileRegistry = this.getFileRegistry();
@@ -381,6 +382,7 @@ export class PathCommands extends SwitchBasedCommand {
 
         try {
             // Use FileSearchService to show custom webview search dialog
+            logger.debug('[PathCommands.handleSearchForFile] Opening file search dialog');
             const fileSearchService = new FileSearchService();
             const webview = context.fileManager.getWebview();
             fileSearchService.setWebview(webview);
@@ -395,6 +397,11 @@ export class PathCommands extends SwitchBasedCommand {
             fileSearchService.setTrackedFiles(trackedFiles);
 
             const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
+            logger.debug('[PathCommands.handleSearchForFile] File search dialog returned', {
+                hasResult: !!result,
+                batchReplace: result?.batchReplace,
+                selectedPath: result?.uri?.fsPath
+            });
 
             if (!result) {
                 return this.success({ cancelled: true });
@@ -405,6 +412,7 @@ export class PathCommands extends SwitchBasedCommand {
 
             // Handle batch replacement if enabled
             if (result.batchReplace) {
+                logger.debug('[PathCommands.handleSearchForFile] Starting batch replacement');
                 return await this._batchReplacePaths(oldPath, selectedFile, basePath, context, pathFormat);
             }
 
@@ -640,11 +648,7 @@ export class PathCommands extends SwitchBasedCommand {
      * This ensures paths match regardless of encoding or separator differences
      */
     private normalizePath(p: string): string {
-        try {
-            return decodeURIComponent(p).replace(/\\/g, '/').toLowerCase();
-        } catch {
-            return p.replace(/\\/g, '/').toLowerCase();
-        }
+        return safeDecodeURIComponent(p).replace(/\\/g, '/').toLowerCase();
     }
 
     /**
@@ -737,20 +741,22 @@ export class PathCommands extends SwitchBasedCommand {
         if (hasOldPath) {
             const pathVariants: string[] = [oldPath];
 
-            // Add encoded version (in case frontend sent decoded but file has encoded)
-            const encodedPath = encodeFilePath(oldPath);
-            if (encodedPath !== oldPath) {
-                pathVariants.push(encodedPath);
+            // First decode, then encode - this gives us the canonical form without double-encoding
+            // Example: if oldPath is "path%E2%80%93file" (already encoded en-dash):
+            //   - decodedPath becomes "path–file" (literal en-dash)
+            //   - encodedPath becomes "path%E2%80%93file" (same as original, no double-encoding)
+            // If oldPath is "path–file" (literal en-dash):
+            //   - decodedPath stays "path–file" (nothing to decode)
+            //   - encodedPath becomes "path%E2%80%93file" (encoded version)
+            const decodedPath = safeDecodeURIComponent(oldPath);
+            if (decodedPath !== oldPath) {
+                pathVariants.push(decodedPath);
             }
 
-            // Add decoded version (in case frontend sent encoded but file has decoded)
-            try {
-                const decodedPath = decodeURIComponent(oldPath);
-                if (decodedPath !== oldPath) {
-                    pathVariants.push(decodedPath);
-                }
-            } catch {
-                // Invalid percent-encoding in oldPath - ignore decode variant
+            // Encode the decoded path to get canonical encoded form (avoids double-encoding)
+            const encodedPath = encodeFilePath(decodedPath);
+            if (encodedPath !== oldPath && encodedPath !== decodedPath) {
+                pathVariants.push(encodedPath);
             }
 
             const expandedVariants: string[] = [];
@@ -866,7 +872,7 @@ export class PathCommands extends SwitchBasedCommand {
                                 imageMappings: {}
                             });
                             context.emitBoardChanged(currentBoard, 'edit');
-                            await context.onBoardUpdate();
+                            // Don't call onBoardUpdate() - targeted update already sent above
                         }
 
                         this.postMessage({
@@ -937,7 +943,7 @@ export class PathCommands extends SwitchBasedCommand {
                                 imageMappings: {}
                             });
                             context.emitBoardChanged(currentBoard, 'edit');
-                            await context.onBoardUpdate();
+                            // Don't call onBoardUpdate() - targeted update already sent above
                         }
 
                         this.postMessage({
@@ -1265,12 +1271,20 @@ export class PathCommands extends SwitchBasedCommand {
         context: CommandContext,
         pathFormat: PathFormat = 'auto'
     ): Promise<CommandResult> {
+        logger.debug('[PathCommands._batchReplacePaths] START', {
+            brokenPath,
+            selectedPath,
+            basePath,
+            pathFormat
+        });
+
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
             return this.failure('File registry not available');
         }
 
         // Save undo entry before making changes
+        logger.debug('[PathCommands._batchReplacePaths] Saving undo entry');
         const currentBoard = context.boardStore.getBoard();
         if (currentBoard) {
             const undoEntry = UndoCapture.forFullBoard(currentBoard, 'batch-path-replace');
@@ -1307,12 +1321,7 @@ export class PathCommands extends SwitchBasedCommand {
                 if (!foundPath) continue;
 
                 // Decode the path for comparison
-                let decodedPath: string;
-                try {
-                    decodedPath = decodeURIComponent(foundPath);
-                } catch {
-                    decodedPath = foundPath;
-                }
+                const decodedPath = safeDecodeURIComponent(foundPath);
 
                 // Check if this path is in the broken directory
                 const foundDir = path.dirname(decodedPath);
@@ -1403,12 +1412,16 @@ export class PathCommands extends SwitchBasedCommand {
             }
 
             if (modified) {
+                logger.debug('[PathCommands._batchReplacePaths] Updating file content:', file.getRelativePath());
                 file.setContent(content, false);
             }
         }
 
         // Refresh the board
+        logger.debug('[PathCommands._batchReplacePaths] All files updated, calling refreshBoard');
+        logger.debug('[PathCommands._batchReplacePaths] pathsToReplace count:', pathsToReplace.size);
         await this.refreshBoard(context);
+        logger.debug('[PathCommands._batchReplacePaths] refreshBoard completed');
 
         // Show result notification
         const skippedMsg = skippedPaths.length > 0

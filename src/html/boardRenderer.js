@@ -1127,6 +1127,16 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
+    // Debug: Log who called renderBoard with stack trace
+    if (window.kanbanDebug?.enabled) {
+        const stack = new Error().stack?.split('\n').slice(2, 6).map(s => s.trim()).join(' <- ');
+        console.log('[RENDER-DEBUG] renderBoard called', {
+            options: options ? JSON.stringify(options) : 'full',
+            columns: window.cachedBoard?.columns?.length ?? 0,
+            editing: Boolean(window.taskEditor?.currentEditor),
+            caller: stack
+        });
+    }
     if (typeof window.logViewMovement === 'function') {
         window.logViewMovement('renderBoard.start', {
             options: options ? Object.keys(options) : null,

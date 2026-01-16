@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
 import { MarkdownPatterns, HtmlPatterns, DiagramPatterns, isUrl } from '../shared/regexPatterns';
+import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 /**
  * Types of embedded elements that can be scanned
@@ -40,6 +41,8 @@ export interface ExtractedElement {
     path: string;
     rawMatch: string;
     location: ElementLocation;
+    /** Base path for resolving relative paths (e.g., include file directory) */
+    resolveBasePath?: string;
 }
 
 /**
@@ -150,7 +153,9 @@ export class BoardContentScanner {
                 // Check task description
                 if (task.description) {
                     const taskDescriptionLocation = this._buildTaskLocation(column, task, 'description');
-                    this._extractFromContent(task.description, taskDescriptionLocation, elements);
+                    // Use include context's directory if available (for correct relative path resolution)
+                    const includeBasePath = task.includeContext?.includeDir;
+                    this._extractFromContent(task.description, taskDescriptionLocation, elements, includeBasePath);
 
                     // Check regular includes in description
                     if (task.regularIncludeFiles && task.regularIncludeFiles.length > 0) {
@@ -201,10 +206,23 @@ export class BoardContentScanner {
                 continue;
             }
 
-            const resolvedPath = this._resolvePath(element.path);
+            // Use element's resolveBasePath if available (for include file content),
+            // otherwise fall back to the main basePath
+            const effectiveBasePath = element.resolveBasePath || this._basePath;
+            const resolvedPath = this._resolvePathWithBase(element.path, effectiveBasePath);
             const exists = fs.existsSync(resolvedPath);
 
+            // Debug logging for broken element detection
             if (!exists) {
+                console.log('[BoardContentScanner] File marked as broken:', {
+                    originalPath: element.path,
+                    resolvedPath,
+                    basePath: this._basePath,
+                    elementBasePath: element.resolveBasePath || '(none)',
+                    effectiveBasePath,
+                    type: element.type,
+                    location: `${element.location.columnTitle}/${element.location.taskTitle || 'column'}`
+                });
                 pushBroken(element, resolvedPath);
             }
         }
@@ -272,13 +290,6 @@ export class BoardContentScanner {
 
         const matches: TextMatch[] = [];
         const lowerQuery = query.toLowerCase();
-        const decodePath = (value: string): string => {
-            try {
-                return decodeURIComponent(value);
-            } catch {
-                return value;
-            }
-        };
 
         for (const column of board.columns) {
             // Search column title
@@ -315,13 +326,9 @@ export class BoardContentScanner {
 
                 if (includeContentByPath && task.regularIncludeFiles && task.regularIncludeFiles.length > 0) {
                     for (const includePath of task.regularIncludeFiles) {
+                        // _resolvePath already handles URL decoding
                         const resolvedPath = this._resolvePath(includePath);
-                        let includeContent = includeContentByPath.get(resolvedPath);
-                        if (!includeContent && includePath.includes('%')) {
-                            const decodedPath = decodePath(includePath);
-                            const resolvedDecoded = this._resolvePath(decodedPath);
-                            includeContent = includeContentByPath.get(resolvedDecoded);
-                        }
+                        const includeContent = includeContentByPath.get(resolvedPath);
 
                         if (includeContent && includeContent.toLowerCase().includes(lowerQuery)) {
                             const context = this._buildSearchContext(includeContent, lowerQuery);
@@ -341,11 +348,16 @@ export class BoardContentScanner {
 
     /**
      * Extract elements from a content string
+     * @param content - The content to extract from
+     * @param location - Location info for the extracted elements
+     * @param elements - Array to push extracted elements to
+     * @param resolveBasePath - Optional base path for resolving relative paths (e.g., include file directory)
      */
     private _extractFromContent(
         content: string,
         location: ElementLocation,
-        elements: ExtractedElement[]
+        elements: ExtractedElement[],
+        resolveBasePath?: string
     ): void {
         if (!content) return;
 
@@ -361,7 +373,8 @@ export class BoardContentScanner {
                     type,
                     path: filePath,
                     rawMatch: match[0],
-                    location
+                    location,
+                    resolveBasePath
                 });
             }
         }
@@ -375,7 +388,8 @@ export class BoardContentScanner {
                     type: 'link',
                     path: filePath,
                     rawMatch: match[0],
-                    location
+                    location,
+                    resolveBasePath
                 });
             }
         }
@@ -389,7 +403,8 @@ export class BoardContentScanner {
                     type: 'image',
                     path: filePath,
                     rawMatch: match[0],
-                    location
+                    location,
+                    resolveBasePath
                 });
             }
         }
@@ -403,7 +418,8 @@ export class BoardContentScanner {
                     type: 'media',
                     path: filePath,
                     rawMatch: match[0],
-                    location
+                    location,
+                    resolveBasePath
                 });
             }
         }
@@ -415,7 +431,8 @@ export class BoardContentScanner {
                 type: 'include',
                 path: match[1],
                 rawMatch: match[0],
-                location
+                location,
+                resolveBasePath
             });
         }
     }
@@ -435,17 +452,42 @@ export class BoardContentScanner {
     }
 
     /**
-     * Resolve a relative path to absolute
+     * Resolve a relative path to absolute using the scanner's base path
+     * Handles URL-encoded paths (e.g., path%20with%20spaces.md)
      */
     private _resolvePath(relativePath: string): string {
-        if (path.isAbsolute(relativePath)) {
-            return relativePath;
+        return this._resolvePathWithBase(relativePath, this._basePath);
+    }
+
+    /**
+     * Resolve a relative path to absolute using a custom base path
+     * Handles URL-encoded paths (e.g., path%20with%20spaces.md)
+     */
+    private _resolvePathWithBase(relativePath: string, basePath: string): string {
+        // Decode URL-encoded characters first
+        const decodedPath = safeDecodeURIComponent(relativePath);
+
+        if (path.isAbsolute(decodedPath)) {
+            return decodedPath;
         }
         // Handle ./ prefix
-        const cleanPath = relativePath.startsWith('./')
-            ? relativePath.substring(2)
-            : relativePath;
-        return path.resolve(this._basePath, cleanPath);
+        const cleanPath = decodedPath.startsWith('./')
+            ? decodedPath.substring(2)
+            : decodedPath;
+        const resolved = path.resolve(basePath, cleanPath);
+
+        // Debug: log path resolution details for troubleshooting
+        if (relativePath !== decodedPath || relativePath.includes('%') || relativePath.includes('..')) {
+            console.log('[BoardContentScanner._resolvePathWithBase]', {
+                input: relativePath,
+                decoded: decodedPath,
+                clean: cleanPath,
+                basePath,
+                resolved
+            });
+        }
+
+        return resolved;
     }
 
     /**
