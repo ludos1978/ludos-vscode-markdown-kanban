@@ -373,6 +373,16 @@ export class IncludeLoadingProcessor {
         task.displayTitle = `# include in ${relativePath}`;
         task.description = fullFileContent;
 
+        // Set includeContext for dynamic image path resolution in the frontend
+        // This allows images in included files to resolve paths relative to the include file
+        const mainFilePath = mainFile.getPath();
+        task.includeContext = {
+            includeFilePath: absolutePath,
+            includeDir: path.dirname(absolutePath),
+            mainFilePath: mainFilePath,
+            mainDir: path.dirname(mainFilePath)
+        };
+
         if (newTitle !== undefined) {
             task.title = newTitle;
             task.originalTitle = newTitle;
