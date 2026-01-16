@@ -193,9 +193,10 @@ const fileSearchModal = (function() {
     }
 
     /**
-     * Close the modal
+     * Close the modal (called when user cancels/escapes)
      */
     function close() {
+        console.log('[DimensionLock] fileSearchModal.close() called, flag before:', window._pendingDimensionUnlock);
         isVisible = false;
         overlay.classList.remove('visible');
 

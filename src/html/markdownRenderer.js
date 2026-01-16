@@ -2261,16 +2261,37 @@ function renderMarkdown(text, includeContext) {
             }
 
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
-            const targetAttr = (href.startsWith('http://') || href.startsWith('https://')) ? ` target="_blank"` : '';
+            const isExternalLink = href.startsWith('http://') || href.startsWith('https://');
+            const isAnchorLink = href.startsWith('#');
+            const isMailtoLink = href.startsWith('mailto:');
+            const targetAttr = isExternalLink ? ` target="_blank"` : '';
+
+            // Check if this is a local file link (not URL, not anchor, not mailto)
+            const isLocalFileLink = !isExternalLink && !isAnchorLink && !isMailtoLink && href.length > 0;
+
+            if (isLocalFileLink) {
+                // Escape the path for use in onclick handlers
+                const escapedPath = href.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                // Mark token so link_close knows to add the burger button
+                token._isLocalFileLink = true;
+                token._escapedPath = escapedPath;
+                // Wrap in overlay container for path menu
+                return `<span class="link-path-overlay-container" data-link-path="${escapeHtml(href)}"><a href="#" data-original-href="${escapeHtml(href)}"${titleAttr} class="markdown-link markdown-file-link">`;
+            }
 
             return `<a href="#" data-original-href="${escapeHtml(href)}"${titleAttr}${targetAttr} class="markdown-link">`;
         };
-        
+
         md.renderer.rules.link_close = function(tokens, idx, options, env, renderer) {
             const openToken = tokens[idx - 2]; // link_open token
-            if (openToken && openToken.attrGet && openToken.attrGet('href') && 
+            if (openToken && openToken.attrGet && openToken.attrGet('href') &&
                 openToken.attrGet('href').startsWith('vscode-webview://')) {
                 return '</span>';
+            }
+            // Check if this was a local file link that needs the burger menu
+            if (openToken && openToken._isLocalFileLink) {
+                const escapedPath = openToken._escapedPath;
+                return `</a><button class="link-menu-btn" onclick="event.stopPropagation(); event.preventDefault(); toggleLinkPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button></span>`;
             }
             return '</a>';
         };

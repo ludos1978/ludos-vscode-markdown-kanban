@@ -1216,6 +1216,15 @@ function renderBoard(options = null) {
     const containerScrollTop = containerElement?.scrollTop || 0;
     const containerScrollLeft = containerElement?.scrollLeft || 0;
 
+    // Debug: Log captured scroll values
+    console.log('[renderBoard] Captured scroll positions:', {
+        boardScrollTop,
+        boardScrollLeft,
+        containerScrollTop,
+        containerScrollLeft,
+        hasPendingDimensionUnlock: !!window._pendingDimensionUnlock
+    });
+
     // Save current scroll positions - scope to board element for performance
     boardElement.querySelectorAll('.column-content').forEach(container => {
         const columnId = container.id.replace('tasks-', '');

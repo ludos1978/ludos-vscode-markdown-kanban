@@ -34,6 +34,8 @@ import {
     UpdateShortcutsMessage,
     ConfigurationUpdateMessage
 } from '../core/bridge/MessageTypes';
+import { BoardContentScanner } from './BoardContentScanner';
+import * as path from 'path';
 
 /**
  * Dependencies required by WebviewUpdateService
@@ -153,6 +155,22 @@ export class WebviewUpdateService {
         const mainFile = this._deps.fileRegistry.getMainFile();
         const mainFilePath = mainFile?.getPath();
 
+        // Find broken link paths for visual indication (only on full refresh to minimize performance impact)
+        let brokenLinkPaths: string[] | undefined;
+        if (options.isFullRefresh && mainFilePath) {
+            try {
+                const basePath = path.dirname(mainFilePath);
+                const scanner = new BoardContentScanner(basePath);
+                const brokenElements = scanner.findBrokenElements(board);
+                // Filter to only link type elements
+                brokenLinkPaths = brokenElements
+                    .filter(elem => elem.type === 'link')
+                    .map(elem => elem.path);
+            } catch (error) {
+                logger.warn('[WebviewUpdateService] Failed to scan for broken links:', error);
+            }
+        }
+
         // BoardUpdateMessage type matches getBoardViewConfig() output
         const message = {
             type: 'boardUpdate' as const,
@@ -163,7 +181,9 @@ export class WebviewUpdateService {
             ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
             ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
             ...(options.version && { version: options.version }),
-            ...(options.debugMode !== undefined && { debugMode: options.debugMode })
+            ...(options.debugMode !== undefined && { debugMode: options.debugMode }),
+            // Include broken link paths if available
+            ...(brokenLinkPaths && brokenLinkPaths.length > 0 && { brokenLinkPaths })
         } as BoardUpdateMessage;
 
         this._deps.webviewBridge.send(message);

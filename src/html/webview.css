@@ -4477,6 +4477,57 @@ blockquote {
 
 /* Image menu button - styles inherited from unified overlay button styles at top of file */
 
+/* Link path conversion overlay - for markdown file links [text](path) */
+.link-path-overlay-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.link-path-overlay-container .link-menu-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border-radius: 2px;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.link-path-overlay-container:hover .link-menu-btn {
+  opacity: 1;
+}
+
+.link-path-overlay-container .link-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Link broken state - show menu button with error styling */
+.link-path-overlay-container.link-broken .link-menu-btn {
+  opacity: 1 !important;
+  outline: 2px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
+  outline-offset: -1px !important;
+  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
+  border-radius: 2px;
+}
+
+/* Link broken state - style the link text */
+.link-path-overlay-container.link-broken .markdown-link {
+  color: var(--vscode-errorForeground, #f48771) !important;
+  text-decoration: line-through;
+}
+
 /* ============================================================================
    DIAGRAM OVERLAY CONTAINER - Mermaid, PlantUML burger menus
    ============================================================================ */

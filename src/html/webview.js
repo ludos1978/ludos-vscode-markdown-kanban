@@ -2630,6 +2630,16 @@ if (!webviewEventListenersInitialized) {
                         window.renderBoard();
                     }
 
+                    // Mark broken links after render completes
+                    if (message.brokenLinkPaths && message.brokenLinkPaths.length > 0) {
+                        // Use requestAnimationFrame to ensure DOM is updated
+                        requestAnimationFrame(() => {
+                            if (typeof window.markBrokenLinks === 'function') {
+                                window.markBrokenLinks(message.brokenLinkPaths);
+                            }
+                        });
+                    }
+
                     // Apply default folding if this is from an external change
                     if (message.applyDefaultFolding) {
                         setTimeout(() => {
@@ -2643,6 +2653,11 @@ if (!webviewEventListenersInitialized) {
 
             // Unlock container dimensions if they were locked for a file operation
             // This must happen regardless of render decisions (editing, skipRender, etc.)
+            console.log('[DimensionLock] boardUpdate: checking _pendingDimensionUnlock:', {
+                hasFlag: !!window._pendingDimensionUnlock,
+                flag: window._pendingDimensionUnlock,
+                hasUnlockFn: typeof window.unlockContainerDimensions === 'function'
+            });
             if (window._pendingDimensionUnlock) {
                 console.log('[DimensionLock] boardUpdate: unlocking, operation:', window._pendingDimensionUnlock.operation);
                 requestAnimationFrame(() => {

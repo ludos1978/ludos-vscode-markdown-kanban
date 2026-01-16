@@ -81,6 +81,8 @@ export interface BoardUpdateMessage extends BaseMessage {
     overlayEditorDefaultMode?: 'markdown' | 'dual' | 'wysiwyg';
     overlayEditorFontScale?: number;
     imageMappings?: Record<string, string>;
+    // Broken link paths for visual indication
+    brokenLinkPaths?: string[];
     // Optional fields for full board loads
     isFullRefresh?: boolean;
     applyDefaultFolding?: boolean;

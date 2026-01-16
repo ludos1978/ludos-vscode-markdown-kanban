@@ -29,6 +29,7 @@ function closeAllPathMenus() {
     document.getElementById('floating-image-path-menu')?.remove();
     document.getElementById('floating-include-path-menu')?.remove();
     document.getElementById('floating-video-path-menu')?.remove();
+    document.getElementById('floating-link-path-menu')?.remove();
 }
 
 // ============================================================================
@@ -219,7 +220,13 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
             operation: 'searchForFile',
             timestamp: Date.now()
         };
-        console.log('[DimensionLock] searchForFile: locked container dimensions');
+        console.log('[DimensionLock] searchForFile: locked container dimensions, flag set:', window._pendingDimensionUnlock);
+        // Verify the flag is accessible
+        setTimeout(() => {
+            console.log('[DimensionLock] searchForFile: verify flag after 100ms:', window._pendingDimensionUnlock);
+        }, 100);
+    } else {
+        console.warn('[DimensionLock] searchForFile: lockContainerDimensions function not available!');
     }
 
     closeAllPathMenus();
@@ -330,12 +337,12 @@ function deleteFromMarkdown(path) {
 // ============================================================================
 
 /**
- * Unified path menu for images, videos, and includes
+ * Unified path menu for images, videos, includes, and links
  * Creates a floating menu dynamically and appends to body to avoid stacking context issues
  *
  * @param {HTMLElement} container - The container element with the menu button
  * @param {string} filePath - The file path
- * @param {'image' | 'video' | 'include'} mediaType - The type of media
+ * @param {'image' | 'video' | 'include' | 'link'} mediaType - The type of media
  */
 function togglePathMenu(container, filePath, mediaType) {
     // Close any existing floating menus and other open menus
@@ -343,7 +350,8 @@ function togglePathMenu(container, filePath, mediaType) {
 
     // Determine button class based on media type
     const buttonClass = mediaType === 'include' ? '.include-menu-btn' :
-                        mediaType === 'video' ? '.video-menu-btn' : '.image-menu-btn';
+                        mediaType === 'video' ? '.video-menu-btn' :
+                        mediaType === 'link' ? '.link-menu-btn' : '.image-menu-btn';
     const button = container.querySelector(buttonClass);
     if (!button) return;
 
@@ -379,6 +387,8 @@ function togglePathMenu(container, filePath, mediaType) {
         }
     } else if (mediaType === 'video') {
         isBroken = container.classList.contains('video-broken');
+    } else if (mediaType === 'link') {
+        isBroken = container.classList.contains('link-broken');
     } else {
         isBroken = container.classList.contains('image-broken');
     }
@@ -443,6 +453,10 @@ function toggleVideoPathMenu(container, videoPath) {
 
 function toggleIncludePathMenu(container, includePath) {
     togglePathMenu(container, includePath, 'include');
+}
+
+function toggleLinkPathMenu(container, linkPath) {
+    togglePathMenu(container, linkPath, 'link');
 }
 
 /**
@@ -792,6 +806,60 @@ function toggleVideoNotFoundMenu(container) {
 }
 
 // ============================================================================
+// BROKEN LINK HANDLING
+// ============================================================================
+
+/**
+ * Mark links as broken based on a list of paths
+ * Called after board render to highlight broken local file links
+ * @param {string[]} brokenPaths - Array of paths that are broken/not found
+ */
+function markBrokenLinks(brokenPaths) {
+    if (!brokenPaths || brokenPaths.length === 0) return;
+
+    // Normalize paths for comparison
+    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
+        try {
+            return decodeURIComponent(p).toLowerCase();
+        } catch {
+            return p.toLowerCase();
+        }
+    }));
+
+    // Find all link containers and check if their path is in the broken list
+    const linkContainers = document.querySelectorAll('.link-path-overlay-container');
+    linkContainers.forEach(container => {
+        const linkPath = container.dataset.linkPath;
+        if (!linkPath) return;
+
+        // Normalize the link path for comparison
+        let normalizedLinkPath;
+        try {
+            normalizedLinkPath = decodeURIComponent(linkPath).toLowerCase();
+        } catch {
+            normalizedLinkPath = linkPath.toLowerCase();
+        }
+
+        // Check if this link is broken
+        if (normalizedBrokenPaths.has(normalizedLinkPath)) {
+            container.classList.add('link-broken');
+        } else {
+            container.classList.remove('link-broken');
+        }
+    });
+}
+
+/**
+ * Clear all broken link markers
+ * Call before re-marking to ensure accurate state
+ */
+function clearBrokenLinkMarkers() {
+    document.querySelectorAll('.link-path-overlay-container.link-broken').forEach(container => {
+        container.classList.remove('link-broken');
+    });
+}
+
+// ============================================================================
 // DOM PATH UPDATES
 // ============================================================================
 
@@ -1014,6 +1082,7 @@ window.togglePathMenu = togglePathMenu;
 window.toggleImagePathMenu = toggleImagePathMenu;
 window.toggleIncludePathMenu = toggleIncludePathMenu;
 window.toggleVideoPathMenu = toggleVideoPathMenu;
+window.toggleLinkPathMenu = toggleLinkPathMenu;
 window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
 window.toggleVideoNotFoundMenu = toggleVideoNotFoundMenu;
 
@@ -1028,6 +1097,10 @@ window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFound
 
 // DOM updates
 window.updatePathInDOM = updatePathInDOM;
+
+// Broken link handling
+window.markBrokenLinks = markBrokenLinks;
+window.clearBrokenLinkMarkers = clearBrokenLinkMarkers;
 
 // ============================================================================
 // DIAGRAM MENUS (Mermaid, PlantUML)

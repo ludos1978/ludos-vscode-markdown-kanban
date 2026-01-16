@@ -413,7 +413,7 @@ export class PathCommands extends SwitchBasedCommand {
             // Handle batch replacement if enabled
             if (result.batchReplace) {
                 logger.debug('[PathCommands.handleSearchForFile] Starting batch replacement');
-                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context, pathFormat);
+                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context, pathFormat, message.taskId, message.columnId, message.isColumnTitle);
             }
 
             // Single file replacement
@@ -1269,13 +1269,19 @@ export class PathCommands extends SwitchBasedCommand {
         selectedPath: string,
         basePath: string,
         context: CommandContext,
-        pathFormat: PathFormat = 'auto'
+        pathFormat: PathFormat = 'auto',
+        taskId?: string,
+        columnId?: string,
+        isColumnTitle?: boolean
     ): Promise<CommandResult> {
         logger.debug('[PathCommands._batchReplacePaths] START', {
             brokenPath,
             selectedPath,
             basePath,
-            pathFormat
+            pathFormat,
+            taskId,
+            columnId,
+            isColumnTitle
         });
 
         const fileRegistry = this.getFileRegistry();
@@ -1363,6 +1369,7 @@ export class PathCommands extends SwitchBasedCommand {
 
         // Second pass: Perform replacements, calculating relative paths per-file
         let replacedCount = 0;
+        const modifiedFiles: MarkdownFile[] = [];
         for (const file of allFiles) {
             let content = file.getContent();
             let modified = false;
@@ -1414,14 +1421,135 @@ export class PathCommands extends SwitchBasedCommand {
             if (modified) {
                 logger.debug('[PathCommands._batchReplacePaths] Updating file content:', file.getRelativePath());
                 file.setContent(content, false);
+                modifiedFiles.push(file);
             }
         }
 
-        // Refresh the board
-        logger.debug('[PathCommands._batchReplacePaths] All files updated, calling refreshBoard');
-        logger.debug('[PathCommands._batchReplacePaths] pathsToReplace count:', pathsToReplace.size);
-        await this.refreshBoard(context);
-        logger.debug('[PathCommands._batchReplacePaths] refreshBoard completed');
+        // Determine if we can use targeted update instead of full refresh
+        // Conditions: only main file modified AND taskId/columnId context available
+        const onlyMainFileModified = modifiedFiles.length === 1 && modifiedFiles[0] === mainFile;
+        const hasTargetContext = !!(taskId && columnId);
+
+        logger.debug('[PathCommands._batchReplacePaths] Update decision:', {
+            modifiedFilesCount: modifiedFiles.length,
+            onlyMainFileModified,
+            hasTargetContext,
+            taskId,
+            columnId,
+            isColumnTitle,
+            pathsToReplaceCount: pathsToReplace.size
+        });
+
+        if (onlyMainFileModified && hasTargetContext && currentBoard) {
+            // Use targeted update - manually update the board object's task/column content
+            // Note: We can't rely on getBoard() to return fresh content because it just returns the cached board.
+            // We need to manually update the task/column objects with the replaced paths.
+
+            if (isColumnTitle) {
+                // Update column only
+                const column = currentBoard.columns.find(c => c.id === columnId);
+                if (column) {
+                    // Manually apply the path replacements to the column title
+                    for (const [oldPath, absoluteNewPath] of pathsToReplace) {
+                        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
+
+                        let newPath: string;
+                        if (useRelative) {
+                            newPath = path.relative(basePath, absoluteNewPath);
+                            newPath = newPath.replace(/\\/g, '/');
+                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                                newPath = './' + newPath;
+                            }
+                        } else {
+                            newPath = absoluteNewPath;
+                        }
+                        const encodedNewPath = encodeFilePath(newPath);
+                        // Try decoded path first, then encoded path (task.title may have either)
+                        let newTitle = LinkOperations.replaceSingleLink(column.title, oldPath, encodedNewPath, 0);
+                        if (newTitle === column.title) {
+                            // Decoded path didn't match - try encoded version
+                            const encodedOldPath = encodeFilePath(oldPath);
+                            newTitle = LinkOperations.replaceSingleLink(column.title, encodedOldPath, encodedNewPath, 0);
+                        }
+                        column.title = newTitle;
+                    }
+
+                    logger.debug('[PathCommands._batchReplacePaths] Sending targeted column update with updated title:', column.title);
+                    this.postMessage({
+                        type: 'updateColumnContent',
+                        columnId: columnId,
+                        column: column,
+                        imageMappings: {}
+                    });
+                    // Mark cache invalid since we've modified the board object
+                    context.boardStore.invalidateCache();
+                } else {
+                    logger.debug('[PathCommands._batchReplacePaths] Column not found, falling back to full refresh');
+                    await this.refreshBoard(context);
+                }
+            } else {
+                // Update task only
+                const column = currentBoard.columns.find(c => c.id === columnId);
+                const task = column?.tasks.find(t => t.id === taskId);
+                if (task && column) {
+                    // Manually apply the path replacements to the task title and description
+                    for (const [oldPath, absoluteNewPath] of pathsToReplace) {
+                        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
+
+                        let newPath: string;
+                        if (useRelative) {
+                            newPath = path.relative(basePath, absoluteNewPath);
+                            newPath = newPath.replace(/\\/g, '/');
+                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                                newPath = './' + newPath;
+                            }
+                        } else {
+                            newPath = absoluteNewPath;
+                        }
+                        const encodedNewPath = encodeFilePath(newPath);
+                        const encodedOldPath = encodeFilePath(oldPath);
+
+                        // Try decoded path first, then encoded path (task.title may have either)
+                        let newTitle = LinkOperations.replaceSingleLink(task.title, oldPath, encodedNewPath, 0);
+                        if (newTitle === task.title) {
+                            // Decoded path didn't match - try encoded version
+                            newTitle = LinkOperations.replaceSingleLink(task.title, encodedOldPath, encodedNewPath, 0);
+                        }
+                        task.title = newTitle;
+
+                        if (task.description) {
+                            let newDesc = LinkOperations.replaceSingleLink(task.description, oldPath, encodedNewPath, 0);
+                            if (newDesc === task.description) {
+                                // Decoded path didn't match - try encoded version
+                                newDesc = LinkOperations.replaceSingleLink(task.description, encodedOldPath, encodedNewPath, 0);
+                            }
+                            task.description = newDesc;
+                        }
+                    }
+
+                    logger.debug('[PathCommands._batchReplacePaths] Sending targeted task update with updated title:', task.title);
+                    this.postMessage({
+                        type: 'updateTaskContent',
+                        taskId: taskId,
+                        columnId: columnId,
+                        task: task,
+                        imageMappings: {}
+                    });
+                    // Mark cache invalid since we've modified the board object
+                    context.boardStore.invalidateCache();
+                } else {
+                    logger.debug('[PathCommands._batchReplacePaths] Task/column not found, falling back to full refresh');
+                    await this.refreshBoard(context);
+                }
+            }
+        } else {
+            // Full refresh needed - multiple files modified or no target context
+            logger.debug('[PathCommands._batchReplacePaths] Using full refresh');
+            await this.refreshBoard(context);
+        }
+        logger.debug('[PathCommands._batchReplacePaths] Update completed');
 
         // Show result notification
         const skippedMsg = skippedPaths.length > 0
