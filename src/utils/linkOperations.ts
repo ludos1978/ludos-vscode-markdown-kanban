@@ -3,7 +3,7 @@ import { escapeRegExp } from './stringUtils';
 /**
  * Types of link patterns that can be matched
  */
-type LinkMatchType = 'image' | 'link' | 'wiki' | 'auto' | 'include';
+type LinkMatchType = 'image' | 'link' | 'wiki' | 'auto' | 'include' | 'html';
 
 /**
  * Information about a matched link in the text
@@ -93,7 +93,9 @@ export class LinkOperations {
             // Auto link: <path>
             { regex: new RegExp(`(<${escapedPath}>)`, 'g'), type: 'auto' },
             // Include: !!!include(path)!!!
-            { regex: new RegExp(`(!!!include\\(${escapedPath}\\)!!!)`, 'g'), type: 'include' }
+            { regex: new RegExp(`(!!!include\\(${escapedPath}\\)!!!)`, 'g'), type: 'include' },
+            // HTML media tags: <img src="path">, <video src="path">, <audio src="path">, <source src="path">
+            { regex: new RegExp(`(<(?:img|video|audio|source)[^>]*\\s+src\\s*=\\s*["']${escapedPath}["'][^>]*>)`, 'gi'), type: 'html' }
         ];
 
         // Find all matches with their positions
@@ -309,6 +311,12 @@ export class LinkOperations {
             case 'include': {
                 // !!!include(oldPath)!!! → !!!include(newPath)!!!
                 replacement = `!!!include(${encodedNewPath})!!!`;
+                break;
+            }
+            case 'html': {
+                // <img src="oldPath" ...> → <img src="newPath" ...>
+                const htmlTag = match[1];
+                replacement = htmlTag.replace(new RegExp(escapedPath, 'g'), encodedNewPath);
                 break;
             }
             default:
