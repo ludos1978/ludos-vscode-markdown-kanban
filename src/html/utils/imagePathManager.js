@@ -488,6 +488,15 @@ function toggleImageNotFoundMenu(container) {
 // ============================================================================
 
 /**
+ * Check if a path is an external URL (http://, https://, data:, blob:)
+ * External URLs that fail to load are not "broken" - they just can't load in webview
+ */
+function isExternalUrl(path) {
+    if (!path) return false;
+    return /^(https?:|data:|blob:)/i.test(path);
+}
+
+/**
  * Handle image not found - replace broken image with a placeholder that has a burger menu
  * Called from image onerror handlers
  * Uses data attributes instead of inline onclick to safely handle paths with special characters
@@ -495,6 +504,23 @@ function toggleImageNotFoundMenu(container) {
 function handleImageNotFound(imgElement, originalSrc) {
     if (!imgElement || !imgElement.parentElement) {
         console.warn('[handleImageNotFound] No imgElement or parent');
+        return;
+    }
+
+    // Skip external URLs - they fail to load due to webview security, not because they're broken
+    // Show a different indicator for external URLs that can't be loaded
+    if (isExternalUrl(originalSrc)) {
+        // Mark as handled but don't show broken state
+        imgElement.dataset.handled = 'true';
+        // Replace with a placeholder showing it's an external URL
+        const placeholder = document.createElement('span');
+        placeholder.className = 'external-url-blocked';
+        placeholder.title = `External image cannot be loaded in editor: ${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🔗 External image (click to open)</span>`;
+        placeholder.style.cursor = 'pointer';
+        placeholder.onclick = () => window.open(originalSrc, '_blank');
+        imgElement.parentElement.insertBefore(placeholder, imgElement);
+        imgElement.style.display = 'none';
         return;
     }
 
@@ -722,6 +748,20 @@ function handleVideoNotFound(videoElement, originalSrc) {
         return;
     }
 
+    // Skip external URLs - they fail to load due to webview security, not because they're broken
+    if (isExternalUrl(originalSrc)) {
+        videoElement.dataset.handled = 'true';
+        const placeholder = document.createElement('span');
+        placeholder.className = 'external-url-blocked';
+        placeholder.title = `External video cannot be loaded in editor: ${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🔗 External video (click to open)</span>`;
+        placeholder.style.cursor = 'pointer';
+        placeholder.onclick = () => window.open(originalSrc, '_blank');
+        videoElement.parentElement.insertBefore(placeholder, videoElement);
+        videoElement.style.display = 'none';
+        return;
+    }
+
     // Check if already handled (prevent double processing)
     if (videoElement.dataset.handled === 'true') {
         return;
@@ -817,6 +857,8 @@ function toggleVideoNotFoundMenu(container) {
 function markBrokenLinks(brokenPaths) {
     if (!brokenPaths || brokenPaths.length === 0) return;
 
+    console.log('[markBrokenLinks] Received brokenPaths:', brokenPaths);
+
     // Normalize paths for comparison
     const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
         try {
@@ -826,8 +868,12 @@ function markBrokenLinks(brokenPaths) {
         }
     }));
 
+    console.log('[markBrokenLinks] Normalized broken paths:', [...normalizedBrokenPaths]);
+
     // Find all link containers and check if their path is in the broken list
     const linkContainers = document.querySelectorAll('.link-path-overlay-container');
+    console.log('[markBrokenLinks] Found link containers:', linkContainers.length);
+
     linkContainers.forEach(container => {
         const linkPath = container.dataset.linkPath;
         if (!linkPath) return;
@@ -840,8 +886,11 @@ function markBrokenLinks(brokenPaths) {
             normalizedLinkPath = linkPath.toLowerCase();
         }
 
+        const isBroken = normalizedBrokenPaths.has(normalizedLinkPath);
+        console.log('[markBrokenLinks] Checking link:', { linkPath, normalizedLinkPath, isBroken });
+
         // Check if this link is broken
-        if (normalizedBrokenPaths.has(normalizedLinkPath)) {
+        if (isBroken) {
             container.classList.add('link-broken');
         } else {
             container.classList.remove('link-broken');
