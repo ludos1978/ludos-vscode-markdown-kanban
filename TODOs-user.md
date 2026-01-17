@@ -1,3 +1,5 @@
+- [ ] o this implementation. activate a scroll locking on the target, if it doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys , release the locking as well. 
+
 - [ ] when i "search for file" with "replace all paths with the same directory" it says there is 0 files found. but it must at least find the one i am searching for. i am sure all files are there, but someting goes wrong while searching.
 @logs/vscode-app-1768683549969.log is the log
 the path found is "/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/"

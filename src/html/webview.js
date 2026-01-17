@@ -4562,7 +4562,7 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
         return;
     }
 
-    // Scroll the element into view
+    // Scroll the element into view with scroll anchoring
     if (typeof window.logViewMovement === 'function') {
         window.logViewMovement('scrollToAndHighlight', {
             columnId,
@@ -4574,11 +4574,78 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
         });
     }
 
+    // Enable scroll anchoring on target element to keep it stable as images load
+    targetElement.style.overflowAnchor = 'auto';
+
+    // Track element position for stability detection
+    let lastTop = null;
+    let stableTimer = null;
+    let rafId = null;
+
+    const cleanup = () => {
+        // Release scroll anchoring
+        targetElement.style.overflowAnchor = '';
+        // Remove listeners
+        window.removeEventListener('wheel', onUserInput);
+        window.removeEventListener('keydown', onUserInput);
+        window.removeEventListener('mousedown', onScrollbarClick);
+        if (stableTimer) clearTimeout(stableTimer);
+        if (rafId) cancelAnimationFrame(rafId);
+    };
+
+    const onUserInput = () => {
+        cleanup();
+    };
+
+    const onScrollbarClick = (e) => {
+        // Detect scrollbar click (click near right edge of scrollable container)
+        const scrollContainer = document.querySelector('.kanban-scroll-container') || document.body;
+        const rect = scrollContainer.getBoundingClientRect();
+        if (e.clientX > rect.right - 20) {
+            cleanup();
+        }
+    };
+
+    // Check if element position is stable (hasn't moved for 200ms)
+    const checkStability = () => {
+        const currentTop = targetElement.getBoundingClientRect().top;
+
+        if (lastTop !== null && Math.abs(currentTop - lastTop) < 1) {
+            // Position stable - start/continue timer
+            if (!stableTimer) {
+                stableTimer = setTimeout(() => {
+                    cleanup();
+                }, 200);
+            }
+        } else {
+            // Position changed - reset timer
+            if (stableTimer) {
+                clearTimeout(stableTimer);
+                stableTimer = null;
+            }
+        }
+
+        lastTop = currentTop;
+        rafId = requestAnimationFrame(checkStability);
+    };
+
+    // Listen for user input to release lock
+    window.addEventListener('wheel', onUserInput, { passive: true });
+    window.addEventListener('keydown', onUserInput);
+    window.addEventListener('mousedown', onScrollbarClick);
+
+    // Scroll to target
     targetElement.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
         inline: 'nearest'
     });
+
+    // Start stability check after scroll begins
+    rafId = requestAnimationFrame(checkStability);
+
+    // Failsafe: always cleanup after 5 seconds max
+    setTimeout(cleanup, 5000);
 
     // Add highlight animation if requested
     if (highlight) {
