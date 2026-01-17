@@ -850,6 +850,27 @@ export interface RequestPDFInfoMessage extends RequestMessage {
     includeDir?: string;
 }
 
+/**
+ * Request EPUB page render
+ */
+export interface RequestEPUBPageRenderMessage extends RequestMessage {
+    type: 'requestEPUBPageRender';
+    filePath: string;
+    pageNumber: number;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
+}
+
+/**
+ * Request EPUB info
+ */
+export interface RequestEPUBInfoMessage extends RequestMessage {
+    type: 'requestEPUBInfo';
+    filePath: string;
+    /** Directory of include file if diagram is inside an include (for relative path resolution) */
+    includeDir?: string;
+}
+
 // ============= UI MESSAGES =============
 
 /**
@@ -1981,6 +2002,8 @@ export type IncomingMessage =
     | RequestExcalidrawRenderMessage
     | RequestPDFPageRenderMessage
     | RequestPDFInfoMessage
+    | RequestEPUBPageRenderMessage
+    | RequestEPUBInfoMessage
     | EditModeStartMessage
     | EditModeEndMessage
     | EditingStoppedMessage

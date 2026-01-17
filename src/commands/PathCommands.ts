@@ -1314,7 +1314,9 @@ export class PathCommands extends SwitchBasedCommand {
 
         // Find all image/file paths in the content that start with brokenDir
         // First pass: identify which paths need replacement and verify new files exist
-        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
+        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
         // Map: oldPath -> absolute new file path (we'll calculate relative per-file later)
         const pathsToReplace: Map<string, string> = new Map();
         const skippedPaths: string[] = []; // Paths where new file doesn't exist
@@ -1326,8 +1328,8 @@ export class PathCommands extends SwitchBasedCommand {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Get the path from either image or link syntax
-                const foundPath = match[2] || match[4];
+                // Group 1 = image path, Group 2 = link path (titles are excluded)
+                const foundPath = match[1] || match[2];
                 if (!foundPath) continue;
 
                 // Decode the path for comparison

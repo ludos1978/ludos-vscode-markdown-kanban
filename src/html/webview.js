@@ -169,6 +169,7 @@ window.showSpecialCharacters = window.configManager?.getPreference('showSpecialC
 window.overlayEditorEnabled = window.configManager?.getPreference('overlayEditorEnabled', false) ?? false;
 window.overlayEditorDefaultMode = window.configManager?.getPreference('overlayEditorDefaultMode', 'markdown') ?? 'markdown';
 window.overlayEditorFontScale = window.configManager?.getPreference('overlayEditorFontScale', 1.2) ?? 1.2;
+window.includeA4Mode = window.configManager?.getPreference('includeA4Mode', false) ?? false;
 
 // ============================================================================
 // PlantUML Initialization
@@ -1317,6 +1318,29 @@ function toggleOverlayEditor() {
 }
 
 window.toggleOverlayEditor = toggleOverlayEditor;
+
+/**
+ * Toggles A4 aspect ratio view for include content areas
+ * @param {boolean} enabled - Whether to enable A4 mode
+ */
+function toggleIncludeA4Mode(enabled) {
+    if (enabled) {
+        document.body.classList.add('include-a4-mode');
+    } else {
+        document.body.classList.remove('include-a4-mode');
+    }
+    // Persist preference
+    if (window.configManager) {
+        window.configManager.setPreference('includeA4Mode', enabled);
+    } else {
+        vscode.postMessage({ type: 'setPreference', key: 'includeA4Mode', value: enabled });
+    }
+    if (window.cachedConfig) {
+        window.cachedConfig.includeA4Mode = enabled;
+    }
+}
+
+window.toggleIncludeA4Mode = toggleIncludeA4Mode;
 window.createSpecialCharOverlay = createSpecialCharOverlay;
 window.updateSpecialCharOverlay = updateSpecialCharOverlay;
 window.removeSpecialCharOverlay = removeSpecialCharOverlay;
@@ -1731,21 +1755,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     lastScrollTop = element.scrollTop;
                     lastScrollLeft = element.scrollLeft;
                     return;
-                }
-                const deltaTop = element.scrollTop - lastScrollTop;
-                const deltaLeft = element.scrollLeft - lastScrollLeft;
-                if (Math.abs(deltaTop) > 20 || Math.abs(deltaLeft) > 20) {
-                    console.log('[SCROLL-EVENT] Large scroll detected:', {
-                        element: label,
-                        fromTop: lastScrollTop,
-                        toTop: element.scrollTop,
-                        deltaTop,
-                        fromLeft: lastScrollLeft,
-                        toLeft: element.scrollLeft,
-                        deltaLeft,
-                        timestamp: performance.now(),
-                        stack: new Error().stack.split('\n').slice(0, 8).join('\n')
-                    });
                 }
                 lastScrollTop = element.scrollTop;
                 lastScrollLeft = element.scrollLeft;
@@ -2819,6 +2828,17 @@ if (!webviewEventListenersInitialized) {
             window.cachedConfig.overlayEditorEnabled = window.overlayEditorEnabled;
             window.cachedConfig.overlayEditorDefaultMode = overlayDefaultModeValue;
             window.cachedConfig.overlayEditorFontScale = overlayFontScaleValue;
+            // Apply includeA4Mode preference
+            const includeA4ModeValue = typeof configData.includeA4Mode === 'boolean'
+                ? configData.includeA4Mode
+                : (typeof window.includeA4Mode === 'boolean' ? window.includeA4Mode : false);
+            window.includeA4Mode = Boolean(includeA4ModeValue);
+            window.cachedConfig.includeA4Mode = window.includeA4Mode;
+            if (window.includeA4Mode) {
+                document.body.classList.add('include-a4-mode');
+            } else {
+                document.body.classList.remove('include-a4-mode');
+            }
             if (window.taskOverlayEditor?.applySettings) {
                 window.taskOverlayEditor.applySettings({
                     enabled: window.overlayEditorEnabled,
@@ -4553,6 +4573,7 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
             field
         });
     }
+
     targetElement.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
@@ -5461,6 +5482,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update special character toggle UI
     updateSpecialCharToggleUI(window.showSpecialCharacters ?? false);
     updateOverlayEditorToggleUI(window.overlayEditorEnabled ?? false);
+    // Apply includeA4Mode on startup
+    if (window.includeA4Mode) {
+        document.body.classList.add('include-a4-mode');
+    }
 });
 } // End of third webviewEventListenersInitialized guard
 

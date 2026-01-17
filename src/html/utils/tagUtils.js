@@ -1358,7 +1358,8 @@ class TagUtils {
                     const originalPath = match[1];
                     extractedPaths.push(originalPath);
                     // Replace with a safe token that won't be affected by markdown processing
-                    tempTitle = tempTitle.replace(match[0], `__INCLUDE_PLACEHOLDER_${placeholderIndex}__`);
+                    // Using :: delimiters which markdown doesn't interpret
+                    tempTitle = tempTitle.replace(match[0], `::INCLUDE_PLACEHOLDER_${placeholderIndex}::`);
                     placeholderIndex++;
                 }
 
@@ -1400,7 +1401,7 @@ class TagUtils {
                     const badgeHtml = generateIncludeLinkWithMenu(filePath, displayText, 'column', column.includeError);
 
                     // Replace the safe token with the badge HTML
-                    renderedTitle = renderedTitle.replace(`__INCLUDE_PLACEHOLDER_${index}__`, badgeHtml);
+                    renderedTitle = renderedTitle.replace(`::INCLUDE_PLACEHOLDER_${index}::`, badgeHtml);
                 });
 
                 return renderedTitle;
@@ -1475,7 +1476,8 @@ class TagUtils {
                 const originalPath = match[1];
                 extractedPaths.push(originalPath);
                 // Replace with a safe token that won't be affected by markdown processing
-                tempTitle = tempTitle.replace(match[0], `__INCLUDE_PLACEHOLDER_${placeholderIndex}__`);
+                // Using :: delimiters which markdown doesn't interpret
+                tempTitle = tempTitle.replace(match[0], `::INCLUDE_PLACEHOLDER_${placeholderIndex}::`);
                 placeholderIndex++;
             }
 
@@ -1513,7 +1515,7 @@ class TagUtils {
                 const badgeHtml = generateIncludeLinkWithMenu(filePath, displayText, 'task', task.includeError);
 
                 // Replace the safe token with the badge HTML
-                rendered = rendered.replace(`__INCLUDE_PLACEHOLDER_${index}__`, badgeHtml);
+                rendered = rendered.replace(`::INCLUDE_PLACEHOLDER_${index}::`, badgeHtml);
             });
 
             return rendered;

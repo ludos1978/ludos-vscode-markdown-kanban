@@ -874,13 +874,26 @@ function markBrokenLinks(brokenPaths) {
     if (!brokenPaths || brokenPaths.length === 0) return;
 
     // Normalize paths for comparison
-    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
-        try {
-            return decodeURIComponent(p).toLowerCase();
-        } catch {
-            return p.toLowerCase();
+    const normalizedBrokenPaths = new Set();
+    brokenPaths.forEach(p => {
+        normalizedBrokenPaths.add(normalizeBrokenPath(p));
+    });
+
+    // Check if a path matches any broken path
+    const isPathBroken = (linkPath) => {
+        const normalized = normalizeBrokenPath(linkPath);
+        // First try exact match
+        if (normalizedBrokenPaths.has(normalized)) {
+            return true;
         }
-    }));
+        // Also check if the path ends with any broken path (handles relative vs absolute)
+        for (const brokenPath of normalizedBrokenPaths) {
+            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     // Find all link containers and check if their path is in the broken list
     const linkContainers = document.querySelectorAll('.link-path-overlay-container');
@@ -888,16 +901,8 @@ function markBrokenLinks(brokenPaths) {
         const linkPath = container.dataset.linkPath;
         if (!linkPath) return;
 
-        // Normalize the link path for comparison
-        let normalizedLinkPath;
-        try {
-            normalizedLinkPath = decodeURIComponent(linkPath).toLowerCase();
-        } catch {
-            normalizedLinkPath = linkPath.toLowerCase();
-        }
-
         // Check if this link is broken
-        if (normalizedBrokenPaths.has(normalizedLinkPath)) {
+        if (isPathBroken(linkPath)) {
             container.classList.add('link-broken');
         } else {
             container.classList.remove('link-broken');
@@ -916,6 +921,41 @@ function clearBrokenLinkMarkers() {
 }
 
 /**
+ * Normalize a path for comparison
+ * @param {string} p - The path to normalize
+ * @returns {string} Normalized path
+ */
+function normalizeBrokenPath(p) {
+    if (!p) return '';
+    try {
+        // Decode URL encoding
+        let normalized = decodeURIComponent(p);
+        // Normalize path separators (Windows backslashes to forward slashes)
+        normalized = normalized.replace(/\\/g, '/');
+        // Remove leading ./
+        if (normalized.startsWith('./')) {
+            normalized = normalized.substring(2);
+        }
+        // Lowercase for case-insensitive matching
+        return normalized.toLowerCase();
+    } catch {
+        return p.toLowerCase().replace(/\\/g, '/');
+    }
+}
+
+/**
+ * Extract filename from a path
+ * @param {string} p - The path
+ * @returns {string} Filename
+ */
+function extractFilename(p) {
+    if (!p) return '';
+    const normalized = p.replace(/\\/g, '/');
+    const lastSlash = normalized.lastIndexOf('/');
+    return lastSlash >= 0 ? normalized.substring(lastSlash + 1).toLowerCase() : normalized.toLowerCase();
+}
+
+/**
  * Mark images as broken based on backend file existence scan
  * Pre-marks images that don't exist on disk before they try to load
  * @param {string[]} brokenPaths - Array of paths that don't exist
@@ -923,14 +963,30 @@ function clearBrokenLinkMarkers() {
 function markBrokenImages(brokenPaths) {
     if (!brokenPaths || brokenPaths.length === 0) return;
 
-    // Normalize paths for comparison
-    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
-        try {
-            return decodeURIComponent(p).toLowerCase();
-        } catch {
-            return p.toLowerCase();
+    // Normalize paths for comparison - store both full path and filename
+    const normalizedBrokenPaths = new Set();
+    const brokenFilenames = new Set();
+    brokenPaths.forEach(p => {
+        const normalized = normalizeBrokenPath(p);
+        normalizedBrokenPaths.add(normalized);
+        brokenFilenames.add(extractFilename(p));
+    });
+
+    // Check if a path matches any broken path
+    const isPathBroken = (imagePath) => {
+        const normalized = normalizeBrokenPath(imagePath);
+        // First try exact match
+        if (normalizedBrokenPaths.has(normalized)) {
+            return true;
         }
-    }));
+        // Also check if the path ends with any broken path (handles relative vs absolute)
+        for (const brokenPath of normalizedBrokenPaths) {
+            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     // Find all image containers and check if their path is in the broken list
     const imageContainers = document.querySelectorAll('.image-path-overlay-container');
@@ -943,16 +999,8 @@ function markBrokenImages(brokenPaths) {
         }
         if (!imagePath) return;
 
-        // Normalize the image path for comparison
-        let normalizedImagePath;
-        try {
-            normalizedImagePath = decodeURIComponent(imagePath).toLowerCase();
-        } catch {
-            normalizedImagePath = imagePath.toLowerCase();
-        }
-
         // Check if this image is broken
-        if (normalizedBrokenPaths.has(normalizedImagePath)) {
+        if (isPathBroken(imagePath)) {
             container.classList.add('image-broken');
         }
     });
@@ -963,14 +1011,7 @@ function markBrokenImages(brokenPaths) {
         const imagePath = img.dataset.originalSrc || img.getAttribute('src');
         if (!imagePath) return;
 
-        let normalizedImagePath;
-        try {
-            normalizedImagePath = decodeURIComponent(imagePath).toLowerCase();
-        } catch {
-            normalizedImagePath = imagePath.toLowerCase();
-        }
-
-        if (normalizedBrokenPaths.has(normalizedImagePath)) {
+        if (isPathBroken(imagePath)) {
             // Trigger the not-found handler to convert to broken state
             if (typeof handleImageNotFound === 'function') {
                 handleImageNotFound(img, imagePath);
@@ -987,13 +1028,26 @@ function markBrokenMedia(brokenPaths) {
     if (!brokenPaths || brokenPaths.length === 0) return;
 
     // Normalize paths for comparison
-    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
-        try {
-            return decodeURIComponent(p).toLowerCase();
-        } catch {
-            return p.toLowerCase();
+    const normalizedBrokenPaths = new Set();
+    brokenPaths.forEach(p => {
+        normalizedBrokenPaths.add(normalizeBrokenPath(p));
+    });
+
+    // Check if a path matches any broken path
+    const isPathBroken = (mediaPath) => {
+        const normalized = normalizeBrokenPath(mediaPath);
+        // First try exact match
+        if (normalizedBrokenPaths.has(normalized)) {
+            return true;
         }
-    }));
+        // Also check if the path ends with any broken path (handles relative vs absolute)
+        for (const brokenPath of normalizedBrokenPaths) {
+            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     // Find all video containers
     const videoContainers = document.querySelectorAll('.video-path-overlay-container');
@@ -1005,14 +1059,7 @@ function markBrokenMedia(brokenPaths) {
         }
         if (!videoPath) return;
 
-        let normalizedVideoPath;
-        try {
-            normalizedVideoPath = decodeURIComponent(videoPath).toLowerCase();
-        } catch {
-            normalizedVideoPath = videoPath.toLowerCase();
-        }
-
-        if (normalizedBrokenPaths.has(normalizedVideoPath)) {
+        if (isPathBroken(videoPath)) {
             container.classList.add('video-broken');
         }
     });
@@ -1023,14 +1070,7 @@ function markBrokenMedia(brokenPaths) {
         const videoPath = video.getAttribute('src');
         if (!videoPath) return;
 
-        let normalizedVideoPath;
-        try {
-            normalizedVideoPath = decodeURIComponent(videoPath).toLowerCase();
-        } catch {
-            normalizedVideoPath = videoPath.toLowerCase();
-        }
-
-        if (normalizedBrokenPaths.has(normalizedVideoPath)) {
+        if (isPathBroken(videoPath)) {
             // Trigger the not-found handler
             if (typeof handleVideoNotFound === 'function') {
                 handleVideoNotFound(video, videoPath);

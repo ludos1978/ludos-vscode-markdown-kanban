@@ -3,10 +3,10 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.100.42",
+  "version": "0.101.6",
   "engines": {
     "vscode": "^1.74.0"
-  }, 
+  },
   "categories": [
     "Other"
   ],
@@ -926,7 +926,7 @@
                   "labelColor": "#000000"
                 }
               },
-              "\u00f8": {
+              "ø": {
                 "light": {
                   "text": "#000000",
                   "background": "#d1d5db",
@@ -944,7 +944,7 @@
                   "color": "#9ca3af"
                 },
                 "cornerBadge": {
-                  "label": "\u00d8",
+                  "label": "Ø",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#9ca3af",
@@ -1022,7 +1022,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\u2699",
+                  "label": "⚙",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -1046,7 +1046,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83c\udfa8",
+                  "label": "🎨",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -1070,7 +1070,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\uddc4",
+                  "label": "🗄",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -1087,7 +1087,7 @@
                   "backgroundDark": "#4d8e8e"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd0c",
+                  "label": "🔌",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -1110,7 +1110,7 @@
                   "color": "#ff0000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd12",
+                  "label": "🔒",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#ff0000",
@@ -1135,7 +1135,7 @@
                   "color": "#fdcb6e"
                 },
                 "cornerBadge": {
-                  "label": "\u26a1",
+                  "label": "⚡",
                   "position": "top-left",
                   "style": "square",
                   "color": "#fdcb6e",
@@ -1160,7 +1160,7 @@
                   "color": "#e83e8c"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udc64",
+                  "label": "👤",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#e83e8c",
@@ -1186,7 +1186,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\uddbc",
+                  "label": "🖼",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -2871,7 +2871,7 @@
               },
               "uat-passed": {
                 "cornerBadge": {
-                  "label": "\u2713",
+                  "label": "✓",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#159F44",
@@ -2892,7 +2892,7 @@
             "platform-teaching": {
               "online": {
                 "cornerBadge": {
-                  "label": "\ud83c\udf10",
+                  "label": "🌐",
                   "position": "top-left",
                   "style": "square",
                   "color": "#88CCEE",
@@ -2911,7 +2911,7 @@
               },
               "in-person": {
                 "cornerBadge": {
-                  "label": "\ud83c\udfeb",
+                  "label": "🏫",
                   "position": "top-left",
                   "style": "square",
                   "color": "#117733",
@@ -2930,7 +2930,7 @@
               },
               "hybrid": {
                 "cornerBadge": {
-                  "label": "\ud83d\udd00",
+                  "label": "🔀",
                   "position": "top-left",
                   "style": "square",
                   "color": "#44AA99",
@@ -2949,7 +2949,7 @@
               },
               "async": {
                 "cornerBadge": {
-                  "label": "\u23f0",
+                  "label": "⏰",
                   "position": "top-left",
                   "style": "square",
                   "color": "#DDCC77",
@@ -2968,7 +2968,7 @@
               },
               "sync": {
                 "cornerBadge": {
-                  "label": "\ud83d\udd34",
+                  "label": "🔴",
                   "position": "top-left",
                   "style": "square",
                   "color": "#EE7733",
@@ -2989,7 +2989,7 @@
             "platform-product": {
               "web": {
                 "cornerBadge": {
-                  "label": "\ud83c\udf10",
+                  "label": "🌐",
                   "position": "top-left",
                   "style": "square",
                   "color": "#88CCEE",
@@ -3008,7 +3008,7 @@
               },
               "mobile": {
                 "cornerBadge": {
-                  "label": "\ud83d\udcf1",
+                  "label": "📱",
                   "position": "top-left",
                   "style": "square",
                   "color": "#332288",
@@ -3027,7 +3027,7 @@
               },
               "ios": {
                 "cornerBadge": {
-                  "label": "\ud83c\udf4e",
+                  "label": "🍎",
                   "position": "top-left",
                   "style": "square",
                   "color": "#999999",
@@ -3046,7 +3046,7 @@
               },
               "android": {
                 "cornerBadge": {
-                  "label": "\ud83e\udd16",
+                  "label": "🤖",
                   "position": "top-left",
                   "style": "square",
                   "color": "#88CC44",
@@ -3065,7 +3065,7 @@
               },
               "desktop": {
                 "cornerBadge": {
-                  "label": "\ud83d\udcbb",
+                  "label": "💻",
                   "position": "top-left",
                   "style": "square",
                   "color": "#6B7A8F",
@@ -3084,7 +3084,7 @@
               },
               "api": {
                 "cornerBadge": {
-                  "label": "\ud83d\udd0c",
+                  "label": "🔌",
                   "position": "top-left",
                   "style": "square",
                   "color": "#44AA99",
@@ -3181,7 +3181,7 @@
               },
               "stable": {
                 "cornerBadge": {
-                  "label": "\u2713",
+                  "label": "✓",
                   "position": "top-left",
                   "style": "filled",
                   "color": "#117733",
@@ -3219,7 +3219,7 @@
               },
               "eol": {
                 "cornerBadge": {
-                  "label": "\u2297",
+                  "label": "⊗",
                   "position": "top-left",
                   "style": "filled",
                   "color": "#777777",
@@ -3254,7 +3254,7 @@
                   "labelColor": "#212529"
                 },
                 "cornerBadge": {
-                  "label": "\ud83c\udfa8",
+                  "label": "🎨",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3283,7 +3283,7 @@
                   "color": "#f4a261"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udccb",
+                  "label": "📋",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3312,7 +3312,7 @@
                   "color": "#e76f51"
                 },
                 "cornerBadge": {
-                  "label": "\u2699\ufe0f",
+                  "label": "⚙️",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3341,7 +3341,7 @@
                   "color": "#2a9d8f"
                 },
                 "cornerBadge": {
-                  "label": "\u2728",
+                  "label": "✨",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3368,7 +3368,7 @@
                   "color": "#ff6b35"
                 },
                 "cornerBadge": {
-                  "label": "\u03b1",
+                  "label": "α",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3395,7 +3395,7 @@
                   "color": "#f72585"
                 },
                 "cornerBadge": {
-                  "label": "\u03b2",
+                  "label": "β",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3424,7 +3424,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\u2713",
+                  "label": "✓",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3433,7 +3433,7 @@
             "impact": {
               "minor": {
                 "cornerBadge": {
-                  "label": "\u25cb",
+                  "label": "○",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#88CC44",
@@ -3452,7 +3452,7 @@
               },
               "moderate": {
                 "cornerBadge": {
-                  "label": "\u25d0",
+                  "label": "◐",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#DDCC77",
@@ -3471,7 +3471,7 @@
               },
               "major": {
                 "cornerBadge": {
-                  "label": "\u25cf",
+                  "label": "●",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#FFAA00",
@@ -3490,7 +3490,7 @@
               },
               "breaking": {
                 "cornerBadge": {
-                  "label": "\u26a0",
+                  "label": "⚠",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#CC3311",
@@ -3529,7 +3529,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udc1b",
+                  "label": "🐛",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#dc3545",
@@ -3556,7 +3556,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\u2728",
+                  "label": "✨",
                   "position": "top-left",
                   "style": "ribbon"
                 }
@@ -3581,7 +3581,7 @@
                   "height": "3px"
                 },
                 "cornerBadge": {
-                  "label": "\u2b06",
+                  "label": "⬆",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3603,7 +3603,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcda",
+                  "label": "📚",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3626,7 +3626,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd2c",
+                  "label": "🔬",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3653,7 +3653,7 @@
                   "color": "#ff6b6b"
                 },
                 "cornerBadge": {
-                  "label": "\u267b\ufe0f",
+                  "label": "♻️",
                   "position": "top-left",
                   "style": "square",
                   "color": "#ff6b6b",
@@ -3684,7 +3684,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd25",
+                  "label": "🔥",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3709,7 +3709,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\ude80",
+                  "label": "🚀",
                   "position": "top-left",
                   "style": "ribbon"
                 }
@@ -3740,7 +3740,7 @@
                   "style": "solid"
                 },
                 "cornerBadge": {
-                  "label": "\u26a1",
+                  "label": "⚡",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3764,7 +3764,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd0d",
+                  "label": "🔍",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3786,7 +3786,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\u2753",
+                  "label": "❓",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#ff00ff",
@@ -3811,7 +3811,7 @@
                   "color": "#ffd700"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udca1",
+                  "label": "💡",
                   "position": "top-left",
                   "style": "circle",
                   "color": "#fff200",
@@ -3836,7 +3836,7 @@
                   "labelColor": "#000000"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcdc",
+                  "label": "📜",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3865,7 +3865,7 @@
                   "color": "#50c878"
                 },
                 "cornerBadge": {
-                  "label": "\ud83c\udfed",
+                  "label": "🏭",
                   "position": "top-left",
                   "style": "square"
                 }
@@ -3894,7 +3894,7 @@
                   "color": "#ff7f00"
                 },
                 "cornerBadge": {
-                  "label": "\u2699\ufe0f",
+                  "label": "⚙️",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3915,7 +3915,7 @@
                   "color": "#4a90d9"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcc5",
+                  "label": "📅",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3934,7 +3934,7 @@
                   "color": "#5ba3ec"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udccb",
+                  "label": "📋",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3953,7 +3953,7 @@
                   "color": "#6cb6ff"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udd27",
+                  "label": "🔧",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3972,7 +3972,7 @@
                   "color": "#3d7abd"
                 },
                 "cornerBadge": {
-                  "label": "\u2713",
+                  "label": "✓",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -3993,7 +3993,7 @@
                   "color": "#9b59b6"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udc41",
+                  "label": "👁",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4012,7 +4012,7 @@
                   "color": "#a569bd"
                 },
                 "cornerBadge": {
-                  "label": "\u2139\ufe0f",
+                  "label": "ℹ️",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4031,7 +4031,7 @@
                   "color": "#bb8fce"
                 },
                 "cornerBadge": {
-                  "label": "\ud83c\udfa4",
+                  "label": "🎤",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4052,7 +4052,7 @@
                   "color": "#27ae60"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udca1",
+                  "label": "💡",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4071,7 +4071,7 @@
                   "color": "#2ecc71"
                 },
                 "cornerBadge": {
-                  "label": "\u270f\ufe0f",
+                  "label": "✏️",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4090,7 +4090,7 @@
                   "color": "#58d68d"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcdd",
+                  "label": "📝",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4111,7 +4111,7 @@
                   "color": "#e74c3c"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udce6",
+                  "label": "📦",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4130,7 +4130,7 @@
                   "color": "#ec7063"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcc4",
+                  "label": "📄",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4149,7 +4149,7 @@
                   "color": "#f1948a"
                 },
                 "cornerBadge": {
-                  "label": "\ud83d\udcda",
+                  "label": "📚",
                   "position": "top-left",
                   "style": "circle"
                 }
@@ -4257,7 +4257,7 @@
         },
         "markdown-kanban.tagCategoryReference": {
           "type": "null",
-          "markdownDescription": "## Tag Category Reference\n\nAll 26 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n- `schedule` - Schedule phases: schedule, planning, preparation, verify\n- `overview` - Overview content: overview, information, presentation\n- `example` - Example content: example, tasks, homework\n- `deliveries` - Deliverables: deliveries, handouts, references\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `positivity` - Sentiment levels: ++ (very positive), + (positive), \u00f8 (neutral), - (negative), -- (very negative)\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
+          "markdownDescription": "## Tag Category Reference\n\nAll 26 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n- `schedule` - Schedule phases: schedule, planning, preparation, verify\n- `overview` - Overview content: overview, information, presentation\n- `example` - Example content: example, tasks, homework\n- `deliveries` - Deliverables: deliveries, handouts, references\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `positivity` - Sentiment levels: ++ (very positive), + (positive), ø (neutral), - (negative), -- (very negative)\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
         },
         "markdown-kanban.maxRowHeight": {
           "type": "number",
@@ -4326,6 +4326,11 @@
           "type": "string",
           "default": "",
           "description": "Path to poppler tools directory (containing pdftoppm and pdfinfo). Leave empty for auto-detection. Example: /opt/homebrew/bin"
+        },
+        "markdown-kanban.mutoolPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to MuPDF tools directory (containing mutool for EPUB rendering). Leave empty for auto-detection. Example: /opt/homebrew/bin"
         },
         "markdown-kanban.drawioPath": {
           "type": "string",
@@ -4685,6 +4690,7 @@
     "test:unit": "jest --config jest.config.js"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/jest": "^30.0.0",
     "@types/markdown-it": "^12.2.3",
     "@types/node": "16.x",
@@ -4716,6 +4722,7 @@
     "@excalidraw/utils": "^0.1.2",
     "@marp-team/marp-cli": "^4.2.3",
     "@marp-team/marp-core": "^4.1.0",
+    "adm-zip": "^0.5.16",
     "canvas": "^3.2.0",
     "canvas-5-polyfill": "^0.1.5",
     "jsdom": "^27.3.0",

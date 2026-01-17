@@ -6,6 +6,7 @@
  * - convertMermaidToSVG, mermaidExportSuccess, mermaidExportError
  * - requestDrawIORender, requestExcalidrawRender
  * - requestPDFPageRender, requestPDFInfo
+ * - requestEPUBPageRender, requestEPUBInfo
  *
  * @module commands/DiagramCommands
  */
@@ -18,7 +19,9 @@ import {
     RequestDrawIORenderMessage,
     RequestExcalidrawRenderMessage,
     RequestPDFPageRenderMessage,
-    RequestPDFInfoMessage
+    RequestPDFInfoMessage,
+    RequestEPUBPageRenderMessage,
+    RequestEPUBInfoMessage
 } from '../core/bridge/MessageTypes';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
@@ -35,7 +38,7 @@ export class DiagramCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'diagram-commands',
         name: 'Diagram Commands',
-        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, and PDF rendering',
+        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, PDF, and EPUB rendering',
         messageTypes: [
             'renderPlantUML',
             'convertPlantUMLToSVG',
@@ -45,7 +48,9 @@ export class DiagramCommands extends SwitchBasedCommand {
             'requestDrawIORender',
             'requestExcalidrawRender',
             'requestPDFPageRender',
-            'requestPDFInfo'
+            'requestPDFInfo',
+            'requestEPUBPageRender',
+            'requestEPUBInfo'
         ],
         priority: 100
     };
@@ -90,6 +95,14 @@ export class DiagramCommands extends SwitchBasedCommand {
         },
         'requestPDFInfo': async (msg, ctx) => {
             await this.handleGetPDFInfo(msg as RequestPDFInfoMessage, ctx);
+            return this.success();
+        },
+        'requestEPUBPageRender': async (msg, ctx) => {
+            await this.handleRenderEPUBPage(msg as RequestEPUBPageRenderMessage, ctx);
+            return this.success();
+        },
+        'requestEPUBInfo': async (msg, ctx) => {
+            await this.handleGetEPUBInfo(msg as RequestEPUBInfoMessage, ctx);
             return this.success();
         }
     };
@@ -665,6 +678,123 @@ export class DiagramCommands extends SwitchBasedCommand {
             // Send error response
             this.postMessage({
                 type: 'pdfInfoError',
+                requestId,
+                error: getErrorMessage(error)
+            });
+        }
+    }
+
+    // ============= EPUB HANDLERS =============
+
+    /**
+     * Handle EPUB page rendering request from webview
+     * Renders a specific page from an EPUB file to PNG
+     * Uses backend EPUBService with mutool CLI for conversion
+     */
+    private async handleRenderEPUBPage(message: RequestEPUBPageRenderMessage, context: CommandContext): Promise<void> {
+        const { requestId, filePath, pageNumber, includeDir } = message;
+        const panel = context.getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[DiagramCommands.handleRenderEPUBPage] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import EPUBService dynamically
+            const { EPUBService } = await import('../services/export/EPUBService');
+            const service = new EPUBService();
+
+            // Build include context if provided (for EPUBs inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
+            // Resolve file path (handles both workspace-relative and document-relative paths)
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
+            if (!resolution || !resolution.exists) {
+                throw new Error(`EPUB file not found: ${filePath}`);
+            }
+
+            const absolutePath = resolution.resolvedPath;
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Render EPUB page to PNG
+            const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
+
+            // Convert PNG to data URL
+            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+
+            // Send success response to webview with mtime for cache invalidation
+            this.postMessage({
+                type: 'epubPageRenderSuccess',
+                requestId,
+                pngDataUrl,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[EPUB Backend] Render error:', error);
+
+            // Send error response to webview
+            this.postMessage({
+                type: 'epubPageRenderError',
+                requestId,
+                error: getErrorMessage(error)
+            });
+        }
+    }
+
+    /**
+     * Handle EPUB info request (get page count)
+     */
+    private async handleGetEPUBInfo(message: RequestEPUBInfoMessage, context: CommandContext): Promise<void> {
+        const { requestId, filePath, includeDir } = message;
+        const panel = context.getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[DiagramCommands.handleGetEPUBInfo] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import EPUBService dynamically
+            const { EPUBService } = await import('../services/export/EPUBService');
+            const service = new EPUBService();
+
+            // Build include context if provided (for EPUBs inside include files)
+            const includeContext = includeDir ? { includeDir } : undefined;
+
+            // Resolve file path (handles both workspace-relative and document-relative paths)
+            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
+            if (!resolution || !resolution.exists) {
+                throw new Error(`EPUB file not found: ${filePath}`);
+            }
+
+            const absolutePath = resolution.resolvedPath;
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Get page count
+            const pageCount = await service.getPageCount(absolutePath);
+
+            // Send success response
+            this.postMessage({
+                type: 'epubInfoSuccess',
+                requestId,
+                pageCount,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[EPUB Info] Error:', error);
+
+            // Send error response
+            this.postMessage({
+                type: 'epubInfoError',
                 requestId,
                 error: getErrorMessage(error)
             });

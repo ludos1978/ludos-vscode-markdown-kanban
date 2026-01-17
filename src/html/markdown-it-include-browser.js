@@ -254,6 +254,11 @@
                `</div>`;
       }
 
+      // Set include context so relative paths in included content resolve correctly
+      const includeDir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
+      const previousContext = window.currentTaskIncludeContext;
+      window.currentTaskIncludeContext = { includeDir };
+
       // Render the content as markdown
       try {
         const rendered = md.render(content);
@@ -264,7 +269,7 @@
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
-        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
+        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}" data-include-dir="${escapeHtml(includeDir)}">
           <div class="include-title-bar">
             ${includeLink}
           </div>
@@ -315,6 +320,9 @@
             <pre style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(content || '')}</pre>
           </div>
         </div>`;
+      } finally {
+        // Always restore previous context (for nested includes)
+        window.currentTaskIncludeContext = previousContext;
       }
     };
 
@@ -336,6 +344,11 @@
         return generateVideoIncludeHtml(filePath, false);
       }
 
+      // Set include context so relative paths in included content resolve correctly
+      const includeDir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
+      const previousContext = window.currentTaskIncludeContext;
+      window.currentTaskIncludeContext = { includeDir };
+
       // Render the content as markdown
       try {
         const rendered = md.render(content);
@@ -346,7 +359,7 @@
         const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
-        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
+        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}" data-include-dir="${escapeHtml(includeDir)}">
           <div class="include-title-bar">
             ${includeLink}
           </div>
@@ -357,6 +370,9 @@
       } catch (error) {
         console.error('Error rendering included content:', error);
         return `<span class="include-error" title="Error rendering included content">Error including: ${escapeHtml(filePath)}</span>`;
+      } finally {
+        // Always restore previous context (for nested includes)
+        window.currentTaskIncludeContext = previousContext;
       }
     };
 

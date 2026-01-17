@@ -5929,6 +5929,30 @@ s {
     /* background-color: var(--vscode-editor-background); */
 }
 
+/* A4 Scrollable Include View */
+/* Toggle via body.include-a4-mode class */
+body.include-a4-mode .include-content-area {
+    /* A4 aspect ratio: 210mm x 297mm = 1:1.414 */
+    aspect-ratio: 1 / 1.414;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 200px;
+    max-height: 80vh;
+    padding: 16px 20px;
+    background: var(--vscode-editor-background);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+}
+
+/* Scrollbar styling for A4 view */
+body.include-a4-mode .include-content-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+body.include-a4-mode .include-content-area::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 4px;
+}
+
 @keyframes highlightFlash {
     0% {
         background-color: transparent;
@@ -7847,6 +7871,17 @@ figcaption {
   background: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
+}
+
+.pdf-slideshow-title {
+  padding: 8px 12px;
+  background: var(--vscode-textBlockQuote-background, rgba(0, 0, 0, 0.1));
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+  text-align: center;
+  order: -1; /* Display before image container */
 }
 
 .pdf-slideshow-btn {

@@ -1,3 +1,42 @@
+- [ ] when i "search for file" with "replace all paths with the same directory" it says there is 0 files found. but it must at least find the one i am searching for. i am sure all files are there, but someting goes wrong while searching.
+@logs/vscode-app-1768683549969.log is the log
+the path found is "/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/"
+this is the task description """---:
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-20.png "high society")
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-25.png "philosophical")
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-30.png "underwater city")
+
+:--:
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-36.png "theares & bars")
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-40.png "lofty (erhaben)")
+
+![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-44.png "philosophical")
+
+:--:
+
+![ruin](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-48.png "ruin")
+
+![despair](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-52.png "despair")
+
+![factions](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-00-55.png "factions")
+
+:--:
+
+![new year](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-01-00.png "new year")
+
+![1959](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-01-06.png "1959")
+
+![alt text](../../_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-01-11.png)
+
+:---
+
+<br>"""
+
 - [ ] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
 
 - [ ] the pinned headers are not on top anymore! why is translateZ not working anymore to fixate column-title them above the column-content?

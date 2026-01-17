@@ -535,7 +535,9 @@ export class FileSearchWebview {
         const brokenDir = path.dirname(this._originalPath);
 
         // Pattern to find markdown image/link paths
-        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
+        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
         let brokenCount = 0;
         const foundFiles: string[] = [];
         let lastUpdateTime = 0;
@@ -560,7 +562,8 @@ export class FileSearchWebview {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                const foundPath = match[2] || match[4];
+                // Group 1 = image path, Group 2 = link path (titles are excluded)
+                const foundPath = match[1] || match[2];
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);
@@ -593,7 +596,9 @@ export class FileSearchWebview {
         const newDir = path.dirname(selectedPath);
 
         // Find all paths with broken directory and check if they exist in new directory
-        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
+        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
         const filesToReplace: string[] = [];
         const filesMissing: string[] = [];
         let lastUpdateTime = 0;
@@ -620,7 +625,8 @@ export class FileSearchWebview {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                const foundPath = match[2] || match[4];
+                // Group 1 = image path, Group 2 = link path (titles are excluded)
+                const foundPath = match[1] || match[2];
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);
