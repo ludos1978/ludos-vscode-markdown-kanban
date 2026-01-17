@@ -562,6 +562,20 @@
         log('Rendered HTML length:', renderedHtml?.length);
         taskDescriptionEl.innerHTML = renderedHtml;
         log('Updated task description innerHTML');
+
+        // Re-apply broken element markers after re-render
+        // The markers were lost when innerHTML was replaced
+        requestAnimationFrame(() => {
+          if (window._cachedBrokenLinkPaths && window._cachedBrokenLinkPaths.length > 0 && typeof window.markBrokenLinks === 'function') {
+            window.markBrokenLinks(window._cachedBrokenLinkPaths);
+          }
+          if (window._cachedBrokenImagePaths && window._cachedBrokenImagePaths.length > 0 && typeof window.markBrokenImages === 'function') {
+            window.markBrokenImages(window._cachedBrokenImagePaths);
+          }
+          if (window._cachedBrokenMediaPaths && window._cachedBrokenMediaPaths.length > 0 && typeof window.markBrokenMedia === 'function') {
+            window.markBrokenMedia(window._cachedBrokenMediaPaths);
+          }
+        });
       } else {
         log('window.renderMarkdown is NOT a function:', typeof window.renderMarkdown);
       }

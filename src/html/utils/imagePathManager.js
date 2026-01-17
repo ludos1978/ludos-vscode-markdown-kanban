@@ -515,10 +515,18 @@ function handleImageNotFound(imgElement, originalSrc) {
         // Replace with a placeholder showing it's an external URL
         const placeholder = document.createElement('span');
         placeholder.className = 'external-url-blocked';
-        placeholder.title = `External image cannot be loaded in editor: ${originalSrc}`;
-        placeholder.innerHTML = `<span class="external-url-text">🔗 External image (click to open)</span>`;
+        placeholder.dataset.externalUrl = originalSrc;
+        placeholder.title = `External image (Alt+click to open in browser)\n${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🔗 External image (Alt+click to open)</span>`;
         placeholder.style.cursor = 'pointer';
-        placeholder.onclick = () => window.open(originalSrc, '_blank');
+        placeholder.onclick = (e) => {
+            if (e.altKey) {
+                e.stopPropagation();
+                e.preventDefault();
+                window.open(originalSrc, '_blank');
+            }
+            // Without Alt, let the event bubble normally (e.g., for task editing)
+        };
         imgElement.parentElement.insertBefore(placeholder, imgElement);
         imgElement.style.display = 'none';
         return;
@@ -753,10 +761,18 @@ function handleVideoNotFound(videoElement, originalSrc) {
         videoElement.dataset.handled = 'true';
         const placeholder = document.createElement('span');
         placeholder.className = 'external-url-blocked';
-        placeholder.title = `External video cannot be loaded in editor: ${originalSrc}`;
-        placeholder.innerHTML = `<span class="external-url-text">🔗 External video (click to open)</span>`;
+        placeholder.dataset.externalUrl = originalSrc;
+        placeholder.title = `External video (Alt+click to open in browser)\n${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🔗 External video (Alt+click to open)</span>`;
         placeholder.style.cursor = 'pointer';
-        placeholder.onclick = () => window.open(originalSrc, '_blank');
+        placeholder.onclick = (e) => {
+            if (e.altKey) {
+                e.stopPropagation();
+                e.preventDefault();
+                window.open(originalSrc, '_blank');
+            }
+            // Without Alt, let the event bubble normally (e.g., for task editing)
+        };
         videoElement.parentElement.insertBefore(placeholder, videoElement);
         videoElement.style.display = 'none';
         return;
@@ -857,8 +873,6 @@ function toggleVideoNotFoundMenu(container) {
 function markBrokenLinks(brokenPaths) {
     if (!brokenPaths || brokenPaths.length === 0) return;
 
-    console.log('[markBrokenLinks] Received brokenPaths:', brokenPaths);
-
     // Normalize paths for comparison
     const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
         try {
@@ -868,12 +882,8 @@ function markBrokenLinks(brokenPaths) {
         }
     }));
 
-    console.log('[markBrokenLinks] Normalized broken paths:', [...normalizedBrokenPaths]);
-
     // Find all link containers and check if their path is in the broken list
     const linkContainers = document.querySelectorAll('.link-path-overlay-container');
-    console.log('[markBrokenLinks] Found link containers:', linkContainers.length);
-
     linkContainers.forEach(container => {
         const linkPath = container.dataset.linkPath;
         if (!linkPath) return;
@@ -886,11 +896,8 @@ function markBrokenLinks(brokenPaths) {
             normalizedLinkPath = linkPath.toLowerCase();
         }
 
-        const isBroken = normalizedBrokenPaths.has(normalizedLinkPath);
-        console.log('[markBrokenLinks] Checking link:', { linkPath, normalizedLinkPath, isBroken });
-
         // Check if this link is broken
-        if (isBroken) {
+        if (normalizedBrokenPaths.has(normalizedLinkPath)) {
             container.classList.add('link-broken');
         } else {
             container.classList.remove('link-broken');

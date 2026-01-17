@@ -2630,25 +2630,37 @@ if (!webviewEventListenersInitialized) {
                         window.renderBoard();
                     }
 
+                    // Cache broken element paths for re-use after include content re-renders
+                    // These are stored globally so markdown-it-include-browser can re-apply markers
+                    if (message.brokenLinkPaths) {
+                        window._cachedBrokenLinkPaths = message.brokenLinkPaths;
+                    }
+                    if (message.brokenImagePaths) {
+                        window._cachedBrokenImagePaths = message.brokenImagePaths;
+                    }
+                    if (message.brokenMediaPaths) {
+                        window._cachedBrokenMediaPaths = message.brokenMediaPaths;
+                    }
+
                     // Mark broken elements after render completes
                     // Use requestAnimationFrame to ensure DOM is updated
                     requestAnimationFrame(() => {
                         // Mark broken links
-                        if (message.brokenLinkPaths && message.brokenLinkPaths.length > 0) {
+                        if (window._cachedBrokenLinkPaths && window._cachedBrokenLinkPaths.length > 0) {
                             if (typeof window.markBrokenLinks === 'function') {
-                                window.markBrokenLinks(message.brokenLinkPaths);
+                                window.markBrokenLinks(window._cachedBrokenLinkPaths);
                             }
                         }
                         // Mark broken images (pre-scanned by backend)
-                        if (message.brokenImagePaths && message.brokenImagePaths.length > 0) {
+                        if (window._cachedBrokenImagePaths && window._cachedBrokenImagePaths.length > 0) {
                             if (typeof window.markBrokenImages === 'function') {
-                                window.markBrokenImages(message.brokenImagePaths);
+                                window.markBrokenImages(window._cachedBrokenImagePaths);
                             }
                         }
                         // Mark broken media (video/audio)
-                        if (message.brokenMediaPaths && message.brokenMediaPaths.length > 0) {
+                        if (window._cachedBrokenMediaPaths && window._cachedBrokenMediaPaths.length > 0) {
                             if (typeof window.markBrokenMedia === 'function') {
-                                window.markBrokenMedia(message.brokenMediaPaths);
+                                window.markBrokenMedia(window._cachedBrokenMediaPaths);
                             }
                         }
                     });
