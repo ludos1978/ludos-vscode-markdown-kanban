@@ -2630,15 +2630,28 @@ if (!webviewEventListenersInitialized) {
                         window.renderBoard();
                     }
 
-                    // Mark broken links after render completes
-                    if (message.brokenLinkPaths && message.brokenLinkPaths.length > 0) {
-                        // Use requestAnimationFrame to ensure DOM is updated
-                        requestAnimationFrame(() => {
+                    // Mark broken elements after render completes
+                    // Use requestAnimationFrame to ensure DOM is updated
+                    requestAnimationFrame(() => {
+                        // Mark broken links
+                        if (message.brokenLinkPaths && message.brokenLinkPaths.length > 0) {
                             if (typeof window.markBrokenLinks === 'function') {
                                 window.markBrokenLinks(message.brokenLinkPaths);
                             }
-                        });
-                    }
+                        }
+                        // Mark broken images (pre-scanned by backend)
+                        if (message.brokenImagePaths && message.brokenImagePaths.length > 0) {
+                            if (typeof window.markBrokenImages === 'function') {
+                                window.markBrokenImages(message.brokenImagePaths);
+                            }
+                        }
+                        // Mark broken media (video/audio)
+                        if (message.brokenMediaPaths && message.brokenMediaPaths.length > 0) {
+                            if (typeof window.markBrokenMedia === 'function') {
+                                window.markBrokenMedia(message.brokenMediaPaths);
+                            }
+                        }
+                    });
 
                     // Apply default folding if this is from an external change
                     if (message.applyDefaultFolding) {
@@ -3507,6 +3520,11 @@ if (!webviewEventListenersInitialized) {
                         foundTask.includeMode = taskData.includeMode;
                     }
                     if (taskData.includeFiles !== undefined) {
+                        // DEBUG: Log includeFiles received from backend to trace corruption
+                        console.log('[webview.updateTaskContent] taskId:', message.taskId, 'includeFiles from backend:', JSON.stringify(taskData.includeFiles));
+                        if (taskData.includeFiles && taskData.includeFiles[0]) {
+                            console.log('[webview.updateTaskContent] includeFiles[0] bytes:', Array.from(taskData.includeFiles[0]).map(c => c.charCodeAt(0).toString(16)).slice(0, 50).join(' '));
+                        }
                         foundTask.includeFiles = taskData.includeFiles;
                     }
                     // Update loading state for includes

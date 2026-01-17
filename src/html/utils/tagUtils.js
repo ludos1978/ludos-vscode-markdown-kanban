@@ -1345,14 +1345,29 @@ class TagUtils {
                 // Backend has already inserted %INCLUDE_BADGE:filepath% placeholder in displayTitle
                 // We just need to replace it with the badge HTML
 
-                // Render markdown first (with the placeholder still in place)
-                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
-
-                // Replace ALL %INCLUDE_BADGE:filepath% placeholders with badge HTML using regex
-                // This handles cases where backend path != frontend path (e.g., ../relative/paths)
+                // CRITICAL FIX: Extract placeholder paths BEFORE markdown rendering to prevent corruption
+                // markdown-it's typographer or other processing might corrupt paths with special chars
                 const placeholderRegex = /%INCLUDE_BADGE:([^%]+)%/g;
-                const result = renderedTitle.replace(placeholderRegex, (match, filePath) => {
+                const extractedPaths = [];
+                let tempTitle = additionalTitle;
+                let match;
+                let placeholderIndex = 0;
+
+                // Extract all placeholder paths and replace with safe tokens
+                while ((match = placeholderRegex.exec(additionalTitle)) !== null) {
+                    const originalPath = match[1];
+                    extractedPaths.push(originalPath);
+                    // Replace with a safe token that won't be affected by markdown processing
+                    tempTitle = tempTitle.replace(match[0], `__INCLUDE_PLACEHOLDER_${placeholderIndex}__`);
+                    placeholderIndex++;
+                }
+
+                // Render markdown on content with safe placeholder tokens
+                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+                let renderedTitle = renderFn ? renderFn(tempTitle) : tempTitle;
+
+                // Replace safe tokens back with badge HTML using the preserved paths
+                extractedPaths.forEach((filePath, index) => {
                     // Generate badge for this file path (may be different from fileName if path normalized)
                     const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
                     const baseFileName = parts[parts.length - 1];
@@ -1382,11 +1397,13 @@ class TagUtils {
                     }
 
                     const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
+                    const badgeHtml = generateIncludeLinkWithMenu(filePath, displayText, 'column', column.includeError);
 
-                    return generateIncludeLinkWithMenu(filePath, displayText, 'column', column.includeError);
+                    // Replace the safe token with the badge HTML
+                    renderedTitle = renderedTitle.replace(`__INCLUDE_PLACEHOLDER_${index}__`, badgeHtml);
                 });
 
-                return result;
+                return renderedTitle;
             } else {
                 return linkHtml;
             }
@@ -1406,8 +1423,6 @@ class TagUtils {
      */
     getTaskDisplayTitle(task) {
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-            // DEBUG: Log includeError state
-            console.log(`[tagUtils.getTaskDisplayTitle] task=${task.id}, includeMode=${task.includeMode}, includeError=${task.includeError}, includeFiles=${JSON.stringify(task.includeFiles)}`);
             // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
@@ -1447,14 +1462,29 @@ class TagUtils {
             // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
             const displayTitle = task.displayTitle || (task.title ? (window.removeTagsForDisplay ? window.removeTagsForDisplay(task.title) : task.title) : '');
 
-            // Render markdown first (placeholder will be preserved in the output)
-            const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-            let rendered = renderFn ? renderFn(displayTitle) : displayTitle;
-
-            // Replace any %INCLUDE_BADGE:filepath% placeholders with badge HTML
-            // This handles cases where tasks have includes with additional text
+            // CRITICAL FIX: Extract placeholder paths BEFORE markdown rendering to prevent corruption
+            // markdown-it's typographer or other processing might corrupt paths with special chars
             const placeholderRegex = /%INCLUDE_BADGE:([^%]+)%/g;
-            rendered = rendered.replace(placeholderRegex, (match, filePath) => {
+            const extractedPaths = [];
+            let tempTitle = displayTitle;
+            let match;
+            let placeholderIndex = 0;
+
+            // Extract all placeholder paths and replace with safe tokens
+            while ((match = placeholderRegex.exec(displayTitle)) !== null) {
+                const originalPath = match[1];
+                extractedPaths.push(originalPath);
+                // Replace with a safe token that won't be affected by markdown processing
+                tempTitle = tempTitle.replace(match[0], `__INCLUDE_PLACEHOLDER_${placeholderIndex}__`);
+                placeholderIndex++;
+            }
+
+            // Render markdown on content with safe placeholder tokens
+            const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+            let rendered = renderFn ? renderFn(tempTitle) : tempTitle;
+
+            // Replace safe tokens back with badge HTML using the preserved paths
+            extractedPaths.forEach((filePath, index) => {
                 // Generate badge for this file path
                 const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
                 const baseFileName = parts[parts.length - 1];
@@ -1480,8 +1510,10 @@ class TagUtils {
                 }
 
                 const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
+                const badgeHtml = generateIncludeLinkWithMenu(filePath, displayText, 'task', task.includeError);
 
-                return generateIncludeLinkWithMenu(filePath, displayText, 'task', task.includeError);
+                // Replace the safe token with the badge HTML
+                rendered = rendered.replace(`__INCLUDE_PLACEHOLDER_${index}__`, badgeHtml);
             });
 
             return rendered;
@@ -1498,8 +1530,6 @@ class TagUtils {
  * @returns {string} HTML string with include link wrapped in overlay container
  */
 function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBroken = false) {
-    // DEBUG: Log isBroken state
-    console.log(`[generateIncludeLinkWithMenu] filePath=${filePath}, isBroken=${isBroken}, clickHandler=${clickHandler}`);
     const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' : 'handleColumnIncludeClick';

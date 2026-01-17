@@ -226,16 +226,41 @@ body {
     position: sticky;
     top: 0;
     z-index: 1;
+    cursor: pointer;
+    user-select: none;
+}
+
+.result-group-header:hover {
+    background: var(--vscode-list-hoverBackground);
 }
 
 .result-group-header .codicon {
     font-size: 12px;
 }
 
+.result-group-fold-toggle {
+    font-size: 14px !important;
+    opacity: 0.7;
+    transition: transform 0.15s ease;
+}
+
+.result-group-header:hover .result-group-fold-toggle {
+    opacity: 1;
+}
+
 .result-group-count {
     margin-left: auto;
     font-weight: normal;
     opacity: 0.7;
+}
+
+/* Folded state */
+.result-group.folded .result-group-items {
+    display: none;
+}
+
+.result-group-items {
+    /* Container for items - allows easy fold/unfold */
 }
 
 /* Result Item */

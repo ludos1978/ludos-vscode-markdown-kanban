@@ -367,7 +367,11 @@ export class PathCommands extends SwitchBasedCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const oldPath = message.filePath;
-        logger.debug('[PathCommands.handleSearchForFile] START', { oldPath, taskId: message.taskId, columnId: message.columnId });
+        logger.debug('[PathCommands.handleSearchForFile] START', {
+            oldPath,
+            taskId: message.taskId,
+            columnId: message.columnId
+        });
 
         // Get the main file's directory for the search
         const fileRegistry = this.getFileRegistry();
@@ -654,7 +658,7 @@ export class PathCommands extends SwitchBasedCommand {
     /**
      * Normalize a directory path for comparison
      * Strips leading ./ and normalizes separators
-     * This ensures directories match regardless of ./ prefix differences
+     * This ensures directories match regardless of ./ prefix
      */
     private normalizeDirForComparison(dir: string): string {
         let normalized = dir.replace(/\\/g, '/');

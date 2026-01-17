@@ -122,3 +122,4 @@ export function encodeFilePath(filePath: string): string {
 
     return encodedParts.join('/');
 }
+

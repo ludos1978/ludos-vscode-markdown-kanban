@@ -253,28 +253,59 @@
         }
     }
 
+    // Track folded state per type
+    const foldedGroups = new Set();
+
     /**
      * Create a result group element
      */
     function createResultGroup(type, items, searchType, startIndex = 0) {
         const group = document.createElement('div');
         group.className = 'result-group';
+        group.dataset.type = type;
 
-        // Header
+        // Check if this group should be folded (persisted state)
+        const isFolded = foldedGroups.has(type);
+        if (isFolded) {
+            group.classList.add('folded');
+        }
+
+        // Header with fold toggle
         const header = document.createElement('div');
         header.className = 'result-group-header';
         header.innerHTML = `
+            <span class="result-group-fold-toggle codicon codicon-chevron-${isFolded ? 'right' : 'down'}"></span>
             <span class="codicon codicon-${typeIcons[type] || 'file'}"></span>
-            <span>${typeLabels[type] || type}</span>
+            <span class="result-group-label">${typeLabels[type] || type}</span>
             <span class="result-group-count">${items.length}</span>
         `;
+
+        // Click handler to toggle fold
+        header.addEventListener('click', () => {
+            const isNowFolded = group.classList.toggle('folded');
+            const toggleIcon = header.querySelector('.result-group-fold-toggle');
+            if (toggleIcon) {
+                toggleIcon.classList.remove('codicon-chevron-down', 'codicon-chevron-right');
+                toggleIcon.classList.add(isNowFolded ? 'codicon-chevron-right' : 'codicon-chevron-down');
+            }
+            // Persist fold state
+            if (isNowFolded) {
+                foldedGroups.add(type);
+            } else {
+                foldedGroups.delete(type);
+            }
+        });
+
         group.appendChild(header);
 
-        // Items
+        // Items container (for easier folding)
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'result-group-items';
         items.forEach((item, offset) => {
             const itemEl = createResultItem(item, searchType, startIndex + offset);
-            group.appendChild(itemEl);
+            itemsContainer.appendChild(itemEl);
         });
+        group.appendChild(itemsContainer);
 
         return group;
     }

@@ -171,7 +171,7 @@ function revealPathInExplorer(filePath) {
  * Shows filename + limited parent folder for context
  * @param {string} filePath - The full file path
  * @param {number} maxFolderChars - Maximum characters for folder portion (default 20)
- * @returns {string} Shortened display name like "…/folder/image.png"
+ * @returns {string} Shortened display name like ".../folder/image.png"
  */
 function getShortDisplayPath(filePath, maxFolderChars = 20) {
     if (!filePath) return 'unknown';
@@ -194,11 +194,11 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
     // Truncate parent folder if too long
     let displayFolder = parentFolder;
     if (parentFolder.length > maxFolderChars) {
-        displayFolder = parentFolder.substring(0, maxFolderChars - 1) + '…';
+        displayFolder = parentFolder.substring(0, maxFolderChars - 1) + '...';
     }
 
     // Add ellipsis prefix if there are more parent folders
-    const prefix = parts.length > 2 ? '…/' : '';
+    const prefix = parts.length > 2 ? '.../' : '';
 
     return `${prefix}${displayFolder}/${filename}`;
 }
@@ -859,6 +859,148 @@ function clearBrokenLinkMarkers() {
     });
 }
 
+/**
+ * Mark images as broken based on backend file existence scan
+ * Pre-marks images that don't exist on disk before they try to load
+ * @param {string[]} brokenPaths - Array of paths that don't exist
+ */
+function markBrokenImages(brokenPaths) {
+    if (!brokenPaths || brokenPaths.length === 0) return;
+
+    // Normalize paths for comparison
+    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
+        try {
+            return decodeURIComponent(p).toLowerCase();
+        } catch {
+            return p.toLowerCase();
+        }
+    }));
+
+    // Find all image containers and check if their path is in the broken list
+    const imageContainers = document.querySelectorAll('.image-path-overlay-container');
+    imageContainers.forEach(container => {
+        // Get path from container's data-image-path or from img's data-original-src
+        let imagePath = container.dataset.imagePath;
+        if (!imagePath) {
+            const img = container.querySelector('img');
+            imagePath = img?.dataset?.originalSrc || img?.getAttribute('src');
+        }
+        if (!imagePath) return;
+
+        // Normalize the image path for comparison
+        let normalizedImagePath;
+        try {
+            normalizedImagePath = decodeURIComponent(imagePath).toLowerCase();
+        } catch {
+            normalizedImagePath = imagePath.toLowerCase();
+        }
+
+        // Check if this image is broken
+        if (normalizedBrokenPaths.has(normalizedImagePath)) {
+            container.classList.add('image-broken');
+        }
+    });
+
+    // Also check standalone images not in overlay containers
+    const standaloneImages = document.querySelectorAll('img[data-original-src]:not(.image-path-overlay-container img)');
+    standaloneImages.forEach(img => {
+        const imagePath = img.dataset.originalSrc || img.getAttribute('src');
+        if (!imagePath) return;
+
+        let normalizedImagePath;
+        try {
+            normalizedImagePath = decodeURIComponent(imagePath).toLowerCase();
+        } catch {
+            normalizedImagePath = imagePath.toLowerCase();
+        }
+
+        if (normalizedBrokenPaths.has(normalizedImagePath)) {
+            // Trigger the not-found handler to convert to broken state
+            if (typeof handleImageNotFound === 'function') {
+                handleImageNotFound(img, imagePath);
+            }
+        }
+    });
+}
+
+/**
+ * Mark media elements (video/audio) as broken based on backend file existence scan
+ * @param {string[]} brokenPaths - Array of paths that don't exist
+ */
+function markBrokenMedia(brokenPaths) {
+    if (!brokenPaths || brokenPaths.length === 0) return;
+
+    // Normalize paths for comparison
+    const normalizedBrokenPaths = new Set(brokenPaths.map(p => {
+        try {
+            return decodeURIComponent(p).toLowerCase();
+        } catch {
+            return p.toLowerCase();
+        }
+    }));
+
+    // Find all video containers
+    const videoContainers = document.querySelectorAll('.video-path-overlay-container');
+    videoContainers.forEach(container => {
+        let videoPath = container.dataset.videoPath;
+        if (!videoPath) {
+            const video = container.querySelector('video');
+            videoPath = video?.getAttribute('src');
+        }
+        if (!videoPath) return;
+
+        let normalizedVideoPath;
+        try {
+            normalizedVideoPath = decodeURIComponent(videoPath).toLowerCase();
+        } catch {
+            normalizedVideoPath = videoPath.toLowerCase();
+        }
+
+        if (normalizedBrokenPaths.has(normalizedVideoPath)) {
+            container.classList.add('video-broken');
+        }
+    });
+
+    // Check standalone videos
+    const standaloneVideos = document.querySelectorAll('video:not(.video-path-overlay-container video)');
+    standaloneVideos.forEach(video => {
+        const videoPath = video.getAttribute('src');
+        if (!videoPath) return;
+
+        let normalizedVideoPath;
+        try {
+            normalizedVideoPath = decodeURIComponent(videoPath).toLowerCase();
+        } catch {
+            normalizedVideoPath = videoPath.toLowerCase();
+        }
+
+        if (normalizedBrokenPaths.has(normalizedVideoPath)) {
+            // Trigger the not-found handler
+            if (typeof handleVideoNotFound === 'function') {
+                handleVideoNotFound(video, videoPath);
+            }
+        }
+    });
+}
+
+/**
+ * Clear all broken image markers (for re-scanning)
+ */
+function clearBrokenImageMarkers() {
+    document.querySelectorAll('.image-path-overlay-container.image-broken').forEach(container => {
+        container.classList.remove('image-broken');
+    });
+}
+
+/**
+ * Clear all broken media markers (for re-scanning)
+ */
+function clearBrokenMediaMarkers() {
+    document.querySelectorAll('.video-path-overlay-container.video-broken').forEach(container => {
+        container.classList.remove('video-broken');
+    });
+}
+
 // ============================================================================
 // DOM PATH UPDATES
 // ============================================================================
@@ -1098,9 +1240,13 @@ window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFound
 // DOM updates
 window.updatePathInDOM = updatePathInDOM;
 
-// Broken link handling
+// Broken element handling
 window.markBrokenLinks = markBrokenLinks;
 window.clearBrokenLinkMarkers = clearBrokenLinkMarkers;
+window.markBrokenImages = markBrokenImages;
+window.clearBrokenImageMarkers = clearBrokenImageMarkers;
+window.markBrokenMedia = markBrokenMedia;
+window.clearBrokenMediaMarkers = clearBrokenMediaMarkers;
 
 // ============================================================================
 // DIAGRAM MENUS (Mermaid, PlantUML)

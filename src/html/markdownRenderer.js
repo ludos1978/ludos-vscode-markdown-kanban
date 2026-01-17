@@ -2255,6 +2255,8 @@ function renderMarkdown(text, includeContext) {
             const href = token.attrGet('href') || '';
             const title = token.attrGet('title') || '';
 
+            console.log('[LINK-RENDER] link_open called:', { href, title, tokenType: token.type });
+
             // Don't make webview URIs clickable (they're for display only)
             if (href.startsWith('vscode-webview://')) {
                 return '<span class="webview-uri-text">';
@@ -2269,12 +2271,15 @@ function renderMarkdown(text, includeContext) {
             // Check if this is a local file link (not URL, not anchor, not mailto)
             const isLocalFileLink = !isExternalLink && !isAnchorLink && !isMailtoLink && href.length > 0;
 
+            console.log('[LINK-RENDER] link_open analysis:', { isExternalLink, isAnchorLink, isMailtoLink, isLocalFileLink });
+
             if (isLocalFileLink) {
                 // Escape the path for use in onclick handlers
                 const escapedPath = href.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
                 // Mark token so link_close knows to add the burger button
                 token._isLocalFileLink = true;
                 token._escapedPath = escapedPath;
+                console.log('[LINK-RENDER] Wrapping local file link with overlay container:', href);
                 // Wrap in overlay container for path menu
                 return `<span class="link-path-overlay-container" data-link-path="${escapeHtml(href)}"><a href="#" data-original-href="${escapeHtml(href)}"${titleAttr} class="markdown-link markdown-file-link">`;
             }
@@ -2283,7 +2288,24 @@ function renderMarkdown(text, includeContext) {
         };
 
         md.renderer.rules.link_close = function(tokens, idx, options, env, renderer) {
-            const openToken = tokens[idx - 2]; // link_open token
+            // Search backwards for the matching link_open token
+            // Can't assume it's at idx-2 because link text may contain multiple tokens (emphasis, etc.)
+            let openToken = null;
+            for (let i = idx - 1; i >= 0; i--) {
+                if (tokens[i].type === 'link_open') {
+                    openToken = tokens[i];
+                    break;
+                }
+            }
+
+            console.log('[LINK-RENDER] link_close called:', {
+                idx,
+                foundOpenToken: !!openToken,
+                openTokenType: openToken?.type,
+                isLocalFileLink: openToken?._isLocalFileLink,
+                href: openToken?.attrGet?.('href')
+            });
+
             if (openToken && openToken.attrGet && openToken.attrGet('href') &&
                 openToken.attrGet('href').startsWith('vscode-webview://')) {
                 return '</span>';
@@ -2291,6 +2313,7 @@ function renderMarkdown(text, includeContext) {
             // Check if this was a local file link that needs the burger menu
             if (openToken && openToken._isLocalFileLink) {
                 const escapedPath = openToken._escapedPath;
+                console.log('[LINK-RENDER] Adding burger menu for local file link:', escapedPath);
                 return `</a><button class="link-menu-btn" onclick="event.stopPropagation(); event.preventDefault(); toggleLinkPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button></span>`;
             }
             return '</a>';

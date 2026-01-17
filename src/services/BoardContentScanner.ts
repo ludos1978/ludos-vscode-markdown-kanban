@@ -212,17 +212,7 @@ export class BoardContentScanner {
             const resolvedPath = this._resolvePathWithBase(element.path, effectiveBasePath);
             const exists = fs.existsSync(resolvedPath);
 
-            // Debug logging for broken element detection
             if (!exists) {
-                console.log('[BoardContentScanner] File marked as broken:', {
-                    originalPath: element.path,
-                    resolvedPath,
-                    basePath: this._basePath,
-                    elementBasePath: element.resolveBasePath || '(none)',
-                    effectiveBasePath,
-                    type: element.type,
-                    location: `${element.location.columnTitle}/${element.location.taskTitle || 'column'}`
-                });
                 pushBroken(element, resolvedPath);
             }
         }
@@ -474,20 +464,7 @@ export class BoardContentScanner {
         const cleanPath = decodedPath.startsWith('./')
             ? decodedPath.substring(2)
             : decodedPath;
-        const resolved = path.resolve(basePath, cleanPath);
-
-        // Debug: log path resolution details for troubleshooting
-        if (relativePath !== decodedPath || relativePath.includes('%') || relativePath.includes('..')) {
-            console.log('[BoardContentScanner._resolvePathWithBase]', {
-                input: relativePath,
-                decoded: decodedPath,
-                clean: cleanPath,
-                basePath,
-                resolved
-            });
-        }
-
-        return resolved;
+        return path.resolve(basePath, cleanPath);
     }
 
     /**
