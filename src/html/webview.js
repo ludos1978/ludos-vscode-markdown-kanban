@@ -4507,31 +4507,103 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
 
     const findElementByPath = (root, path, type) => {
         if (!root || !path) return null;
-        const pathCandidates = [path];
+        const pathCandidates = [];
+        console.log('[scrollToAndHighlight] findElementByPath called with:', { path: path.substring(0, 100), type, rootTag: root.tagName });
 
-        // Handle %INCLUDE_BADGE:path% format - extract the actual path
-        const includeBadgeMatch = path.match(/^%INCLUDE_BADGE:(.+)%$/);
+        // Handle complex path formats that may contain multiple parts:
+        // - "imagePath\n%INCLUDE_BADGE:path% #stack > ![markdown]"
+        // - "%INCLUDE_BADGE:path%"
+        // - Simple path
+
+        // Extract %INCLUDE_BADGE:path% from anywhere in the string
+        const includeBadgeMatch = path.match(/%INCLUDE_BADGE:([^%]+)%/);
         if (includeBadgeMatch) {
-            pathCandidates.unshift(includeBadgeMatch[1]); // Prefer extracted path
+            pathCandidates.push(includeBadgeMatch[1]); // The include file path
         }
 
-        // Handle URL-encoded paths
-        if (path.includes('%')) {
-            try {
-                const decoded = decodeURIComponent(path);
-                if (decoded !== path) pathCandidates.push(decoded);
-            } catch (e) {
-                // Ignore decode errors - use original path
+        // Extract image/link path from markdown syntax: ![...](path) or [text](path)
+        const markdownPathMatch = path.match(/!\[[^\]]*\]\(([^)\s"]+)/);
+        if (markdownPathMatch) {
+            pathCandidates.push(markdownPathMatch[1]);
+        }
+        const linkPathMatch = path.match(/(?<!!)\[[^\]]*\]\(([^)\s"]+)/);
+        if (linkPathMatch) {
+            pathCandidates.push(linkPathMatch[1]);
+        }
+
+        // If the path starts with a relative path (../ or ./), extract just that part
+        const relativePathMatch = path.match(/^(\.\.?\/[^\s\n%]+)/);
+        if (relativePathMatch) {
+            pathCandidates.push(relativePathMatch[1]);
+        }
+
+        // Also try the original path
+        pathCandidates.push(path);
+
+        // Handle URL-encoded paths - decode each candidate
+        const decodedCandidates = [];
+        for (const candidate of pathCandidates) {
+            if (candidate.includes('%')) {
+                try {
+                    const decoded = decodeURIComponent(candidate);
+                    if (decoded !== candidate) decodedCandidates.push(decoded);
+                } catch (e) {
+                    // Ignore decode errors
+                }
             }
         }
+        pathCandidates.push(...decodedCandidates);
+
+        // Also extract just the filename and try that
+        const filenames = [];
+        for (const candidate of [...pathCandidates]) {
+            const filename = candidate.split('/').pop();
+            if (filename && filename !== candidate && !pathCandidates.includes(filename)) {
+                pathCandidates.push(filename);
+                filenames.push(filename);
+            }
+        }
+
+        console.log('[scrollToAndHighlight] Path candidates:', pathCandidates.map(p => p.substring(0, 60)));
+
+        // Try each candidate with exact match
         for (const candidate of pathCandidates) {
+            if (!candidate) continue;
             const safePath = escapeSelector(candidate);
             const selectors = getSelectorsForPath(safePath, type);
             for (const selector of selectors) {
-                const found = root.querySelector(selector);
-                if (found) return found;
+                try {
+                    const found = root.querySelector(selector);
+                    if (found) {
+                        console.log('[scrollToAndHighlight] FOUND element with selector:', selector.substring(0, 80));
+                        return found;
+                    }
+                } catch (e) {
+                    // Ignore invalid selector errors
+                }
             }
         }
+
+        // Fallback: Search by filename suffix match (for paths that may have been transformed)
+        // This handles cases where the element has an absolute path but we're searching with relative
+        if (filenames.length > 0) {
+            console.log('[scrollToAndHighlight] Trying filename suffix match for:', filenames);
+            const allElements = root.querySelectorAll('[data-original-src], [data-original-href], [data-include-path], [data-include-file]');
+            for (const el of allElements) {
+                const src = el.getAttribute('data-original-src') ||
+                           el.getAttribute('data-original-href') ||
+                           el.getAttribute('data-include-path') ||
+                           el.getAttribute('data-include-file') || '';
+                for (const filename of filenames) {
+                    if (src.endsWith(filename) || src.endsWith('/' + filename)) {
+                        console.log('[scrollToAndHighlight] FOUND element by filename suffix:', filename, 'in', src.substring(0, 60));
+                        return el;
+                    }
+                }
+            }
+        }
+
+        console.log('[scrollToAndHighlight] No element found for any candidate');
         return null;
     };
 
@@ -4582,8 +4654,41 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
         });
     }
 
-    // Enable scroll anchoring on target element to keep it stable as images load
-    targetElement.style.overflowAnchor = 'auto';
+    // Helper to check if element is visible
+    const isElementVisible = (el) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return el.offsetParent !== null && rect.width > 0 && rect.height > 0;
+    };
+
+    // If the target element is not visible (zero size or hidden), find a visible ancestor
+    let scrollTarget = targetElement;
+
+    if (!isElementVisible(targetElement)) {
+        console.log('[scrollToAndHighlight] Target not visible, looking for visible ancestor...');
+        let parent = targetElement.parentElement;
+        while (parent && parent !== document.body) {
+            if (isElementVisible(parent)) {
+                console.log('[scrollToAndHighlight] Found visible ancestor:', parent.tagName, parent.className);
+                scrollTarget = parent;
+                break;
+            }
+            parent = parent.parentElement;
+        }
+        // If still no visible ancestor, fall back to task or column
+        if (!isElementVisible(scrollTarget)) {
+            if (taskElement && isElementVisible(taskElement)) {
+                console.log('[scrollToAndHighlight] Falling back to task element');
+                scrollTarget = taskElement;
+            } else if (columnElement && isElementVisible(columnElement)) {
+                console.log('[scrollToAndHighlight] Falling back to column element');
+                scrollTarget = columnElement;
+            }
+        }
+    }
+
+    // Enable scroll anchoring on scroll target to keep it stable as images load
+    scrollTarget.style.overflowAnchor = 'auto';
 
     // Track element position for stability detection
     let lastTop = null;
@@ -4592,7 +4697,7 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
 
     const cleanup = () => {
         // Release scroll anchoring
-        targetElement.style.overflowAnchor = '';
+        scrollTarget.style.overflowAnchor = '';
         // Remove listeners
         window.removeEventListener('wheel', onUserInput);
         window.removeEventListener('keydown', onUserInput);
@@ -4616,7 +4721,7 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
 
     // Check if element position is stable (hasn't moved for 200ms)
     const checkStability = () => {
-        const currentTop = targetElement.getBoundingClientRect().top;
+        const currentTop = scrollTarget.getBoundingClientRect().top;
 
         if (lastTop !== null && Math.abs(currentTop - lastTop) < 1) {
             // Position stable - start/continue timer
@@ -4642,12 +4747,19 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
     window.addEventListener('keydown', onUserInput);
     window.addEventListener('mousedown', onScrollbarClick);
 
-    // Jump directly to target (no smooth scrolling)
-    targetElement.scrollIntoView({
+    console.log('[scrollToAndHighlight] Scrolling to:', {
+        tagName: scrollTarget.tagName,
+        className: scrollTarget.className?.substring?.(0, 50) || scrollTarget.className,
+        rect: scrollTarget.getBoundingClientRect(),
+        isVisible: isElementVisible(scrollTarget)
+    });
+
+    scrollTarget.scrollIntoView({
         behavior: 'instant',
         block: 'center',
         inline: 'nearest'
     });
+    console.log('[scrollToAndHighlight] After scrollIntoView, rect:', scrollTarget.getBoundingClientRect());
 
     // Start stability check after scroll begins
     rafId = requestAnimationFrame(checkStability);

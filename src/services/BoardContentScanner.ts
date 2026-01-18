@@ -13,6 +13,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
 import { MarkdownPatterns, HtmlPatterns, DiagramPatterns, isUrl } from '../shared/regexPatterns';
 import { safeDecodeURIComponent } from '../utils/stringUtils';
@@ -453,6 +454,7 @@ export class BoardContentScanner {
      * Resolve a relative path to absolute using a custom base path
      * Handles URL-encoded paths (e.g., path%20with%20spaces.md)
      * Handles markdown escape sequences (e.g., \' -> ', \" -> ")
+     * Handles workspace-relative paths (e.g., Sammelsurium/subfolder/file.pdf)
      */
     private _resolvePathWithBase(relativePath: string, basePath: string): string {
         // Decode URL-encoded characters first
@@ -465,11 +467,39 @@ export class BoardContentScanner {
         if (path.isAbsolute(decodedPath)) {
             return decodedPath;
         }
+
         // Handle ./ prefix
         const cleanPath = decodedPath.startsWith('./')
             ? decodedPath.substring(2)
             : decodedPath;
-        return path.resolve(basePath, cleanPath);
+
+        // Check if path starts with a workspace folder name (workspace-relative path)
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            for (const folder of workspaceFolders) {
+                const folderName = path.basename(folder.uri.fsPath);
+                if (cleanPath.startsWith(folderName + '/') || cleanPath.startsWith(folderName + '\\')) {
+                    // This is a workspace-relative path - resolve relative to workspace parent
+                    const relativePart = cleanPath.substring(folderName.length + 1);
+                    return path.resolve(folder.uri.fsPath, relativePart);
+                }
+            }
+        }
+
+        // Standard resolution: relative to base path
+        const resolved = path.resolve(basePath, cleanPath);
+
+        // If not found, also try workspace folders as fallback
+        if (!fs.existsSync(resolved) && workspaceFolders) {
+            for (const folder of workspaceFolders) {
+                const candidate = path.resolve(folder.uri.fsPath, cleanPath);
+                if (fs.existsSync(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+
+        return resolved;
     }
 
     /**
