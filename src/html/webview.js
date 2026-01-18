@@ -4508,6 +4508,14 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
     const findElementByPath = (root, path, type) => {
         if (!root || !path) return null;
         const pathCandidates = [path];
+
+        // Handle %INCLUDE_BADGE:path% format - extract the actual path
+        const includeBadgeMatch = path.match(/^%INCLUDE_BADGE:(.+)%$/);
+        if (includeBadgeMatch) {
+            pathCandidates.unshift(includeBadgeMatch[1]); // Prefer extracted path
+        }
+
+        // Handle URL-encoded paths
         if (path.includes('%')) {
             try {
                 const decoded = decodeURIComponent(path);
@@ -4634,9 +4642,9 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
     window.addEventListener('keydown', onUserInput);
     window.addEventListener('mousedown', onScrollbarClick);
 
-    // Scroll to target
+    // Jump directly to target (no smooth scrolling)
     targetElement.scrollIntoView({
-        behavior: 'smooth',
+        behavior: 'instant',
         block: 'center',
         inline: 'nearest'
     });

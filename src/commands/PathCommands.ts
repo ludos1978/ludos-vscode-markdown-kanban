@@ -1302,8 +1302,17 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Extract directories from paths
-        const brokenDir = path.dirname(brokenPath);
+        // Decode brokenPath in case it contains URL-encoded characters (e.g., %E2%80%93 for en-dash)
+        const decodedBrokenPath = safeDecodeURIComponent(brokenPath);
+        const brokenDir = path.dirname(decodedBrokenPath);
         const newDir = path.dirname(selectedPath);
+
+        logger.debug('[PathCommands._batchReplacePaths] Directory extraction', {
+            originalBrokenPath: brokenPath.substring(0, 100),
+            decodedBrokenPath: decodedBrokenPath.substring(0, 100),
+            brokenDir: brokenDir.substring(0, 100),
+            newDir: newDir.substring(0, 100)
+        });
 
         // Collect all files to search
         const mainFile = fileRegistry.getMainFile();
@@ -1321,13 +1330,34 @@ export class PathCommands extends SwitchBasedCommand {
         const pathsToReplace: Map<string, string> = new Map();
         const skippedPaths: string[] = []; // Paths where new file doesn't exist
 
+        // Get the filename from the broken path for diagnostic purposes
+        const brokenFilename = path.basename(decodedBrokenPath);
+
+        logger.debug('[PathCommands._batchReplacePaths] Scanning files for matching paths', {
+            brokenDir,
+            newDir,
+            brokenFilename,
+            fileCount: allFiles.length
+        });
+
         for (const file of allFiles) {
             const content = file.getContent();
             const fileBasePath = path.dirname(file.getPath());
             let match;
             pathPattern.lastIndex = 0;
+            let matchCount = 0;
+
+            // Diagnostic: Check if the broken filename exists anywhere in the content
+            const filenameInContent = content.includes(brokenFilename);
+            if (filenameInContent) {
+                logger.debug('[PathCommands._batchReplacePaths] Broken filename FOUND in content', {
+                    file: file.getRelativePath(),
+                    brokenFilename
+                });
+            }
 
             while ((match = pathPattern.exec(content)) !== null) {
+                matchCount++;
                 // Group 1 = image path, Group 2 = link path (titles are excluded)
                 const foundPath = match[1] || match[2];
                 if (!foundPath) continue;
@@ -1340,7 +1370,18 @@ export class PathCommands extends SwitchBasedCommand {
                 const normalizedFoundDir = this.normalizeDirForComparison(foundDir);
                 const normalizedBrokenDir = this.normalizeDirForComparison(brokenDir);
 
-                if (normalizedFoundDir === normalizedBrokenDir || this.normalizeDirForComparison(decodedPath).startsWith(normalizedBrokenDir + '/')) {
+                const dirMatch = normalizedFoundDir === normalizedBrokenDir;
+                const prefixMatch = this.normalizeDirForComparison(decodedPath).startsWith(normalizedBrokenDir + '/');
+
+                logger.debug('[PathCommands._batchReplacePaths] Path comparison', {
+                    foundPath: foundPath.substring(0, 80) + (foundPath.length > 80 ? '...' : ''),
+                    normalizedFoundDir: normalizedFoundDir.substring(0, 80) + (normalizedFoundDir.length > 80 ? '...' : ''),
+                    normalizedBrokenDir: normalizedBrokenDir.substring(0, 80) + (normalizedBrokenDir.length > 80 ? '...' : ''),
+                    dirMatch,
+                    prefixMatch
+                });
+
+                if (dirMatch || prefixMatch) {
                     // Calculate the new absolute path
                     const filename = path.basename(decodedPath);
                     const absoluteNewPath = path.join(newDir, filename);
@@ -1352,20 +1393,34 @@ export class PathCommands extends SwitchBasedCommand {
                         newPathResolved = path.resolve(fileBasePath, absoluteNewPath);
                     }
 
+                    logger.debug('[PathCommands._batchReplacePaths] Checking file existence', {
+                        filename,
+                        newPathResolved: newPathResolved.substring(0, 100) + (newPathResolved.length > 100 ? '...' : '')
+                    });
+
                     try {
                         await fs.promises.access(newPathResolved);
                         // File exists - store the absolute path (we'll make it relative per-file)
                         if (!pathsToReplace.has(decodedPath)) {
                             pathsToReplace.set(decodedPath, newPathResolved);
+                            logger.debug('[PathCommands._batchReplacePaths] Added path to replace', { decodedPath: decodedPath.substring(0, 80) });
                         }
-                    } catch {
+                    } catch (err) {
                         // File doesn't exist in new location
                         if (!skippedPaths.includes(filename)) {
                             skippedPaths.push(filename);
+                            logger.debug('[PathCommands._batchReplacePaths] File not found, skipping', { filename, error: String(err) });
                         }
                     }
                 }
             }
+
+            logger.debug('[PathCommands._batchReplacePaths] File scan complete', {
+                file: file.getRelativePath(),
+                matchCount,
+                pathsToReplaceSize: pathsToReplace.size,
+                skippedCount: skippedPaths.length
+            });
         }
 
         if (pathsToReplace.size === 0) {

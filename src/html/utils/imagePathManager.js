@@ -930,7 +930,11 @@ function normalizeBrokenPath(p) {
     try {
         // Decode URL encoding
         let normalized = decodeURIComponent(p);
-        // Normalize path separators (Windows backslashes to forward slashes)
+        // Unescape markdown escape sequences (e.g., \' -> ', \" -> ", \[ -> [, etc.)
+        // These are characters that might be escaped in markdown paths
+        normalized = normalized.replace(/\\(['"()\[\]\\])/g, '$1');
+        // Normalize Windows-style path separators to forward slashes
+        // After unescaping, remaining backslashes should be path separators
         normalized = normalized.replace(/\\/g, '/');
         // Remove leading ./
         if (normalized.startsWith('./')) {
@@ -939,7 +943,8 @@ function normalizeBrokenPath(p) {
         // Lowercase for case-insensitive matching
         return normalized.toLowerCase();
     } catch {
-        return p.toLowerCase().replace(/\\/g, '/');
+        // Fallback: unescape and normalize
+        return p.replace(/\\(['"()\[\]\\])/g, '$1').toLowerCase().replace(/\\/g, '/');
     }
 }
 

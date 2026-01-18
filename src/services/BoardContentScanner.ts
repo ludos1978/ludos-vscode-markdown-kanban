@@ -452,10 +452,15 @@ export class BoardContentScanner {
     /**
      * Resolve a relative path to absolute using a custom base path
      * Handles URL-encoded paths (e.g., path%20with%20spaces.md)
+     * Handles markdown escape sequences (e.g., \' -> ', \" -> ")
      */
     private _resolvePathWithBase(relativePath: string, basePath: string): string {
         // Decode URL-encoded characters first
-        const decodedPath = safeDecodeURIComponent(relativePath);
+        let decodedPath = safeDecodeURIComponent(relativePath);
+
+        // Unescape markdown escape sequences (e.g., \' -> ', \" -> ", \[ -> [, etc.)
+        // These characters might be escaped in markdown image/link paths
+        decodedPath = decodedPath.replace(/\\(['"()\[\]\\])/g, '$1');
 
         if (path.isAbsolute(decodedPath)) {
             return decodedPath;
