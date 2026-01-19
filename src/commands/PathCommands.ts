@@ -939,7 +939,9 @@ export class PathCommands extends SwitchBasedCommand {
             decodedBrokenPath,
             absoluteBrokenPath,
             brokenDir,
-            newDir
+            newDir,
+            filesCount: files.length,
+            fileList: files.map(f => f.getRelativePath())
         });
 
         // Pattern to match images, links, and includes
@@ -948,6 +950,11 @@ export class PathCommands extends SwitchBasedCommand {
         for (const file of files) {
             const content = file.getContent();
             const fileDir = path.dirname(file.getPath());
+            logger.debug('[_findBatchPaths] Scanning file', {
+                file: file.getRelativePath(),
+                fileDir,
+                contentLength: content.length
+            });
             let match;
             pathPattern.lastIndex = 0; // Reset regex for each file
 
@@ -964,6 +971,11 @@ export class PathCommands extends SwitchBasedCommand {
                     : path.resolve(fileDir, decodedPath);
                 const pathDir = this.normalizeDirForComparison(path.dirname(absolutePath));
 
+                // Also check if the relative path directories match (for paths from different files)
+                const matchedRelativeDir = path.dirname(decodedPath);
+                const brokenRelativeDir = path.dirname(decodedBrokenPath);
+                const relativeDirMatch = matchedRelativeDir === brokenRelativeDir;
+
                 logger.debug('[_findBatchPaths] Checking path', {
                     matchedPath,
                     decodedPath,
@@ -971,11 +983,15 @@ export class PathCommands extends SwitchBasedCommand {
                     absolutePath,
                     pathDir,
                     brokenDir,
-                    match: pathDir === brokenDir
+                    matchedRelativeDir,
+                    brokenRelativeDir,
+                    absoluteMatch: pathDir === brokenDir,
+                    relativeMatch: relativeDirMatch
                 });
 
                 // Check if this path is in the same directory as the broken path
-                if (pathDir === brokenDir) {
+                // Match by absolute path OR by relative path string (for paths from different files)
+                if (pathDir === brokenDir || relativeDirMatch) {
                     const filename = path.basename(decodedPath);
                     const newAbsPath = path.join(newDir, filename);
 
@@ -1001,6 +1017,39 @@ export class PathCommands extends SwitchBasedCommand {
                 }
             }
         }
+
+        // FALLBACK: If no paths found, at least include the original broken path
+        // This handles cases where the include file isn't registered
+        if (replacements.size === 0) {
+            const decodedBrokenPath = safeDecodeURIComponent(brokenPath);
+            const filename = path.basename(decodedBrokenPath);
+            const newAbsPath = path.join(newDir, filename);
+
+            try {
+                const exists = fs.existsSync(newAbsPath);
+                logger.debug('[_findBatchPaths] Fallback - adding original broken path', {
+                    brokenPath,
+                    filename,
+                    newAbsPath,
+                    exists
+                });
+                if (exists) {
+                    replacements.set(brokenPath, {
+                        oldPath: brokenPath,
+                        decodedOldPath: decodedBrokenPath,
+                        newAbsolutePath: newAbsPath,
+                        sourceFile: files[0] // Use main file as fallback
+                    });
+                }
+            } catch {
+                // File doesn't exist in new location
+            }
+        }
+
+        logger.debug('[_findBatchPaths] Complete', {
+            replacementsFound: replacements.size,
+            replacementPaths: Array.from(replacements.keys())
+        });
 
         return replacements;
     }

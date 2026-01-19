@@ -540,6 +540,16 @@ export class FileSearchWebview {
             : brokenDir;
         const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
 
+        logger.debug('[FileSearchWebview._handleScanBrokenPath] Setup', {
+            originalPath: this._originalPath,
+            brokenDir,
+            baseDir: this._baseDir,
+            absoluteBrokenDir,
+            normalizedBrokenDir,
+            trackedFilesCount: this._trackedFiles.length,
+            trackedFiles: this._trackedFiles.map(f => f.relativePath)
+        });
+
         // Pattern to find markdown image/link/include paths
         // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
         // Also matches !!!include(path)!!! directives
@@ -562,12 +572,21 @@ export class FileSearchWebview {
         // Search within tracked files (already loaded in memory)
         for (const trackedFile of this._trackedFiles) {
             const content = trackedFile.content;
-            if (!content) continue;
+            if (!content) {
+                logger.debug('[FileSearchWebview] Skipping file with no content:', trackedFile.relativePath);
+                continue;
+            }
 
             // Get this file's directory for resolving relative paths
             const fileDir = path.dirname(trackedFile.path);
+            logger.debug('[FileSearchWebview] Scanning file:', {
+                file: trackedFile.relativePath,
+                fileDir,
+                contentLength: content.length
+            });
 
             let match;
+            let pathsInFile = 0;
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
@@ -575,6 +594,7 @@ export class FileSearchWebview {
                 const foundPath = match[1] || match[2] || match[3];
                 if (!foundPath) continue;
 
+                pathsInFile++;
                 const decodedPath = safeDecodeURIComponent(foundPath);
 
                 // Resolve foundDir to absolute using the tracked file's directory
@@ -584,9 +604,28 @@ export class FileSearchWebview {
                     : path.resolve(fileDir, foundDir);
                 const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
 
-                if (normalizedFoundDir === normalizedBrokenDir) {
+                // Also check relative directory match (for paths from different files)
+                const decodedOriginalPath = safeDecodeURIComponent(this._originalPath);
+                const brokenRelativeDir = path.dirname(decodedOriginalPath);
+                const relativeDirMatch = foundDir === brokenRelativeDir;
+
+                const isAbsoluteMatch = normalizedFoundDir === normalizedBrokenDir;
+                const isMatch = isAbsoluteMatch || relativeDirMatch;
+                logger.debug('[FileSearchWebview] Checking path:', {
+                    file: trackedFile.relativePath,
+                    foundPath: foundPath.substring(0, 80),
+                    foundDir,
+                    brokenRelativeDir,
+                    normalizedFoundDir: normalizedFoundDir.substring(normalizedFoundDir.length - 60),
+                    normalizedBrokenDir: normalizedBrokenDir.substring(normalizedBrokenDir.length - 60),
+                    absoluteMatch: isAbsoluteMatch,
+                    relativeMatch: relativeDirMatch
+                });
+
+                if (isMatch) {
                     brokenCount++;
                     const filename = path.basename(decodedPath);
+                    logger.debug('[FileSearchWebview] MATCH FOUND:', { filename, brokenCount });
                     if (!foundFiles.includes(filename)) {
                         foundFiles.push(filename);
                         // Send incremental update (throttled to every 100ms)
@@ -598,14 +637,37 @@ export class FileSearchWebview {
                     }
                 }
             }
+            logger.debug('[FileSearchWebview] File scan complete:', {
+                file: trackedFile.relativePath,
+                pathsFound: pathsInFile
+            });
+        }
+
+        // FALLBACK: If no paths found, at least include the original broken path
+        // This handles cases where the include file isn't registered
+        if (brokenCount === 0) {
+            const filename = path.basename(safeDecodeURIComponent(this._originalPath));
+            logger.debug('[FileSearchWebview] Fallback - adding original broken path', {
+                originalPath: this._originalPath,
+                filename
+            });
+            brokenCount = 1;
+            foundFiles.push(filename);
         }
 
         // Send final update
+        logger.debug('[FileSearchWebview] Scan complete:', {
+            brokenCount,
+            uniqueFiles: foundFiles.length,
+            files: foundFiles
+        });
         sendUpdate(false);
     }
 
     private async _handleAnalyzeBatch(selectedPath: string): Promise<void> {
+        const decodedOriginalPath = safeDecodeURIComponent(this._originalPath);
         const brokenDir = path.dirname(this._originalPath);
+        const brokenRelativeDir = path.dirname(decodedOriginalPath);
         const newDir = path.dirname(selectedPath);
 
         // Resolve brokenDir to absolute using _baseDir
@@ -613,6 +675,14 @@ export class FileSearchWebview {
             ? path.resolve(this._baseDir, brokenDir)
             : brokenDir;
         const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
+
+        logger.debug('[FileSearchWebview._handleAnalyzeBatch] Setup', {
+            brokenDir,
+            brokenRelativeDir,
+            newDir,
+            absoluteBrokenDir,
+            normalizedBrokenDir
+        });
 
         // Find all paths with broken directory and check if they exist in new directory
         // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
@@ -653,6 +723,7 @@ export class FileSearchWebview {
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);
+                const foundFilename = path.basename(decodedPath);
 
                 // Resolve foundDir to absolute using the tracked file's directory
                 const foundDir = path.dirname(decodedPath);
@@ -661,16 +732,31 @@ export class FileSearchWebview {
                     : path.resolve(fileDir, foundDir);
                 const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
 
-                if (normalizedFoundDir === normalizedBrokenDir) {
-                    const filename = path.basename(decodedPath);
-                    if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {
+                // Check for directory match (absolute or relative)
+                const relativeDirMatch = foundDir === brokenRelativeDir;
+                const absoluteDirMatch = normalizedFoundDir === normalizedBrokenDir;
+
+                if (absoluteDirMatch || relativeDirMatch) {
+                    logger.debug('[FileSearchWebview._handleAnalyzeBatch] Directory match', {
+                        file: path.basename(trackedFile.path),
+                        foundPath: foundPath.substring(0, 80),
+                        foundFilename,
+                        foundDir,
+                        brokenRelativeDir,
+                        relativeDirMatch,
+                        absoluteDirMatch
+                    });
+
+                    if (!filesToReplace.includes(foundFilename) && !filesMissing.includes(foundFilename)) {
                         // Check if file exists in new directory
-                        const newPath = path.join(newDir, filename);
+                        const newPath = path.join(newDir, foundFilename);
                         try {
                             await vscode.workspace.fs.stat(vscode.Uri.file(newPath));
-                            filesToReplace.push(filename);
+                            filesToReplace.push(foundFilename);
+                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File CAN be replaced', { foundFilename, newPath });
                         } catch {
-                            filesMissing.push(filename);
+                            filesMissing.push(foundFilename);
+                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File MISSING in new dir', { foundFilename, newPath });
                         }
                         // Send incremental update (throttled)
                         const now = Date.now();
@@ -682,6 +768,13 @@ export class FileSearchWebview {
                 }
             }
         }
+
+        logger.debug('[FileSearchWebview._handleAnalyzeBatch] Final result', {
+            canReplace: filesToReplace.length,
+            missing: filesMissing.length,
+            filesToReplace,
+            filesMissing
+        });
 
         // Send final update
         sendUpdate(false);
