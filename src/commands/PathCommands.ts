@@ -23,9 +23,32 @@ import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showInfo, showWarning } from '../services/NotificationService';
-import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { extractIncludeFiles } from '../constants/IncludeConstants';
 import { findColumn, findColumnContainingTask } from '../actions/helpers';
 import { logger } from '../utils/logger';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
+
+/**
+ * Options for path replacement operations
+ */
+interface PathReplacementOptions {
+    mode: 'single' | 'batch';
+    pathFormat: PathFormat;
+    taskId?: string;
+    columnId?: string;
+    isColumnTitle?: boolean;
+    successMessage?: string;
+}
+
+/**
+ * Information about a path that needs replacement
+ */
+interface PathReplacement {
+    oldPath: string;           // Path as found in file (may be encoded)
+    decodedOldPath: string;    // Decoded version for comparison
+    newAbsolutePath: string;   // Absolute path to replacement file
+    sourceFile: MarkdownFile;  // File where path was found
+}
 
 /**
  * Path Commands Handler
@@ -414,15 +437,15 @@ export class PathCommands extends SwitchBasedCommand {
             const selectedFile = result.uri.fsPath;
             const pathFormat = result.pathFormat;
 
-            // Handle batch replacement if enabled
-            if (result.batchReplace) {
-                logger.debug('[PathCommands.handleSearchForFile] Starting batch replacement');
-                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context, pathFormat, message.taskId, message.columnId, message.isColumnTitle);
-            }
-
-            // Single file replacement
-            const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
-            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId, message.isColumnTitle, pathFormat);
+            // Unified path replacement - handles both single and batch modes
+            return await this._replacePaths(oldPath, selectedFile, basePath, context, {
+                mode: result.batchReplace ? 'batch' : 'single',
+                pathFormat: pathFormat,
+                taskId: message.taskId,
+                columnId: message.columnId,
+                isColumnTitle: message.isColumnTitle,
+                successMessage: `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`
+            });
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error searching for file:`, error);
@@ -522,7 +545,14 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         const selectedFile = result[0].fsPath;
-        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully', message.taskId, message.columnId, message.isColumnTitle);
+        return await this._replacePaths(oldPath, selectedFile, basePath, context, {
+            mode: 'single',
+            pathFormat: 'auto',
+            taskId: message.taskId,
+            columnId: message.columnId,
+            isColumnTitle: message.isColumnTitle,
+            successMessage: 'Image path updated successfully'
+        });
     }
 
     /**
@@ -647,15 +677,6 @@ export class PathCommands extends SwitchBasedCommand {
     // ============= HELPER METHODS =============
 
     /**
-     * Normalize a path for comparison
-     * Decodes URL encoding, normalizes separators, and lowercases
-     * This ensures paths match regardless of encoding or separator differences
-     */
-    private normalizePath(p: string): string {
-        return safeDecodeURIComponent(p).replace(/\\/g, '/').toLowerCase();
-    }
-
-    /**
      * Normalize a directory path for comparison
      * Strips leading ./ and normalizes separators
      * This ensures directories match regardless of ./ prefix
@@ -671,554 +692,6 @@ export class PathCommands extends SwitchBasedCommand {
         return normalized;
     }
 
-    /**
-     * Replace a path in markdown files and refresh the board
-     * Common logic used by handleSearchForFile and handleBrowseForImage
-     * If taskId and columnId are provided, sends targeted update instead of full refresh
-     * If isColumnTitle is true, updates column title instead of task
-     */
-    private async _replacePathInFiles(
-        oldPath: string,
-        selectedFilePath: string,
-        basePath: string,
-        context: CommandContext,
-        successMessage: string,
-        taskId?: string,
-        columnId?: string,
-        isColumnTitle?: boolean,
-        pathFormat: PathFormat = 'auto'
-    ): Promise<CommandResult> {
-        await this._syncEditingState(context);
-
-        const fileRegistry = this.getFileRegistry();
-        if (!fileRegistry) {
-            return this.failure('File registry not available');
-        }
-        const mainFile = fileRegistry.getMainFile();
-        if (!mainFile) {
-            return this.failure('No main file found');
-        }
-
-        // Save undo entry before making changes
-        const currentBoard = context.boardStore.getBoard();
-        if (currentBoard) {
-            if (taskId && columnId) {
-                const undoEntry = UndoCapture.forTask(currentBoard, taskId, columnId, 'path-replace');
-                context.boardStore.saveUndoEntry(undoEntry);
-            } else if (columnId) {
-                const undoEntry = UndoCapture.forColumn(currentBoard, columnId, 'path-replace');
-                context.boardStore.saveUndoEntry(undoEntry);
-            } else {
-                const undoEntry = UndoCapture.forFullBoard(currentBoard, 'path-replace');
-                context.boardStore.saveUndoEntry(undoEntry);
-            }
-        }
-
-        // Collect all files to search
-        const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
-
-        // Find the file containing the old path FIRST
-        // Try both URL-decoded and URL-encoded versions of the path
-        // (frontend may send decoded path like "00:00:20" but file has "00%3A00%3A20")
-        let foundFile: MarkdownFile | null = null;
-        let foundContent: string = '';
-        let actualOldPath = oldPath; // The path variant that was actually found
-        let uniqueVariants: string[] = [];
-
-        const hasOldPath = typeof oldPath === 'string' && oldPath.trim().length > 0;
-        const normalizeSlashes = (value: string) => value.replace(/\\/g, '/');
-        const stripDotPrefix = (value: string) => value.startsWith('./') ? value.slice(2) : value;
-        const addDotPrefix = (value: string) => {
-            if (value.startsWith('./') || value.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(value)) {
-                return value;
-            }
-            return `./${value}`;
-        };
-        const decodeHtmlEntities = (value: string) => value
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, '\'')
-            .replace(/&apos;/g, '\'')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&amp;/g, '&');
-
-        if (hasOldPath) {
-            const pathVariants: string[] = [oldPath];
-
-            // First decode, then encode - this gives us the canonical form without double-encoding
-            // Example: if oldPath is "path%E2%80%93file" (already encoded en-dash):
-            //   - decodedPath becomes "path–file" (literal en-dash)
-            //   - encodedPath becomes "path%E2%80%93file" (same as original, no double-encoding)
-            // If oldPath is "path–file" (literal en-dash):
-            //   - decodedPath stays "path–file" (nothing to decode)
-            //   - encodedPath becomes "path%E2%80%93file" (encoded version)
-            const decodedPath = safeDecodeURIComponent(oldPath);
-            if (decodedPath !== oldPath) {
-                pathVariants.push(decodedPath);
-            }
-
-            // Encode the decoded path to get canonical encoded form (avoids double-encoding)
-            const encodedPath = encodeFilePath(decodedPath);
-            if (encodedPath !== oldPath && encodedPath !== decodedPath) {
-                pathVariants.push(encodedPath);
-            }
-
-            const expandedVariants: string[] = [];
-            for (const variant of pathVariants) {
-                if (!variant) continue;
-                const normalized = normalizeSlashes(variant);
-                const htmlDecoded = decodeHtmlEntities(normalized);
-                const stripped = stripDotPrefix(htmlDecoded);
-                const withDot = addDotPrefix(stripped);
-                expandedVariants.push(variant, normalized, htmlDecoded, stripped, withDot);
-            }
-
-            // Remove duplicates
-            uniqueVariants = [...new Set(expandedVariants.filter(p => p))];
-        }
-
-        const resolveContextBasePath = (): string => {
-            let resolvedBase = basePath;
-            if (!currentBoard) {
-                return resolvedBase;
-            }
-
-            const column = columnId ? currentBoard.columns.find(c => c.id === columnId) : undefined;
-            let includePath: string | undefined;
-
-            if (isColumnTitle && column?.includeFiles?.length) {
-                includePath = column.includeFiles[0];
-            } else if (taskId && column) {
-                const task = column.tasks.find(t => t.id === taskId);
-                includePath = task?.includeContext?.includeFilePath
-                    || task?.includeFiles?.[0]
-                    || column?.includeFiles?.[0];
-            }
-
-            if (!includePath) {
-                return resolvedBase;
-            }
-
-            const absoluteIncludePath = path.isAbsolute(includePath)
-                ? includePath
-                : path.resolve(basePath, includePath);
-            return path.dirname(absoluteIncludePath);
-        };
-
-        const computeReplacementPath = (fileBasePath: string): string => {
-            const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-            const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-            let nextPath: string;
-            if (useRelative) {
-                nextPath = path.relative(fileBasePath, selectedFilePath);
-                nextPath = nextPath.replace(/\\/g, '/');
-                if (!nextPath.startsWith('.') && !nextPath.startsWith('/')) {
-                    nextPath = './' + nextPath;
-                }
-            } else {
-                nextPath = selectedFilePath;
-            }
-            return encodeFilePath(nextPath);
-        };
-
-        const tryReplaceInText = (text: string | undefined, newPath: string): { updatedText: string; usedOldPath: string } | null => {
-            if (text === undefined || text === null) {
-                return null;
-            }
-            if (!hasOldPath) {
-                const updatedText = LinkOperations.replaceSingleLink(text, '', newPath, 0);
-                if (updatedText !== text) {
-                    return { updatedText, usedOldPath: oldPath };
-                }
-                return null;
-            }
-            for (const candidate of uniqueVariants) {
-                const updatedText = LinkOperations.replaceSingleLink(text, candidate, newPath, 0);
-                if (updatedText !== text) {
-                    return { updatedText, usedOldPath: candidate };
-                }
-            }
-            return null;
-        };
-
-        // Prefer board-based replacement when we have task/column context to avoid mismatches
-        if (currentBoard && (taskId || (columnId && isColumnTitle))) {
-            const contextBasePath = resolveContextBasePath();
-            const newPath = computeReplacementPath(contextBasePath);
-
-            if (isColumnTitle && columnId) {
-                const column = currentBoard.columns.find(c => c.id === columnId);
-                if (column) {
-                    const oldIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    const replaced = tryReplaceInText(column.title, newPath);
-                    if (replaced) {
-                        column.title = replaced.updatedText;
-                        actualOldPath = replaced.usedOldPath;
-
-                        const newIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                        const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-                        const normalizedOldPath = this.normalizePath(actualOldPath);
-                        const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
-                        if (oldPathWasInclude && newIncludePaths.length > 0) {
-                            await context.handleIncludeSwitch({
-                                columnId: columnId,
-                                oldFiles: oldIncludePaths,
-                                newFiles: newIncludePaths,
-                                newTitle: column.title
-                            });
-                        } else {
-                            this.postMessage({
-                                type: 'updateColumnContent',
-                                columnId: columnId,
-                                column: column,
-                                imageMappings: {}
-                            });
-                            context.emitBoardChanged(currentBoard, 'edit');
-                            // Don't call onBoardUpdate() - targeted update already sent above
-                        }
-
-                        this.postMessage({
-                            type: 'imagePathReplaced',
-                            oldPath: oldPath,
-                            newPath: newPath,
-                            filePath: mainFile.getRelativePath()
-                        });
-                        this.postMessage({
-                            type: 'pathReplaced',
-                            originalPath: oldPath,
-                            actualPath: actualOldPath,
-                            newPath: newPath,
-                            taskId: taskId,
-                            columnId: columnId,
-                            isColumnTitle: isColumnTitle,
-                            filePath: mainFile.getRelativePath()
-                        });
-
-                        showInfo(successMessage);
-                        return this.success({
-                            replaced: true,
-                            oldPath: oldPath,
-                            newPath: newPath,
-                            filePath: mainFile.getRelativePath()
-                        });
-                    }
-                }
-            } else if (taskId && columnId) {
-                const column = currentBoard.columns.find(c => c.id === columnId);
-                const task = column?.tasks.find(t => t.id === taskId);
-                if (column && task) {
-                    const oldIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    const replacedTitle = tryReplaceInText(task.title, newPath);
-                    const replacedDescription = tryReplaceInText(task.description, newPath);
-
-                    if (replacedTitle || replacedDescription) {
-                        if (replacedTitle) {
-                            task.title = replacedTitle.updatedText;
-                            actualOldPath = replacedTitle.usedOldPath;
-                        }
-                        if (replacedDescription) {
-                            task.description = replacedDescription.updatedText;
-                            if (!replacedTitle) {
-                                actualOldPath = replacedDescription.usedOldPath;
-                            }
-                        }
-
-                        const newIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                        const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-                        const normalizedOldPath = this.normalizePath(actualOldPath);
-                        const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
-                        if (oldPathWasInclude && newIncludePaths.length > 0) {
-                            await context.handleIncludeSwitch({
-                                taskId: taskId,
-                                oldFiles: oldIncludePaths,
-                                newFiles: newIncludePaths,
-                                newTitle: task.title
-                            });
-                        } else {
-                            this.postMessage({
-                                type: 'updateTaskContent',
-                                taskId: taskId,
-                                columnId: columnId,
-                                task: task,
-                                imageMappings: {}
-                            });
-                            context.emitBoardChanged(currentBoard, 'edit');
-                            // Don't call onBoardUpdate() - targeted update already sent above
-                        }
-
-                        this.postMessage({
-                            type: 'imagePathReplaced',
-                            oldPath: oldPath,
-                            newPath: newPath,
-                            filePath: mainFile.getRelativePath()
-                        });
-                        this.postMessage({
-                            type: 'pathReplaced',
-                            originalPath: oldPath,
-                            actualPath: actualOldPath,
-                            newPath: newPath,
-                            taskId: taskId,
-                            columnId: columnId,
-                            isColumnTitle: isColumnTitle,
-                            filePath: mainFile.getRelativePath()
-                        });
-
-                        showInfo(successMessage);
-                        return this.success({
-                            replaced: true,
-                            oldPath: oldPath,
-                            newPath: newPath,
-                            filePath: mainFile.getRelativePath()
-                        });
-                    }
-                }
-            }
-        }
-
-        if (!hasOldPath) {
-            let targetFile: MarkdownFile | null = mainFile;
-
-            if (taskId && columnId && currentBoard) {
-                const column = currentBoard.columns.find(c => c.id === columnId);
-                const task = column?.tasks.find(t => t.id === taskId);
-                const includeFilePath = task?.includeContext?.includeFilePath;
-                if (includeFilePath) {
-                    const includeFile = fileRegistry.get(includeFilePath) ||
-                        fileRegistry.getByRelativePath(path.relative(path.dirname(mainFile.getPath()), includeFilePath));
-                    if (includeFile) {
-                        targetFile = includeFile;
-                    } else {
-                        logger.debug('[PathCommands] Include file not found for empty path replacement:', includeFilePath);
-                        return this.failure('Include file not found for empty path replacement');
-                    }
-                }
-            }
-
-            if (!targetFile) {
-                logger.debug('[PathCommands] No target file resolved for empty path replacement.');
-                return this.failure('No target file resolved for empty path replacement');
-            }
-
-            foundFile = targetFile;
-            foundContent = targetFile.getContent();
-        }
-
-        // Build path variants to handle encoding mismatches between frontend and file content
-        if (hasOldPath) {
-            const hasLinkMatch = (content: string, candidate: string): boolean => {
-                const probe = '__KANBAN_PATH_PROBE__';
-                return LinkOperations.replaceSingleLink(content, candidate, probe, 0) !== content;
-            };
-
-            for (const pathVariant of uniqueVariants) {
-                for (const file of allFiles) {
-                    const content = file.getContent();
-                    if (hasLinkMatch(content, pathVariant)) {
-                        foundFile = file;
-                        foundContent = content;
-                        actualOldPath = pathVariant;
-                        break;
-                    }
-                }
-                if (foundFile) break;
-            }
-        }
-
-        if (!foundFile) {
-            logger.debug('[PathCommands] Path not found in any file. Tried variants:', uniqueVariants);
-            return this.failure('Old path not found in any file');
-        }
-
-        logger.debug('[PathCommands] Found path variant:', actualOldPath, 'in file:', foundFile.getRelativePath());
-        const replacementOldPath = actualOldPath || oldPath;
-
-        // Use the FOUND FILE's directory as base for relative path calculation
-        // This is critical for include files in different directories
-        const fileBasePath = path.dirname(foundFile.getPath());
-
-        // Determine path format based on user choice or original format
-        const newPath = computeReplacementPath(fileBasePath);
-
-        // Use LinkOperations to replace with strikethrough pattern
-        // Use actualOldPath (the variant that was found in the file)
-        const newContent = LinkOperations.replaceSingleLink(foundContent, actualOldPath, newPath, 0);
-
-        if (newContent === foundContent) {
-            const normalizedOld = this.normalizePath(replacementOldPath);
-            const normalizedNew = this.normalizePath(newPath);
-            if (normalizedOld === normalizedNew) {
-                logger.debug('[PathCommands] Path already matches selected file (no-op replacement):', replacementOldPath);
-                this.postMessage({
-                    type: 'imagePathReplaced',
-                    oldPath: oldPath,
-                    newPath: newPath,
-                    filePath: foundFile.getRelativePath()
-                });
-                this.postMessage({
-                    type: 'pathReplaced',
-                    originalPath: oldPath,
-                    actualPath: actualOldPath,
-                    newPath: newPath,
-                    taskId: taskId,
-                    columnId: columnId,
-                    isColumnTitle: isColumnTitle,
-                    filePath: foundFile.getRelativePath()
-                });
-                showInfo('Selected file already matches the current path.');
-                return this.success({
-                    replaced: false,
-                    unchanged: true,
-                    oldPath: oldPath,
-                    newPath: newPath,
-                    filePath: foundFile.getRelativePath()
-                });
-            }
-            logger.debug('[PathCommands] No link/include match found for path replacement:', actualOldPath);
-            return this.failure('Old path not found in any link/include');
-        }
-
-        foundFile.setContent(newContent, false);
-
-        // If path was found in an include file, always do full refresh
-        // This ensures include content is properly re-parsed after the path change
-        // Targeted updates for include files have encoding issues
-        const isIncludeFile = foundFile !== mainFile;
-        if (isIncludeFile) {
-            logger.debug('[PathCommands] Path found in include file, triggering full refresh');
-            await this.refreshBoard(context);
-        }
-        // Send targeted update based on context (only for main file)
-        else if (isColumnTitle && columnId) {
-            // Include/image is in column title - update column only
-            const board = context.boardStore.getBoard();
-            if (board) {
-                const column = board.columns.find(c => c.id === columnId);
-                if (column) {
-                    // Extract old include paths before updating
-                    const oldIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    // Manually update the column title with the new path
-                    column.title = LinkOperations.replaceSingleLink(column.title, replacementOldPath, newPath, 0);
-
-                    // Extract new include paths after updating
-                    const newIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    // Check if include paths changed - if so, trigger include switch to reload content
-                    // Use normalized comparison to handle URL encoding differences
-                    const normalizedOldPath = this.normalizePath(replacementOldPath);
-                    const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
-                    if (oldPathWasInclude && newIncludePaths.length > 0) {
-                        // Trigger include file switch to reload content from new path
-                        await context.handleIncludeSwitch({
-                            columnId: columnId,
-                            oldFiles: oldIncludePaths,
-                            newFiles: newIncludePaths,
-                            newTitle: column.title
-                        });
-                    } else {
-                        // Not an include change, just send targeted column update
-                        this.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: columnId,
-                            column: column,
-                            imageMappings: {}
-                        });
-                    }
-                } else {
-                    // Column not found, fall back to full update
-                    await this.refreshBoard(context);
-                }
-            } else {
-                await this.refreshBoard(context);
-            }
-        } else if (taskId && columnId) {
-            // Include/image is in task - update task only
-            const board = context.boardStore.getBoard();
-            if (board) {
-                const column = board.columns.find(c => c.id === columnId);
-                const task = column?.tasks.find(t => t.id === taskId);
-                if (task && column) {
-                    // Extract old include paths before updating
-                    const oldIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const oldIncludePaths = oldIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    // Manually update the task object with the new path
-                    task.title = LinkOperations.replaceSingleLink(task.title, replacementOldPath, newPath, 0);
-                    if (task.description) {
-                        task.description = LinkOperations.replaceSingleLink(task.description, replacementOldPath, newPath, 0);
-                    }
-
-                    // Extract new include paths after updating
-                    const newIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX) || [];
-                    const newIncludePaths = newIncludeMatches.map(m => m.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim());
-
-                    // Check if include paths changed - if so, trigger include switch to reload content
-                    // Use normalized comparison to handle URL encoding differences
-                    const normalizedOldPath = this.normalizePath(replacementOldPath);
-                    const oldPathWasInclude = oldIncludePaths.some(p => this.normalizePath(p) === normalizedOldPath);
-                    if (oldPathWasInclude && newIncludePaths.length > 0) {
-                        // Trigger include file switch to reload content from new path
-                        await context.handleIncludeSwitch({
-                            taskId: taskId,
-                            oldFiles: oldIncludePaths,
-                            newFiles: newIncludePaths,
-                            newTitle: task.title
-                        });
-                    } else {
-                        // Not an include change, just send targeted task update
-                        this.postMessage({
-                            type: 'updateTaskContent',
-                            taskId: taskId,
-                            columnId: columnId,
-                            task: task,
-                            imageMappings: {}
-                        });
-                    }
-                } else {
-                    // Task/column not found, fall back to full update
-                    await this.refreshBoard(context);
-                }
-            } else {
-                await this.refreshBoard(context);
-            }
-        } else {
-            // No context, do full board refresh
-            await this.refreshBoard(context);
-        }
-
-        // Notify frontend about the replacement
-        this.postMessage({
-            type: 'imagePathReplaced',
-            oldPath: oldPath,
-            newPath: newPath,
-            filePath: foundFile.getRelativePath()
-        });
-        this.postMessage({
-            type: 'pathReplaced',
-            originalPath: oldPath,
-            actualPath: actualOldPath,
-            newPath: newPath,
-            taskId: taskId,
-            columnId: columnId,
-            isColumnTitle: isColumnTitle,
-            filePath: foundFile.getRelativePath()
-        });
-
-        showInfo(successMessage);
-
-        return this.success({
-            replaced: true,
-            oldPath: oldPath,
-            newPath: newPath,
-            filePath: foundFile.getRelativePath()
-        });
-    }
 
     private async _syncEditingState(context: CommandContext): Promise<void> {
         const capturedEdit = await context.requestStopEditing();
@@ -1262,419 +735,591 @@ export class PathCommands extends SwitchBasedCommand {
         }
     }
 
+    // ============================================================================
+    // PATH REPLACEMENT HELPERS - Shared by single and batch replacement modes
+    // ============================================================================
+
     /**
-     * Batch replace paths with the same directory prefix.
-     * Finds all paths in the board that have the same directory as the broken path,
-     * checks if the corresponding file exists in the new directory,
-     * and replaces all matching paths.
+     * Resolve the context-aware base path for path resolution.
+     * If the path is from an include file, returns the include file's directory.
+     * Otherwise returns the main file's directory (basePath).
      */
-    private async _batchReplacePaths(
+    private _resolveContextBasePath(
+        board: KanbanBoard | null,
+        basePath: string,
+        taskId?: string,
+        columnId?: string,
+        isColumnTitle?: boolean
+    ): string {
+        if (!board) {
+            return basePath;
+        }
+
+        const column = columnId ? board.columns.find((c: KanbanColumn) => c.id === columnId) : undefined;
+        let includePath: string | undefined;
+
+        if (isColumnTitle && column?.includeFiles?.length) {
+            includePath = column.includeFiles[0];
+        } else if (taskId && column) {
+            const task = column.tasks.find((t: KanbanTask) => t.id === taskId);
+            includePath = task?.includeContext?.includeFilePath
+                || task?.includeFiles?.[0]
+                || column?.includeFiles?.[0];
+        }
+
+        if (!includePath) {
+            return basePath;
+        }
+
+        const absoluteIncludePath = path.isAbsolute(includePath)
+            ? includePath
+            : path.resolve(basePath, includePath);
+        return path.dirname(absoluteIncludePath);
+    }
+
+    /**
+     * Generate all possible variants of a path for matching.
+     * Handles URL encoding, HTML entities, slashes, and dot prefixes.
+     */
+    private _generatePathVariants(pathStr: string): string[] {
+        if (!pathStr || typeof pathStr !== 'string' || pathStr.trim().length === 0) {
+            return [];
+        }
+
+        const normalizeSlashes = (value: string) => value.replace(/\\/g, '/');
+        const stripDotPrefix = (value: string) => value.startsWith('./') ? value.slice(2) : value;
+        const addDotPrefix = (value: string) => {
+            if (value.startsWith('./') || value.startsWith('/') || /^[a-zA-Z]:/.test(value)) {
+                return value;
+            }
+            return './' + value;
+        };
+        const decodeHtmlEntities = (value: string) =>
+            value.replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&');
+
+        const pathVariants: string[] = [pathStr];
+
+        // Add decoded version
+        const decodedPath = safeDecodeURIComponent(pathStr);
+        if (decodedPath !== pathStr) {
+            pathVariants.push(decodedPath);
+        }
+
+        // Add encoded version (from decoded to get canonical form)
+        const encodedPath = encodeFilePath(decodedPath);
+        if (encodedPath !== pathStr && encodedPath !== decodedPath) {
+            pathVariants.push(encodedPath);
+        }
+
+        // Expand all variants with normalization transformations
+        const expandedVariants: string[] = [];
+        for (const variant of pathVariants) {
+            if (!variant) continue;
+            const normalized = normalizeSlashes(variant);
+            const htmlDecoded = decodeHtmlEntities(normalized);
+            const stripped = stripDotPrefix(htmlDecoded);
+            const withDot = addDotPrefix(stripped);
+            expandedVariants.push(variant, normalized, htmlDecoded, stripped, withDot);
+        }
+
+        return [...new Set(expandedVariants.filter(p => p))];
+    }
+
+    /**
+     * Compute the replacement path based on format preference.
+     */
+    private _computeReplacementPath(
+        _oldPath: string,
+        newAbsolutePath: string,
+        fileBasePath: string,
+        pathFormat: PathFormat
+    ): string {
+        if (pathFormat === 'absolute') {
+            return newAbsolutePath;
+        } else if (pathFormat === 'relative') {
+            return path.relative(fileBasePath, newAbsolutePath);
+        } else {
+            // 'auto' - use relative
+            return path.relative(fileBasePath, newAbsolutePath);
+        }
+    }
+
+    /**
+     * Find a single path in the files (for single replacement mode).
+     * Returns a Map with 0 or 1 entries.
+     */
+    private _findSinglePath(
+        variants: string[],
+        files: MarkdownFile[],
+        newAbsolutePath: string,
+        board: KanbanBoard | null,
+        options: PathReplacementOptions
+    ): Map<string, PathReplacement> {
+        const replacements = new Map<string, PathReplacement>();
+
+        // Strategy 1: Search in board structure first (more precise)
+        if (board && (options.taskId || options.columnId)) {
+            const column = options.columnId
+                ? board.columns.find((c: KanbanColumn) => c.id === options.columnId)
+                : undefined;
+
+            let textToSearch = '';
+            if (options.isColumnTitle && column) {
+                textToSearch = column.title || '';
+            } else if (options.taskId && column) {
+                const task = column.tasks.find((t: KanbanTask) => t.id === options.taskId);
+                if (task) {
+                    textToSearch = (task.title || '') + '\n' + (task.description || '');
+                }
+            }
+
+            for (const variant of variants) {
+                if (textToSearch.includes(variant)) {
+                    // Find which file this content belongs to
+                    for (const file of files) {
+                        if (file.getContent().includes(variant)) {
+                            replacements.set(variant, {
+                                oldPath: variant,
+                                decodedOldPath: safeDecodeURIComponent(variant),
+                                newAbsolutePath,
+                                sourceFile: file
+                            });
+                            return replacements;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: Fall back to file content search
+        for (const file of files) {
+            const content = file.getContent();
+            for (const variant of variants) {
+                if (content.includes(variant)) {
+                    replacements.set(variant, {
+                        oldPath: variant,
+                        decodedOldPath: safeDecodeURIComponent(variant),
+                        newAbsolutePath,
+                        sourceFile: file
+                    });
+                    return replacements;
+                }
+            }
+        }
+
+        return replacements;
+    }
+
+    /**
+     * Find all paths with the same directory for batch replacement.
+     * Returns a Map with 0 to N entries.
+     */
+    private _findBatchPaths(
+        brokenPath: string,
+        contextBasePath: string,
+        files: MarkdownFile[],
+        newDir: string
+    ): Map<string, PathReplacement> {
+        const replacements = new Map<string, PathReplacement>();
+
+        // Get the directory of the broken path
+        const decodedBrokenPath = safeDecodeURIComponent(brokenPath);
+        const absoluteBrokenPath = path.isAbsolute(decodedBrokenPath)
+            ? decodedBrokenPath
+            : path.resolve(contextBasePath, decodedBrokenPath);
+        const brokenDir = this.normalizeDirForComparison(path.dirname(absoluteBrokenPath));
+
+        // Pattern to match images, links, and includes
+        const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|!!!include\(([^)]+)\)!!!/g;
+
+        for (const file of files) {
+            const content = file.getContent();
+            const fileDir = path.dirname(file.getPath());
+            let match;
+
+            while ((match = pathPattern.exec(content)) !== null) {
+                const matchedPath = match[1] || match[2] || match[3];
+                if (!matchedPath) continue;
+
+                const decodedPath = safeDecodeURIComponent(matchedPath);
+                const absolutePath = path.isAbsolute(decodedPath)
+                    ? decodedPath
+                    : path.resolve(fileDir, decodedPath);
+                const pathDir = this.normalizeDirForComparison(path.dirname(absolutePath));
+
+                // Check if this path is in the same directory as the broken path
+                if (pathDir === brokenDir) {
+                    const filename = path.basename(decodedPath);
+                    const newAbsPath = path.join(newDir, filename);
+
+                    // Check if the file exists in the new location
+                    try {
+                        if (fs.existsSync(newAbsPath)) {
+                            replacements.set(matchedPath, {
+                                oldPath: matchedPath,
+                                decodedOldPath: decodedPath,
+                                newAbsolutePath: newAbsPath,
+                                sourceFile: file
+                            });
+                        }
+                    } catch {
+                        // File doesn't exist, skip
+                    }
+                }
+            }
+        }
+
+        return replacements;
+    }
+
+    /**
+     * Execute the path replacements in the files.
+     */
+    private _executeReplacements(
+        replacements: Map<string, PathReplacement>,
+        pathFormat: PathFormat
+    ): MarkdownFile[] {
+        const modifiedFiles: MarkdownFile[] = [];
+
+        for (const [oldPath, replacement] of replacements) {
+            const file = replacement.sourceFile;
+            const fileDir = path.dirname(file.getPath());
+            const newRelativePath = this._computeReplacementPath(
+                oldPath,
+                replacement.newAbsolutePath,
+                fileDir,
+                pathFormat
+            );
+            const encodedNewPath = encodeFilePath(newRelativePath);
+
+            let content = file.getContent();
+            let newContent = LinkOperations.replaceSingleLink(content, oldPath, encodedNewPath, 0);
+
+            // If encoded old path didn't match, try decoded version
+            if (newContent === content && replacement.decodedOldPath !== oldPath) {
+                newContent = LinkOperations.replaceSingleLink(content, replacement.decodedOldPath, encodedNewPath, 0);
+            }
+
+            if (newContent !== content) {
+                file.setContent(newContent);
+                if (!modifiedFiles.includes(file)) {
+                    modifiedFiles.push(file);
+                }
+            }
+        }
+
+        return modifiedFiles;
+    }
+
+    /**
+     * Check if a path was an include path and handle the include switch if needed.
+     * Returns true if an include switch was handled, false otherwise.
+     */
+    private async _handleIncludeSwitchIfNeeded(
+        context: CommandContext,
+        board: KanbanBoard | null,
+        options: PathReplacementOptions,
+        oldTitle: string,
+        newTitle: string
+    ): Promise<boolean> {
+        if (!board) return false;
+
+        const oldIncludePaths = extractIncludeFiles(oldTitle);
+        const newIncludePaths = extractIncludeFiles(newTitle);
+
+        // No include files involved
+        if (oldIncludePaths.length === 0 && newIncludePaths.length === 0) {
+            return false;
+        }
+
+        // Check if include paths actually changed (using normalized comparison)
+        const normalizeForCompare = (p: string) => safeDecodeURIComponent(p).toLowerCase();
+        const oldNormalized = new Set(oldIncludePaths.map(normalizeForCompare));
+        const newNormalized = new Set(newIncludePaths.map(normalizeForCompare));
+
+        const includesChanged = oldNormalized.size !== newNormalized.size ||
+            [...oldNormalized].some(p => !newNormalized.has(p));
+
+        if (!includesChanged) {
+            return false;
+        }
+
+        // Include paths changed - trigger include switch
+        if (options.isColumnTitle && options.columnId) {
+            await context.handleIncludeSwitch({
+                columnId: options.columnId,
+                oldFiles: oldIncludePaths,
+                newFiles: newIncludePaths,
+                newTitle: newTitle
+            });
+            return true;
+        } else if (options.taskId) {
+            await context.handleIncludeSwitch({
+                taskId: options.taskId,
+                oldFiles: oldIncludePaths,
+                newFiles: newIncludePaths,
+                newTitle: newTitle
+            });
+            return true;
+        }
+
+        // Can't determine context, fall back to full refresh
+        await this.refreshBoard(context);
+        return true;
+    }
+
+    /**
+     * Apply ALL replacements to a text string.
+     */
+    private _applyAllReplacements(
+        text: string,
+        replacements: Map<string, PathReplacement>,
+        mainFileDir: string,
+        pathFormat: PathFormat
+    ): string {
+        let result = text;
+        for (const [, replacement] of replacements) {
+            const encodedNewPath = encodeFilePath(
+                this._computeReplacementPath(
+                    replacement.oldPath,
+                    replacement.newAbsolutePath,
+                    mainFileDir,
+                    pathFormat
+                )
+            );
+            let newResult = LinkOperations.replaceSingleLink(result, replacement.oldPath, encodedNewPath, 0);
+            if (newResult === result && replacement.decodedOldPath !== replacement.oldPath) {
+                newResult = LinkOperations.replaceSingleLink(result, replacement.decodedOldPath, encodedNewPath, 0);
+            }
+            result = newResult;
+        }
+        return result;
+    }
+
+    /**
+     * Apply board updates - either targeted or full refresh.
+     */
+    private async _applyBoardUpdates(
+        context: CommandContext,
+        board: KanbanBoard | null,
+        modifiedFiles: MarkdownFile[],
+        mainFile: MarkdownFile,
+        replacements: Map<string, PathReplacement>,
+        options: PathReplacementOptions
+    ): Promise<void> {
+        const mainFileDir = path.dirname(mainFile.getPath());
+        const mainFileModified = modifiedFiles.some(f => f.getPath() === mainFile.getPath());
+        const includeFilesModified = modifiedFiles.some(f => f.getPath() !== mainFile.getPath());
+
+        // Use targeted updates when possible
+        if (!includeFilesModified && mainFileModified && board && (options.taskId || options.columnId)) {
+            if (options.isColumnTitle && options.columnId) {
+                const column = board.columns.find((c: KanbanColumn) => c.id === options.columnId);
+                if (column) {
+                    const oldTitle = column.title || '';
+                    const newTitle = this._applyAllReplacements(oldTitle, replacements, mainFileDir, options.pathFormat);
+
+                    // Check for include switch
+                    const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                        context, board, options, oldTitle, newTitle
+                    );
+                    if (hadIncludeSwitch) {
+                        return;
+                    }
+
+                    // Update column with new title
+                    column.title = newTitle;
+                    this.postMessage({
+                        type: 'updateColumnTitle',
+                        columnId: options.columnId,
+                        title: column.title,
+                        imageMappings: {}
+                    });
+                    context.boardStore.invalidateCache();
+                    return;
+                }
+            } else if (options.taskId && options.columnId) {
+                const column = board.columns.find((c: KanbanColumn) => c.id === options.columnId);
+                const task = column?.tasks.find((t: KanbanTask) => t.id === options.taskId);
+                if (task) {
+                    const oldTitle = task.title || '';
+                    const newTitle = this._applyAllReplacements(oldTitle, replacements, mainFileDir, options.pathFormat);
+
+                    // Check for include switch (title may contain include directive)
+                    const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                        context, board, options, oldTitle, newTitle
+                    );
+                    if (hadIncludeSwitch) {
+                        return;
+                    }
+
+                    // Update task with new paths
+                    task.title = newTitle;
+                    if (task.description) {
+                        task.description = this._applyAllReplacements(
+                            task.description, replacements, mainFileDir, options.pathFormat
+                        );
+                    }
+
+                    this.postMessage({
+                        type: 'updateTaskContent',
+                        taskId: options.taskId,
+                        columnId: options.columnId,
+                        task: task,
+                        imageMappings: {}
+                    });
+                    context.boardStore.invalidateCache();
+                    return;
+                }
+            }
+        }
+
+        // Fall back to full refresh
+        await this.refreshBoard(context);
+    }
+
+    /**
+     * Send notifications about the path replacement.
+     */
+    private _sendReplacementNotifications(
+        originalPath: string,
+        actualPath: string,
+        newPath: string,
+        filePath: string,
+        options: PathReplacementOptions
+    ): void {
+        this.postMessage({
+            type: 'imagePathReplaced',
+            originalPath,
+            newPath,
+            file: filePath
+        });
+
+        // Also send a generic path replaced message for non-image paths
+        if (!originalPath.match(/\.(png|jpg|jpeg|gif|bmp|webp|svg|ico)$/i)) {
+            this.postMessage({
+                type: 'pathReplaced',
+                oldPath: actualPath,
+                newPath,
+                taskId: options.taskId,
+                columnId: options.columnId
+            });
+        }
+    }
+
+    /**
+     * Unified path replacement function - handles both single and batch modes.
+     */
+    private async _replacePaths(
         brokenPath: string,
         selectedPath: string,
         basePath: string,
         context: CommandContext,
-        pathFormat: PathFormat = 'auto',
-        taskId?: string,
-        columnId?: string,
-        isColumnTitle?: boolean
+        options: PathReplacementOptions
     ): Promise<CommandResult> {
-        logger.debug('[PathCommands._batchReplacePaths] START', {
-            brokenPath,
-            selectedPath,
-            basePath,
-            pathFormat,
-            taskId,
-            columnId,
-            isColumnTitle
+        logger.debug('[PathCommands._replacePaths] START', {
+            brokenPath: brokenPath.substring(0, 100),
+            selectedPath: selectedPath.substring(0, 100),
+            mode: options.mode,
+            taskId: options.taskId,
+            columnId: options.columnId
         });
 
+        // 1. Sync editing state (capture any unsaved edits)
+        await this._syncEditingState(context);
+
+        // 2. Get file registry
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
             return this.failure('File registry not available');
         }
 
-        // Save undo entry before making changes
-        logger.debug('[PathCommands._batchReplacePaths] Saving undo entry');
-        const currentBoard = context.boardStore.getBoard();
-        if (currentBoard) {
-            const undoEntry = UndoCapture.forFullBoard(currentBoard, 'batch-path-replace');
-            context.boardStore.saveUndoEntry(undoEntry);
-        }
-
-        // Resolve the context-aware base path
-        // If the broken path is from an include file, use that file's directory as base
-        // This is critical for correct path resolution!
-        let contextBasePath = basePath;
-        if (currentBoard && (taskId || (columnId && isColumnTitle))) {
-            const column = columnId ? currentBoard.columns.find(c => c.id === columnId) : undefined;
-            let includePath: string | undefined;
-
-            if (isColumnTitle && column?.includeFiles?.length) {
-                includePath = column.includeFiles[0];
-            } else if (taskId && column) {
-                const task = column.tasks.find(t => t.id === taskId);
-                includePath = task?.includeContext?.includeFilePath
-                    || task?.includeFiles?.[0]
-                    || column?.includeFiles?.[0];
-            }
-
-            if (includePath) {
-                const absoluteIncludePath = path.isAbsolute(includePath)
-                    ? includePath
-                    : path.resolve(basePath, includePath);
-                contextBasePath = path.dirname(absoluteIncludePath);
-                logger.debug('[PathCommands._batchReplacePaths] Using include file context', {
-                    includePath,
-                    contextBasePath
-                });
-            }
-        }
-
-        // Extract directories from paths
-        // Decode brokenPath in case it contains URL-encoded characters (e.g., %E2%80%93 for en-dash)
-        const decodedBrokenPath = safeDecodeURIComponent(brokenPath);
-        const brokenDir = path.dirname(decodedBrokenPath);
-        const newDir = path.dirname(selectedPath);
-
-        logger.debug('[PathCommands._batchReplacePaths] Directory extraction', {
-            originalBrokenPath: brokenPath.substring(0, 100),
-            decodedBrokenPath: decodedBrokenPath.substring(0, 100),
-            brokenDir: brokenDir.substring(0, 100),
-            newDir: newDir.substring(0, 100)
-        });
-
-        // Collect all files to search
         const mainFile = fileRegistry.getMainFile();
         if (!mainFile) {
             return this.failure('No main file found');
         }
+
         const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
+        const board = context.boardStore.getBoard();
 
-        // Find all image/file paths in the content that start with brokenDir
-        // First pass: identify which paths need replacement and verify new files exist
-        // Matches:
-        // - Images: ![alt](path "title")
-        // - Links: [text](path "title")
-        // - Includes: !!!include(path)!!!
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
-        // Map: oldPath -> absolute new file path (we'll calculate relative per-file later)
-        const pathsToReplace: Map<string, string> = new Map();
-        const skippedPaths: string[] = []; // Paths where new file doesn't exist
-
-        // Get the filename from the broken path for diagnostic purposes
-        const brokenFilename = path.basename(decodedBrokenPath);
-
-        logger.debug('[PathCommands._batchReplacePaths] Scanning files for matching paths', {
-            brokenDir,
-            newDir,
-            brokenFilename,
-            fileCount: allFiles.length
-        });
-
-        for (const file of allFiles) {
-            const content = file.getContent();
-            const fileBasePath = path.dirname(file.getPath());
-            let match;
-            pathPattern.lastIndex = 0;
-            let matchCount = 0;
-
-            // Diagnostic: Check if the broken filename exists anywhere in the content
-            const filenameInContent = content.includes(brokenFilename);
-            if (filenameInContent) {
-                logger.debug('[PathCommands._batchReplacePaths] Broken filename FOUND in content', {
-                    file: file.getRelativePath(),
-                    brokenFilename
-                });
-            }
-
-            while ((match = pathPattern.exec(content)) !== null) {
-                matchCount++;
-                // Group 1 = image path, Group 2 = link path, Group 3 = include path
-                const foundPath = match[1] || match[2] || match[3];
-                if (!foundPath) continue;
-
-                // Decode the path for comparison
-                const decodedPath = safeDecodeURIComponent(foundPath);
-
-                // Check if this path is in the broken directory
-                // IMPORTANT: Resolve paths to absolute before comparing, because:
-                // - In main file: `../include_folder/images/broken.png`
-                // - In include file: `./images/broken.png`
-                // These are the SAME directory when resolved, but different as strings!
-                const foundDir = path.dirname(decodedPath);
-
-                // Resolve foundDir to absolute using THIS file's base path
-                const absoluteFoundDir = path.isAbsolute(foundDir)
-                    ? foundDir
-                    : path.resolve(fileBasePath, foundDir);
-
-                // Resolve brokenDir to absolute using context-aware base path
-                // (include file's dir if broken path is from include, else main file's dir)
-                const absoluteBrokenDir = path.isAbsolute(brokenDir)
-                    ? brokenDir
-                    : path.resolve(contextBasePath, brokenDir);
-
-                const normalizedFoundDir = this.normalizeDirForComparison(absoluteFoundDir);
-                const normalizedBrokenDir = this.normalizeDirForComparison(absoluteBrokenDir);
-
-                const dirMatch = normalizedFoundDir === normalizedBrokenDir;
-                // Also check if found path is in a subdirectory of broken dir
-                const absoluteFoundPath = path.isAbsolute(decodedPath)
-                    ? decodedPath
-                    : path.resolve(fileBasePath, decodedPath);
-                const prefixMatch = this.normalizeDirForComparison(absoluteFoundPath).startsWith(normalizedBrokenDir + '/');
-
-                logger.debug('[PathCommands._batchReplacePaths] Path comparison', {
-                    foundPath: foundPath.substring(0, 80) + (foundPath.length > 80 ? '...' : ''),
-                    absoluteFoundDir: absoluteFoundDir.substring(0, 80) + (absoluteFoundDir.length > 80 ? '...' : ''),
-                    absoluteBrokenDir: absoluteBrokenDir.substring(0, 80) + (absoluteBrokenDir.length > 80 ? '...' : ''),
-                    dirMatch,
-                    prefixMatch
-                });
-
-                if (dirMatch || prefixMatch) {
-                    // Calculate the new absolute path
-                    const filename = path.basename(decodedPath);
-                    const absoluteNewPath = path.join(newDir, filename);
-
-                    // Resolve to absolute path for file existence check
-                    let newPathResolved = absoluteNewPath;
-                    if (!path.isAbsolute(absoluteNewPath)) {
-                        // Use THIS file's directory as base for resolution
-                        newPathResolved = path.resolve(fileBasePath, absoluteNewPath);
-                    }
-
-                    logger.debug('[PathCommands._batchReplacePaths] Checking file existence', {
-                        filename,
-                        newPathResolved: newPathResolved.substring(0, 100) + (newPathResolved.length > 100 ? '...' : '')
-                    });
-
-                    try {
-                        await fs.promises.access(newPathResolved);
-                        // File exists - store the absolute path (we'll make it relative per-file)
-                        if (!pathsToReplace.has(decodedPath)) {
-                            pathsToReplace.set(decodedPath, newPathResolved);
-                            logger.debug('[PathCommands._batchReplacePaths] Added path to replace', { decodedPath: decodedPath.substring(0, 80) });
-                        }
-                    } catch (err) {
-                        // File doesn't exist in new location
-                        if (!skippedPaths.includes(filename)) {
-                            skippedPaths.push(filename);
-                            logger.debug('[PathCommands._batchReplacePaths] File not found, skipping', { filename, error: String(err) });
-                        }
-                    }
-                }
-            }
-
-            logger.debug('[PathCommands._batchReplacePaths] File scan complete', {
-                file: file.getRelativePath(),
-                matchCount,
-                pathsToReplaceSize: pathsToReplace.size,
-                skippedCount: skippedPaths.length
-            });
-        }
-
-        if (pathsToReplace.size === 0) {
-            showWarning('No matching paths found to replace.');
-            return this.success({ replaced: false, count: 0 });
-        }
-
-        // Second pass: Perform replacements, calculating relative paths per-file
-        let replacedCount = 0;
-        const modifiedFiles: MarkdownFile[] = [];
-        for (const file of allFiles) {
-            let content = file.getContent();
-            let modified = false;
-            const fileBasePath = path.dirname(file.getPath());
-
-            for (const [oldPath, absoluteNewPath] of pathsToReplace) {
-                // Calculate the correct path format for THIS file's location
-                const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-                const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-
-                let newPath: string;
-                if (useRelative) {
-                    // Calculate relative to THIS file's directory
-                    newPath = path.relative(fileBasePath, absoluteNewPath);
-                    newPath = newPath.replace(/\\/g, '/');
-                    if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                        newPath = './' + newPath;
-                    }
-                } else {
-                    newPath = absoluteNewPath;
-                }
-
-                // Encode paths for replacement in markdown
-                const encodedOldPath = encodeFilePath(oldPath);
-                const encodedNewPath = encodeFilePath(newPath);
-
-                // Also try the original (possibly already encoded) path
-                const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const escapedEncodedOldPath = encodedOldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-                const regex1 = new RegExp(escapedOldPath, 'g');
-                const regex2 = new RegExp(escapedEncodedOldPath, 'g');
-
-                const newContent1 = content.replace(regex1, encodedNewPath);
-                if (newContent1 !== content) {
-                    content = newContent1;
-                    modified = true;
-                    replacedCount++;
-                }
-
-                const newContent2 = content.replace(regex2, encodedNewPath);
-                if (newContent2 !== content) {
-                    content = newContent2;
-                    modified = true;
-                    // Don't double count if both matched
-                }
-            }
-
-            if (modified) {
-                logger.debug('[PathCommands._batchReplacePaths] Updating file content:', file.getRelativePath());
-                file.setContent(content, false);
-                modifiedFiles.push(file);
-            }
-        }
-
-        // Determine if we can use targeted update instead of full refresh
-        // Conditions: only main file modified AND taskId/columnId context available
-        const onlyMainFileModified = modifiedFiles.length === 1 && modifiedFiles[0] === mainFile;
-        const hasTargetContext = !!(taskId && columnId);
-
-        logger.debug('[PathCommands._batchReplacePaths] Update decision:', {
-            modifiedFilesCount: modifiedFiles.length,
-            onlyMainFileModified,
-            hasTargetContext,
-            taskId,
-            columnId,
-            isColumnTitle,
-            pathsToReplaceCount: pathsToReplace.size
-        });
-
-        if (onlyMainFileModified && hasTargetContext && currentBoard) {
-            // Use targeted update - manually update the board object's task/column content
-            // Note: We can't rely on getBoard() to return fresh content because it just returns the cached board.
-            // We need to manually update the task/column objects with the replaced paths.
-
-            if (isColumnTitle) {
-                // Update column only
-                const column = currentBoard.columns.find(c => c.id === columnId);
-                if (column) {
-                    // Manually apply the path replacements to the column title
-                    for (const [oldPath, absoluteNewPath] of pathsToReplace) {
-                        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-
-                        let newPath: string;
-                        if (useRelative) {
-                            newPath = path.relative(basePath, absoluteNewPath);
-                            newPath = newPath.replace(/\\/g, '/');
-                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                                newPath = './' + newPath;
-                            }
-                        } else {
-                            newPath = absoluteNewPath;
-                        }
-                        const encodedNewPath = encodeFilePath(newPath);
-                        // Try decoded path first, then encoded path (task.title may have either)
-                        let newTitle = LinkOperations.replaceSingleLink(column.title, oldPath, encodedNewPath, 0);
-                        if (newTitle === column.title) {
-                            // Decoded path didn't match - try encoded version
-                            const encodedOldPath = encodeFilePath(oldPath);
-                            newTitle = LinkOperations.replaceSingleLink(column.title, encodedOldPath, encodedNewPath, 0);
-                        }
-                        column.title = newTitle;
-                    }
-
-                    logger.debug('[PathCommands._batchReplacePaths] Sending targeted column update with updated title:', column.title);
-                    this.postMessage({
-                        type: 'updateColumnContent',
-                        columnId: columnId,
-                        column: column,
-                        imageMappings: {}
-                    });
-                    // Mark cache invalid since we've modified the board object
-                    context.boardStore.invalidateCache();
-                } else {
-                    logger.debug('[PathCommands._batchReplacePaths] Column not found, falling back to full refresh');
-                    await this.refreshBoard(context);
-                }
+        // 3. Save undo entry
+        if (board) {
+            let undoEntry;
+            if (options.taskId && options.columnId) {
+                undoEntry = UndoCapture.forTask(board, options.taskId, options.columnId, 'path-replace');
+            } else if (options.columnId) {
+                undoEntry = UndoCapture.forColumn(board, options.columnId, 'path-replace');
             } else {
-                // Update task only
-                const column = currentBoard.columns.find(c => c.id === columnId);
-                const task = column?.tasks.find(t => t.id === taskId);
-                if (task && column) {
-                    // Manually apply the path replacements to the task title and description
-                    for (const [oldPath, absoluteNewPath] of pathsToReplace) {
-                        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-
-                        let newPath: string;
-                        if (useRelative) {
-                            newPath = path.relative(basePath, absoluteNewPath);
-                            newPath = newPath.replace(/\\/g, '/');
-                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                                newPath = './' + newPath;
-                            }
-                        } else {
-                            newPath = absoluteNewPath;
-                        }
-                        const encodedNewPath = encodeFilePath(newPath);
-                        const encodedOldPath = encodeFilePath(oldPath);
-
-                        // Try decoded path first, then encoded path (task.title may have either)
-                        let newTitle = LinkOperations.replaceSingleLink(task.title, oldPath, encodedNewPath, 0);
-                        if (newTitle === task.title) {
-                            // Decoded path didn't match - try encoded version
-                            newTitle = LinkOperations.replaceSingleLink(task.title, encodedOldPath, encodedNewPath, 0);
-                        }
-                        task.title = newTitle;
-
-                        if (task.description) {
-                            let newDesc = LinkOperations.replaceSingleLink(task.description, oldPath, encodedNewPath, 0);
-                            if (newDesc === task.description) {
-                                // Decoded path didn't match - try encoded version
-                                newDesc = LinkOperations.replaceSingleLink(task.description, encodedOldPath, encodedNewPath, 0);
-                            }
-                            task.description = newDesc;
-                        }
-                    }
-
-                    logger.debug('[PathCommands._batchReplacePaths] Sending targeted task update with updated title:', task.title);
-                    this.postMessage({
-                        type: 'updateTaskContent',
-                        taskId: taskId,
-                        columnId: columnId,
-                        task: task,
-                        imageMappings: {}
-                    });
-                    // Mark cache invalid since we've modified the board object
-                    context.boardStore.invalidateCache();
-                } else {
-                    logger.debug('[PathCommands._batchReplacePaths] Task/column not found, falling back to full refresh');
-                    await this.refreshBoard(context);
-                }
+                undoEntry = UndoCapture.forFullBoard(board, 'path-replace');
             }
-        } else {
-            // Full refresh needed - multiple files modified or no target context
-            logger.debug('[PathCommands._batchReplacePaths] Using full refresh');
-            await this.refreshBoard(context);
+            context.boardStore.saveUndoEntry(undoEntry);
         }
-        logger.debug('[PathCommands._batchReplacePaths] Update completed');
 
-        // Show result notification
-        const skippedMsg = skippedPaths.length > 0
-            ? ` (${skippedPaths.length} skipped - file not found)`
-            : '';
-        showInfo(
-            `Replaced ${pathsToReplace.size} paths${skippedMsg}`
+        // 4. Resolve context base path
+        const contextBasePath = this._resolveContextBasePath(
+            board, basePath, options.taskId, options.columnId, options.isColumnTitle
         );
+
+        // 5. Collect paths to replace (MODE-SPECIFIC)
+        let replacements: Map<string, PathReplacement>;
+
+        if (options.mode === 'single') {
+            const variants = this._generatePathVariants(brokenPath);
+            replacements = this._findSinglePath(variants, allFiles, selectedPath, board, options);
+        } else {
+            // Batch mode - selectedPath is the new directory
+            const newDir = path.dirname(selectedPath);
+            replacements = this._findBatchPaths(brokenPath, contextBasePath, allFiles, newDir);
+        }
+
+        if (replacements.size === 0) {
+            if (options.mode === 'batch') {
+                showWarning('No matching paths found to replace.');
+                return this.success({ replaced: false, count: 0 });
+            }
+            return this.failure('Path not found in any file');
+        }
+
+        // 6. Execute replacements
+        const modifiedFiles = this._executeReplacements(replacements, options.pathFormat);
+
+        // 7. Apply board updates
+        await this._applyBoardUpdates(context, board, modifiedFiles, mainFile, replacements, options);
+
+        // 8. Send notifications
+        const firstReplacement = replacements.values().next().value;
+        const newPath = firstReplacement ? this._computeReplacementPath(
+            firstReplacement.oldPath,
+            firstReplacement.newAbsolutePath,
+            path.dirname(mainFile.getPath()),
+            options.pathFormat
+        ) : '';
+
+        if (firstReplacement) {
+            this._sendReplacementNotifications(
+                brokenPath, firstReplacement.oldPath, newPath,
+                firstReplacement.sourceFile.getRelativePath(), options
+            );
+        }
+
+        // 9. Show success message
+        const message = options.mode === 'batch'
+            ? `Replaced ${replacements.size} path${replacements.size > 1 ? 's' : ''}`
+            : options.successMessage || 'Path updated';
+        showInfo(message);
 
         return this.success({
             replaced: true,
-            count: pathsToReplace.size,
-            skipped: skippedPaths.length
+            count: replacements.size,
+            oldPath: brokenPath,
+            newPath: firstReplacement ? this._computeReplacementPath(
+                firstReplacement.oldPath,
+                firstReplacement.newAbsolutePath,
+                path.dirname(mainFile.getPath()),
+                options.pathFormat
+            ) : undefined
         });
     }
 }
