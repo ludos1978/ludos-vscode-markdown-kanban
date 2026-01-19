@@ -1323,8 +1323,12 @@ function renderBoard(options = null) {
     const detectedRows = detectRowsFromBoard(window.cachedBoard);
     const numRows = Math.max(currentLayoutRows, detectedRows);
 
-    // Always use row containers (even for single row)
-    boardElement.classList.add('multi-row');
+    // Only add multi-row class when there are actually multiple rows
+    if (numRows > 1) {
+        boardElement.classList.add('multi-row');
+    } else {
+        boardElement.classList.remove('multi-row');
+    }
 
     // Use DocumentFragment to batch DOM insertions for better performance
     const fragment = document.createDocumentFragment();
