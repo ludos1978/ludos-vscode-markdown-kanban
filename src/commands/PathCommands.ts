@@ -1301,6 +1301,35 @@ export class PathCommands extends SwitchBasedCommand {
             context.boardStore.saveUndoEntry(undoEntry);
         }
 
+        // Resolve the context-aware base path
+        // If the broken path is from an include file, use that file's directory as base
+        // This is critical for correct path resolution!
+        let contextBasePath = basePath;
+        if (currentBoard && (taskId || (columnId && isColumnTitle))) {
+            const column = columnId ? currentBoard.columns.find(c => c.id === columnId) : undefined;
+            let includePath: string | undefined;
+
+            if (isColumnTitle && column?.includeFiles?.length) {
+                includePath = column.includeFiles[0];
+            } else if (taskId && column) {
+                const task = column.tasks.find(t => t.id === taskId);
+                includePath = task?.includeContext?.includeFilePath
+                    || task?.includeFiles?.[0]
+                    || column?.includeFiles?.[0];
+            }
+
+            if (includePath) {
+                const absoluteIncludePath = path.isAbsolute(includePath)
+                    ? includePath
+                    : path.resolve(basePath, includePath);
+                contextBasePath = path.dirname(absoluteIncludePath);
+                logger.debug('[PathCommands._batchReplacePaths] Using include file context', {
+                    includePath,
+                    contextBasePath
+                });
+            }
+        }
+
         // Extract directories from paths
         // Decode brokenPath in case it contains URL-encoded characters (e.g., %E2%80%93 for en-dash)
         const decodedBrokenPath = safeDecodeURIComponent(brokenPath);
@@ -1323,9 +1352,11 @@ export class PathCommands extends SwitchBasedCommand {
 
         // Find all image/file paths in the content that start with brokenDir
         // First pass: identify which paths need replacement and verify new files exist
-        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
-        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
+        // Matches:
+        // - Images: ![alt](path "title")
+        // - Links: [text](path "title")
+        // - Includes: !!!include(path)!!!
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
         // Map: oldPath -> absolute new file path (we'll calculate relative per-file later)
         const pathsToReplace: Map<string, string> = new Map();
         const skippedPaths: string[] = []; // Paths where new file doesn't exist
@@ -1358,25 +1389,45 @@ export class PathCommands extends SwitchBasedCommand {
 
             while ((match = pathPattern.exec(content)) !== null) {
                 matchCount++;
-                // Group 1 = image path, Group 2 = link path (titles are excluded)
-                const foundPath = match[1] || match[2];
+                // Group 1 = image path, Group 2 = link path, Group 3 = include path
+                const foundPath = match[1] || match[2] || match[3];
                 if (!foundPath) continue;
 
                 // Decode the path for comparison
                 const decodedPath = safeDecodeURIComponent(foundPath);
 
                 // Check if this path is in the broken directory
+                // IMPORTANT: Resolve paths to absolute before comparing, because:
+                // - In main file: `../include_folder/images/broken.png`
+                // - In include file: `./images/broken.png`
+                // These are the SAME directory when resolved, but different as strings!
                 const foundDir = path.dirname(decodedPath);
-                const normalizedFoundDir = this.normalizeDirForComparison(foundDir);
-                const normalizedBrokenDir = this.normalizeDirForComparison(brokenDir);
+
+                // Resolve foundDir to absolute using THIS file's base path
+                const absoluteFoundDir = path.isAbsolute(foundDir)
+                    ? foundDir
+                    : path.resolve(fileBasePath, foundDir);
+
+                // Resolve brokenDir to absolute using context-aware base path
+                // (include file's dir if broken path is from include, else main file's dir)
+                const absoluteBrokenDir = path.isAbsolute(brokenDir)
+                    ? brokenDir
+                    : path.resolve(contextBasePath, brokenDir);
+
+                const normalizedFoundDir = this.normalizeDirForComparison(absoluteFoundDir);
+                const normalizedBrokenDir = this.normalizeDirForComparison(absoluteBrokenDir);
 
                 const dirMatch = normalizedFoundDir === normalizedBrokenDir;
-                const prefixMatch = this.normalizeDirForComparison(decodedPath).startsWith(normalizedBrokenDir + '/');
+                // Also check if found path is in a subdirectory of broken dir
+                const absoluteFoundPath = path.isAbsolute(decodedPath)
+                    ? decodedPath
+                    : path.resolve(fileBasePath, decodedPath);
+                const prefixMatch = this.normalizeDirForComparison(absoluteFoundPath).startsWith(normalizedBrokenDir + '/');
 
                 logger.debug('[PathCommands._batchReplacePaths] Path comparison', {
                     foundPath: foundPath.substring(0, 80) + (foundPath.length > 80 ? '...' : ''),
-                    normalizedFoundDir: normalizedFoundDir.substring(0, 80) + (normalizedFoundDir.length > 80 ? '...' : ''),
-                    normalizedBrokenDir: normalizedBrokenDir.substring(0, 80) + (normalizedBrokenDir.length > 80 ? '...' : ''),
+                    absoluteFoundDir: absoluteFoundDir.substring(0, 80) + (absoluteFoundDir.length > 80 ? '...' : ''),
+                    absoluteBrokenDir: absoluteBrokenDir.substring(0, 80) + (absoluteBrokenDir.length > 80 ? '...' : ''),
                     dirMatch,
                     prefixMatch
                 });

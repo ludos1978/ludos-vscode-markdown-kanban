@@ -131,8 +131,17 @@ export class BoardContentScanner {
         for (const column of board.columns) {
             const columnLocation = this._buildColumnLocation(column, 'columnTitle');
 
-            // Check column title for elements
-            this._extractFromContent(column.title, columnLocation, elements);
+            // Determine column include base path if column is from an include file
+            let columnIncludeBasePath: string | undefined;
+            if (column.includeMode && column.includeFiles && column.includeFiles.length > 0) {
+                // Resolve the first include file to get its directory
+                const firstInclude = column.includeFiles[0];
+                const resolvedInclude = this._resolvePathWithBase(firstInclude, this._basePath);
+                columnIncludeBasePath = path.dirname(resolvedInclude);
+            }
+
+            // Check column title for elements (use include base path if available)
+            this._extractFromContent(column.title, columnLocation, elements, columnIncludeBasePath);
 
             // Check column-level includes
             if (column.includeFiles && column.includeFiles.length > 0) {
@@ -143,8 +152,13 @@ export class BoardContentScanner {
             for (const task of column.tasks) {
                 const taskTitleLocation = this._buildTaskLocation(column, task, 'taskTitle');
 
-                // Check task title
-                this._extractFromContent(task.title, taskTitleLocation, elements);
+                // Determine task include base path:
+                // 1. Use task's own includeContext if available
+                // 2. Fall back to column's include base path (for tasks inside include columns)
+                const taskIncludeBasePath = task.includeContext?.includeDir || columnIncludeBasePath;
+
+                // Check task title (use include base path if available)
+                this._extractFromContent(task.title, taskTitleLocation, elements, taskIncludeBasePath);
 
                 // Check task-level includes
                 if (task.includeFiles && task.includeFiles.length > 0) {
@@ -155,7 +169,7 @@ export class BoardContentScanner {
                 if (task.description) {
                     const taskDescriptionLocation = this._buildTaskLocation(column, task, 'description');
                     // Use include context's directory if available (for correct relative path resolution)
-                    const includeBasePath = task.includeContext?.includeDir;
+                    const includeBasePath = task.includeContext?.includeDir || columnIncludeBasePath;
                     this._extractFromContent(task.description, taskDescriptionLocation, elements, includeBasePath);
 
                     // Check regular includes in description

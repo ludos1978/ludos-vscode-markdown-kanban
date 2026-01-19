@@ -4666,15 +4666,25 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
 
     if (!isElementVisible(targetElement)) {
         console.log('[scrollToAndHighlight] Target not visible, looking for visible ancestor...');
-        let parent = targetElement.parentElement;
-        while (parent && parent !== document.body) {
-            if (isElementVisible(parent)) {
-                console.log('[scrollToAndHighlight] Found visible ancestor:', parent.tagName, parent.className);
-                scrollTarget = parent;
-                break;
+
+        // Prefer field-specific containers first (column title, task title, description)
+        const fieldContainer = getSearchRoot();
+        if (fieldContainer && isElementVisible(fieldContainer)) {
+            console.log('[scrollToAndHighlight] Using field container:', fieldContainer.className);
+            scrollTarget = fieldContainer;
+        } else {
+            // Walk up DOM tree to find first visible ancestor
+            let parent = targetElement.parentElement;
+            while (parent && parent !== document.body) {
+                if (isElementVisible(parent)) {
+                    console.log('[scrollToAndHighlight] Found visible ancestor:', parent.tagName, parent.className);
+                    scrollTarget = parent;
+                    break;
+                }
+                parent = parent.parentElement;
             }
-            parent = parent.parentElement;
         }
+
         // If still no visible ancestor, fall back to task or column
         if (!isElementVisible(scrollTarget)) {
             if (taskElement && isElementVisible(taskElement)) {
