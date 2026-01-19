@@ -41,7 +41,8 @@ function parsePresentation(content) {
     let workingContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
     // Strip YAML frontmatter if present (e.g., ---\nmarp: true\n---\n)
-    const yamlMatch = workingContent.match(/^---\n[\s\S]*?\n---\n/);
+    // Allow trailing spaces/tabs after --- (common from editors)
+    const yamlMatch = workingContent.match(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n/);
     if (yamlMatch) {
         workingContent = workingContent.substring(yamlMatch[0].length);
     }
@@ -57,7 +58,8 @@ function parsePresentation(content) {
 
     // Split by slide separators: \n\n---\n\n (blank line + --- + blank line)
     // CRITICAL: Only plain --- is a separator, use [ \t]* not \s* to avoid matching newlines
-    const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/g);
+    // Allow whitespace on "empty" lines and after --- (common from editors)
+    const rawSlides = contentWithPlaceholders.split(/\n[ \t]*\n---[ \t]*\n[ \t]*\n/g);
     const slides = [];
 
     rawSlides.forEach((slideContent, index) => {

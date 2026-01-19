@@ -49,7 +49,8 @@ export class PresentationParser {
     // Strip YAML frontmatter if present (e.g., ---\nmarp: true\n---\n)
     // This is critical for parsing include files that have Marp YAML headers
     // NOTE: Must use workingContent (normalized) not original content!
-    const yamlMatch = workingContent.match(/^---\n[\s\S]*?\n---\n/);
+    // Allow trailing spaces/tabs after --- (common from editors)
+    const yamlMatch = workingContent.match(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n/);
     if (yamlMatch) {
       workingContent = workingContent.substring(yamlMatch[0].length);
     }
@@ -69,7 +70,8 @@ export class PresentationParser {
     // Split by slide separators: \n\n---\n\n (blank line + --- + blank line)
     // This consumes the blank lines around ---, so slides don't have extra leading/trailing empties
     // CRITICAL: Only plain --- is a separator, others are Marp column layout markers (---:, :--:, :---)
-    const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/g);
+    // Allow whitespace on "empty" lines and after --- (common from editors)
+    const rawSlides = contentWithPlaceholders.split(/\n[ \t]*\n---[ \t]*\n[ \t]*\n/g);
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
