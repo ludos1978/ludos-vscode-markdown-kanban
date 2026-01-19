@@ -915,6 +915,8 @@ export class PathCommands extends SwitchBasedCommand {
     /**
      * Find all paths with the same directory for batch replacement.
      * Returns a Map with 0 to N entries.
+     * Note: Same path may exist in multiple files - we don't track sourceFile here.
+     * The _executeReplacements function will apply replacements to ALL files.
      */
     private _findBatchPaths(
         brokenPath: string,
@@ -931,6 +933,15 @@ export class PathCommands extends SwitchBasedCommand {
             : path.resolve(contextBasePath, decodedBrokenPath);
         const brokenDir = this.normalizeDirForComparison(path.dirname(absoluteBrokenPath));
 
+        logger.debug('[_findBatchPaths] Setup', {
+            brokenPath,
+            contextBasePath,
+            decodedBrokenPath,
+            absoluteBrokenPath,
+            brokenDir,
+            newDir
+        });
+
         // Pattern to match images, links, and includes
         const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|!!!include\(([^)]+)\)!!!/g;
 
@@ -938,16 +949,30 @@ export class PathCommands extends SwitchBasedCommand {
             const content = file.getContent();
             const fileDir = path.dirname(file.getPath());
             let match;
+            pathPattern.lastIndex = 0; // Reset regex for each file
 
             while ((match = pathPattern.exec(content)) !== null) {
                 const matchedPath = match[1] || match[2] || match[3];
                 if (!matchedPath) continue;
+
+                // Skip if we already have this path
+                if (replacements.has(matchedPath)) continue;
 
                 const decodedPath = safeDecodeURIComponent(matchedPath);
                 const absolutePath = path.isAbsolute(decodedPath)
                     ? decodedPath
                     : path.resolve(fileDir, decodedPath);
                 const pathDir = this.normalizeDirForComparison(path.dirname(absolutePath));
+
+                logger.debug('[_findBatchPaths] Checking path', {
+                    matchedPath,
+                    decodedPath,
+                    fileDir,
+                    absolutePath,
+                    pathDir,
+                    brokenDir,
+                    match: pathDir === brokenDir
+                });
 
                 // Check if this path is in the same directory as the broken path
                 if (pathDir === brokenDir) {
@@ -956,12 +981,18 @@ export class PathCommands extends SwitchBasedCommand {
 
                     // Check if the file exists in the new location
                     try {
-                        if (fs.existsSync(newAbsPath)) {
+                        const exists = fs.existsSync(newAbsPath);
+                        logger.debug('[_findBatchPaths] File exists check', {
+                            filename,
+                            newAbsPath,
+                            exists
+                        });
+                        if (exists) {
                             replacements.set(matchedPath, {
                                 oldPath: matchedPath,
                                 decodedOldPath: decodedPath,
                                 newAbsolutePath: newAbsPath,
-                                sourceFile: file
+                                sourceFile: file // Note: This is just for reference, not authoritative
                             });
                         }
                     } catch {
@@ -975,40 +1006,86 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Execute the path replacements in the files.
+     * Execute the path replacements in ALL files.
+     * Each file gets ALL applicable replacements applied.
+     * Paths are calculated relative to each file's directory.
      */
     private _executeReplacements(
         replacements: Map<string, PathReplacement>,
+        files: MarkdownFile[],
         pathFormat: PathFormat
     ): MarkdownFile[] {
         const modifiedFiles: MarkdownFile[] = [];
 
-        for (const [oldPath, replacement] of replacements) {
-            const file = replacement.sourceFile;
-            const fileDir = path.dirname(file.getPath());
-            const newRelativePath = this._computeReplacementPath(
-                oldPath,
-                replacement.newAbsolutePath,
-                fileDir,
-                pathFormat
-            );
-            const encodedNewPath = encodeFilePath(newRelativePath);
+        logger.debug('[_executeReplacements] Starting', {
+            replacementsCount: replacements.size,
+            filesCount: files.length,
+            replacementPaths: Array.from(replacements.keys())
+        });
 
+        // Apply ALL replacements to EACH file
+        for (const file of files) {
             let content = file.getContent();
-            let newContent = LinkOperations.replaceSingleLink(content, oldPath, encodedNewPath, 0);
+            let modified = false;
+            const fileDir = path.dirname(file.getPath());
 
-            // If encoded old path didn't match, try decoded version
-            if (newContent === content && replacement.decodedOldPath !== oldPath) {
-                newContent = LinkOperations.replaceSingleLink(content, replacement.decodedOldPath, encodedNewPath, 0);
-            }
+            for (const [oldPath, replacement] of replacements) {
+                // Calculate the correct relative path for THIS file's location
+                const newRelativePath = this._computeReplacementPath(
+                    oldPath,
+                    replacement.newAbsolutePath,
+                    fileDir,
+                    pathFormat
+                );
+                const encodedNewPath = encodeFilePath(newRelativePath);
 
-            if (newContent !== content) {
-                file.setContent(newContent);
-                if (!modifiedFiles.includes(file)) {
-                    modifiedFiles.push(file);
+                // Check if path exists in content BEFORE replacement
+                const pathExistsInContent = content.includes(oldPath);
+                const decodedPathExistsInContent = content.includes(replacement.decodedOldPath);
+
+                logger.debug('[_executeReplacements] Before replace', {
+                    file: file.getRelativePath(),
+                    oldPath,
+                    decodedOldPath: replacement.decodedOldPath,
+                    newRelativePath,
+                    pathExistsInContent,
+                    decodedPathExistsInContent
+                });
+
+                // Try replacing with the original path
+                let newContent = LinkOperations.replaceSingleLink(content, oldPath, encodedNewPath, 0);
+
+                // If that didn't match, try with decoded path
+                if (newContent === content && replacement.decodedOldPath !== oldPath) {
+                    newContent = LinkOperations.replaceSingleLink(content, replacement.decodedOldPath, encodedNewPath, 0);
+                }
+
+                const replaced = newContent !== content;
+                logger.debug('[_executeReplacements] Replacement attempt', {
+                    file: file.getRelativePath(),
+                    oldPath,
+                    newRelativePath,
+                    replaced
+                });
+
+                if (replaced) {
+                    content = newContent;
+                    modified = true;
                 }
             }
+
+            if (modified) {
+                file.setContent(content);
+                modifiedFiles.push(file);
+                logger.debug('[_executeReplacements] File modified', {
+                    file: file.getRelativePath()
+                });
+            }
         }
+
+        logger.debug('[_executeReplacements] Complete', {
+            modifiedFilesCount: modifiedFiles.length
+        });
 
         return modifiedFiles;
     }
@@ -1113,8 +1190,116 @@ export class PathCommands extends SwitchBasedCommand {
         const mainFileModified = modifiedFiles.some(f => f.getPath() === mainFile.getPath());
         const includeFilesModified = modifiedFiles.some(f => f.getPath() !== mainFile.getPath());
 
-        // Use targeted updates when possible
-        if (!includeFilesModified && mainFileModified && board && (options.taskId || options.columnId)) {
+        logger.debug('[_applyBoardUpdates] START', {
+            mode: options.mode,
+            replacementsSize: replacements.size,
+            modifiedFilesCount: modifiedFiles.length,
+            mainFileModified,
+            includeFilesModified,
+            hasBoard: !!board,
+            taskId: options.taskId,
+            columnId: options.columnId
+        });
+
+        // Batch mode - find and update all affected columns AND tasks
+        // Note: paths may be in include files (not main file), so check both
+        if (options.mode === 'batch' && replacements.size >= 1 && board && (mainFileModified || includeFilesModified)) {
+            const replacementPaths = Array.from(replacements.keys());
+            logger.debug('[_applyBoardUpdates] Batch mode - finding affected items', {
+                replacementPaths,
+                columnCount: board.columns.length
+            });
+            let updatedColumns = 0;
+            let updatedTasks = 0;
+
+            for (const column of board.columns) {
+                // Check column title
+                const oldColumnTitle = column.title || '';
+                const columnHasPath = replacementPaths.some(p => oldColumnTitle.includes(p));
+
+                if (columnHasPath) {
+                    const newTitle = this._applyAllReplacements(oldColumnTitle, replacements, mainFileDir, options.pathFormat);
+                    if (oldColumnTitle !== newTitle) {
+                        logger.debug('[_applyBoardUpdates] Updating column title', {
+                            columnId: column.id,
+                            changed: true
+                        });
+
+                        const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                            context, board, { ...options, columnId: column.id, isColumnTitle: true },
+                            oldColumnTitle, newTitle
+                        );
+
+                        if (!hadIncludeSwitch) {
+                            column.title = newTitle;
+                            this.postMessage({
+                                type: 'updateColumnTitle',
+                                columnId: column.id,
+                                title: newTitle,
+                                imageMappings: {}
+                            });
+                        }
+                        updatedColumns++;
+                    }
+                }
+
+                // Check tasks in this column
+                for (const task of column.tasks) {
+                    const oldTaskTitle = task.title || '';
+                    const oldTaskDesc = task.description || '';
+                    const taskTitleHasPath = replacementPaths.some(p => oldTaskTitle.includes(p));
+                    const taskDescHasPath = replacementPaths.some(p => oldTaskDesc.includes(p));
+
+                    if (taskTitleHasPath || taskDescHasPath) {
+                        let taskChanged = false;
+                        // Use include file's directory if task has include context, otherwise main file's directory
+                        const taskBaseDir = task.includeContext?.includeDir || mainFileDir;
+
+                        if (taskTitleHasPath) {
+                            const newTaskTitle = this._applyAllReplacements(oldTaskTitle, replacements, taskBaseDir, options.pathFormat);
+                            if (newTaskTitle !== oldTaskTitle) {
+                                task.title = newTaskTitle;
+                                taskChanged = true;
+                            }
+                        }
+
+                        if (taskDescHasPath) {
+                            const newTaskDesc = this._applyAllReplacements(oldTaskDesc, replacements, taskBaseDir, options.pathFormat);
+                            if (newTaskDesc !== oldTaskDesc) {
+                                task.description = newTaskDesc;
+                                taskChanged = true;
+                            }
+                        }
+
+                        if (taskChanged) {
+                            logger.debug('[_applyBoardUpdates] Updating task', {
+                                taskId: task.id,
+                                columnId: column.id
+                            });
+
+                            this.postMessage({
+                                type: 'updateTaskContent',
+                                taskId: task.id,
+                                columnId: column.id,
+                                task: task,
+                                imageMappings: {}
+                            });
+                            updatedTasks++;
+                        }
+                    }
+                }
+            }
+
+            logger.debug('[_applyBoardUpdates] Batch mode complete', { updatedColumns, updatedTasks });
+            if (updatedColumns > 0 || updatedTasks > 0) {
+                context.boardStore.invalidateCache();
+            }
+            return;
+        }
+
+        // Use targeted updates when possible (single replacement only)
+        // Works for both main file and include file modifications
+        if ((mainFileModified || includeFilesModified) && board && (options.taskId || options.columnId)) {
             if (options.isColumnTitle && options.columnId) {
                 const column = board.columns.find((c: KanbanColumn) => c.id === options.columnId);
                 if (column) {
@@ -1144,8 +1329,10 @@ export class PathCommands extends SwitchBasedCommand {
                 const column = board.columns.find((c: KanbanColumn) => c.id === options.columnId);
                 const task = column?.tasks.find((t: KanbanTask) => t.id === options.taskId);
                 if (task) {
+                    // Use include file's directory if task has include context, otherwise main file's directory
+                    const taskBaseDir = task.includeContext?.includeDir || mainFileDir;
                     const oldTitle = task.title || '';
-                    const newTitle = this._applyAllReplacements(oldTitle, replacements, mainFileDir, options.pathFormat);
+                    const newTitle = this._applyAllReplacements(oldTitle, replacements, taskBaseDir, options.pathFormat);
 
                     // Check for include switch (title may contain include directive)
                     const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
@@ -1159,7 +1346,7 @@ export class PathCommands extends SwitchBasedCommand {
                     task.title = newTitle;
                     if (task.description) {
                         task.description = this._applyAllReplacements(
-                            task.description, replacements, mainFileDir, options.pathFormat
+                            task.description, replacements, taskBaseDir, options.pathFormat
                         );
                     }
 
@@ -1177,7 +1364,9 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Fall back to full refresh
+        logger.debug('[_applyBoardUpdates] Falling back to full refresh');
         await this.refreshBoard(context);
+        logger.debug('[_applyBoardUpdates] Full refresh completed');
     }
 
     /**
@@ -1258,9 +1447,11 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // 4. Resolve context base path
-        const contextBasePath = this._resolveContextBasePath(
-            board, basePath, options.taskId, options.columnId, options.isColumnTitle
-        );
+        // For single mode: use include file's directory if applicable
+        // For batch mode: use main file's directory (basePath) since we scan all files
+        const contextBasePath = options.mode === 'single'
+            ? this._resolveContextBasePath(board, basePath, options.taskId, options.columnId, options.isColumnTitle)
+            : basePath;
 
         // 5. Collect paths to replace (MODE-SPECIFIC)
         let replacements: Map<string, PathReplacement>;
@@ -1283,10 +1474,21 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // 6. Execute replacements
-        const modifiedFiles = this._executeReplacements(replacements, options.pathFormat);
+        // For single mode: only modify the specific sourceFile
+        // For batch mode: apply to ALL files (same path may exist in multiple files)
+        let filesToModify: MarkdownFile[];
+        if (options.mode === 'single') {
+            const firstReplacement = replacements.values().next().value;
+            filesToModify = firstReplacement ? [firstReplacement.sourceFile] : [];
+        } else {
+            filesToModify = allFiles;
+        }
+        const modifiedFiles = this._executeReplacements(replacements, filesToModify, options.pathFormat);
 
         // 7. Apply board updates
+        logger.debug('[_replacePaths] Calling _applyBoardUpdates');
         await this._applyBoardUpdates(context, board, modifiedFiles, mainFile, replacements, options);
+        logger.debug('[_replacePaths] _applyBoardUpdates completed');
 
         // 8. Send notifications
         const firstReplacement = replacements.values().next().value;

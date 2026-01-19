@@ -534,10 +534,16 @@ export class FileSearchWebview {
         // Scan tracked files (main + includes) for paths matching the broken directory
         const brokenDir = path.dirname(this._originalPath);
 
-        // Pattern to find markdown image/link paths
+        // Resolve brokenDir to absolute using _baseDir
+        const absoluteBrokenDir = this._baseDir && !path.isAbsolute(brokenDir)
+            ? path.resolve(this._baseDir, brokenDir)
+            : brokenDir;
+        const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
+
+        // Pattern to find markdown image/link/include paths
         // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
-        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
+        // Also matches !!!include(path)!!! directives
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
         let brokenCount = 0;
         const foundFiles: string[] = [];
         let lastUpdateTime = 0;
@@ -558,19 +564,26 @@ export class FileSearchWebview {
             const content = trackedFile.content;
             if (!content) continue;
 
+            // Get this file's directory for resolving relative paths
+            const fileDir = path.dirname(trackedFile.path);
+
             let match;
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Group 1 = image path, Group 2 = link path (titles are excluded)
-                const foundPath = match[1] || match[2];
+                // Group 1 = image path, Group 2 = link path, Group 3 = include path
+                const foundPath = match[1] || match[2] || match[3];
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);
 
+                // Resolve foundDir to absolute using the tracked file's directory
                 const foundDir = path.dirname(decodedPath);
-                const normalizedFoundDir = this._normalizeDirForComparison(foundDir);
-                const normalizedBrokenDir = this._normalizeDirForComparison(brokenDir);
+                const absoluteFoundDir = path.isAbsolute(foundDir)
+                    ? foundDir
+                    : path.resolve(fileDir, foundDir);
+                const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
+
                 if (normalizedFoundDir === normalizedBrokenDir) {
                     brokenCount++;
                     const filename = path.basename(decodedPath);
@@ -595,10 +608,17 @@ export class FileSearchWebview {
         const brokenDir = path.dirname(this._originalPath);
         const newDir = path.dirname(selectedPath);
 
+        // Resolve brokenDir to absolute using _baseDir
+        const absoluteBrokenDir = this._baseDir && !path.isAbsolute(brokenDir)
+            ? path.resolve(this._baseDir, brokenDir)
+            : brokenDir;
+        const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
+
         // Find all paths with broken directory and check if they exist in new directory
         // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
+        // Also captures !!!include(path)!!! directives
         // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)/g;
+        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
         const filesToReplace: string[] = [];
         const filesMissing: string[] = [];
         let lastUpdateTime = 0;
@@ -621,19 +641,26 @@ export class FileSearchWebview {
             const content = trackedFile.content;
             if (!content) continue;
 
+            // Get this file's directory for resolving relative paths
+            const fileDir = path.dirname(trackedFile.path);
+
             let match;
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Group 1 = image path, Group 2 = link path (titles are excluded)
-                const foundPath = match[1] || match[2];
+                // Group 1 = image path, Group 2 = link path, Group 3 = include path
+                const foundPath = match[1] || match[2] || match[3];
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);
 
+                // Resolve foundDir to absolute using the tracked file's directory
                 const foundDir = path.dirname(decodedPath);
-                const normalizedFoundDir = this._normalizeDirForComparison(foundDir);
-                const normalizedBrokenDir = this._normalizeDirForComparison(brokenDir);
+                const absoluteFoundDir = path.isAbsolute(foundDir)
+                    ? foundDir
+                    : path.resolve(fileDir, foundDir);
+                const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
+
                 if (normalizedFoundDir === normalizedBrokenDir) {
                     const filename = path.basename(decodedPath);
                     if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {

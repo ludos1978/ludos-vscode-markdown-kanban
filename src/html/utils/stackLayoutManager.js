@@ -624,7 +624,7 @@ function updateStackLayoutDebounced(stackElement = null) {
  * @param {HTMLElement} stackElement - Specific stack to update, or null for all stacks
  */
 function updateStackLayoutCore(stackElement = null) {
-    const perfEnabled = window.kanbanDebug?.enabled;
+    const perfEnabled = false; // window.kanbanDebug?.enabled;
     const perfStart = perfEnabled ? performance.now() : 0;
     const stacks = stackElement ? [stackElement] : document.querySelectorAll('.kanban-column-stack');
     const stackCount = stackElement ? 1 : stacks.length;
