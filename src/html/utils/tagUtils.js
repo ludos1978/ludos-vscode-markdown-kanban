@@ -1482,8 +1482,9 @@ class TagUtils {
             }
 
             // Render markdown on content with safe placeholder tokens
+            // CRITICAL: Pass includeContext for dynamic image path resolution in included files
             const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-            let rendered = renderFn ? renderFn(tempTitle) : tempTitle;
+            let rendered = renderFn ? renderFn(tempTitle, task.includeContext) : tempTitle;
 
             // Replace safe tokens back with badge HTML using the preserved paths
             extractedPaths.forEach((filePath, index) => {

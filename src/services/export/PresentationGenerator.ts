@@ -90,7 +90,8 @@ export class PresentationGenerator {
 
         for (const column of columns) {
             // Column title slide
-            let columnTitle = column.displayTitle ?? column.title;
+            // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
+            let columnTitle = column.originalTitle ?? column.title;
             if (options.stripIncludes) {
                 columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
@@ -142,7 +143,8 @@ export class PresentationGenerator {
 
         for (const column of board.columns) {
             // Column title as H1
-            let columnTitle = column.displayTitle ?? column.title;
+            // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
+            let columnTitle = column.originalTitle ?? column.title;
             if (options.stripIncludes) {
                 columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
@@ -156,7 +158,8 @@ export class PresentationGenerator {
 
             for (const task of tasks) {
                 // Task title (plain text, like presentation format)
-                let title = task.displayTitle ?? task.title ?? '';
+                // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
+                let title = task.originalTitle ?? task.title ?? '';
                 if (options.stripIncludes) {
                     title = title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
                 }
@@ -196,8 +199,8 @@ export class PresentationGenerator {
      * Convert a single task to slide content string
      */
     private static taskToSlideContent(task: KanbanTask, options: PresentationOptions): string {
-        // Use displayTitle if available, fall back to title
-        let title = task.displayTitle ?? task.title ?? '';
+        // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
+        let title = task.originalTitle ?? task.title ?? '';
         const description = task.description ?? '';
 
         if (options.stripIncludes) {

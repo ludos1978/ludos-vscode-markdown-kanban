@@ -2022,14 +2022,8 @@ class TaskEditor {
      * Compute the new column title, handling reconstruction of hidden layout tags
      */
     _computeNewColumnTitle(value, element, column) {
-        const hasIncludes = /!!!include\([^)]+\)!!!/.test(value);
-
-        if (hasIncludes) {
-            // Includes bypass reconstruction (no hidden layout tag preservation)
-            return value.trim();
-        }
-
-        // No includes: Reconstruct to merge user input with preserved hidden tags
+        // Always reconstruct to merge user input with preserved hidden tags
+        // This ensures layout tags like #stack are preserved even when includes are added
         try {
             return this.reconstructColumnTitle(value.trim(), element.getAttribute('data-original-title') || column.title);
         } catch (error) {
@@ -2788,15 +2782,17 @@ class TaskEditor {
             result += ` ${originalSpan}`;
         }
 
-        // Handle stack tags - user sees full title with #stack, so if they removed it, respect that
-        // (Unlike hidden tags that users can't see, #stack is visible in editor)
+        // Handle stack tags - preserve original unless explicitly changed
+        // (Like #span, preserve by default to prevent accidental removal when editing)
         if (userNoStack) {
             // User explicitly disabled stack - don't add stack tag
         } else if (userStack) {
             // User kept or added stack tag - use it
             result += ` #stack`;
+        } else if (originalStack) {
+            // Keep original stack tag if user didn't specify one (preserve layout)
+            result += ` #stack`;
         }
-        // If originalStack existed but userStack is null, user intentionally removed it - don't re-add
 
         return result.trim();
     }

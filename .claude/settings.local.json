@@ -141,7 +141,8 @@
       "Bash(pandoc --version:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix image loading and improve editor navigation\n\nImage path resolution:\n- Include mainFilePath in boardUpdate message for atomic path availability\n- Set window.currentFilePath at start of boardUpdate processing\n- Fixes race condition where images couldn''t resolve paths on initial load\n  \\(boardUpdate processing is synchronous ~600ms, updateFileInfo was queued\\)\n\nEditor keyboard navigation:\n- Alt+Enter in task title now transitions to description editing\n- Alt+Enter in overlay title input now focuses content editor\n- Consistent behavior across inline and overlay editors\n\nFile search optimization:\n- Remove redundant onBoardUpdate\\(\\) call in _syncEditingState\n- Prevents double board refresh when selecting file in search modal\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(mutool -v:*)"
+      "Bash(mutool -v:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
