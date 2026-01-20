@@ -343,16 +343,20 @@ export class DiagramPreprocessor {
     }
 
     /**
-     * Render draw.io diagrams in parallel
-     * Similar to PlantUML batch rendering (CLI-based)
+     * Render file-based diagrams (draw.io, excalidraw) in parallel
      * Skips diagrams whose source files haven't changed
+     * @param diagrams - Diagrams with file paths
+     * @param outputFolder - Where to save rendered SVG files
+     * @param baseFileName - Base name for output files
      * @param sourceDir - Directory of source markdown file (for resolving relative paths)
+     * @param renderFn - Function to render the diagram to SVG
      */
-    private async renderDrawIOBatch(
+    private async renderFileBasedDiagramBatch(
         diagrams: DiagramBlock[],
         outputFolder: string,
         baseFileName: string,
-        sourceDir: string
+        sourceDir: string,
+        renderFn: (absolutePath: string) => Promise<string>
     ): Promise<RenderedDiagram[]> {
 
         const renderPromises = diagrams.map(async (diagram) => {
@@ -386,9 +390,9 @@ export class DiagramPreprocessor {
                     };
                 }
 
-                // Render using draw.io service
+                // Render using provided service function
                 log(`Rendering ${diagram.id}...`);
-                const svg = await this.drawioService.renderSVG(absolutePath);
+                const svg = await renderFn(absolutePath);
 
                 // Save SVG file
                 await fs.promises.writeFile(outputPath, svg, 'utf8');
@@ -411,10 +415,25 @@ export class DiagramPreprocessor {
     }
 
     /**
+     * Render draw.io diagrams in parallel
+     */
+    private async renderDrawIOBatch(
+        diagrams: DiagramBlock[],
+        outputFolder: string,
+        baseFileName: string,
+        sourceDir: string
+    ): Promise<RenderedDiagram[]> {
+        return this.renderFileBasedDiagramBatch(
+            diagrams,
+            outputFolder,
+            baseFileName,
+            sourceDir,
+            (absolutePath) => this.drawioService.renderSVG(absolutePath)
+        );
+    }
+
+    /**
      * Render excalidraw diagrams in parallel
-     * Similar to PlantUML batch rendering (library-based)
-     * Skips diagrams whose source files haven't changed
-     * @param sourceDir - Directory of source markdown file (for resolving relative paths)
      */
     private async renderExcalidrawBatch(
         diagrams: DiagramBlock[],
@@ -422,60 +441,13 @@ export class DiagramPreprocessor {
         baseFileName: string,
         sourceDir: string
     ): Promise<RenderedDiagram[]> {
-
-        const renderPromises = diagrams.map(async (diagram) => {
-            try {
-                if (!diagram.filePath) {
-                    console.error(`[DiagramPreprocessor] ❌ No file path for ${diagram.id}`);
-                    return null;
-                }
-
-                // Resolve path relative to the SOURCE markdown file's directory, not output folder
-                const absolutePath = path.isAbsolute(diagram.filePath)
-                    ? diagram.filePath
-                    : path.resolve(sourceDir, diagram.filePath);
-
-                // Check if file exists
-                if (!fs.existsSync(absolutePath)) {
-                    console.error(`[DiagramPreprocessor] ❌ File not found: ${absolutePath}`);
-                    return null;
-                }
-
-                const fileName = `${baseFileName}-${diagram.id}.svg`;
-                const outputPath = path.join(outputFolder, fileName);
-
-                // Check if output is up-to-date (skip re-rendering unchanged diagrams)
-                if (await this.isOutputUpToDate(absolutePath, outputPath)) {
-                    log(`✓ Skipping ${diagram.id} (unchanged)`);
-                    return {
-                        id: diagram.id,
-                        fileName,
-                        originalBlock: diagram.fullMatch
-                    };
-                }
-
-                // Render using excalidraw service
-                log(`Rendering ${diagram.id}...`);
-                const svg = await this.excalidrawService.renderSVG(absolutePath);
-
-                // Save SVG file
-                await fs.promises.writeFile(outputPath, svg, 'utf8');
-
-                return {
-                    id: diagram.id,
-                    fileName,
-                    originalBlock: diagram.fullMatch
-                };
-            } catch (error) {
-                console.error(`[DiagramPreprocessor] Failed to render ${diagram.id}:`, error);
-                return null;
-            }
-        });
-
-        const results = await Promise.all(renderPromises);
-
-        // Filter out failures
-        return results.filter((r): r is RenderedDiagram => r !== null);
+        return this.renderFileBasedDiagramBatch(
+            diagrams,
+            outputFolder,
+            baseFileName,
+            sourceDir,
+            (absolutePath) => this.excalidrawService.renderSVG(absolutePath)
+        );
     }
 
     /**

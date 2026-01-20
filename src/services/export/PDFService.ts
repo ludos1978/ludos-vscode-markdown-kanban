@@ -2,80 +2,35 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import * as vscode from 'vscode';
-import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
+import { AbstractCLIService } from './AbstractCLIService';
 
 /**
  * Service for rendering individual PDF pages to images
- * Uses pdftoppm CLI tool for conversion
+ * Uses pdftoppm CLI tool from poppler-utils for conversion
  *
  * Supports:
  * - Rendering specific pages from PDF files
  * - PNG output with configurable DPI
  */
-export class PDFService {
-    private cliPath: string | null = null;
-    private availabilityChecked: boolean = false;
-    private isCliAvailable: boolean = false;
-
-    constructor() {
-        // Will auto-detect CLI on first use
+export class PDFService extends AbstractCLIService {
+    protected getConfigKey(): string {
+        return 'popplerPath';
     }
 
-    /**
-     * Check if pdftoppm CLI is available
-     */
-    async isAvailable(): Promise<boolean> {
-        if (this.availabilityChecked) {
-            return this.isCliAvailable;
-        }
-
-        // Check user-configured poppler path first
-        const config = vscode.workspace.getConfiguration('markdown-kanban');
-        const popplerPath = config.get<string>('popplerPath', '');
-
-        // Use configured path or fall back to PATH
-        const cliName = popplerPath ? path.join(popplerPath, 'pdftoppm') : 'pdftoppm';
-
-        if (await this.testCliCommand(cliName)) {
-            this.cliPath = cliName;
-            this.isCliAvailable = true;
-            this.availabilityChecked = true;
-            return true;
-        }
-
-        this.availabilityChecked = true;
-        this.isCliAvailable = false;
-        console.warn('[PDFService] pdftoppm CLI not found. Configure markdown-kanban.popplerPath in settings.');
-        return false;
+    protected getDefaultCliName(): string {
+        return 'pdftoppm';
     }
 
-    /**
-     * Test if a CLI command is available by running version check
-     */
-    private async testCliCommand(command: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn(command, ['-v']);
+    protected getServiceName(): string {
+        return 'PDFService';
+    }
 
-                process.on('error', () => {
-                    resolve(false);
-                });
+    protected getCliNotFoundWarning(): string {
+        return 'pdftoppm CLI is not installed. PDF page rendering will not work.';
+    }
 
-                process.on('exit', (_code) => {
-                    // pdftoppm returns 0 for -v, or 99 for --version, or 1 for -v (depends on version)
-                    // Any response means it exists
-                    resolve(true);
-                });
-
-                // Timeout after 2 seconds
-                setTimeout(() => {
-                    process.kill();
-                    resolve(false);
-                }, 2000);
-            } catch (error) {
-                resolve(false);
-            }
-        });
+    protected getInstallationUrl(): string {
+        return 'https://poppler.freedesktop.org/';
     }
 
     /**
@@ -86,112 +41,72 @@ export class PDFService {
      * @returns PNG data as Buffer
      */
     async renderPage(filePath: string, pageNumber: number = 1, dpi: number = 150): Promise<Buffer> {
-        // Check CLI availability
         if (!await this.isAvailable()) {
             this.showCliWarning();
             throw new Error('pdftoppm CLI not available');
         }
 
-        return new Promise((resolve, reject) => {
-            const timeout = EXTERNAL_SERVICE_TIMEOUT_MS;
+        const tempDir = this.ensureTempDir();
+        const tempPrefix = path.join(tempDir, `pdf-${Date.now()}`);
 
-            // Create temp output file path
-            const tempDir = path.join(__dirname, '../../../tmp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
+        // pdftoppm -png -f PAGE -l PAGE -r DPI input.pdf output-prefix
+        const args = [
+            '-png',
+            '-f', pageNumber.toString(),
+            '-l', pageNumber.toString(),
+            '-r', dpi.toString(),
+            filePath,
+            tempPrefix
+        ];
+
+        const { code, stderr } = await this.executeCliCommand(args);
+
+        if (code !== 0) {
+            console.error('[PDFService] Conversion failed:', stderr);
+            throw new Error(`pdftoppm exited with code ${code}`);
+        }
+
+        // pdftoppm creates files like: prefix-N.png where N is the page number
+        const outputPath = await this.findOutputFile(tempDir, tempPrefix, pageNumber);
+
+        if (!outputPath) {
+            const errorMsg = 'pdftoppm exited successfully but did not create output file';
+            console.error('[PDFService]', errorMsg);
+            if (stderr) {
+                console.error('[PDFService] stderr output:', stderr);
             }
-            const tempPrefix = path.join(tempDir, `pdf-${Date.now()}`);
+            throw new Error(errorMsg);
+        }
 
-            // Build CLI arguments
-            // pdftoppm -png -f PAGE -l PAGE -r DPI input.pdf output-prefix
-            const args = [
-                '-png',                    // Output as PNG
-                '-f', pageNumber.toString(), // First page
-                '-l', pageNumber.toString(), // Last page (same as first for single page)
-                '-r', dpi.toString(),        // Resolution
-                filePath,                   // Input PDF
-                tempPrefix                  // Output prefix
-            ];
+        const png = await fs.promises.readFile(outputPath);
+        await fs.promises.unlink(outputPath);
+        return png;
+    }
 
-            const child = spawn(this.cliPath!, args);
+    /**
+     * Find the output file created by pdftoppm (handles various naming patterns)
+     */
+    private async findOutputFile(tempDir: string, tempPrefix: string, pageNumber: number): Promise<string | null> {
+        const possibleFiles = [
+            `${tempPrefix}-${pageNumber}.png`,
+            `${tempPrefix}-${pageNumber.toString().padStart(2, '0')}.png`,
+            `${tempPrefix}-${pageNumber.toString().padStart(3, '0')}.png`,
+            `${tempPrefix}-1.png`,
+        ];
 
-            let stderr = '';
+        for (const candidate of possibleFiles) {
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        }
 
-            child.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
+        // Try to find any file starting with tempPrefix
+        const files = fs.readdirSync(tempDir).filter(f => f.startsWith(path.basename(tempPrefix)));
+        if (files.length > 0) {
+            return path.join(tempDir, files[0]);
+        }
 
-            // Set timeout
-            const timer = setTimeout(() => {
-                child.kill();
-                reject(new Error(`PDF conversion timed out after ${timeout}ms`));
-            }, timeout);
-
-            child.on('error', (error) => {
-                clearTimeout(timer);
-                console.error('[PDFService] Process error:', error);
-                reject(error);
-            });
-
-            child.on('exit', async (code) => {
-                clearTimeout(timer);
-
-                try {
-                    if (code !== 0) {
-                        console.error('[PDFService] Conversion failed:', stderr);
-                        reject(new Error(`pdftoppm exited with code ${code}`));
-                        return;
-                    }
-
-                    // pdftoppm creates files like: prefix-N.png where N is the page number
-                    // The page number is zero-padded based on total pages, but for single page it's usually -1, -01, etc.
-                    // We need to find the generated file
-                    const possibleFiles = [
-                        `${tempPrefix}-${pageNumber}.png`,
-                        `${tempPrefix}-${pageNumber.toString().padStart(2, '0')}.png`,
-                        `${tempPrefix}-${pageNumber.toString().padStart(3, '0')}.png`,
-                        `${tempPrefix}-1.png`,  // Sometimes it just outputs -1.png for single page
-                    ];
-
-                    let outputPath: string | null = null;
-                    for (const candidate of possibleFiles) {
-                        if (fs.existsSync(candidate)) {
-                            outputPath = candidate;
-                            break;
-                        }
-                    }
-
-                    if (!outputPath) {
-                        // Try to find any file starting with tempPrefix
-                        const files = fs.readdirSync(tempDir).filter(f => f.startsWith(path.basename(tempPrefix)));
-                        if (files.length > 0) {
-                            outputPath = path.join(tempDir, files[0]);
-                        }
-                    }
-
-                    if (!outputPath || !fs.existsSync(outputPath)) {
-                        const errorMsg = `pdftoppm exited successfully but did not create output file. Expected one of: ${possibleFiles.join(', ')}`;
-                        console.error('[PDFService]', errorMsg);
-                        if (stderr) {
-                            console.error('[PDFService] stderr output:', stderr);
-                        }
-                        reject(new Error(errorMsg));
-                        return;
-                    }
-
-                    // Read PNG output
-                    const png = await fs.promises.readFile(outputPath);
-
-                    // Cleanup temp file
-                    await fs.promises.unlink(outputPath);
-
-                    resolve(png);
-                } catch (error) {
-                    console.error('[PDFService] Failed to read output:', error);
-                    reject(error);
-                }
-            });
-        });
+        return null;
     }
 
     /**
@@ -201,20 +116,18 @@ export class PDFService {
      * @returns Total number of pages
      */
     async getPageCount(filePath: string): Promise<number> {
+        // Determine pdfinfo path - derive from cliPath or use config/PATH
+        let pdfinfoPath: string;
+
+        if (this.cliPath) {
+            pdfinfoPath = this.cliPath.replace('pdftoppm', 'pdfinfo');
+        } else {
+            const config = vscode.workspace.getConfiguration('markdown-kanban');
+            const popplerPath = config.get<string>('popplerPath', '');
+            pdfinfoPath = popplerPath ? path.join(popplerPath, 'pdfinfo') : 'pdfinfo';
+        }
+
         return new Promise((resolve, reject) => {
-            // Determine pdfinfo path - derive from cliPath or use config/PATH
-            let pdfinfoPath: string;
-
-            if (this.cliPath) {
-                // Derive from pdftoppm path
-                pdfinfoPath = this.cliPath.replace('pdftoppm', 'pdfinfo');
-            } else {
-                // Check user-configured poppler path or use PATH
-                const config = vscode.workspace.getConfiguration('markdown-kanban');
-                const popplerPath = config.get<string>('popplerPath', '');
-                pdfinfoPath = popplerPath ? path.join(popplerPath, 'pdfinfo') : 'pdfinfo';
-            }
-
             const child = spawn(pdfinfoPath, [filePath]);
 
             let stdout = '';
@@ -240,35 +153,18 @@ export class PDFService {
                     return;
                 }
 
-                // Parse output to find "Pages: N"
                 const match = stdout.match(/Pages:\s+(\d+)/);
                 if (match) {
-                    const pageCount = parseInt(match[1], 10);
-                    resolve(pageCount);
+                    resolve(parseInt(match[1], 10));
                 } else {
                     reject(new Error('Could not determine page count from pdfinfo output'));
                 }
             });
 
-            // Timeout after 5 seconds
             setTimeout(() => {
                 child.kill();
                 reject(new Error('pdfinfo timed out'));
             }, 5000);
-        });
-    }
-
-    /**
-     * Show warning notification when CLI is not available
-     */
-    private showCliWarning(): void {
-        const message = 'pdftoppm CLI is not installed. PDF page rendering will not work.';
-        const installAction = 'Installation Instructions';
-
-        vscode.window.showWarningMessage(message, installAction).then(selection => {
-            if (selection === installAction) {
-                vscode.env.openExternal(vscode.Uri.parse('https://poppler.freedesktop.org/'));
-            }
         });
     }
 

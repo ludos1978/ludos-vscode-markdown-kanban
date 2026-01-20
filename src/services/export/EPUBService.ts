@@ -1,9 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { spawn } from 'child_process';
-import * as vscode from 'vscode';
 import AdmZip from 'adm-zip';
-import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
+import { AbstractCLIService } from './AbstractCLIService';
 
 /**
  * Service for rendering individual EPUB pages to images
@@ -13,69 +9,25 @@ import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
  * - Rendering specific pages from EPUB files
  * - PNG output with configurable DPI
  */
-export class EPUBService {
-    private cliPath: string | null = null;
-    private availabilityChecked: boolean = false;
-    private isCliAvailable: boolean = false;
-
-    constructor() {
-        // Will auto-detect CLI on first use
+export class EPUBService extends AbstractCLIService {
+    protected getConfigKey(): string {
+        return 'mutoolPath';
     }
 
-    /**
-     * Check if mutool CLI is available
-     */
-    async isAvailable(): Promise<boolean> {
-        if (this.availabilityChecked) {
-            return this.isCliAvailable;
-        }
-
-        // Check user-configured mutool path first
-        const config = vscode.workspace.getConfiguration('markdown-kanban');
-        const mutoolPath = config.get<string>('mutoolPath', '');
-
-        // Use configured path or fall back to PATH
-        const cliName = mutoolPath ? path.join(mutoolPath, 'mutool') : 'mutool';
-
-        if (await this.testCliCommand(cliName)) {
-            this.cliPath = cliName;
-            this.isCliAvailable = true;
-            this.availabilityChecked = true;
-            return true;
-        }
-
-        this.availabilityChecked = true;
-        this.isCliAvailable = false;
-        console.warn('[EPUBService] mutool CLI not found. Configure markdown-kanban.mutoolPath in settings.');
-        return false;
+    protected getDefaultCliName(): string {
+        return 'mutool';
     }
 
-    /**
-     * Test if a CLI command is available by running version check
-     */
-    private async testCliCommand(command: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn(command, ['-v']);
+    protected getServiceName(): string {
+        return 'EPUBService';
+    }
 
-                process.on('error', () => {
-                    resolve(false);
-                });
+    protected getCliNotFoundWarning(): string {
+        return 'mutool CLI is not installed. EPUB page rendering will not work.';
+    }
 
-                process.on('exit', (_code) => {
-                    // Any response means it exists
-                    resolve(true);
-                });
-
-                // Timeout after 2 seconds
-                setTimeout(() => {
-                    process.kill();
-                    resolve(false);
-                }, 2000);
-            } catch (error) {
-                resolve(false);
-            }
-        });
+    protected getInstallationUrl(): string {
+        return 'https://mupdf.com/docs/manual-mutool-draw.html';
     }
 
     /**
@@ -86,85 +38,19 @@ export class EPUBService {
      * @returns PNG data as Buffer
      */
     async renderPage(filePath: string, pageNumber: number = 1, dpi: number = 150): Promise<Buffer> {
-        // Check CLI availability
-        if (!await this.isAvailable()) {
-            this.showCliWarning();
-            throw new Error('mutool CLI not available');
-        }
+        const tempOutput = this.getTempFilePath(`epub-${pageNumber}`, 'png');
 
-        return new Promise((resolve, reject) => {
-            const timeout = EXTERNAL_SERVICE_TIMEOUT_MS;
+        // mutool draw -r DPI -o output.png input.epub PAGE
+        const args = [
+            'draw',
+            '-r', dpi.toString(),
+            '-o', tempOutput,
+            filePath,
+            pageNumber.toString()
+        ];
 
-            // Create temp output file path
-            const tempDir = path.join(__dirname, '../../../tmp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
-            const tempOutput = path.join(tempDir, `epub-${Date.now()}-${pageNumber}.png`);
-
-            // Build CLI arguments
-            // mutool draw -r DPI -o output.png input.epub PAGE
-            const args = [
-                'draw',
-                '-r', dpi.toString(),           // Resolution
-                '-o', tempOutput,               // Output file
-                filePath,                       // Input EPUB
-                pageNumber.toString()           // Page number
-            ];
-
-            const child = spawn(this.cliPath!, args);
-
-            let stderr = '';
-
-            child.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            // Set timeout
-            const timer = setTimeout(() => {
-                child.kill();
-                reject(new Error(`EPUB conversion timed out after ${timeout}ms`));
-            }, timeout);
-
-            child.on('error', (error) => {
-                clearTimeout(timer);
-                console.error('[EPUBService] Process error:', error);
-                reject(error);
-            });
-
-            child.on('exit', async (code) => {
-                clearTimeout(timer);
-
-                try {
-                    if (code !== 0) {
-                        console.error('[EPUBService] Conversion failed:', stderr);
-                        reject(new Error(`mutool exited with code ${code}`));
-                        return;
-                    }
-
-                    if (!fs.existsSync(tempOutput)) {
-                        const errorMsg = `mutool exited successfully but did not create output file: ${tempOutput}`;
-                        console.error('[EPUBService]', errorMsg);
-                        if (stderr) {
-                            console.error('[EPUBService] stderr output:', stderr);
-                        }
-                        reject(new Error(errorMsg));
-                        return;
-                    }
-
-                    // Read PNG output
-                    const png = await fs.promises.readFile(tempOutput);
-
-                    // Cleanup temp file
-                    await fs.promises.unlink(tempOutput);
-
-                    resolve(png);
-                } catch (error) {
-                    console.error('[EPUBService] Failed to read output:', error);
-                    reject(error);
-                }
-            });
-        });
+        const result = await this.executeAndReadOutput(args, tempOutput, { binary: true });
+        return result as Buffer;
     }
 
     /**
@@ -187,7 +73,6 @@ export class EPUBService {
             const containerXml = containerEntry.getData().toString('utf8');
 
             // Parse container.xml to find OPF path
-            // Looking for: <rootfile full-path="OEBPS/content.opf" .../>
             const rootfileMatch = containerXml.match(/rootfile[^>]+full-path=["']([^"']+)["']/i);
             if (!rootfileMatch) {
                 throw new Error('Invalid EPUB: Cannot find rootfile in container.xml');
@@ -205,7 +90,6 @@ export class EPUBService {
             const opfContent = opfEntry.getData().toString('utf8');
 
             // Step 3: Count spine items
-            // The <spine> element contains <itemref> elements, one per "page" in reading order
             const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
             if (!spineMatch) {
                 throw new Error('Invalid EPUB: Cannot find spine in OPF');
@@ -225,20 +109,6 @@ export class EPUBService {
             console.error('[EPUBService] Failed to get page count:', error);
             throw error;
         }
-    }
-
-    /**
-     * Show warning notification when CLI is not available
-     */
-    private showCliWarning(): void {
-        const message = 'mutool CLI is not installed. EPUB page rendering will not work.';
-        const installAction = 'Installation Instructions';
-
-        vscode.window.showWarningMessage(message, installAction).then(selection => {
-            if (selection === installAction) {
-                vscode.env.openExternal(vscode.Uri.parse('https://mupdf.com/docs/manual-mutool-draw.html'));
-            }
-        });
     }
 
     /**

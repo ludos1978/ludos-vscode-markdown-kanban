@@ -1,172 +1,60 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
+import { AbstractCLIService } from './AbstractCLIService';
 
 /**
- * Service for converting draw.io diagrams to SVG using draw.io CLI
- * Similar architecture to PlantUMLService - uses external CLI tool
+ * Service for converting draw.io diagrams to SVG/PNG using draw.io CLI
  */
-export class DrawIOService {
-    private availabilityChecked: boolean = false;
-    private isCliAvailable: boolean = false;
-    private cliPath: string | null = null;
+export class DrawIOService extends AbstractCLIService {
+    protected getConfigKey(): string {
+        return 'drawioPath';
+    }
 
-    /**
-     * Check if draw.io CLI is installed on the system
-     */
-    async isAvailable(): Promise<boolean> {
-        if (this.availabilityChecked) {
-            return this.isCliAvailable;
-        }
+    protected getDefaultCliName(): string {
+        return 'drawio';
+    }
 
-        // Check configured path or use PATH
-        const config = vscode.workspace.getConfiguration('markdown-kanban');
-        const customPath = config.get<string>('drawioPath', '');
+    protected getServiceName(): string {
+        return 'DrawIOService';
+    }
 
-        // Use configured path or fall back to PATH
-        const cliName = customPath || 'drawio';
+    protected getVersionCheckArgs(): string[] {
+        return ['--version'];
+    }
 
-        if (await this.testCliCommand(cliName)) {
-            this.cliPath = cliName;
-            this.isCliAvailable = true;
-            this.availabilityChecked = true;
-            return true;
-        }
+    protected isVersionCheckSuccess(code: number | null): boolean {
+        return code === 0;
+    }
 
-        this.availabilityChecked = true;
-        this.isCliAvailable = false;
-        console.warn('[DrawIOService] draw.io CLI not found. Configure markdown-kanban.drawioPath in settings.');
-        return false;
+    protected getCliNotFoundWarning(): string {
+        return 'draw.io CLI is not installed. Draw.io diagrams will not be converted during export.';
+    }
+
+    protected getInstallationUrl(): string {
+        return 'https://github.com/jgraph/drawio-desktop/releases';
     }
 
     /**
-     * Test if a CLI command is available by running version check
+     * Override to show platform-specific installation instructions
      */
-    private async testCliCommand(command: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn(command, ['--version']);
+    protected showCliWarning(): void {
+        const message = this.getCliNotFoundWarning();
+        const installAction = 'Installation Instructions';
 
-                process.on('error', () => {
-                    resolve(false);
-                });
+        vscode.window.showWarningMessage(message, installAction).then(selection => {
+            if (selection === installAction) {
+                const platform = process.platform;
+                let instructions = '';
 
-                process.on('exit', (code) => {
-                    resolve(code === 0);
-                });
-
-                // Timeout after 2 seconds
-                setTimeout(() => {
-                    process.kill();
-                    resolve(false);
-                }, 2000);
-            } catch (error) {
-                resolve(false);
-            }
-        });
-    }
-
-    /**
-     * Render draw.io diagram file to specified format
-     * @param filePath Absolute path to .drawio or .dio file
-     * @param format Output format: 'svg' or 'png'
-     * @returns Image data as string (SVG) or Buffer (PNG)
-     */
-    private async renderDiagram(filePath: string, format: 'svg' | 'png'): Promise<string | Buffer> {
-        // Check CLI availability
-        if (!await this.isAvailable()) {
-            this.showCliWarning();
-            throw new Error('draw.io CLI not available');
-        }
-
-        return new Promise((resolve, reject) => {
-            const timeout = EXTERNAL_SERVICE_TIMEOUT_MS;
-
-            // Create temp output file path
-            const tempDir = path.join(__dirname, '../../../tmp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
-            const ext = format === 'png' ? 'png' : 'svg';
-            const tempOutputPath = path.join(tempDir, `drawio-${Date.now()}.${ext}`);
-
-            // Build CLI arguments
-            const args = [
-                '--export',
-                '--format', format,
-                '--output', tempOutputPath,
-                filePath
-            ];
-
-            // Add transparent background for PNG
-            if (format === 'png') {
-                args.push('--transparent');
-            }
-
-            const child = spawn(this.cliPath!, args);
-
-            let stderr = '';
-
-            child.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            // Set timeout
-            const timer = setTimeout(() => {
-                child.kill();
-                reject(new Error(`draw.io conversion timed out after ${timeout}ms`));
-            }, timeout);
-
-            child.on('error', (error) => {
-                clearTimeout(timer);
-                console.error('[DrawIOService] Process error:', error);
-                reject(error);
-            });
-
-            child.on('exit', async (code) => {
-                clearTimeout(timer);
-
-                if (code !== 0) {
-                    console.error('[DrawIOService] Conversion failed:', stderr);
-                    // Cleanup temp file if exists
-                    if (fs.existsSync(tempOutputPath)) {
-                        fs.unlinkSync(tempOutputPath);
-                    }
-                    reject(new Error(`draw.io CLI exited with code ${code}: ${stderr}`));
-                    return;
+                if (platform === 'darwin') {
+                    instructions = `Install draw.io desktop app with CLI support:\n\nbrew install --cask drawio\n\nOr download from: https://github.com/jgraph/drawio-desktop/releases\n\nNote: The GUI app may not work properly for CLI operations. Make sure the 'drawio' command is in your PATH.`;
+                } else if (platform === 'win32') {
+                    instructions = `Install draw.io desktop app:\n\nDownload from: https://github.com/jgraph/drawio-desktop/releases\n\nOr use chocolatey:\nchoco install drawio\n\nMake sure the CLI is in your PATH.`;
+                } else {
+                    instructions = `Install draw.io desktop app:\n\nDownload from: https://github.com/jgraph/drawio-desktop/releases\n\nOr use your package manager (e.g., apt, yum)\n\nMake sure the 'drawio' command is in your PATH.`;
                 }
 
-                try {
-                    // Check if output file was actually created
-                    if (!fs.existsSync(tempOutputPath)) {
-                        const errorMsg = `draw.io CLI exited successfully but did not create output file. ` +
-                            `This usually means the draw.io GUI app was detected instead of the CLI tool. ` +
-                            `Please install the draw.io CLI: https://github.com/jgraph/drawio-desktop/releases ` +
-                            `(look for drawio-*-x64.dmg or use 'brew install --cask drawio')`;
-                        console.error('[DrawIOService]', errorMsg);
-                        if (stderr) {
-                            console.error('[DrawIOService] stderr output:', stderr);
-                        }
-                        reject(new Error(errorMsg));
-                        return;
-                    }
-
-                    // Read output file (text for SVG, binary for PNG)
-                    const data = format === 'svg'
-                        ? await fs.promises.readFile(tempOutputPath, 'utf8')
-                        : await fs.promises.readFile(tempOutputPath);
-
-                    // Cleanup temp file
-                    await fs.promises.unlink(tempOutputPath);
-
-                    resolve(data);
-                } catch (error) {
-                    console.error('[DrawIOService] Failed to read output:', error);
-                    reject(error);
-                }
-            });
+                vscode.window.showInformationMessage(instructions, { modal: true });
+            }
         });
     }
 
@@ -189,30 +77,23 @@ export class DrawIOService {
     }
 
     /**
-     * Show warning notification when CLI is not available
-     * Similar to PlantUML's Graphviz warning
+     * Render draw.io diagram file to specified format
      */
-    private showCliWarning(): void {
-        const message = 'draw.io CLI is not installed. Draw.io diagrams will not be converted during export.';
-        const installAction = 'Installation Instructions';
+    private async renderDiagram(filePath: string, format: 'svg' | 'png'): Promise<string | Buffer> {
+        const tempOutput = this.getTempFilePath('drawio', format);
+        const isPng = format === 'png';
 
-        vscode.window.showWarningMessage(message, installAction).then(selection => {
-            if (selection === installAction) {
-                // Show installation instructions based on platform
-                const platform = process.platform;
-                let instructions = '';
+        const args = [
+            '--export',
+            '--format', format,
+            '--output', tempOutput,
+            filePath
+        ];
 
-                if (platform === 'darwin') {
-                    instructions = `Install draw.io desktop app with CLI support:\n\nbrew install --cask drawio\n\nOr download from: https://github.com/jgraph/drawio-desktop/releases\n\nNote: The GUI app may not work properly for CLI operations. Make sure the 'drawio' command is in your PATH.`;
-                } else if (platform === 'win32') {
-                    instructions = `Install draw.io desktop app:\n\nDownload from: https://github.com/jgraph/drawio-desktop/releases\n\nOr use chocolatey:\nchoco install drawio\n\nMake sure the CLI is in your PATH.`;
-                } else {
-                    instructions = `Install draw.io desktop app:\n\nDownload from: https://github.com/jgraph/drawio-desktop/releases\n\nOr use your package manager (e.g., apt, yum)\n\nMake sure the 'drawio' command is in your PATH.`;
-                }
+        if (isPng) {
+            args.push('--transparent');
+        }
 
-                vscode.window.showInformationMessage(instructions, { modal: true });
-            }
-        });
+        return this.executeAndReadOutput(args, tempOutput, { binary: isPng });
     }
-
 }
