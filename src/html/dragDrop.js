@@ -3165,6 +3165,12 @@ function updateStackBottomDropZones(stackElement = null) {
 
             if (columnFooter) {
                 cumulativeTop += columnFooter.offsetHeight;
+                // Footer bars are inside footer but can overflow (footer has fixed height: 4px)
+                // So we need to measure them separately
+                const footerBarsContainer = columnFooter.querySelector('.stacked-footer-bars');
+                if (footerBarsContainer) {
+                    cumulativeTop += footerBarsContainer.offsetHeight;
+                }
                 // Account for footer borders and margins using computed style
                 const footerStyle = window.getComputedStyle(columnFooter);
                 const marginBottom = parseFloat(footerStyle.marginBottom) || 0;
