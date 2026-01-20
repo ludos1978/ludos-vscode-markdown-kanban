@@ -29,6 +29,13 @@ class TagUtils {
         // Store prefixes for external access
         this.prefixes = TAG_PREFIXES;
 
+        // Date locale configuration (default: auto-detect)
+        // Supported: 'auto', 'de-DE', 'de-AT', 'de-CH', 'en-US', 'en-GB', 'fr-FR', 'iso'
+        this.dateLocale = 'auto';
+
+        // Resolved locale (actual locale used after auto-detection)
+        this._resolvedLocale = null;
+
         // Centralized regex patterns for tag matching
         // All tags capture everything after their prefix until whitespace (space, tab, newline)
         this.patterns = {
@@ -58,12 +65,18 @@ class TagUtils {
             // Captures: type prefix and the query content
             queryTags: new RegExp(`${P.Q}([${P.H}${P.P}${P.T}])([^\\s]+)`, 'g'),
 
-            // TEMPORAL TAGS - all start with . and capture everything until whitespace
-            // Date patterns (.2025.01.28, .2025-01-05, .2025/01/05)
-            dateTags: new RegExp(`${P.T}(\\d{4}[-./]\\d{1,2}[-./]\\d{1,2})(?=\\s|$)`, 'g'),
+            // TEMPORAL TAGS - all start with ! and capture everything until whitespace
+            // Date patterns - supports multiple formats:
+            // - ISO: !2025.01.28, !2025-01-05, !2025/01/05 (YYYY.MM.DD)
+            // - European: !28.01.2025, !28-01-2025, !28/01/2025 (DD.MM.YYYY)
+            // - European short: !28.01.25, !28-01-25, !28/01/25 (DD.MM.YY)
+            // - Day-month only: !28.01, !28-01, !28/01 (DD.MM - current year assumed)
+            // Combined pattern matches all formats, parsing logic determines interpretation
+            dateTags: new RegExp(`${P.T}(\\d{1,4}[-./]\\d{1,2}(?:[-./]\\d{2,4})?)(?=\\s|$)`, 'g'),
 
-            // Week patterns (.w15, .W15, .2025.w15, .2025-w15)
-            weekTags: new RegExp(`${P.T}(?:(\\d{4})[-.]?)?[wW](\\d{1,2})(?=\\s|$)`, 'g'),
+            // Week patterns (.w15, .W15, .kw15, .KW15, .2025.w15, .2025-w15, .2025.kw15)
+            // Supports both English 'w/W' and German 'kw/KW' (Kalenderwoche) prefixes
+            weekTags: new RegExp(`${P.T}(?:(\\d{4})[-.]?)?(?:[wW]|[kK][wW])(\\d{1,2})(?=\\s|$)`, 'g'),
 
             // Weekday patterns (.mon, .monday, .tue, .tuesday, etc.)
             weekdayTags: new RegExp(`${P.T}(mon|monday|tue|tuesday|wed|wednesday|thu|thursday|fri|friday|sat|saturday|sun|sunday)(?=\\s|$)`, 'gi'),
@@ -250,7 +263,59 @@ class TagUtils {
     }
 
     /**
-     * Extract date tag from text
+     * Set the date locale for parsing
+     * @param {string} locale - Locale code ('auto', 'de-DE', 'en-US', etc.)
+     */
+    setDateLocale(locale) {
+        this.dateLocale = locale;
+        this._resolvedLocale = null; // Reset resolved locale
+    }
+
+    /**
+     * Get the effective locale (resolves 'auto' to actual locale)
+     * @returns {string} The resolved locale code
+     */
+    getEffectiveLocale() {
+        if (this._resolvedLocale) {
+            return this._resolvedLocale;
+        }
+
+        if (this.dateLocale !== 'auto') {
+            this._resolvedLocale = this.dateLocale;
+            return this._resolvedLocale;
+        }
+
+        // Auto-detect from browser/system
+        let detectedLocale = 'iso'; // Default fallback
+        if (typeof navigator !== 'undefined' && navigator.language) {
+            const lang = navigator.language.toLowerCase();
+            if (lang.startsWith('de')) {
+                detectedLocale = 'de-DE';
+            } else if (lang === 'en-us') {
+                detectedLocale = 'en-US';
+            } else if (lang.startsWith('en')) {
+                detectedLocale = 'en-GB'; // UK/European style for other English
+            } else if (lang.startsWith('fr')) {
+                detectedLocale = 'fr-FR';
+            }
+        }
+
+        this._resolvedLocale = detectedLocale;
+        return this._resolvedLocale;
+    }
+
+    /**
+     * Check if locale uses day-first format (DD.MM.YYYY)
+     * @returns {boolean} True if locale uses day-first format
+     */
+    isLocaleDayFirst() {
+        const locale = this.getEffectiveLocale();
+        // European locales use day-first
+        return ['de-DE', 'de-AT', 'de-CH', 'en-GB', 'fr-FR'].includes(locale);
+    }
+
+    /**
+     * Extract date tag from text with locale-aware parsing
      * @param {string} text - Text to extract date tag from
      * @returns {Object|null} Object with {year, month, day} or null if not found
      */
@@ -263,13 +328,68 @@ class TagUtils {
 
         // Parse date string (supports -, ., / separators)
         const parts = match[1].split(/[-./]/);
-        if (parts.length !== 3) return null;
+        if (parts.length < 2 || parts.length > 3) return null;
 
-        return {
-            year: parseInt(parts[0], 10),
-            month: parseInt(parts[1], 10),
-            day: parseInt(parts[2], 10)
-        };
+        const currentYear = new Date().getFullYear();
+        let year, month, day;
+
+        if (parts.length === 2) {
+            // Format: DD.MM or MM/DD (day-month only, current year assumed)
+            if (this.isLocaleDayFirst()) {
+                // European: DD.MM
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10);
+            } else {
+                // US: MM/DD
+                month = parseInt(parts[0], 10);
+                day = parseInt(parts[1], 10);
+            }
+            year = currentYear;
+        } else {
+            // 3 parts - determine format based on which part has 4 digits or locale
+            const firstNum = parseInt(parts[0], 10);
+            const secondNum = parseInt(parts[1], 10);
+            const thirdNum = parseInt(parts[2], 10);
+            const firstLen = parts[0].length;
+            const thirdLen = parts[2].length;
+
+            if (firstLen === 4) {
+                // ISO format: YYYY-MM-DD
+                year = firstNum;
+                month = secondNum;
+                day = thirdNum;
+            } else if (thirdLen === 4) {
+                // Year at end: either DD.MM.YYYY (European) or MM/DD/YYYY (US)
+                year = thirdNum;
+                if (this.isLocaleDayFirst()) {
+                    day = firstNum;
+                    month = secondNum;
+                } else {
+                    month = firstNum;
+                    day = secondNum;
+                }
+            } else {
+                // Short year format: DD.MM.YY or MM/DD/YY
+                // Convert 2-digit year to 4-digit (assume 20xx for years 00-99)
+                const shortYear = thirdNum;
+                year = shortYear < 100 ? 2000 + shortYear : shortYear;
+
+                if (this.isLocaleDayFirst()) {
+                    day = firstNum;
+                    month = secondNum;
+                } else {
+                    month = firstNum;
+                    day = secondNum;
+                }
+            }
+        }
+
+        // Validate the parsed date
+        if (month < 1 || month > 12) return null;
+        if (day < 1 || day > 31) return null;
+        if (year < 1900 || year > 2100) return null;
+
+        return { year, month, day };
     }
 
     /**
@@ -1576,6 +1696,10 @@ if (typeof window !== 'undefined') {
     // Backward compatibility functions
     window.extractFirstTag = (text) => tagUtils.extractFirstTag(text);
     window.extractAllTags = (text) => tagUtils.extractTags(text, { includeHash: false });
+
+    // Date locale functions
+    window.setDateLocale = (locale) => tagUtils.setDateLocale(locale);
+    window.getEffectiveLocale = () => tagUtils.getEffectiveLocale();
 
     // Temporal tag functions
     window.isCurrentDate = (text) => tagUtils.isCurrentDate(text);

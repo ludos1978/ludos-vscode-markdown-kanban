@@ -2845,6 +2845,11 @@ if (!webviewEventListenersInitialized) {
                 window.enabledTagCategoriesTask = configData.enabledTagCategoriesTask;
             }
 
+            // Apply date locale setting for temporal tag parsing
+            if (configData.dateLocale !== undefined && typeof window.setDateLocale === 'function') {
+                window.setDateLocale(configData.dateLocale);
+            }
+
             // Merge custom tag categories into tagColors
             if (configData.customTagCategories && Object.keys(configData.customTagCategories).length > 0) {
                 window.tagColors = window.tagColors || {};

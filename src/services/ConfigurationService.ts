@@ -12,6 +12,7 @@ export interface KanbanConfiguration {
     openLinksInNewTab: boolean;
     pathGeneration: 'relative' | 'absolute';
     mediaIndexScanScope: 'mediaFolders' | 'contentFolders' | 'allWorkspaces';
+    dateLocale: 'auto' | 'de-DE' | 'de-AT' | 'de-CH' | 'en-US' | 'en-GB' | 'fr-FR' | 'iso';
     whitespace: string;
     maxRowHeight: number;
     tagColors: { [key: string]: string };
@@ -74,6 +75,7 @@ export class ConfigurationService {
         openLinksInNewTab: false,
         pathGeneration: 'absolute' as 'relative' | 'absolute',
         mediaIndexScanScope: 'allWorkspaces',
+        dateLocale: 'auto' as 'auto' | 'de-DE' | 'de-AT' | 'de-CH' | 'en-US' | 'en-GB' | 'fr-FR' | 'iso',
         whitespace: '4px',
         maxRowHeight: 0,
         taskMinHeight: 'auto',
@@ -268,7 +270,8 @@ export class ConfigurationService {
             wysiwygEnabled: this.getConfig('wysiwygEnabled'),
             overlayEditorEnabled: this.getConfig('overlayEditorEnabled'),
             overlayEditorDefaultMode: this.getConfig('overlayEditorDefaultMode'),
-            overlayEditorFontScale: this.getConfig('overlayEditorFontScale')
+            overlayEditorFontScale: this.getConfig('overlayEditorFontScale'),
+            dateLocale: this.getConfig('dateLocale')
         };
     }
 
