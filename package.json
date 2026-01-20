@@ -4771,6 +4771,8 @@
     "prosemirror-schema-list": "^1.2.3",
     "prosemirror-state": "^1.4.3",
     "prosemirror-view": "^1.33.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "sql.js": "^1.13.0"
   },
   "extensionDependencies": [
