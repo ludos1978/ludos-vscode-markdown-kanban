@@ -797,8 +797,8 @@ class TagUtils {
      * @returns {Object} { attrs: {attr: boolean}, gate: {open, closedBy} }
      */
     evaluateTemporalsAtLevel(text, incomingGate, levelName) {
-        // If no text or gate already closed, return empty
-        if (!text || !incomingGate.open) {
+        // If no text, return empty (but still pass gate through)
+        if (!text) {
             return { attrs: {}, gate: incomingGate };
         }
 
@@ -806,24 +806,29 @@ class TagUtils {
         let gate = { ...incomingGate };
 
         // Temporal checks ordered by hierarchy (higher order first)
-        // Higher-order temporals gate lower-order ones
+        // Index represents temporal rank: 0=date (highest), 4=timeSlot (lowest)
         const checks = [
-            { has: this.hasDateTag,     check: this.isCurrentDate,     attr: 'data-current-day',     name: 'date' },
-            { has: this.hasWeekTag,     check: this.isCurrentWeek,     attr: 'data-current-week',    name: 'week' },
-            { has: this.hasWeekdayTag,  check: this.isCurrentWeekday,  attr: 'data-current-weekday', name: 'weekday' },
-            { has: this.hasTimeTag,     check: this.isCurrentTime,     attr: 'data-current-hour',    name: 'hour' },
-            { has: this.hasTimeSlotTag, check: this.isCurrentTimeSlot, attr: 'data-current-time',    name: 'timeSlot' }
+            { has: this.hasDateTag,     check: this.isCurrentDate,     attr: 'data-current-day',     name: 'date',     rank: 0 },
+            { has: this.hasWeekTag,     check: this.isCurrentWeek,     attr: 'data-current-week',    name: 'week',     rank: 1 },
+            { has: this.hasWeekdayTag,  check: this.isCurrentWeekday,  attr: 'data-current-weekday', name: 'weekday',  rank: 2 },
+            { has: this.hasTimeTag,     check: this.isCurrentTime,     attr: 'data-current-hour',    name: 'hour',     rank: 3 },
+            { has: this.hasTimeSlotTag, check: this.isCurrentTimeSlot, attr: 'data-current-time',    name: 'timeSlot', rank: 4 }
         ];
 
-        for (const { has, check, attr, name } of checks) {
-            if (has.call(this, text)) {
-                // Only check if gate is still open
-                const isActive = gate.open && check.call(this, text);
+        for (const { has, check, attr, name, rank } of checks) {
+            const hasTag = has.call(this, text);
+            if (hasTag) {
+                // Check if this temporal's rank is higher than or equal to the gating rank
+                // Higher rank temporals (lower number) can bypass gates from lower rank temporals
+                const canBypassGate = gate.gatingRank !== undefined && rank < gate.gatingRank;
+                const isGateOpen = gate.open || canBypassGate;
+
+                const isActive = isGateOpen && check.call(this, text);
                 attrs[attr] = isActive;
 
-                // If this temporal exists but isn't active, close the gate for lower levels
+                // If this temporal exists but isn't active, close the gate for lower-rank temporals
                 if (!isActive && gate.open) {
-                    gate = { open: false, closedBy: `${levelName}:${name}` };
+                    gate = { open: false, closedBy: `${levelName}:${name}`, gatingRank: rank };
                 }
             }
         }
