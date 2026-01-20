@@ -2455,6 +2455,12 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
 
 // Global click handlers that check for Alt key
 function handleColumnTitleClick(event, columnId) {
+    // Don't intercept clicks on media menu buttons - let event delegation handle them
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    if (menuButton) {
+        return; // Let event bubble to document-level event delegation
+    }
+
     if (event.altKey) {
         // Alt+click: open link/image (no taskId for column titles)
         if (handleLinkOrImageOpen(event, event.target, null, columnId)) {return;}
@@ -2493,6 +2499,11 @@ function handleColumnTitleClick(event, columnId) {
 }
 
 function handleTaskTitleClick(event, element, taskId, columnId) {
+    // Don't intercept clicks on media menu buttons - let event delegation handle them
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    if (menuButton) {
+        return; // Let event bubble to document-level event delegation
+    }
 
     if (event.altKey) {
         // Alt+click: open link/image
@@ -2520,6 +2531,12 @@ function handleDescriptionClick(event, element, taskId, columnId) {
             window.toggleTaskDescriptionCheckbox(checkbox, taskId, columnId);
         }
         return;
+    }
+
+    // Don't intercept clicks on media menu buttons - let event delegation handle them
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    if (menuButton) {
+        return; // Let event bubble to document-level event delegation
     }
 
     // DEBUG: Log scroll position at the VERY START of click handling
