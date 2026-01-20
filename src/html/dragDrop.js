@@ -3135,44 +3135,41 @@ function updateStackBottomDropZones() {
         if (columns.length === 0) {return;}
 
         // Create transparent drop zone element that fills remaining stack height
-        // Position it absolutely using same calculation as column sticky positioning
         const dropZone = document.createElement('div');
         dropZone.className = 'stack-bottom-drop-zone';
 
-        // Calculate top position by summing up heights of all columns' elements
-        // This matches the calculation in updateStackLayout()
-        let cumulativeTop = 0;
+        // SIMPLIFIED: Calculate top position by finding the actual bottom of the last visible element
+        // This is more reliable than summing individual heights which can miss margins/borders/transforms
+        const stackRect = stack.getBoundingClientRect();
+        let maxBottom = 0;
+
         columns.forEach(col => {
             const isVerticallyFolded = col.classList.contains('collapsed-vertical');
             const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
 
-            const columnMargin = col.querySelector('.column-margin');
-            const columnHeader = col.querySelector('.column-header');
-            const columnTitle = col.querySelector('.column-title');
-            const columnContent = col.querySelector('.column-content');
+            // For folded columns, use the footer bottom; for expanded, use the whole column
             const columnFooter = col.querySelector('.column-footer');
+            const columnContent = col.querySelector('.column-content');
 
-            if (columnMargin) {cumulativeTop += columnMargin.offsetHeight;}
-            if (columnHeader) {cumulativeTop += columnHeader.offsetHeight;}
-            if (columnTitle) {cumulativeTop += columnTitle.offsetHeight;}
-
-            // Include column-content height (skip if column is folded)
-            if (columnContent && !isVerticallyFolded && !isHorizontallyFolded) {
-                cumulativeTop += columnContent.scrollHeight;
+            // Get the bottom-most visible element of this column
+            let bottomElement = columnFooter;
+            if (!bottomElement && columnContent && !isVerticallyFolded && !isHorizontallyFolded) {
+                bottomElement = columnContent;
+            }
+            if (!bottomElement) {
+                bottomElement = col;
             }
 
-            if (columnFooter) {
-                cumulativeTop += columnFooter.offsetHeight;
-                // Account for footer borders and margins using computed style
-                const footerStyle = window.getComputedStyle(columnFooter);
-                const marginBottom = parseFloat(footerStyle.marginBottom) || 0;
-                cumulativeTop += marginBottom;
+            const elementRect = bottomElement.getBoundingClientRect();
+            const relativeBottom = elementRect.bottom - stackRect.top;
+            if (relativeBottom > maxBottom) {
+                maxBottom = relativeBottom;
             }
         });
 
         dropZone.style.cssText = `
             position: absolute;
-            top: ${cumulativeTop}px;
+            top: ${maxBottom}px;
             left: 0;
             right: 0;
             bottom: 0;
