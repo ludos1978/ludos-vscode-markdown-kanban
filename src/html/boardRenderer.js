@@ -1695,7 +1695,7 @@ function createColumnElement(column, columnIndex) {
 								</span>
 								${!column.includeError ? `<button class="collapsed-add-task-btn" onclick="addTaskAndUnfold('${column.id}')" title="Add task and unfold column">+</button>` : ''}
 								<div class="donut-menu">
-										<button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">⋯</button>
+										<button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">☰</button>
 										<div class="donut-menu-dropdown">
 												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert column before</button>
 												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert column after</button>
@@ -1968,7 +1968,7 @@ function createTaskElement(task, columnId, taskIndex) {
                 </div>
                 <div class="task-menu-container">
                     <div class="donut-menu">
-                        <button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">⋯</button>
+                        <button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">☰</button>
                         <div class="donut-menu-dropdown">
                             <button class="donut-menu-item" onclick="openTaskOverlayEditor('${task.id}', '${columnId}')">
                                 Edit task (overlay)

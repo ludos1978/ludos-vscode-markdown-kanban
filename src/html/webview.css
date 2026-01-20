@@ -1621,9 +1621,9 @@ figure:has(.diagram-placeholder .image-not-found) {
 /* Drag handles */
 .drag-handle,
 .task-drag-handle {
-  background: var(--button-alternative-background);
-  color: var(--button-alternative-foreground);
-  border: var(--button-alternative-border);
+  /* background: var(--button-alternative-background); */
+  /* color: var(--button-alternative-foreground); */
+  /* border: var(--button-alternative-border); */
   cursor: grab;
   transition: all 0.2s;
   user-select: none;
@@ -1632,8 +1632,8 @@ figure:has(.diagram-placeholder .image-not-found) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   font-size: 14px;
 }
 
@@ -1653,7 +1653,7 @@ figure:has(.diagram-placeholder .image-not-found) {
   /* Accent color + border to distinguish from column drag handles */
   background: var(--vscode-button-background, #0e639c);
   color: var(--vscode-button-foreground, #ffffff);
-  border: 2px solid var(--vscode-focusBorder, #007fd4) !important;
+  /* border: 2px solid var(--vscode-focusBorder, #007fd4) !important; */
 }
 
 .task-drag-handle:hover {
@@ -2516,7 +2516,7 @@ body.section-height-limited .task-section figure img {
   font-weight: 500;
   display: flex;
   gap: 4px;
-  padding: 1px 1px 1px 4px;
+  padding: 0px 0px 0px 4px;
   align-items: center;
 }
 
@@ -2546,12 +2546,12 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .fold-all-btn {
-  padding: 2px 4px;
+  padding: 2px;
   font-size: 10px;
   line-height: 1;
-  min-width: 16px;
-  height: 16px;
-  width: 16px;
+  min-width: 18px;
+  height: 18px;
+  width: 18px;
 }
 
 /* Pin button (sticky toggle) */
