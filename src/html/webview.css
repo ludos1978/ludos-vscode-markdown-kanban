@@ -2670,16 +2670,14 @@ body.vscode-high-contrast-light .task-count {
   color: var(--button-foreground);
   border: var(--button-border);
   cursor: pointer;
-  padding: 2px 2px;
-  line-height: 1;
+  padding: 0;
   transition: all 0.2s;
   border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 18px;
   height: 18px;
   font-size: 14px;
+  text-align: center;
+  line-height: 19px; /* slightly more than height to push icon down 1px */
 }
 
 .donut-menu-btn:hover {
