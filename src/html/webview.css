@@ -1462,9 +1462,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Allow only the column drag handle to be draggable */
 .column-drag-handle {
-  background: var(--button-alternative-background);
-  color: var(--button-alternative-foreground);
-  border: var(--button-alternative-border);
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: none;
   -webkit-user-drag: element !important;
   cursor: grab;
   border-radius: 3px;
@@ -1475,8 +1475,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .column-drag-handle:hover {
-  background: var(--button-alternative-background-hover);
-  color: var(--button-alternative-foreground-hover);
+  background: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 .column-drag-handle:active {
@@ -1549,6 +1548,15 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .task-drag-handle {
   line-height: 1;
+  /* Accent color + border to distinguish from column drag handles */
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: 2px solid var(--vscode-focusBorder, #007fd4) !important;
+}
+
+.task-drag-handle:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+  border-color: var(--vscode-button-hoverBackground, #1177bb) !important;
 }
 
 /* Collapse toggles */
@@ -2452,7 +2460,7 @@ body.vscode-high-contrast-light .task-count {
 /* Pin button (sticky toggle) */
 .pin-btn {
   padding: 2px 4px;
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1;
   height: 16px;
   width: 16px;
@@ -8501,6 +8509,29 @@ body.font-size-5x .task-description-wysiwyg {
     word-break: break-all;
 }
 
+.file-search-source-file {
+    font-size: 11px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    color: var(--vscode-textLink-foreground, #3794ff);
+    margin-top: 4px;
+    display: block;
+    max-height: 1.4em;
+    line-height: 1.4em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    unicode-bidi: plaintext;
+    cursor: default;
+}
+
+.file-search-source-file:hover {
+    max-height: none;
+    overflow: visible;
+    white-space: normal;
+    word-break: break-all;
+}
+
 .file-search-broken-info {
     display: flex;
     align-items: center;
@@ -8520,6 +8551,7 @@ body.font-size-5x .task-description-wysiwyg {
 .file-search-badge.warning {
     background: var(--vscode-inputValidation-warningBackground, #352a05);
     border: 1px solid var(--vscode-inputValidation-warningBorder, #be8c00);
+    color: var(--vscode-inputValidation-warningForeground);
 }
 
 .file-search-input-container {
@@ -8880,19 +8912,17 @@ body.font-size-5x .task-description-wysiwyg {
     /* color: var(--vscode-textPreformat-foreground, #d7ba7d); */
     word-break: break-all;
     flex: 1;
-    /* Max 2 lines, show end of text (filename visible) */
+    /* Max 2 lines with ellipsis */
     max-height: calc(2 * 1.4em);
     line-height: 1.4em;
     overflow: hidden;
-    direction: rtl;
-    text-align: left;
+    text-overflow: ellipsis;
     cursor: default;
 }
 
 .file-search-path-preview:hover .file-search-path-preview-value {
     max-height: none;
     overflow: visible;
-    direction: ltr;
 }
 
 .file-search-path-preview:not(.has-value) .file-search-path-preview-value {

@@ -73,17 +73,47 @@ export class FileCommands extends SwitchBasedCommand {
 
     /**
      * Handle openFileLink command
+     *
+     * Triggered when user Alt+clicks a link or image in the board (from boardRenderer.js).
+     * Flow: Alt+click → openFileLink message → LinkHandler.handleFileLink → opens file or shows search dialog if not found.
+     *
+     * Different from PathCommands.handleSearchForFile which is triggered from path menus.
      */
     private async handleOpenFileLink(message: OpenFileLinkMessage, context: CommandContext): Promise<CommandResult> {
+        // Set up tracked files for file search (main + includes) before handling link
+        const fileRegistry = context.getFileRegistry();
+        let mainFilePath: string | undefined;
+        console.log('[FileCommands.handleOpenFileLink] START', {
+            href: message.href,
+            hasRegistry: !!fileRegistry,
+            includeContext: message.includeContext
+        });
+        if (fileRegistry) {
+            const allFiles = fileRegistry.getAll();
+            const trackedFiles = allFiles.map(file => ({
+                path: file.getPath(),
+                relativePath: file.getRelativePath(),
+                content: file.getContent()
+            }));
+            context.linkHandler.setTrackedFiles(trackedFiles);
+            // Get main file path from registry
+            const mainFile = fileRegistry.getMainFile();
+            mainFilePath = mainFile?.getPath();
+            console.log('[FileCommands.handleOpenFileLink] Registry info', {
+                fileCount: allFiles.length,
+                mainFilePath,
+                hasMainFile: !!mainFile
+            });
+        }
+
         await context.linkHandler.handleFileLink(
             message.href,
             message.taskId,
             message.columnId,
             message.linkIndex,
-            message.includeContext
+            message.includeContext,
+            mainFilePath
         );
-
-        const fileRegistry = context.getFileRegistry();
         if (fileRegistry && message.href) {
             const includeFile = fileRegistry.getByRelativePath(message.href);
             if (includeFile && includeFile.getFileType() !== 'main') {

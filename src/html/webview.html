@@ -1020,6 +1020,7 @@
             <div class="file-search-header">
                 <div class="file-search-title">File not found</div>
                 <div class="file-search-subtitle" id="file-search-original-path"></div>
+                <div class="file-search-source-file" id="file-search-source-file"></div>
                 <div class="file-search-broken-info">
                     <span class="file-search-badge warning" id="file-search-broken-badge">Scanning...</span>
                 </div>
@@ -1141,8 +1142,8 @@
         const escapeHtml = window.escapeHtml;
         let overlay, originalPathEl, brokenBadgeEl, searchInputEl, caseBtnEl, wordBtnEl, regexBtnEl;
         let resultsEl, batchPanelEl, batchCountEl, batchListEl, batchCheckboxEl, batchInfoEl, cancelBtnEl, selectBtnEl;
-        let formatAutoBtnEl, formatRelativeBtnEl, formatAbsoluteBtnEl, pathPreviewEl, pathPreviewValueEl, previewToggleEl;
-        let results = [], selectedIndex = -1, originalPath = '', brokenPathData = null, batchAnalysisData = null, batchAnalysisCache = {}, isVisible = false;
+        let formatAutoBtnEl, formatRelativeBtnEl, formatAbsoluteBtnEl, pathPreviewEl, pathPreviewValueEl, previewToggleEl, sourceFileEl;
+        let results = [], selectedIndex = -1, originalPath = '', sourceFile = '', brokenPathData = null, batchAnalysisData = null, batchAnalysisCache = {}, isVisible = false;
         let pathFormat = 'auto'; // 'auto', 'relative', 'absolute'
         let filePreviewEnabled = false; // File preview toggle state
         let isSearching = false; // Streaming: indicates if search is in progress
@@ -1151,6 +1152,7 @@
         function init() {
             overlay = document.getElementById('file-search-overlay');
             originalPathEl = document.getElementById('file-search-original-path');
+            sourceFileEl = document.getElementById('file-search-source-file');
             brokenBadgeEl = document.getElementById('file-search-broken-badge');
             searchInputEl = document.getElementById('file-search-input');
             caseBtnEl = document.getElementById('file-search-case-btn');
@@ -1282,12 +1284,17 @@
             return !!overlay;
         }
 
-        function show(path, initialSearch) {
-            console.log('[FileSearchModal] show() called with path:', path, 'initialSearch:', initialSearch);
+        function show(path, initialSearch, srcFile) {
+            console.log('[FileSearchModal] show() called with path:', path, 'initialSearch:', initialSearch, 'sourceFile:', srcFile);
             if (!ensureModalReady()) { return; }
             if (!requireOverlay('show')) { return; }
-            originalPath = path; results = []; selectedIndex = -1; brokenPathData = null; batchAnalysisData = null; batchAnalysisCache = {};
+            originalPath = path; sourceFile = srcFile || ''; results = []; selectedIndex = -1; brokenPathData = null; batchAnalysisData = null; batchAnalysisCache = {};
             originalPathEl.textContent = path;
+            // Show source file (always visible for debugging)
+            if (sourceFileEl) {
+                sourceFileEl.textContent = srcFile ? ('in: ' + srcFile) : '(source file not available)';
+                sourceFileEl.style.display = '';
+            }
             searchInputEl.value = initialSearch || '';
             brokenBadgeEl.textContent = 'Scanning...';
             batchCheckboxEl.checked = false;
@@ -1512,7 +1519,7 @@
 
         function handleMessage(msg) {
             switch (msg.type) {
-                case 'fileSearchShow': console.log('[FileSearchModal] Received fileSearchShow'); show(msg.originalPath, msg.initialSearch); break;
+                case 'fileSearchShow': console.log('[FileSearchModal] Received fileSearchShow'); show(msg.originalPath, msg.initialSearch, msg.sourceFile); break;
                 case 'fileSearchSearching':
                     console.log('[FileSearchModal] Received fileSearchSearching');
                     results = []; selectedIndex = -1; isSearching = true; currentSearchTerm = '';

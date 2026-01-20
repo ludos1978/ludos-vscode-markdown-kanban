@@ -383,7 +383,17 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Search for a file by name using VS Code's Quick Open
+     * Search for a file by name and show file search dialog
+     *
+     * Triggered from imagePathManager.js when user:
+     * - Clicks "Search for File" in a path menu (image, video, link path menus)
+     * - Clicks an image-not-found placeholder
+     * - Clicks search button on include file errors
+     *
+     * Flow: User action → searchForFile message → shows file search dialog directly.
+     *
+     * Different from FileCommands.handleOpenFileLink which tries to open the file first
+     * and only shows search dialog if the file doesn't exist.
      */
     private async handleSearchForFile(
         message: SearchForFileMessage,
@@ -423,7 +433,12 @@ export class PathCommands extends SwitchBasedCommand {
             }));
             fileSearchService.setTrackedFiles(trackedFiles);
 
-            const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
+            // Determine source file: main file path (TODO: support includeContext for include files)
+            const sourceFile = mainFile.getPath();
+
+            const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath, {
+                sourceFile
+            });
             logger.debug('[PathCommands.handleSearchForFile] File search dialog returned', {
                 hasResult: !!result,
                 batchReplace: result?.batchReplace,

@@ -1,3 +1,5 @@
+- [ ] where is FileCommands.handleOpenFileLink used? can it be removed if it's unused?
+
 - [x] it sometimes happens that the "drop-indicator active" is not removed properly! check the codepaths that it's allways cleaned up!
 
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 

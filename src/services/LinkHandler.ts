@@ -36,10 +36,19 @@ export class LinkHandler {
         this._fileSearchService = new FileSearchService();
         this._fileSearchService.setWebview(this._fileManager.getWebview());
     }
+
+    /**
+     * Set tracked files for the file search service (main + includes)
+     * Must be called before handleFileLink for proper source file display
+     */
+    public setTrackedFiles(files: { path: string; relativePath: string; content: string }[]): void {
+        this._fileSearchService.setTrackedFiles(files);
+    }
+
     /**
      * Enhanced file link handler with workspace-relative path support
      */
-    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
+    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution, mainFilePath?: string) {
         try {
             if (href.startsWith('file://')) {
                 href = vscode.Uri.parse(href).fsPath;
@@ -60,10 +69,23 @@ export class LinkHandler {
 
             if (!exists) {
                 // Unified behavior: Open an incremental QuickPick and stream results.
-                const baseDir = this._fileManager.getDocument()
-                    ? path.dirname(this._fileManager.getDocument()!.uri.fsPath)
-                    : undefined;
-                const result = await this._fileSearchService.pickReplacementForBrokenLink(href, baseDir);
+                const resolvedMainFilePath = mainFilePath || this._fileManager.getFilePath();
+                const baseDir = resolvedMainFilePath ? path.dirname(resolvedMainFilePath) : undefined;
+                // Show source file: include file path if from include, otherwise main file path
+                // Note: task.includeContext uses 'includeFilePath', MessageTypes uses 'filePath'
+                const sourceFile = includeContext?.includeFilePath || includeContext?.filePath || resolvedMainFilePath;
+                console.log('[LinkHandler.handleFileLink] File not found - showing search', {
+                    href,
+                    mainFilePath,
+                    resolvedMainFilePath,
+                    includeContextIncludeFilePath: includeContext?.includeFilePath,
+                    includeContextFilePath: includeContext?.filePath,
+                    sourceFile,
+                    baseDir
+                });
+                const result = await this._fileSearchService.pickReplacementForBrokenLink(href, baseDir, {
+                    sourceFile
+                });
                 if (result) {
                     await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex);
                     return;

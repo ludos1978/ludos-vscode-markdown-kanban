@@ -45,6 +45,7 @@ export interface IncludeContextForResolution {
     columnId?: string;
     taskId?: string;
     filePath?: string;
+    includeFilePath?: string;  // Used by task.includeContext from IncludeLoadingProcessor
 }
 
 export class FileManager {

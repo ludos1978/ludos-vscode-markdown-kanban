@@ -32,12 +32,12 @@ export class FileSearchService {
      * Returns selection with optional batch replace flag.
      * @param originalPath - The original broken path
      * @param baseDir - Base directory for relative path resolution
-     * @param options - Optional settings (showOpenMediaFolder: show media folder button)
+     * @param options - Optional settings (showOpenMediaFolder: show media folder button, sourceFile: file containing the broken link)
      */
     async pickReplacementForBrokenLink(
         originalPath: string,
         baseDir?: string,
-        options?: { showOpenMediaFolder?: boolean }
+        options?: { showOpenMediaFolder?: boolean; sourceFile?: string }
     ): Promise<FileSearchResult | undefined> {
         if (!this._webview) {
             throw new Error('Webview not set. Call setWebview() first.');

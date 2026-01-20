@@ -105,12 +105,12 @@ export class FileSearchWebview {
      * Open the file search modal in the kanban webview
      * @param originalPath - The original broken path to search for
      * @param baseDir - Base directory for relative path resolution
-     * @param options - Optional settings (showOpenMediaFolder: show media folder button)
+     * @param options - Optional settings (showOpenMediaFolder: show media folder button, sourceFile: file containing the broken link)
      */
     async pickReplacementForBrokenLink(
         originalPath: string,
         baseDir?: string,
-        options?: { showOpenMediaFolder?: boolean }
+        options?: { showOpenMediaFolder?: boolean; sourceFile?: string }
     ): Promise<FileSearchResult | undefined> {
         if (!this._webview) {
             console.error('[FileSearchWebview] pickReplacementForBrokenLink: webview not set');
@@ -135,11 +135,17 @@ export class FileSearchWebview {
 
             // Send message to show the modal
             // Frontend will trigger initial search via fileSearchQuery message
+            console.log('[FileSearchWebview] Posting fileSearchShow message', {
+                originalPath: decodedPath,
+                initialSearch: fileName,
+                sourceFile: options?.sourceFile
+            });
             this._webview?.postMessage({
                 type: 'fileSearchShow',
                 originalPath: decodedPath,
                 initialSearch: fileName,
-                showOpenMediaFolder: options?.showOpenMediaFolder ?? false
+                showOpenMediaFolder: options?.showOpenMediaFolder ?? false,
+                sourceFile: options?.sourceFile
             });
         });
     }
