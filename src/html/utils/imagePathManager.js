@@ -496,102 +496,272 @@ function isExternalUrl(path) {
     return /^(https?:|data:|blob:)/i.test(path);
 }
 
+// ============================================================================
+// SHARED HELPERS FOR BROKEN FILE HANDLING
+// ============================================================================
+
 /**
- * Handle image not found - replace broken image with a placeholder that has a burger menu
- * Called from image onerror handlers
- * Uses data attributes instead of inline onclick to safely handle paths with special characters
+ * Media type configurations for unified broken file handling
  */
-function handleImageNotFound(imgElement, originalSrc) {
-    if (!imgElement || !imgElement.parentElement) {
-        console.warn('[handleImageNotFound] No imgElement or parent');
-        return;
+const MEDIA_TYPE_CONFIG = {
+    image: {
+        emoji: '📷',
+        containerClass: 'image-path-overlay-container',
+        notFoundClass: 'image-not-found',
+        notFoundContainerClass: 'image-not-found-container',
+        notFoundTextClass: 'image-not-found-text',
+        notFoundMenuClass: 'image-not-found-menu',
+        brokenClass: 'image-broken',
+        menuBtnClass: 'image-menu-btn',
+        menuItemClass: 'image-path-menu-item',
+        pathDataAttr: 'imagePath',
+        mediaLabel: 'image'
+    },
+    video: {
+        emoji: '🎬',
+        containerClass: 'video-path-overlay-container',
+        notFoundClass: 'video-not-found',
+        notFoundContainerClass: 'video-not-found-container',
+        notFoundTextClass: 'video-not-found-text',
+        notFoundMenuClass: 'video-not-found-menu',
+        brokenClass: 'video-broken',
+        menuBtnClass: 'video-menu-btn',
+        menuItemClass: 'video-path-menu-item',
+        pathDataAttr: 'videoPath',
+        mediaLabel: 'video'
+    },
+    link: {
+        containerClass: 'link-path-overlay-container',
+        brokenClass: 'link-broken',
+        pathDataAttr: 'linkPath',
+        mediaLabel: 'link'
     }
+};
 
-    // Skip external URLs - they fail to load due to webview security, not because they're broken
-    // Show a different indicator for external URLs that can't be loaded
-    if (isExternalUrl(originalSrc)) {
-        // Mark as handled but don't show broken state
-        imgElement.dataset.handled = 'true';
-        // Replace with a placeholder showing it's an external URL
-        const placeholder = document.createElement('span');
-        placeholder.className = 'external-url-blocked';
-        placeholder.dataset.externalUrl = originalSrc;
-        placeholder.title = `External image (Alt+click to open in browser)\n${originalSrc}`;
-        placeholder.innerHTML = `<span class="external-url-text">🔗 External image (Alt+click to open)</span>`;
-        placeholder.style.cursor = 'pointer';
-        placeholder.onclick = (e) => {
-            if (e.altKey) {
-                e.stopPropagation();
-                e.preventDefault();
-                window.open(originalSrc, '_blank');
-            }
-            // Without Alt, let the event bubble normally (e.g., for task editing)
-        };
-        imgElement.parentElement.insertBefore(placeholder, imgElement);
-        imgElement.style.display = 'none';
-        return;
-    }
-
-    // Check if already handled (prevent double processing)
-    if (imgElement.dataset.handled === 'true') {
-        return;
-    }
-    imgElement.dataset.handled = 'true';
-
-    // Check if the image is inside an existing image-path-overlay-container
-    // If so, we need to upgrade the existing container, not create a nested one
-    const existingOverlay = imgElement.closest('.image-path-overlay-container');
-    if (existingOverlay) {
-        // Create a simple placeholder span for the image
-        const placeholder = document.createElement('span');
-        placeholder.className = 'image-not-found';
-        placeholder.dataset.originalSrc = originalSrc;
-        placeholder.title = `Image not found: ${originalSrc}`;
-        const shortPath = getShortDisplayPath(originalSrc);
-        placeholder.innerHTML = `<span class="image-not-found-text">📷 ${shortPath}</span>`;
-
-        // Insert placeholder before the image and hide the image
-        imgElement.parentElement.insertBefore(placeholder, imgElement);
-        imgElement.style.display = 'none';
-
-        // Upgrade the existing overlay container
-        upgradeImageOverlayToBroken(existingOverlay, placeholder, originalSrc);
-        return;
-    }
-
-    // Standalone image - create full container with menu
-    const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const shortPath = getShortDisplayPath(originalSrc);
-    const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
-
-    // Create container with burger menu
-    const container = document.createElement('div');
-    container.className = 'image-not-found-container';
-    container.dataset.imagePath = originalSrc;
-
-    container.innerHTML = `
-        <span class="image-not-found" data-original-src="${htmlEscapedPath}" title="Image not found: ${htmlEscapedPath}">
-            <span class="image-not-found-text">📷 ${htmlEscapedShortPath}</span>
-            <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
-        </span>
-        <div class="image-not-found-menu" data-is-absolute="${isAbsolutePath}">
-            <button class="image-path-menu-item disabled" disabled>📄 Open</button>
-            <button class="image-path-menu-item" data-action="reveal">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item" data-action="search">🔎 Search for File</button>
-            <button class="image-path-menu-item" data-action="browse">📂 Browse for File</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
-            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
-            <div class="image-path-menu-divider"></div>
-            <button class="image-path-menu-item" data-action="delete">🗑️ Delete</button>
-        </div>
-    `;
-
-    imgElement.parentElement.insertBefore(container, imgElement);
-    imgElement.style.display = 'none';
+/**
+ * Escape HTML special characters for safe insertion
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtmlForBroken(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/**
+ * Create an external URL placeholder element
+ * @param {string} originalSrc - The external URL
+ * @param {string} mediaType - 'image' or 'video'
+ * @returns {HTMLElement} The placeholder element
+ */
+function createExternalUrlPlaceholder(originalSrc, mediaType) {
+    const placeholder = document.createElement('span');
+    placeholder.className = 'external-url-blocked';
+    placeholder.dataset.externalUrl = originalSrc;
+    placeholder.title = `External ${mediaType} (Alt+click to open in browser)\n${originalSrc}`;
+    placeholder.innerHTML = `<span class="external-url-text">🔗 External ${mediaType} (Alt+click to open)</span>`;
+    placeholder.style.cursor = 'pointer';
+    placeholder.onclick = (e) => {
+        if (e.altKey) {
+            e.stopPropagation();
+            e.preventDefault();
+            window.open(originalSrc, '_blank');
+        }
+    };
+    return placeholder;
+}
+
+/**
+ * Create a broken path matcher function from a list of broken paths
+ * @param {string[]} brokenPaths - Array of paths that are broken
+ * @returns {function(string): boolean} Function to check if a path is broken
+ */
+function createBrokenPathMatcher(brokenPaths) {
+    const normalizedBrokenPaths = new Set();
+    brokenPaths.forEach(p => {
+        normalizedBrokenPaths.add(normalizeBrokenPath(p));
+    });
+
+    return function isPathBroken(path) {
+        const normalized = normalizeBrokenPath(path);
+        if (normalizedBrokenPaths.has(normalized)) {
+            return true;
+        }
+        for (const brokenPath of normalizedBrokenPaths) {
+            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    };
+}
+
+/**
+ * Generate the not-found menu HTML for broken media
+ * @param {string} htmlEscapedPath - HTML-escaped path
+ * @param {boolean} isAbsolutePath - Whether path is absolute
+ * @param {object} config - Media type config
+ * @returns {string} Menu HTML
+ */
+function generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config) {
+    return `
+        <div class="${config.notFoundMenuClass}" data-is-absolute="${isAbsolutePath}">
+            <button class="${config.menuItemClass} disabled" disabled>📄 Open</button>
+            <button class="${config.menuItemClass}" data-action="reveal">🔍 Reveal in File Explorer</button>
+            <button class="${config.menuItemClass}" data-action="search">🔎 Search for File</button>
+            <button class="${config.menuItemClass}" data-action="browse">📂 Browse for File</button>
+            <div class="${config.menuItemClass.replace('-item', '-divider')}"></div>
+            <button class="${config.menuItemClass}${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
+            <button class="${config.menuItemClass}${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
+            <div class="${config.menuItemClass.replace('-item', '-divider')}"></div>
+            <button class="${config.menuItemClass}" data-action="delete">🗑️ Delete</button>
+        </div>
+    `;
+}
+
+/**
+ * Unified handler for media not found (image/video)
+ * @param {HTMLElement} element - The media element that failed to load
+ * @param {string} originalSrc - The original source path
+ * @param {'image'|'video'} mediaType - The type of media
+ */
+function handleMediaNotFound(element, originalSrc, mediaType) {
+    const config = MEDIA_TYPE_CONFIG[mediaType];
+    if (!config) {
+        console.warn(`[handleMediaNotFound] Unknown media type: ${mediaType}`);
+        return;
+    }
+
+    if (!element || !element.parentElement) {
+        console.warn(`[handleMediaNotFound] No element or parent for ${mediaType}`);
+        return;
+    }
+
+    // Skip external URLs - they fail to load due to webview security
+    if (isExternalUrl(originalSrc)) {
+        element.dataset.handled = 'true';
+        const placeholder = createExternalUrlPlaceholder(originalSrc, config.mediaLabel);
+        element.parentElement.insertBefore(placeholder, element);
+        element.style.display = 'none';
+        return;
+    }
+
+    // Check if already handled
+    if (element.dataset.handled === 'true') {
+        return;
+    }
+    element.dataset.handled = 'true';
+
+    // Check if inside an existing overlay container
+    const existingOverlay = element.closest(`.${config.containerClass}`);
+    if (existingOverlay) {
+        existingOverlay.classList.add(config.brokenClass);
+
+        const shortPath = getShortDisplayPath(originalSrc);
+        const placeholder = document.createElement('span');
+        placeholder.className = config.notFoundClass;
+        placeholder.dataset.originalSrc = originalSrc;
+        placeholder.title = `${config.mediaLabel.charAt(0).toUpperCase() + config.mediaLabel.slice(1)} not found: ${originalSrc}`;
+        placeholder.innerHTML = `<span class="${config.notFoundTextClass}">${config.emoji} ${escapeHtmlForBroken(shortPath)}</span>`;
+
+        element.parentElement.insertBefore(placeholder, element);
+        element.style.display = 'none';
+
+        // For images, also upgrade the overlay menu
+        if (mediaType === 'image') {
+            upgradeImageOverlayToBroken(existingOverlay, placeholder, originalSrc);
+        }
+        return;
+    }
+
+    // Standalone media - create full container with menu
+    const htmlEscapedPath = escapeHtmlForBroken(originalSrc);
+    const shortPath = getShortDisplayPath(originalSrc);
+    const htmlEscapedShortPath = escapeHtmlForBroken(shortPath);
+    const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
+
+    const container = document.createElement('div');
+    container.className = `${config.notFoundContainerClass}${mediaType === 'video' ? ' ' + config.brokenClass : ''}`;
+    container.dataset[config.pathDataAttr] = originalSrc;
+
+    container.innerHTML = `
+        <span class="${config.notFoundClass}" data-original-src="${htmlEscapedPath}" title="${config.mediaLabel.charAt(0).toUpperCase() + config.mediaLabel.slice(1)} not found: ${htmlEscapedPath}">
+            <span class="${config.notFoundTextClass}">${config.emoji} ${htmlEscapedShortPath}</span>
+            <button class="${config.menuBtnClass}" data-action="toggle-menu" title="Path options">☰</button>
+        </span>
+        ${generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config)}
+    `;
+
+    element.parentElement.insertBefore(container, element);
+    element.style.display = 'none';
+}
+
+/**
+ * Unified function to mark elements as broken based on path list
+ * @param {string[]} brokenPaths - Array of broken paths
+ * @param {'image'|'video'|'link'} mediaType - Type of media to mark
+ * @param {function} [notFoundHandler] - Optional handler for standalone elements
+ */
+function markBrokenElements(brokenPaths, mediaType, notFoundHandler) {
+    if (!brokenPaths || brokenPaths.length === 0) return;
+
+    const config = MEDIA_TYPE_CONFIG[mediaType];
+    if (!config) return;
+
+    const isPathBroken = createBrokenPathMatcher(brokenPaths);
+
+    // Find all containers and mark broken ones
+    const containers = document.querySelectorAll(`.${config.containerClass}`);
+    containers.forEach(container => {
+        let path = container.dataset[config.pathDataAttr];
+
+        // Try to get path from child element if not on container
+        if (!path) {
+            const childSelector = mediaType === 'image' ? 'img' : mediaType === 'video' ? 'video' : 'a';
+            const child = container.querySelector(childSelector);
+            path = child?.dataset?.originalSrc || child?.getAttribute('src') || child?.getAttribute('href');
+        }
+        if (!path) return;
+
+        if (isPathBroken(path)) {
+            container.classList.add(config.brokenClass);
+        } else {
+            container.classList.remove(config.brokenClass);
+        }
+    });
+
+    // Handle standalone elements if handler provided
+    if (notFoundHandler && (mediaType === 'image' || mediaType === 'video')) {
+        const tagName = mediaType === 'image' ? 'img' : 'video';
+        const selector = `${tagName}[data-original-src]:not(.${config.containerClass} ${tagName}), ${tagName}:not(.${config.containerClass} ${tagName})`;
+        const standaloneElements = document.querySelectorAll(selector);
+
+        standaloneElements.forEach(el => {
+            const path = el.dataset?.originalSrc || el.getAttribute('src');
+            if (path && isPathBroken(path)) {
+                notFoundHandler(el, path);
+            }
+        });
+    }
+}
+
+/**
+ * Unified function to clear broken markers
+ * @param {'image'|'video'|'link'|'all'} mediaType - Type to clear, or 'all' for all types
+ */
+function clearBrokenMarkers(mediaType) {
+    const types = mediaType === 'all' ? ['image', 'video', 'link'] : [mediaType];
+
+    types.forEach(type => {
+        const config = MEDIA_TYPE_CONFIG[type];
+        if (config) {
+            document.querySelectorAll(`.${config.containerClass}.${config.brokenClass}`).forEach(container => {
+                container.classList.remove(config.brokenClass);
+            });
+        }
+    });
+}
+
+// ============================================================================
 /**
  * Upgrade a simple image-not-found placeholder to a full container with menu
  * Simple placeholders are created by the onerror fallback when handleImageNotFound isn't available
@@ -742,101 +912,6 @@ function upgradeAllSimpleImageNotFoundPlaceholders() {
 
 }
 
-// ============================================================================
-// BROKEN VIDEO HANDLING
-// ============================================================================
-
-/**
- * Handle video not found - replace broken video with a placeholder that has a burger menu
- * Called from video onerror handlers
- */
-function handleVideoNotFound(videoElement, originalSrc) {
-    if (!videoElement || !videoElement.parentElement) {
-        console.warn('[handleVideoNotFound] No videoElement or parent');
-        return;
-    }
-
-    // Skip external URLs - they fail to load due to webview security, not because they're broken
-    if (isExternalUrl(originalSrc)) {
-        videoElement.dataset.handled = 'true';
-        const placeholder = document.createElement('span');
-        placeholder.className = 'external-url-blocked';
-        placeholder.dataset.externalUrl = originalSrc;
-        placeholder.title = `External video (Alt+click to open in browser)\n${originalSrc}`;
-        placeholder.innerHTML = `<span class="external-url-text">🔗 External video (Alt+click to open)</span>`;
-        placeholder.style.cursor = 'pointer';
-        placeholder.onclick = (e) => {
-            if (e.altKey) {
-                e.stopPropagation();
-                e.preventDefault();
-                window.open(originalSrc, '_blank');
-            }
-            // Without Alt, let the event bubble normally (e.g., for task editing)
-        };
-        videoElement.parentElement.insertBefore(placeholder, videoElement);
-        videoElement.style.display = 'none';
-        return;
-    }
-
-    // Check if already handled (prevent double processing)
-    if (videoElement.dataset.handled === 'true') {
-        return;
-    }
-    videoElement.dataset.handled = 'true';
-
-    // Check if the video is inside an existing video-path-overlay-container
-    const existingOverlay = videoElement.closest('.video-path-overlay-container');
-    if (existingOverlay) {
-        // Mark container as broken so menu is always visible
-        existingOverlay.classList.add('video-broken');
-
-        // Create a placeholder span for the video
-        const shortPath = getShortDisplayPath(originalSrc);
-        const placeholder = document.createElement('span');
-        placeholder.className = 'video-not-found';
-        placeholder.dataset.originalSrc = originalSrc;
-        placeholder.title = `Video not found: ${originalSrc}`;
-        placeholder.innerHTML = `<span class="video-not-found-text">🎬 ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
-
-        // Insert placeholder before the video and hide the video
-        videoElement.parentElement.insertBefore(placeholder, videoElement);
-        videoElement.style.display = 'none';
-        return;
-    }
-
-    // Standalone video - create full container with menu
-    const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const shortPath = getShortDisplayPath(originalSrc);
-    const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
-
-    // Create container with burger menu
-    const container = document.createElement('div');
-    container.className = 'video-not-found-container video-broken';
-    container.dataset.videoPath = originalSrc;
-
-    container.innerHTML = `
-        <span class="video-not-found" data-original-src="${htmlEscapedPath}" title="Video not found: ${htmlEscapedPath}">
-            <span class="video-not-found-text">🎬 ${htmlEscapedShortPath}</span>
-            <button class="video-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
-        </span>
-        <div class="video-not-found-menu" data-is-absolute="${isAbsolutePath}">
-            <button class="video-path-menu-item disabled" disabled>📄 Open</button>
-            <button class="video-path-menu-item" data-action="reveal">🔍 Reveal in File Explorer</button>
-            <button class="video-path-menu-item" data-action="search">🔎 Search for File</button>
-            <button class="video-path-menu-item" data-action="browse">📂 Browse for File</button>
-            <div class="video-path-menu-divider"></div>
-            <button class="video-path-menu-item${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
-            <button class="video-path-menu-item${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
-            <div class="video-path-menu-divider"></div>
-            <button class="video-path-menu-item" data-action="delete">🗑️ Delete</button>
-        </div>
-    `;
-
-    videoElement.parentElement.insertBefore(container, videoElement);
-    videoElement.style.display = 'none';
-}
-
 /**
  * Toggle the video-not-found menu visibility
  */
@@ -859,65 +934,6 @@ function toggleVideoNotFoundMenu(container) {
             setTimeout(() => document.addEventListener('click', closeHandler), 0);
         }
     }
-}
-
-// ============================================================================
-// BROKEN LINK HANDLING
-// ============================================================================
-
-/**
- * Mark links as broken based on a list of paths
- * Called after board render to highlight broken local file links
- * @param {string[]} brokenPaths - Array of paths that are broken/not found
- */
-function markBrokenLinks(brokenPaths) {
-    if (!brokenPaths || brokenPaths.length === 0) return;
-
-    // Normalize paths for comparison
-    const normalizedBrokenPaths = new Set();
-    brokenPaths.forEach(p => {
-        normalizedBrokenPaths.add(normalizeBrokenPath(p));
-    });
-
-    // Check if a path matches any broken path
-    const isPathBroken = (linkPath) => {
-        const normalized = normalizeBrokenPath(linkPath);
-        // First try exact match
-        if (normalizedBrokenPaths.has(normalized)) {
-            return true;
-        }
-        // Also check if the path ends with any broken path (handles relative vs absolute)
-        for (const brokenPath of normalizedBrokenPaths) {
-            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Find all link containers and check if their path is in the broken list
-    const linkContainers = document.querySelectorAll('.link-path-overlay-container');
-    linkContainers.forEach(container => {
-        const linkPath = container.dataset.linkPath;
-        if (!linkPath) return;
-
-        // Check if this link is broken
-        if (isPathBroken(linkPath)) {
-            container.classList.add('link-broken');
-        } else {
-            container.classList.remove('link-broken');
-        }
-    });
-}
-
-/**
- * Clear all broken link markers
- * Call before re-marking to ensure accurate state
- */
-function clearBrokenLinkMarkers() {
-    document.querySelectorAll('.link-path-overlay-container.link-broken').forEach(container => {
-        container.classList.remove('link-broken');
-    });
 }
 
 /**
@@ -958,148 +974,6 @@ function extractFilename(p) {
     const normalized = p.replace(/\\/g, '/');
     const lastSlash = normalized.lastIndexOf('/');
     return lastSlash >= 0 ? normalized.substring(lastSlash + 1).toLowerCase() : normalized.toLowerCase();
-}
-
-/**
- * Mark images as broken based on backend file existence scan
- * Pre-marks images that don't exist on disk before they try to load
- * @param {string[]} brokenPaths - Array of paths that don't exist
- */
-function markBrokenImages(brokenPaths) {
-    if (!brokenPaths || brokenPaths.length === 0) return;
-
-    // Normalize paths for comparison - store both full path and filename
-    const normalizedBrokenPaths = new Set();
-    const brokenFilenames = new Set();
-    brokenPaths.forEach(p => {
-        const normalized = normalizeBrokenPath(p);
-        normalizedBrokenPaths.add(normalized);
-        brokenFilenames.add(extractFilename(p));
-    });
-
-    // Check if a path matches any broken path
-    const isPathBroken = (imagePath) => {
-        const normalized = normalizeBrokenPath(imagePath);
-        // First try exact match
-        if (normalizedBrokenPaths.has(normalized)) {
-            return true;
-        }
-        // Also check if the path ends with any broken path (handles relative vs absolute)
-        for (const brokenPath of normalizedBrokenPaths) {
-            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Find all image containers and check if their path is in the broken list
-    const imageContainers = document.querySelectorAll('.image-path-overlay-container');
-    imageContainers.forEach(container => {
-        // Get path from container's data-image-path or from img's data-original-src
-        let imagePath = container.dataset.imagePath;
-        if (!imagePath) {
-            const img = container.querySelector('img');
-            imagePath = img?.dataset?.originalSrc || img?.getAttribute('src');
-        }
-        if (!imagePath) return;
-
-        // Check if this image is broken
-        if (isPathBroken(imagePath)) {
-            container.classList.add('image-broken');
-        }
-    });
-
-    // Also check standalone images not in overlay containers
-    const standaloneImages = document.querySelectorAll('img[data-original-src]:not(.image-path-overlay-container img)');
-    standaloneImages.forEach(img => {
-        const imagePath = img.dataset.originalSrc || img.getAttribute('src');
-        if (!imagePath) return;
-
-        if (isPathBroken(imagePath)) {
-            // Trigger the not-found handler to convert to broken state
-            if (typeof handleImageNotFound === 'function') {
-                handleImageNotFound(img, imagePath);
-            }
-        }
-    });
-}
-
-/**
- * Mark media elements (video/audio) as broken based on backend file existence scan
- * @param {string[]} brokenPaths - Array of paths that don't exist
- */
-function markBrokenMedia(brokenPaths) {
-    if (!brokenPaths || brokenPaths.length === 0) return;
-
-    // Normalize paths for comparison
-    const normalizedBrokenPaths = new Set();
-    brokenPaths.forEach(p => {
-        normalizedBrokenPaths.add(normalizeBrokenPath(p));
-    });
-
-    // Check if a path matches any broken path
-    const isPathBroken = (mediaPath) => {
-        const normalized = normalizeBrokenPath(mediaPath);
-        // First try exact match
-        if (normalizedBrokenPaths.has(normalized)) {
-            return true;
-        }
-        // Also check if the path ends with any broken path (handles relative vs absolute)
-        for (const brokenPath of normalizedBrokenPaths) {
-            if (normalized.endsWith(brokenPath) || brokenPath.endsWith(normalized)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Find all video containers
-    const videoContainers = document.querySelectorAll('.video-path-overlay-container');
-    videoContainers.forEach(container => {
-        let videoPath = container.dataset.videoPath;
-        if (!videoPath) {
-            const video = container.querySelector('video');
-            videoPath = video?.getAttribute('src');
-        }
-        if (!videoPath) return;
-
-        if (isPathBroken(videoPath)) {
-            container.classList.add('video-broken');
-        }
-    });
-
-    // Check standalone videos
-    const standaloneVideos = document.querySelectorAll('video:not(.video-path-overlay-container video)');
-    standaloneVideos.forEach(video => {
-        const videoPath = video.getAttribute('src');
-        if (!videoPath) return;
-
-        if (isPathBroken(videoPath)) {
-            // Trigger the not-found handler
-            if (typeof handleVideoNotFound === 'function') {
-                handleVideoNotFound(video, videoPath);
-            }
-        }
-    });
-}
-
-/**
- * Clear all broken image markers (for re-scanning)
- */
-function clearBrokenImageMarkers() {
-    document.querySelectorAll('.image-path-overlay-container.image-broken').forEach(container => {
-        container.classList.remove('image-broken');
-    });
-}
-
-/**
- * Clear all broken media markers (for re-scanning)
- */
-function clearBrokenMediaMarkers() {
-    document.querySelectorAll('.video-path-overlay-container.video-broken').forEach(container => {
-        container.classList.remove('video-broken');
-    });
 }
 
 // ============================================================================
@@ -1329,25 +1203,19 @@ window.toggleLinkPathMenu = toggleLinkPathMenu;
 window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
 window.toggleVideoNotFoundMenu = toggleVideoNotFoundMenu;
 
-// Broken image handling
-window.handleImageNotFound = handleImageNotFound;
+// Unified broken media handling
+window.handleMediaNotFound = handleMediaNotFound;
+window.markBrokenElements = markBrokenElements;
+window.clearBrokenMarkers = clearBrokenMarkers;
+window.createBrokenPathMatcher = createBrokenPathMatcher;
 
-// Broken video handling
-window.handleVideoNotFound = handleVideoNotFound;
+// Image placeholder upgrade functions
 window.upgradeSimpleImageNotFoundPlaceholder = upgradeSimpleImageNotFoundPlaceholder;
 window.upgradeImageOverlayToBroken = upgradeImageOverlayToBroken;
 window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFoundPlaceholders;
 
 // DOM updates
 window.updatePathInDOM = updatePathInDOM;
-
-// Broken element handling
-window.markBrokenLinks = markBrokenLinks;
-window.clearBrokenLinkMarkers = clearBrokenLinkMarkers;
-window.markBrokenImages = markBrokenImages;
-window.clearBrokenImageMarkers = clearBrokenImageMarkers;
-window.markBrokenMedia = markBrokenMedia;
-window.clearBrokenMediaMarkers = clearBrokenMediaMarkers;
 
 // ============================================================================
 // DIAGRAM MENUS (Mermaid, PlantUML)

@@ -106,7 +106,7 @@
 
     return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}" style="display: inline-block;">
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
-           onerror="handleImageNotFound(this, '${escapedPath}')"
+           onerror="handleMediaNotFound(this, '${escapedPath}', 'image')"
            style="max-width: 100%; height: auto;">
       <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
     </span>`;
@@ -125,7 +125,7 @@
 
     return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}" style="display: inline-block;">
       <video src="${escapeHtml(filePath)}" controls
-             onerror="handleVideoNotFound(this, '${escapedPath}')"
+             onerror="handleMediaNotFound(this, '${escapedPath}', 'video')"
              style="max-width: 100%; height: auto;">
         Your browser does not support the video tag.
       </video>
@@ -582,14 +582,17 @@
         // Re-apply broken element markers after re-render
         // The markers were lost when innerHTML was replaced
         requestAnimationFrame(() => {
-          if (window._cachedBrokenLinkPaths && window._cachedBrokenLinkPaths.length > 0 && typeof window.markBrokenLinks === 'function') {
-            window.markBrokenLinks(window._cachedBrokenLinkPaths);
-          }
-          if (window._cachedBrokenImagePaths && window._cachedBrokenImagePaths.length > 0 && typeof window.markBrokenImages === 'function') {
-            window.markBrokenImages(window._cachedBrokenImagePaths);
-          }
-          if (window._cachedBrokenMediaPaths && window._cachedBrokenMediaPaths.length > 0 && typeof window.markBrokenMedia === 'function') {
-            window.markBrokenMedia(window._cachedBrokenMediaPaths);
+          if (typeof window.markBrokenElements === 'function' && window._cachedBrokenElements) {
+            const broken = window._cachedBrokenElements;
+            if (broken.link?.length > 0) {
+              window.markBrokenElements(broken.link, 'link');
+            }
+            if (broken.image?.length > 0) {
+              window.markBrokenElements(broken.image, 'image', window.handleMediaNotFound);
+            }
+            if (broken.video?.length > 0) {
+              window.markBrokenElements(broken.video, 'video', window.handleMediaNotFound);
+            }
           }
         });
       } else {

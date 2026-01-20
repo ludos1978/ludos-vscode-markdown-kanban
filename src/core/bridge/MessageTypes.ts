@@ -36,6 +36,15 @@ export interface ResponseMessage extends BaseMessage {
     requestId: string;
 }
 
+/**
+ * Broken element paths by type (for visual indication in webview)
+ */
+export interface BrokenElementPaths {
+    link?: string[];
+    image?: string[];
+    video?: string[];
+}
+
 // ============= OUTGOING MESSAGES (Backend → Frontend) =============
 
 /**
@@ -82,10 +91,8 @@ export interface BoardUpdateMessage extends BaseMessage {
     overlayEditorFontScale?: number;
     imageMappings?: Record<string, string>;
     // Broken element paths for visual indication (pre-scanned by backend)
-    brokenLinkPaths?: string[];
-    brokenImagePaths?: string[];
-    brokenVideoPaths?: string[];
-    brokenMediaPaths?: string[];
+    // Unified structure: { link?: string[], image?: string[], video?: string[] }
+    brokenElements?: BrokenElementPaths;
     // Optional fields for full board loads
     isFullRefresh?: boolean;
     applyDefaultFolding?: boolean;

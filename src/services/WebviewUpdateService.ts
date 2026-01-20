@@ -156,27 +156,24 @@ export class WebviewUpdateService {
         const mainFilePath = mainFile?.getPath();
 
         // Find broken element paths for visual indication (only on full refresh to minimize performance impact)
-        let brokenLinkPaths: string[] | undefined;
-        let brokenImagePaths: string[] | undefined;
-        let brokenVideoPaths: string[] | undefined;
-        let brokenMediaPaths: string[] | undefined;
+        let brokenElements: import('../core/bridge/MessageTypes').BrokenElementPaths | undefined;
         if (options.isFullRefresh && mainFilePath) {
             try {
                 const basePath = path.dirname(mainFilePath);
                 const scanner = new BoardContentScanner(basePath);
-                const brokenElements = scanner.findBrokenElements(board);
-                // Filter by element type
-                brokenLinkPaths = brokenElements
-                    .filter(elem => elem.type === 'link')
-                    .map(elem => elem.path);
-                brokenImagePaths = brokenElements
-                    .filter(elem => elem.type === 'image' || elem.type === 'diagram')
-                    .map(elem => elem.path);
-                // Media type includes video and audio
-                brokenMediaPaths = brokenElements
-                    .filter(elem => elem.type === 'media')
-                    .map(elem => elem.path);
-                // Includes are handled via includeError flag, not path arrays
+                const scannedBroken = scanner.findBrokenElements(board);
+                // Group by element type (includes are handled via includeError flag)
+                const link = scannedBroken.filter(e => e.type === 'link').map(e => e.path);
+                const image = scannedBroken.filter(e => e.type === 'image' || e.type === 'diagram').map(e => e.path);
+                const video = scannedBroken.filter(e => e.type === 'media').map(e => e.path);
+                // Only include if there are broken elements
+                if (link.length > 0 || image.length > 0 || video.length > 0) {
+                    brokenElements = {
+                        ...(link.length > 0 && { link }),
+                        ...(image.length > 0 && { image }),
+                        ...(video.length > 0 && { video })
+                    };
+                }
             } catch (error) {
                 logger.warn('[WebviewUpdateService] Failed to scan for broken elements:', error);
             }
@@ -193,10 +190,8 @@ export class WebviewUpdateService {
             ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
             ...(options.version && { version: options.version }),
             ...(options.debugMode !== undefined && { debugMode: options.debugMode }),
-            // Include broken element paths if available
-            ...(brokenLinkPaths && brokenLinkPaths.length > 0 && { brokenLinkPaths }),
-            ...(brokenImagePaths && brokenImagePaths.length > 0 && { brokenImagePaths }),
-            ...(brokenMediaPaths && brokenMediaPaths.length > 0 && { brokenMediaPaths })
+            // Include broken element paths if available (unified structure)
+            ...(brokenElements && { brokenElements })
         } as BoardUpdateMessage;
 
         this._deps.webviewBridge.send(message);

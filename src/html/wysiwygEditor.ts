@@ -115,8 +115,7 @@ type MediaPathHelpers = {
     resolveRelativePath?: (baseDir: string, relativePath: string) => string;
     currentFilePath?: string;
     currentTaskIncludeContext?: { includeDir?: string };
-    handleImageNotFound?: (img: HTMLImageElement, originalSrc: string) => void;
-    handleVideoNotFound?: (video: HTMLVideoElement, originalSrc: string) => void;
+    handleMediaNotFound?: (element: HTMLElement, originalSrc: string, mediaType: 'image' | 'video') => void;
     queueDiagramRender?: (id: string, filePath: string, diagramType: string, includeDir?: string) => void;
     queuePDFPageRender?: (id: string, filePath: string, pageNumber: number, includeDir?: string) => void;
     queuePDFSlideshow?: (id: string, filePath: string, includeDir?: string) => void;
@@ -423,8 +422,8 @@ function createMediaView(
             if ((mediaType === 'video' || mediaType === 'audio') && src && !src.startsWith('data:') && !src.startsWith('blob:')) {
                 const api = window as unknown as MediaPathHelpers;
                 mediaEl.addEventListener('error', () => {
-                    if (typeof api.handleVideoNotFound === 'function') {
-                        api.handleVideoNotFound(mediaEl as HTMLVideoElement, src);
+                    if (typeof api.handleMediaNotFound === 'function') {
+                        api.handleMediaNotFound(mediaEl, src, 'video');
                     }
                 });
             }
@@ -569,8 +568,8 @@ function syncWysiwygImages(container: HTMLElement): void {
         if (!(img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler) {
             (img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler = true;
             img.onerror = () => {
-                if (typeof api.handleImageNotFound === 'function') {
-                    api.handleImageNotFound(img, originalSrc);
+                if (typeof api.handleMediaNotFound === 'function') {
+                    api.handleMediaNotFound(img, originalSrc, 'image');
                 }
             };
         }

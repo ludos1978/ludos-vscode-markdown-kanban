@@ -2640,36 +2640,23 @@ if (!webviewEventListenersInitialized) {
                     }
 
                     // Cache broken element paths for re-use after include content re-renders
-                    // These are stored globally so markdown-it-include-browser can re-apply markers
-                    if (message.brokenLinkPaths) {
-                        window._cachedBrokenLinkPaths = message.brokenLinkPaths;
-                    }
-                    if (message.brokenImagePaths) {
-                        window._cachedBrokenImagePaths = message.brokenImagePaths;
-                    }
-                    if (message.brokenMediaPaths) {
-                        window._cachedBrokenMediaPaths = message.brokenMediaPaths;
+                    // Unified structure: { link?: string[], image?: string[], video?: string[] }
+                    if (message.brokenElements) {
+                        window._cachedBrokenElements = message.brokenElements;
                     }
 
                     // Mark broken elements after render completes
-                    // Use requestAnimationFrame to ensure DOM is updated
                     requestAnimationFrame(() => {
-                        // Mark broken links
-                        if (window._cachedBrokenLinkPaths && window._cachedBrokenLinkPaths.length > 0) {
-                            if (typeof window.markBrokenLinks === 'function') {
-                                window.markBrokenLinks(window._cachedBrokenLinkPaths);
+                        if (typeof window.markBrokenElements === 'function' && window._cachedBrokenElements) {
+                            const broken = window._cachedBrokenElements;
+                            if (broken.link?.length > 0) {
+                                window.markBrokenElements(broken.link, 'link');
                             }
-                        }
-                        // Mark broken images (pre-scanned by backend)
-                        if (window._cachedBrokenImagePaths && window._cachedBrokenImagePaths.length > 0) {
-                            if (typeof window.markBrokenImages === 'function') {
-                                window.markBrokenImages(window._cachedBrokenImagePaths);
+                            if (broken.image?.length > 0) {
+                                window.markBrokenElements(broken.image, 'image', window.handleMediaNotFound);
                             }
-                        }
-                        // Mark broken media (video/audio)
-                        if (window._cachedBrokenMediaPaths && window._cachedBrokenMediaPaths.length > 0) {
-                            if (typeof window.markBrokenMedia === 'function') {
-                                window.markBrokenMedia(window._cachedBrokenMediaPaths);
+                            if (broken.video?.length > 0) {
+                                window.markBrokenElements(broken.video, 'video', window.handleMediaNotFound);
                             }
                         }
                     });

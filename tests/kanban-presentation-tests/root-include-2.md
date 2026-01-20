@@ -6,7 +6,7 @@ Modify this line a
 
 included-excalidraw
 
-![](./root-include-2-MEDIA/included-excalidraw.excalidraw)
+![](./a/root-include-2-MEDIA/included-excalidraw.excalidraw)
 
 ---
 

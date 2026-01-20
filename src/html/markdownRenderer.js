@@ -2355,12 +2355,12 @@ function renderMarkdown(text, includeContext) {
             // So we need to add onerror to both the video (for direct src) and source elements
             let videoWithError = videoHtml.replace(
                 /<video([^>]*)>/,
-                `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+                `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','video');}">`
             );
             // Also add error handler to <source> elements - this is where errors actually fire for <video><source></video>
             videoWithError = videoWithError.replace(
                 /<source([^>]*)>/g,
-                `<source$1 onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this.parentElement,'${escapedOriginalSrc}');}">`
+                `<source$1 onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this.parentElement,'${escapedOriginalSrc}','video');}">`
             );
 
             // Wrap with overlay container for path conversion menu (similar to images)
@@ -2398,12 +2398,12 @@ function renderMarkdown(text, includeContext) {
             // IMPORTANT: For <audio> with <source> children, error events fire on <source>, not <audio>!
             let audioWithError = audioHtml.replace(
                 /<audio([^>]*)>/,
-                `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+                `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','video');}">`
             );
             // Also add error handler to <source> elements
             audioWithError = audioWithError.replace(
                 /<source([^>]*)>/g,
-                `<source$1 onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this.parentElement,'${escapedOriginalSrc}');}">`
+                `<source$1 onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this.parentElement,'${escapedOriginalSrc}','video');}">`
             );
 
             // Wrap with overlay container for path conversion menu (same as video)
@@ -2574,7 +2574,7 @@ function renderMarkdown(text, includeContext) {
             if (!isDataUrl) {
                 const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
                 // Extract filename for display (inline since getShortDisplayPath may not be available in fallback)
-                onerrorHandler = ` onerror="if(typeof handleImageNotFound==='function'){handleImageNotFound(this,'${escapedOriginalSrc}');}else{var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';var fn=(typeof getShortDisplayPath==='function')?getShortDisplayPath('${escapedOriginalSrc}'):'${escapedOriginalSrc}'.split('/').pop()||'unknown';p.innerHTML='<span class=image-not-found-text>📷 '+fn+'</span>';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';}"`;
+                onerrorHandler = ` onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','image');}else{var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';var fn=(typeof getShortDisplayPath==='function')?getShortDisplayPath('${escapedOriginalSrc}'):'${escapedOriginalSrc}'.split('/').pop()||'unknown';p.innerHTML='<span class=image-not-found-text>📷 '+fn+'</span>';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';}"`;
             }
 
             // Build the img tag
