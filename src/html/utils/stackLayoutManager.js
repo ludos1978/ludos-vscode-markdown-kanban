@@ -709,7 +709,7 @@ function updateStackLayoutCore(stackElement = null) {
                     }
                 }
 
-                const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
+                const totalHeight = columnHeaderHeight + headerHeight + footerHeight + footerBarsHeight + contentHeight;
 
                 columnData.push({
                     col,
