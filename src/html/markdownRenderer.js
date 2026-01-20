@@ -1315,7 +1315,7 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
     // Create slideshow container with overlay wrapper for burger menu
     const wrapper = document.createElement('span');
     wrapper.className = 'image-path-overlay-container pdf-slideshow-wrapper';
-    wrapper.dataset.imagePath = filePath;
+    wrapper.dataset.filePath = filePath;
 
     const container = document.createElement('div');
     container.className = 'pdf-slideshow';  // Reuse PDF slideshow CSS
@@ -1417,7 +1417,7 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
             const escapedPath = filePath.replace(/"/g, '&quot;');
             const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${escapedPath}">
+            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${escapedPath}">
                 <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load EPUB page ${pageNumber}: ${filePath}">
                     <span class="image-not-found-text">📚 ${escapedShortPath} (page ${pageNumber})</span>
                     <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
@@ -1467,7 +1467,7 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
     // Create slideshow container with overlay wrapper for burger menu
     const wrapper = document.createElement('span');
     wrapper.className = 'image-path-overlay-container pdf-slideshow-wrapper';
-    wrapper.dataset.imagePath = filePath;
+    wrapper.dataset.filePath = filePath;
     // Add tooltip from title/description if provided
     if (title) {
         wrapper.title = title;
@@ -1583,7 +1583,7 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
             const escapedPath = filePath.replace(/"/g, '&quot;');
             const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${escapedPath}">
+            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${escapedPath}">
                 <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load PDF page ${pageNumber}: ${filePath}">
                     <span class="image-not-found-text">📄 ${escapedShortPath} (page ${pageNumber})</span>
                     <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
@@ -1713,6 +1713,10 @@ async function processDiagramQueue() {
             const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
             if (element.dataset && element.dataset.wysiwygHost === 'true') {
                 element.classList.remove('diagram-placeholder');
+                // Add image-path-overlay-container class and data-file-path for unified handling
+                element.classList.add('image-path-overlay-container');
+                element.dataset.filePath = decodedPath;
+
                 const img = document.createElement('img');
                 img.src = imageDataUrl;
                 img.alt = displayLabel;
@@ -1729,16 +1733,15 @@ async function processDiagramQueue() {
                 menuBtn.setAttribute('contenteditable', 'false');
                 menuBtn.onclick = (e) => {
                     e.stopPropagation();
-                    const host = element.closest('.image-path-overlay-container') || element;
-                    toggleImagePathMenu(host, escapedPath);
+                    toggleImagePathMenu(element, decodedPath);
                 };
 
                 element.innerHTML = '';
                 element.appendChild(img);
                 element.appendChild(menuBtn);
             } else {
-                // Use data-image-path for consistency with MEDIA_TYPE_CONFIG.image.pathDataAttr
-                element.innerHTML = `<span class="image-path-overlay-container" data-image-path="${decodedPath.replace(/"/g, '&quot;')}">
+                // Use data-file-path for unified path handling across all media types
+                element.innerHTML = `<span class="image-path-overlay-container" data-file-path="${decodedPath.replace(/"/g, '&quot;')}">
                     <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" />
                     <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
                 </span>`;
@@ -1783,7 +1786,7 @@ async function processDiagramQueue() {
             const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
             // Use unified .image-not-found structure for consistent error styling
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(decodedPath) : decodedPath.split('/').pop() || decodedPath;
-            element.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${decodedPath.replace(/"/g, '&quot;')}">
+            element.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${decodedPath.replace(/"/g, '&quot;')}">
                 <span class="image-not-found" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" title="Failed to load ${typeInfo.label}: ${decodedPath}">
                     <span class="image-not-found-text">${typeInfo.emoji} ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
                     <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
@@ -2386,8 +2389,8 @@ function renderMarkdown(text, includeContext) {
             );
 
             // Wrap with overlay container for path conversion menu (similar to images)
-            // Use data-video-path for consistency with MEDIA_TYPE_CONFIG.video.pathDataAttr
-            return `<div class="video-path-overlay-container" data-video-path="${escapeHtml(originalSrc)}">
+            // Use data-file-path for unified path handling across all media types
+            return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${videoWithError}
                 <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;
@@ -2430,8 +2433,8 @@ function renderMarkdown(text, includeContext) {
             );
 
             // Wrap with overlay container for path conversion menu (same as video)
-            // Use data-video-path for consistency with MEDIA_TYPE_CONFIG.video.pathDataAttr
-            return `<div class="video-path-overlay-container" data-video-path="${escapeHtml(originalSrc)}">
+            // Use data-file-path for unified path handling across all media types
+            return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${audioWithError}
                 <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;
@@ -2618,7 +2621,8 @@ function renderMarkdown(text, includeContext) {
 
             // Wrap with overlay container for path conversion menu
             // Menu is dynamically generated by toggleImagePathMenu to avoid stacking context issues
-            return `<span class="image-path-overlay-container">
+            // Use data-file-path for unified path handling across all media types
+            return `<span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${imgTag}
                 <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </span>`;
@@ -2660,7 +2664,7 @@ function renderMarkdown(text, includeContext) {
                 token._escapedPath = escapedPath;
                 console.log('[LINK-RENDER] Wrapping local file link with overlay container:', href);
                 // Wrap in overlay container for path menu
-                return `<span class="link-path-overlay-container" data-link-path="${escapeHtml(href)}"><a href="#" data-original-href="${escapeHtml(href)}"${titleAttr} class="markdown-link markdown-file-link">`;
+                return `<span class="link-path-overlay-container" data-file-path="${escapeHtml(href)}"><a href="#" data-original-href="${escapeHtml(href)}"${titleAttr} class="markdown-link markdown-file-link">`;
             }
 
             return `<a href="#" data-original-href="${escapeHtml(href)}"${titleAttr}${targetAttr} class="markdown-link">`;

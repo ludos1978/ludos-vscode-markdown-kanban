@@ -1547,7 +1547,7 @@ function generateIncludeLinkWithMenu(filePath, displayText, clickHandler, isBrok
     // Add include-broken class when file is not found
     const brokenClass = isBroken ? ' include-broken' : '';
 
-    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
+    return `<span class="include-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}">
         <span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">

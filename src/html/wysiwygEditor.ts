@@ -365,7 +365,7 @@ function createMediaView(
         dom.dataset.type = mediaType;
 
         if (mediaType === 'image') {
-            dom.dataset.imagePath = src;
+            dom.dataset.filePath = src;
             dom.dataset.src = src;
 
             const diagramInfo = getDiagramFileInfo(src);
@@ -410,7 +410,7 @@ function createMediaView(
 
         if (mediaType === 'video' || mediaType === 'audio') {
             dom.dataset.src = src;
-            dom.dataset.videoPath = src;
+            dom.dataset.filePath = src;
 
             const mediaEl = document.createElement(mediaType === 'audio' ? 'audio' : 'video');
             mediaEl.controls = true;
@@ -551,7 +551,7 @@ function syncWysiwygImages(container: HTMLElement): void {
         if (img.classList.contains('diagram-rendered') || diagramHost) {
             return;
         }
-        const originalSrc = overlay?.dataset?.imagePath || img.dataset.originalSrc || img.getAttribute('data-original-src') || img.getAttribute('src') || '';
+        const originalSrc = overlay?.dataset?.filePath || img.dataset.originalSrc || img.getAttribute('data-original-src') || img.getAttribute('src') || '';
         if (!originalSrc) {
             return;
         }
@@ -562,8 +562,8 @@ function syncWysiwygImages(container: HTMLElement): void {
         if (!img.dataset.originalSrc) {
             img.dataset.originalSrc = originalSrc;
         }
-        if (overlay && !overlay.dataset.imagePath) {
-            overlay.dataset.imagePath = originalSrc;
+        if (overlay && !overlay.dataset.filePath) {
+            overlay.dataset.filePath = originalSrc;
         }
         if (!(img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler) {
             (img as unknown as { __wysiwygImageHandler?: boolean }).__wysiwygImageHandler = true;
@@ -1643,9 +1643,9 @@ export class WysiwygEditor {
                 const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
                 if (imageMenuButton) {
                     const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
-                    const imagePath = container?.dataset?.imagePath ||
+                    const imagePath = container?.dataset?.filePath ||
                         container?.querySelector('img')?.getAttribute('data-original-src') ||
-                        container?.querySelector('img')?.getAttribute('data-image-path') ||
+                        container?.querySelector('img')?.getAttribute('data-file-path') ||
                         container?.querySelector('img')?.getAttribute('src');
                     const menuApi = window as unknown as { toggleImagePathMenu?: (container: HTMLElement, imagePath: string) => void };
                     if (container && imagePath && typeof menuApi.toggleImagePathMenu === 'function') {
@@ -1658,7 +1658,7 @@ export class WysiwygEditor {
                 const videoMenuButton = target.closest?.('.video-menu-btn') as HTMLElement | null;
                 if (videoMenuButton) {
                     const container = videoMenuButton.closest('.video-path-overlay-container') as HTMLElement | null;
-                    const videoPath = container?.dataset?.videoPath ||
+                    const videoPath = container?.dataset?.filePath ||
                         container?.querySelector('video')?.getAttribute('data-original-src') ||
                         container?.querySelector('audio')?.getAttribute('data-original-src') ||
                         container?.querySelector('video')?.getAttribute('src') ||

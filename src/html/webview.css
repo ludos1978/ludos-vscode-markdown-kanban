@@ -1537,7 +1537,7 @@ figure:has(.diagram-placeholder .image-not-found) {
 .task-item {
   /* background-color: var(--task-background); */
   border-radius: 4px;
-	gap: var(--whitespace-div4);
+	/* gap: var(--whitespace-div4); */
   margin-bottom: var(--whitespace-div2);
   min-height: var(--task-height);
   transition: all 0.2s ease;
@@ -1546,6 +1546,7 @@ figure:has(.diagram-placeholder .image-not-found) {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  padding-bottom: 4px;
 }
 
 /* CRITICAL FIX: Prevent task content from being draggable (only drag handle should be draggable) */

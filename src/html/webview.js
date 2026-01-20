@@ -4465,9 +4465,9 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
             case 'include':
                 selectors.push(
                     `.include-container[data-include-file="${safePath}"]`,
-                    `.include-path-overlay-container[data-include-path="${safePath}"]`,
+                    `.include-path-overlay-container[data-file-path="${safePath}"]`,
                     `[data-include-file="${safePath}"]`,
-                    `[data-include-path="${safePath}"]`
+                    `[data-file-path="${safePath}"]`
                 );
                 break;
             case 'link':
@@ -4481,11 +4481,11 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
             default:
                 selectors.push(
                     `.include-container[data-include-file="${safePath}"]`,
-                    `.include-path-overlay-container[data-include-path="${safePath}"]`,
+                    `.include-path-overlay-container[data-file-path="${safePath}"]`,
                     `a[data-original-href="${safePath}"]`,
                     `[data-original-src="${safePath}"]`,
                     `[data-include-file="${safePath}"]`,
-                    `[data-include-path="${safePath}"]`
+                    `[data-file-path="${safePath}"]`
                 );
                 break;
         }
@@ -4575,11 +4575,11 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
         // This handles cases where the element has an absolute path but we're searching with relative
         if (filenames.length > 0) {
             console.log('[scrollToAndHighlight] Trying filename suffix match for:', filenames);
-            const allElements = root.querySelectorAll('[data-original-src], [data-original-href], [data-include-path], [data-include-file]');
+            const allElements = root.querySelectorAll('[data-original-src], [data-original-href], [data-file-path], [data-include-file]');
             for (const el of allElements) {
                 const src = el.getAttribute('data-original-src') ||
                            el.getAttribute('data-original-href') ||
-                           el.getAttribute('data-include-path') ||
+                           el.getAttribute('data-file-path') ||
                            el.getAttribute('data-include-file') || '';
                 for (const filename of filenames) {
                     if (src.endsWith(filename) || src.endsWith('/' + filename)) {

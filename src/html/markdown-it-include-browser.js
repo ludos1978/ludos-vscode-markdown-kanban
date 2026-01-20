@@ -50,7 +50,7 @@
         ? `Include file not found - click for options`
         : `Path options`;
 
-    return `<span class="include-path-overlay-container${brokenClass}" data-include-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}"${isBroken ? ` data-include-error="true"` : ''}>
+    return `<span class="include-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}"${isBroken ? ` data-include-error="true"` : ''}>
         <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="${linkTooltip}">${escapeHtml(displayText)}</span>
         <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="${menuTooltip}">☰</button>
         <div class="include-path-menu">
@@ -104,7 +104,7 @@
     const isAbsolute = isAbsolutePath(filePath);
     const brokenClass = isBroken ? ' image-broken' : '';
 
-    return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}">
+    return `<span class="image-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}">
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
            onerror="handleMediaNotFound(this, '${escapedPath}', 'image')"
            style="max-width: 100%; height: auto;">
@@ -122,7 +122,7 @@
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const brokenClass = isBroken ? ' video-broken' : '';
 
-    return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}">
+    return `<span class="video-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}">
       <video src="${escapeHtml(filePath)}" controls
              onerror="handleMediaNotFound(this, '${escapedPath}', 'video')"
              style="max-width: 100%; height: auto;">

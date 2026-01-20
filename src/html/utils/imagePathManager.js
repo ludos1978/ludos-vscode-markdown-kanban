@@ -526,7 +526,7 @@ const MEDIA_TYPE_CONFIG = {
         brokenClass: 'image-broken',
         menuBtnClass: 'image-menu-btn',
         menuItemClass: 'image-path-menu-item',
-        pathDataAttr: 'imagePath',
+        pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'image'
     },
     video: {
@@ -539,7 +539,7 @@ const MEDIA_TYPE_CONFIG = {
         brokenClass: 'video-broken',
         menuBtnClass: 'video-menu-btn',
         menuItemClass: 'video-path-menu-item',
-        pathDataAttr: 'videoPath',
+        pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'video'
     },
     link: {
@@ -552,7 +552,7 @@ const MEDIA_TYPE_CONFIG = {
         brokenClass: 'link-broken',
         menuBtnClass: 'link-menu-btn',
         menuItemClass: 'link-path-menu-item',
-        pathDataAttr: 'linkPath',
+        pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'link'
     },
     include: {
@@ -565,7 +565,7 @@ const MEDIA_TYPE_CONFIG = {
         brokenClass: 'include-broken',
         menuBtnClass: 'include-menu-btn',
         menuItemClass: 'include-path-menu-item',
-        pathDataAttr: 'includePath',
+        pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'include'
     }
 };
@@ -851,7 +851,7 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
     // Create the full container
     const container = document.createElement('div');
     container.className = 'image-not-found-container';
-    container.dataset.imagePath = originalSrc;
+    container.dataset.filePath = originalSrc;
 
     container.innerHTML = `
         <span class="image-not-found" data-original-src="${htmlEscapedPath}" title="Image not found: ${htmlEscapedPath}">
@@ -893,7 +893,7 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
     simpleSpan.title = `Image not found: ${originalSrc}`;
 
     // Store the path on the overlay container for event delegation
-    overlayContainer.dataset.imagePath = originalSrc;
+    overlayContainer.dataset.filePath = originalSrc;
     overlayContainer.classList.add('image-broken');
 
     // Find task/column context for targeted updates
