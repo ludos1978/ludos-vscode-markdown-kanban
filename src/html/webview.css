@@ -189,8 +189,8 @@ body {
 .kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
 .task-item.include-error .include-path-overlay-container .include-menu-btn {
   position: absolute !important;
-  top: 2px !important;
-  right: 2px !important;
+  top: 3px !important;
+  right: 3px !important;
   width: 18px !important;
   height: 18px !important;
   margin: 0 !important;
