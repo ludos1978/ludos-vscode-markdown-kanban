@@ -1940,6 +1940,8 @@ async function processPlantUMLQueue() {
 
     plantumlQueueProcessing = true;
 
+    // Track affected stacks for targeted height recalculation
+    const affectedStacks = new Set();
 
     while (pendingPlantUMLQueue.length > 0) {
         const item = pendingPlantUMLQueue.shift();
@@ -1948,6 +1950,12 @@ async function processPlantUMLQueue() {
         if (!element) {
             console.warn(`[PlantUML] Placeholder not found: ${item.id}`);
             continue;
+        }
+
+        // Track the stack this element is in (before replacement)
+        const stack = element.closest('.kanban-column-stack');
+        if (stack) {
+            affectedStacks.add(stack);
         }
 
         try {
@@ -1994,6 +2002,13 @@ async function processPlantUMLQueue() {
     }
 
     plantumlQueueProcessing = false;
+
+    // Recalculate only affected stacks after diagrams have rendered
+    if (affectedStacks.size > 0 && typeof window.updateStackLayout === 'function') {
+        affectedStacks.forEach(stack => {
+            window.updateStackLayout(stack);
+        });
+    }
 }
 
 // ============================================================================
@@ -2163,6 +2178,8 @@ async function processMermaidQueue() {
 
     mermaidQueueProcessing = true;
 
+    // Track affected stacks for targeted height recalculation
+    const affectedStacks = new Set();
 
     while (pendingMermaidQueue.length > 0) {
         const item = pendingMermaidQueue.shift();
@@ -2171,6 +2188,12 @@ async function processMermaidQueue() {
         if (!element) {
             console.warn(`[Mermaid] Placeholder not found: ${item.id}`);
             continue;
+        }
+
+        // Track the stack this element is in (before replacement)
+        const stack = element.closest('.kanban-column-stack');
+        if (stack) {
+            affectedStacks.add(stack);
         }
 
         try {
@@ -2217,6 +2240,13 @@ async function processMermaidQueue() {
     }
 
     mermaidQueueProcessing = false;
+
+    // Recalculate only affected stacks after diagrams have rendered
+    if (affectedStacks.size > 0 && typeof window.updateStackLayout === 'function') {
+        affectedStacks.forEach(stack => {
+            window.updateStackLayout(stack);
+        });
+    }
 }
 
 /**
