@@ -4014,6 +4014,7 @@ if (!webviewEventListenersInitialized) {
 
         case 'scrollToElement':
             // Handle scroll-to-element request from search sidebar or dashboard
+            console.log('[Webview] scrollToElement received:', message.columnId, message.taskId);
             scrollToAndHighlight(
                 message.columnId,
                 message.taskId,
@@ -4435,13 +4436,28 @@ function performEditorRedo() {
  * @param {boolean} [highlight] - Whether to add highlight animation
  */
 function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, elementType, field) {
+    console.log('[scrollToAndHighlight] START columnId:', columnId, 'taskId:', taskId);
+
     let targetElement = null;
     const columnElement = columnId
         ? document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`)
         : null;
+    console.log('[scrollToAndHighlight] columnElement found:', !!columnElement);
+
     const taskElement = columnElement && taskId
         ? columnElement.querySelector(`.task-item[data-task-id="${taskId}"]`)
         : null;
+    console.log('[scrollToAndHighlight] taskElement found:', !!taskElement);
+
+    // Debug: List all column IDs in the DOM
+    const allColumns = document.querySelectorAll('.kanban-full-height-column[data-column-id]');
+    console.log('[scrollToAndHighlight] All column IDs in DOM:', Array.from(allColumns).map(c => c.dataset.columnId));
+
+    // Debug: If column found, list all task IDs
+    if (columnElement) {
+        const allTasks = columnElement.querySelectorAll('.task-item[data-task-id]');
+        console.log('[scrollToAndHighlight] All task IDs in column:', Array.from(allTasks).map(t => t.dataset.taskId));
+    }
 
     const escapeSelector = (value) => {
         if (typeof value !== 'string') return '';

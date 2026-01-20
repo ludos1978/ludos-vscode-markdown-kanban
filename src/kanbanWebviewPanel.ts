@@ -255,13 +255,15 @@ export class KanbanWebviewPanel {
         // Reveal the panel first
         this._panel.reveal(undefined, false);
 
+        console.log('[KanbanWebviewPanel.scrollToElement] webviewReady:', this._context.webviewReady, 'columnId:', columnId, 'taskId:', taskId);
+
         if (this._context.webviewReady) {
             // Webview is ready, send immediately
-            logger.debug('[KanbanWebviewPanel.scrollToElement] Sending immediately:', { columnId, taskId });
+            console.log('[KanbanWebviewPanel.scrollToElement] Sending immediately');
             this._panel.webview.postMessage(message);
         } else {
             // Queue the request to be sent when webview is ready
-            logger.debug('[KanbanWebviewPanel.scrollToElement] Queueing for later:', { columnId, taskId });
+            console.log('[KanbanWebviewPanel.scrollToElement] Queueing for later');
             this._pendingScrollRequest = message;
         }
     }
@@ -538,10 +540,13 @@ export class KanbanWebviewPanel {
                 const scrollRequest = this._pendingScrollRequest;
                 this._pendingScrollRequest = null;
                 // Delay to ensure DOM has been updated with board content
+                console.log('[KanbanWebviewPanel._handleWebviewReady] Will send pending scroll in 500ms:', scrollRequest);
                 setTimeout(() => {
-                    logger.debug('[KanbanWebviewPanel._handleWebviewReady] Sending pending scroll request:', scrollRequest);
+                    console.log('[KanbanWebviewPanel._handleWebviewReady] NOW sending pending scroll request:', scrollRequest);
                     this._panel.webview.postMessage(scrollRequest);
-                }, 100);
+                }, 500);
+            } else {
+                console.log('[KanbanWebviewPanel._handleWebviewReady] No pending scroll request');
             }
         };
 

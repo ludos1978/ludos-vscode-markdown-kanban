@@ -183,13 +183,28 @@ export class DashboardScanner {
         let totalTasks = 0;
         let temporalTasks = 0;
 
-        // Scan all columns and tasks
+        // Scan all columns and tasks with hierarchical temporal gating
         for (const column of board.columns || []) {
+            // Check column's temporal tag first (hierarchical gating)
+            const columnTitle = column.title || '';
+            const columnTemporal = this._extractTemporalInfo(columnTitle);
+
+            // If column has a date/week tag outside timeframe, skip all tasks in this column
+            let columnWithinTimeframe = true;
+            let columnDate: Date | undefined;
+
+            if (columnTemporal) {
+                if (columnTemporal.date) {
+                    columnWithinTimeframe = isWithinTimeframe(columnTemporal.date, timeframeDays);
+                    columnDate = columnTemporal.date;
+                }
+            }
+
             for (const task of column.tasks || []) {
                 totalTasks++;
                 const taskText = (task.title || '') + ' ' + (task.description || '');
 
-                // Extract all tags from task
+                // Extract all tags from task (for tag summary)
                 const tags = extractTags(taskText);
                 for (const tag of tags) {
                     const existing = tagCounts.get(tag.name);
@@ -200,26 +215,43 @@ export class DashboardScanner {
                     }
                 }
 
-                // Check for temporal tags and add to upcoming if within timeframe
-                const temporalResult = this._extractTemporalInfo(taskText);
-                if (temporalResult) {
+                // Skip upcoming item check if column is outside timeframe
+                if (!columnWithinTimeframe) {
+                    continue;
+                }
+
+                // Check task's temporal tags
+                const taskTemporal = this._extractTemporalInfo(task.title || '');
+                if (taskTemporal) {
                     temporalTasks++;
 
-                    if (temporalResult.date && isWithinTimeframe(temporalResult.date, timeframeDays)) {
+                    // For time slots, use column's date if task doesn't have its own date
+                    let effectiveDate = taskTemporal.date;
+                    if (taskTemporal.timeSlot && !taskTemporal.week && columnDate) {
+                        // Time slot inherits date from column
+                        effectiveDate = columnDate;
+                    }
+
+                    if (effectiveDate && isWithinTimeframe(effectiveDate, timeframeDays)) {
                         upcomingItems.push({
                             boardUri,
                             boardName,
                             columnId: column.id,
-                            columnTitle: column.title || '',
+                            columnTitle: columnTitle,
                             taskId: task.id,
                             taskTitle: task.title || '',
-                            temporalTag: temporalResult.tag,
-                            date: temporalResult.date,
-                            week: temporalResult.week,
-                            year: temporalResult.year,
+                            temporalTag: taskTemporal.tag,
+                            date: effectiveDate,
+                            week: taskTemporal.week || columnTemporal?.week,
+                            year: taskTemporal.year || columnTemporal?.year,
+                            timeSlot: taskTemporal.timeSlot,
                             rawTitle: task.title || ''
                         });
                     }
+                } else if (columnTemporal && columnWithinTimeframe) {
+                    // Task has no temporal tag but column does - include if column is in timeframe
+                    // This catches tasks that inherit their timing from the column
+                    temporalTasks++;
                 }
             }
         }
@@ -252,8 +284,9 @@ export class DashboardScanner {
         date?: Date;
         week?: number;
         year?: number;
+        timeSlot?: string;
     } | null {
-        // Try to find date tag
+        // Try to find date tag first (most specific)
         const dateMatch = text.match(/!(\d{1,4}[-./]\d{1,2}(?:[-./]\d{2,4})?)/);
         if (dateMatch) {
             const date = parseDateTag(dateMatch[0]);
@@ -269,6 +302,15 @@ export class DashboardScanner {
             const week = parseInt(weekMatch[2], 10);
             const date = getDateOfISOWeek(week, year);
             return { tag: weekMatch[0], date, week, year };
+        }
+
+        // Try to find time slot tag (e.g., !06:00-12:00)
+        // Time slots without a date are considered "today"
+        const timeMatch = text.match(/!(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+        if (timeMatch) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return { tag: timeMatch[0], date: today, timeSlot: timeMatch[0] };
         }
 
         return null;

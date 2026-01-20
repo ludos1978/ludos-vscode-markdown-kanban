@@ -5,6 +5,8 @@
 
 - [ ] Dashboard fixes:
   - the "right-click a .md file in explorer ..." can be hidden after one has been added.
+  - i want to select or enter a tag, then all tags of this type get searched and listed
+  - it doesnt list the upcoming week tags and time tags
 
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
 
