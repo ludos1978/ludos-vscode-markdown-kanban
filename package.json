@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.104.0",
+  "version": "0.104.1",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -99,13 +99,19 @@
               },
               "timeframe": {
                 "type": "number",
-                "enum": [3, 7, 30],
+                "enum": [
+                  3,
+                  7,
+                  30
+                ],
                 "default": 7,
                 "description": "Timeframe in days for showing upcoming items"
               },
               "tagFilters": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "default": [],
                 "description": "Tags to filter/highlight"
               },
@@ -119,7 +125,11 @@
         },
         "markdown-kanban.dashboard.defaultTimeframe": {
           "type": "number",
-          "enum": [3, 7, 30],
+          "enum": [
+            3,
+            7,
+            30
+          ],
           "default": 7,
           "description": "Default timeframe in days for new boards added to the Dashboard"
         },
@@ -4704,6 +4714,11 @@
       "explorer/context": [
         {
           "command": "markdown-kanban.openKanban",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        },
+        {
+          "command": "markdown-kanban.dashboard.addBoard",
           "when": "resourceExtname == .md",
           "group": "navigation"
         }

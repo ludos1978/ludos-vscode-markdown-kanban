@@ -76,9 +76,19 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register dashboard commands
 	context.subscriptions.push(
-		vscode.commands.registerCommand('markdown-kanban.dashboard.addBoard', async (item: any) => {
-			if (item?.uri) {
-				const uriString = item.uri.toString ? item.uri.toString() : String(item.uri);
+		vscode.commands.registerCommand('markdown-kanban.dashboard.addBoard', async (item: vscode.Uri | { uri: vscode.Uri | string } | undefined) => {
+			let uriString: string | undefined;
+
+			// Handle different call contexts:
+			// - From explorer context menu: item is a vscode.Uri directly
+			// - From sidebar context menu: item is { uri: vscode.Uri }
+			if (item instanceof vscode.Uri) {
+				uriString = item.toString();
+			} else if (item?.uri) {
+				uriString = item.uri.toString ? item.uri.toString() : String(item.uri);
+			}
+
+			if (uriString) {
 				await dashboardProvider.addBoard(uriString);
 			}
 		}),

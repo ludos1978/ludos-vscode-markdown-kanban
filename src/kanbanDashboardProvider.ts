@@ -465,17 +465,14 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             padding: 20px;
             color: var(--vscode-descriptionForeground);
         }
-        .drop-zone {
-            border: 2px dashed var(--vscode-panel-border);
-            border-radius: 4px;
-            padding: 16px;
+        .add-board-hint {
+            padding: 12px;
             text-align: center;
             color: var(--vscode-descriptionForeground);
+            font-size: 11px;
             margin-top: 8px;
-        }
-        .drop-zone.drag-over {
-            border-color: var(--vscode-focusBorder);
-            background: var(--vscode-list-hoverBackground);
+            border: 1px dashed var(--vscode-panel-border);
+            border-radius: 4px;
         }
         .refresh-btn {
             background: none;
@@ -532,8 +529,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             </div>
             <div class="section-content" id="boards-content">
                 <div id="boards-list"></div>
-                <div class="drop-zone" id="drop-zone">
-                    Drop kanban files here to add
+                <div class="add-board-hint">
+                    Right-click a .md file in Explorer or Kanban Boards sidebar → "Add to Dashboard"
                 </div>
             </div>
         </div>
@@ -545,7 +542,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            setupDragAndDrop();
             vscode.postMessage({ type: 'dashboardReady' });
         });
 
@@ -660,27 +656,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             container.innerHTML = html;
         }
 
-        function setupDragAndDrop() {
-            const dropZone = document.getElementById('drop-zone');
-
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('drag-over');
-            });
-
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('drag-over');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('drag-over');
-
-                // Note: Due to VS Code webview restrictions, actual file drop
-                // may need to be handled via extension commands
-                console.log('Drop event received');
-            });
-        }
 
         function toggleSection(sectionId) {
             const content = document.getElementById(sectionId + '-content');
