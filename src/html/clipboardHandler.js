@@ -349,6 +349,10 @@ window.handleEmptyColumnDragEnd = function(e) {
     // Column creation is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+
+    // Clean up drop indicator to prevent race conditions with RAF callbacks
+    window.dropIndicatorManager?.hideDropIndicator(window.dragState);
+
     window.dragDropStateMachine?.reset('empty-column-end');
 };
 
@@ -400,6 +404,10 @@ window.handleClipboardColumnDragEnd = function(e) {
     // Column creation is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+
+    // Clean up drop indicator to prevent race conditions with RAF callbacks
+    window.dropIndicatorManager?.hideDropIndicator(window.dragState);
+
     window.dragDropStateMachine?.reset('clipboard-column-end');
 };
 
@@ -452,6 +460,10 @@ window.handleTemplateMenuDragEnd = function(e) {
     // Template application is handled by processTemplateColumnDrop() in the global dragend handler
     // This handler just provides cleanup for the source element
     e.target.classList.remove('dragging');
+
+    // Clean up drop indicator to prevent race conditions with RAF callbacks
+    window.dropIndicatorManager?.hideDropIndicator(window.dragState);
+
     window.dragDropStateMachine?.reset('template-menu-end');
 };
 

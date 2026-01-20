@@ -191,6 +191,7 @@ function createDragDropStateMachine() {
     let state = DragDropStates.IDLE;
     let lastState = DragDropStates.IDLE;
     let context = {};
+    let sessionId = 0; // Incremented on start/reset to detect stale RAF callbacks
 
     const transitions = new Map([
         [DragDropStates.IDLE, new Set([
@@ -237,11 +238,17 @@ function createDragDropStateMachine() {
     }
 
     function start(nextState, meta = {}) {
+        sessionId++; // New drag session
         return transition(nextState, { ...meta, action: 'start' });
     }
 
     function reset(reason) {
+        sessionId++; // End of drag session - invalidates pending RAF callbacks
         return transition(DragDropStates.IDLE, { action: 'reset', reason });
+    }
+
+    function getSessionId() {
+        return sessionId;
     }
 
     function getState() {
@@ -282,6 +289,7 @@ function createDragDropStateMachine() {
         getState,
         getLastState,
         getContext,
+        getSessionId,
         isLayoutDrag,
         isTemplateDrag,
         isExternalDrag,
@@ -3387,9 +3395,10 @@ function setupColumnDragAndDrop() {
             dragState.altKeyPressed = e.altKey;
         }
 
-        // CRITICAL: Capture mouse coordinates BEFORE RAF
+        // CRITICAL: Capture mouse coordinates and session ID BEFORE RAF
         const mouseX = e.clientX;
         const mouseY = e.clientY;
+        const capturedSessionId = dragDropStateMachine.getSessionId();
 
         // RAF throttle
         if (dragState.columnDragoverPending) {return;}
@@ -3397,6 +3406,9 @@ function setupColumnDragAndDrop() {
         dragState.columnDragoverPending = true;
         requestAnimationFrame(() => {
             dragState.columnDragoverPending = false;
+
+            // CRITICAL: Check if session changed (drag ended) before proceeding
+            if (dragDropStateMachine.getSessionId() !== capturedSessionId) {return;}
 
             // Re-check state in case drag ended
             const currentMode = getCurrentDragMode();
@@ -3749,6 +3761,9 @@ function handleTemplateDragEnd(e) {
 
     // Clear all tracked highlights (including template-drag-over)
     clearHighlights();
+
+    // Hide drop indicator
+    hideDropIndicatorWithState();
 
     // If we have a valid drop target, apply the template
     if (templateDragState.isDragging && templateDragState.targetRow !== null) {
