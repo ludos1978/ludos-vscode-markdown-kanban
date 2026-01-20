@@ -3119,9 +3119,10 @@ function cleanupAndRecreateDropZones(container) {
 /**
  * Creates or updates transparent drop zones below the last column in each stack
  * These zones allow dropping columns to stack them vertically
+ * @param {HTMLElement|null} stackElement - Specific stack to update, or null for all stacks
  */
-function updateStackBottomDropZones() {
-    const stacks = document.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+function updateStackBottomDropZones(stackElement = null) {
+    const stacks = stackElement ? [stackElement] : document.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
 
     stacks.forEach(stack => {
         // Remove existing bottom drop zone if any
@@ -3135,41 +3136,45 @@ function updateStackBottomDropZones() {
         if (columns.length === 0) {return;}
 
         // Create transparent drop zone element that fills remaining stack height
+        // Position it absolutely using same calculation as column sticky positioning
         const dropZone = document.createElement('div');
         dropZone.className = 'stack-bottom-drop-zone';
 
-        // SIMPLIFIED: Calculate top position by finding the actual bottom of the last visible element
-        // This is more reliable than summing individual heights which can miss margins/borders/transforms
-        const stackRect = stack.getBoundingClientRect();
-        let maxBottom = 0;
-
+        // Calculate top position by summing up heights of all columns' elements
+        // This matches the calculation in updateStackLayout() - columns are visually stacked
+        // using margin-top offsets, so we need to SUM heights, not find max
+        let cumulativeTop = 0;
         columns.forEach(col => {
             const isVerticallyFolded = col.classList.contains('collapsed-vertical');
             const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
 
-            // For folded columns, use the footer bottom; for expanded, use the whole column
-            const columnFooter = col.querySelector('.column-footer');
+            const columnMargin = col.querySelector('.column-margin');
+            const columnHeader = col.querySelector('.column-header');
+            const columnTitle = col.querySelector('.column-title');
             const columnContent = col.querySelector('.column-content');
+            const columnFooter = col.querySelector('.column-footer');
 
-            // Get the bottom-most visible element of this column
-            let bottomElement = columnFooter;
-            if (!bottomElement && columnContent && !isVerticallyFolded && !isHorizontallyFolded) {
-                bottomElement = columnContent;
-            }
-            if (!bottomElement) {
-                bottomElement = col;
+            if (columnMargin) {cumulativeTop += columnMargin.offsetHeight;}
+            if (columnHeader) {cumulativeTop += columnHeader.offsetHeight;}
+            if (columnTitle) {cumulativeTop += columnTitle.offsetHeight;}
+
+            // Include column-content height (skip if column is folded)
+            if (columnContent && !isVerticallyFolded && !isHorizontallyFolded) {
+                cumulativeTop += columnContent.scrollHeight;
             }
 
-            const elementRect = bottomElement.getBoundingClientRect();
-            const relativeBottom = elementRect.bottom - stackRect.top;
-            if (relativeBottom > maxBottom) {
-                maxBottom = relativeBottom;
+            if (columnFooter) {
+                cumulativeTop += columnFooter.offsetHeight;
+                // Account for footer borders and margins using computed style
+                const footerStyle = window.getComputedStyle(columnFooter);
+                const marginBottom = parseFloat(footerStyle.marginBottom) || 0;
+                cumulativeTop += marginBottom;
             }
         });
 
         dropZone.style.cssText = `
             position: absolute;
-            top: ${maxBottom}px;
+            top: ${cumulativeTop}px;
             left: 0;
             right: 0;
             bottom: 0;

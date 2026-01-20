@@ -645,7 +645,8 @@ function updateStackLayoutCore(stackElement = null) {
             // All columns vertically folded - display horizontally
             stack.classList.add('all-vertical-folded');
             if (typeof window.updateStackBottomDropZones === 'function') {
-                requestAnimationFrame(() => window.updateStackBottomDropZones());
+                const stackToUpdate = stack; // Capture for closure
+                requestAnimationFrame(() => window.updateStackBottomDropZones(stackToUpdate));
             }
         } else {
             // At least one column is expanded or horizontally folded - display vertically
@@ -945,7 +946,7 @@ function updateStackLayoutCore(stackElement = null) {
 
                     // Update drop zones AFTER column positions are applied
                     if (typeof window.updateStackBottomDropZones === 'function') {
-                        window.updateStackBottomDropZones();
+                        window.updateStackBottomDropZones(stack);
                     }
 
                     if (perfEnabled) {
