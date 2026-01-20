@@ -206,16 +206,6 @@ if (!isEditing) {
 
 ---
 
-## src/html/submenuGenerator.js - Submenu Generation
-
-- src_html_submenuGenerator-generateSubmenu - Generate submenu HTML
-- src_html_submenuGenerator-generateColumnSubmenu - Generate column submenu
-- src_html_submenuGenerator-generateTaskSubmenu - Generate task submenu
-- src_html_submenuGenerator-generateBoardSubmenu - Generate board submenu
-- src_html_submenuGenerator-generateExportSubmenu - Generate export submenu
-
----
-
 ## src/html/debugOverlay.js - Debug Overlay
 
 - src_html_debugOverlay-initializeDebugOverlay - Initialize debug overlay
@@ -404,10 +394,9 @@ if (!isEditing) {
 5. dragDrop.js - 9 functions - Drag and drop functionality
 6. markdownRenderer.js - 8 functions - Markdown rendering
 7. search.js - 6 functions - Search functionality
-8. submenuGenerator.js - 5 functions - Submenu generation
-9. debugOverlay.js - 4 functions - Debug overlay
-10. configManager.js - 5 functions - Configuration management
-11. Additional utility modules - 40+ functions
+8. debugOverlay.js - 4 functions - Debug overlay
+9. configManager.js - 5 functions - Configuration management
+10. Additional utility modules - 40+ functions
 
 ### Markdown-it Plugins:
 - 11 browser-compatible markdown-it plugins for extended markdown syntax

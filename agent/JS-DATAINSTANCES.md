@@ -267,13 +267,6 @@ case 'boardData':
 
 ---
 
-## src/html/submenuGenerator.js - Submenu Instances
-
-- src_html_submenuGenerator-activeSubmenu - Active submenu element (null | HTMLElement)
-- src_html_submenuGenerator-submenuStack - Stack of open submenus (array)
-
----
-
 ## src/html/debugOverlay.js - Debug Overlay Instances
 
 - src_html_debugOverlay-overlayElement - Debug overlay DOM element (null | HTMLElement)
