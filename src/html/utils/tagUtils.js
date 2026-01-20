@@ -881,8 +881,6 @@ class TagUtils {
         // Tasks should only have attributes for temporal tags that exist in the task itself
         gate = columnResult.gate;
 
-        console.log('[TEMPORAL DEBUG] Column:', columnTitle, '→ gate:', JSON.stringify(gate), 'attrs:', JSON.stringify(columnResult.attrs));
-
         // Evaluate task title level (gated by column)
         const titleResult = this.evaluateTemporalsAtLevel(taskTitle || '', gate, 'taskTitle');
         // Add task title attrs to result
@@ -891,15 +889,10 @@ class TagUtils {
                 result[attr] = value;
             }
         }
-        gate = titleResult.gate;
-
-        console.log('[TEMPORAL DEBUG] Task title:', taskTitle, '→ gate:', JSON.stringify(gate), 'attrs:', JSON.stringify(titleResult.attrs));
 
         // NOTE: Task content temporals are NOT added to task-level attributes
         // Content temporals should only highlight the individual tag, not the whole task
         // The markdown renderer handles highlighting individual temporal tags in descriptions
-
-        console.log('[TEMPORAL DEBUG] Result:', JSON.stringify(result));
 
         return result;
     }

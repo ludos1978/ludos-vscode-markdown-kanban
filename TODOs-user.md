@@ -1,3 +1,9 @@
+- [ ] i want a side panel that. for each kanban panel that is within it.
+  - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
+  - list all tags (for example #todo )
+  - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
+
+
 - [ ] where is FileCommands.handleOpenFileLink used? can it be removed if it's unused?
 
 - [x] it sometimes happens that the "drop-indicator active" is not removed properly! check the codepaths that it's allways cleaned up!
