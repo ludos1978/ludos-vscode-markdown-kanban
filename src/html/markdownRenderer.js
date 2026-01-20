@@ -1413,7 +1413,10 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
 
         } catch (error) {
             console.error('[EPUB Slideshow] Failed to load page:', error);
-            imageContainer.innerHTML = `<div class="pdf-slideshow-error">Failed to load page ${pageNumber}</div>`;
+            imageContainer.innerHTML = `<div class="diagram-error">
+                <span class="error-icon">⚠️</span>
+                <span class="error-text">Failed to load EPUB page ${pageNumber}</span>
+            </div>`;
         }
     };
 
@@ -1749,9 +1752,14 @@ async function processDiagramQueue() {
 
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
-            const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` :
-                               item.diagramType === 'pdf-slideshow' ? 'PDF' :
-                               item.diagramType === 'epub-slideshow' ? 'EPUB' : `${item.diagramType} diagram`;
+            // Determine error label and emoji based on diagram type
+            const typeInfo = {
+                'pdf': { label: `PDF page ${item.pageNumber}`, emoji: '📄' },
+                'pdf-slideshow': { label: 'PDF', emoji: '📄' },
+                'epub-slideshow': { label: 'EPUB', emoji: '📚' },
+                'drawio': { label: 'DrawIO diagram', emoji: '📊' },
+                'excalidraw': { label: 'Excalidraw diagram', emoji: '🎨' }
+            }[item.diagramType] || { label: `${item.diagramType} diagram`, emoji: '📷' };
             // Wrap error in overlay container with burger menu for path operations
             let decodedPath = item.filePath;
             try {
@@ -1760,12 +1768,13 @@ async function processDiagramQueue() {
                 // If decoding fails, use original path
             }
             const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            // Use unified .image-not-found structure for consistent error styling
+            const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(decodedPath) : decodedPath.split('/').pop() || decodedPath;
             element.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${decodedPath.replace(/"/g, '&quot;')}">
-                <span class="diagram-error">
-                    <span class="error-icon">⚠️</span>
-                    <span class="error-text">Failed to load ${errorLabel}</span>
+                <span class="image-not-found" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" title="Failed to load ${typeInfo.label}: ${decodedPath}">
+                    <span class="image-not-found-text">${typeInfo.emoji} ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
                 </span>
-                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </span>`;
         }
     }

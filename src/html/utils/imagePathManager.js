@@ -657,18 +657,31 @@ function handleMediaNotFound(element, originalSrc, mediaType) {
         existingOverlay.classList.add(config.brokenClass);
 
         const shortPath = getShortDisplayPath(originalSrc);
+        const htmlEscapedPath = escapeHtmlForBroken(originalSrc);
+        const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
+
         const placeholder = document.createElement('span');
         placeholder.className = config.notFoundClass;
         placeholder.dataset.originalSrc = originalSrc;
         placeholder.title = `${config.mediaLabel.charAt(0).toUpperCase() + config.mediaLabel.slice(1)} not found: ${originalSrc}`;
-        placeholder.innerHTML = `<span class="${config.notFoundTextClass}">${config.emoji} ${escapeHtmlForBroken(shortPath)}</span>`;
+        // Include burger menu button for all media types
+        placeholder.innerHTML = `
+            <span class="${config.notFoundTextClass}">${config.emoji} ${escapeHtmlForBroken(shortPath)}</span>
+            <button class="${config.menuBtnClass}" data-action="toggle-menu" title="Path options">☰</button>
+        `;
 
         element.parentElement.insertBefore(placeholder, element);
         element.style.display = 'none';
 
-        // For images, also upgrade the overlay menu
+        // For images, upgrade the overlay menu
         if (mediaType === 'image') {
             upgradeImageOverlayToBroken(existingOverlay, placeholder, originalSrc);
+        } else if (mediaType === 'video') {
+            // For videos, add the dropdown menu after the placeholder
+            const menuHtml = generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config);
+            placeholder.insertAdjacentHTML('afterend', menuHtml);
+            // Store path on overlay container for event delegation
+            existingOverlay.dataset.videoPath = originalSrc;
         }
         return;
     }
