@@ -147,7 +147,8 @@
       "WebFetch(domain:gist.github.com)",
       "Bash(npx jscpd:*)",
       "Bash(npx knip:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Skill(debug)"
     ],
     "deny": [],
     "ask": []

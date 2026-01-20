@@ -2350,10 +2350,17 @@ function renderMarkdown(text, includeContext) {
             // Determine if path is absolute
             const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
 
-            // Inject error handler into video element - handles both source errors and video errors
-            const videoWithError = videoHtml.replace(
+            // Inject error handler into video element and source children
+            // IMPORTANT: For <video> with <source> children, error events fire on <source>, not <video>!
+            // So we need to add onerror to both the video (for direct src) and source elements
+            let videoWithError = videoHtml.replace(
                 /<video([^>]*)>/,
                 `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+            );
+            // Also add error handler to <source> elements - this is where errors actually fire for <video><source></video>
+            videoWithError = videoWithError.replace(
+                /<source([^>]*)>/g,
+                `<source$1 onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this.parentElement,'${escapedOriginalSrc}');}">`
             );
 
             // Wrap with overlay container for path conversion menu (similar to images)
@@ -2387,10 +2394,16 @@ function renderMarkdown(text, includeContext) {
             const escapedPath = originalSrc.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
             const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
 
-            // Inject error handler into audio element
-            const audioWithError = audioHtml.replace(
+            // Inject error handler into audio element and source children
+            // IMPORTANT: For <audio> with <source> children, error events fire on <source>, not <audio>!
+            let audioWithError = audioHtml.replace(
                 /<audio([^>]*)>/,
                 `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+            );
+            // Also add error handler to <source> elements
+            audioWithError = audioWithError.replace(
+                /<source([^>]*)>/g,
+                `<source$1 onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this.parentElement,'${escapedOriginalSrc}');}">`
             );
 
             // Wrap with overlay container for path conversion menu (same as video)
