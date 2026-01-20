@@ -1939,6 +1939,10 @@ function createTaskElement(task, columnId, taskIndex) {
     }
     const temporalAttributeString = temporalAttributes.length > 0 ? ' ' + temporalAttributes.join(' ') : '';
 
+    if (temporalAttributeString) {
+        console.log('[BOARD RENDER] Task:', task.title, '→ temporalAttributeString:', temporalAttributeString);
+    }
+
     // Task include error: ONLY when ALL THREE conditions are met:
     // 1. Task has includeFiles (it's actually a task include)
     // 2. Task has includeMode === true (parsing recognized it as include)

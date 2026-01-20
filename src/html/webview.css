@@ -5091,6 +5091,15 @@ blockquote {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
+/* Direct selectors as fallback for temporal highlighting */
+.task-item[data-current-time="true"],
+.task-item[data-current-day="true"],
+.task-item[data-current-week="true"],
+.task-item[data-current-weekday="true"],
+.task-item[data-current-hour="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
 /* Background style - add class 'week-highlight-background' to body to enable */
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-header,
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title,
@@ -5126,10 +5135,11 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
   margin-right: -4px;
 }
 
-/* Fallback for browsers that don't support :has() - highlight the span itself more prominently */
-.kanban-temporal-minuteSlot.temporal-active {
+/* Highlight individual active temporal tags ONLY in task descriptions (not headers) */
+.task-description-display .kanban-temporal-tag.temporal-active {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
   padding-right: 4px;
+  border-radius: 2px;
 }
 
 /* Header and footer bars */

@@ -659,23 +659,38 @@ class TagUtils {
     }
 
     /**
-     * Check if current time falls within a time slot tag
-     * @param {string} text - Text containing time slot tag
-     * @returns {boolean} True if current time is within the time slot
+     * Check if current time falls within ANY time slot tag in the text
+     * @param {string} text - Text containing time slot tag(s)
+     * @returns {boolean} True if current time is within any time slot
      */
     isCurrentTimeSlot(text) {
-        const timeSlot = this.extractTimeSlotTag(text);
-        if (!timeSlot) return false;
+        if (!text) return false;
 
         const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-        // Handle slots that cross midnight (e.g., @10pm-2am)
-        if (timeSlot.end < timeSlot.start) {
-            return currentMinutes >= timeSlot.start || currentMinutes <= timeSlot.end;
+        // Extract ALL time slots from text and check each one
+        this.patterns.timeSlotTags.lastIndex = 0;
+        let match;
+        while ((match = this.patterns.timeSlotTags.exec(text)) !== null) {
+            const start = this.parseTimeToMinutes(match[1]);
+            const end = this.parseTimeToMinutes(match[2]);
+
+            if (start === null || end === null) continue;
+
+            // Handle slots that cross midnight (e.g., !22:00-02:00)
+            if (end < start) {
+                if (currentMinutes >= start || currentMinutes <= end) {
+                    return true;
+                }
+            } else {
+                if (currentMinutes >= start && currentMinutes <= end) {
+                    return true;
+                }
+            }
         }
 
-        return currentMinutes >= timeSlot.start && currentMinutes <= timeSlot.end;
+        return false;
     }
 
     /**
@@ -859,14 +874,18 @@ class TagUtils {
         let gate = { open: true, closedBy: null };
         const result = {};
 
-        // Evaluate column level (no gating from above)
+        // Evaluate column level for gating only - do NOT copy column attrs to task
+        // Column-level temporals control whether task-level temporals can be active
         const columnResult = this.evaluateTemporalsAtLevel(columnTitle || '', gate, 'column');
-        Object.assign(result, columnResult.attrs);
+        // Note: We intentionally do NOT copy columnResult.attrs to result
+        // Tasks should only have attributes for temporal tags that exist in the task itself
         gate = columnResult.gate;
+
+        console.log('[TEMPORAL DEBUG] Column:', columnTitle, '→ gate:', JSON.stringify(gate), 'attrs:', JSON.stringify(columnResult.attrs));
 
         // Evaluate task title level (gated by column)
         const titleResult = this.evaluateTemporalsAtLevel(taskTitle || '', gate, 'taskTitle');
-        // Only add attrs that aren't already set by column
+        // Add task title attrs to result
         for (const [attr, value] of Object.entries(titleResult.attrs)) {
             if (result[attr] === undefined) {
                 result[attr] = value;
@@ -874,14 +893,13 @@ class TagUtils {
         }
         gate = titleResult.gate;
 
-        // Evaluate task content level (gated by column + title)
-        const contentResult = this.evaluateTemporalsAtLevel(taskContent || '', gate, 'taskContent');
-        // Only add attrs that aren't already set by higher levels
-        for (const [attr, value] of Object.entries(contentResult.attrs)) {
-            if (result[attr] === undefined) {
-                result[attr] = value;
-            }
-        }
+        console.log('[TEMPORAL DEBUG] Task title:', taskTitle, '→ gate:', JSON.stringify(gate), 'attrs:', JSON.stringify(titleResult.attrs));
+
+        // NOTE: Task content temporals are NOT added to task-level attributes
+        // Content temporals should only highlight the individual tag, not the whole task
+        // The markdown renderer handles highlighting individual temporal tags in descriptions
+
+        console.log('[TEMPORAL DEBUG] Result:', JSON.stringify(result));
 
         return result;
     }
