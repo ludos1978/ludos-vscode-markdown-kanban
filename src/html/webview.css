@@ -4658,22 +4658,8 @@ blockquote {
   display: block;
 }
 
-/* Diagram menu button - size and position specific (shared styles in btn-overlay-icon) */
-.diagram-overlay-container .diagram-menu-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 4px;
-}
-
-.diagram-overlay-container:hover .diagram-menu-btn {
-  opacity: 1;
-}
+/* Note: Diagram menu button styles are now unified with other overlay menu buttons
+   in the shared rule at the top of the file (.diagram-overlay-container .diagram-menu-btn) */
 
 /* ============================================================================
    RESOURCE PATH MENUS - Consolidated styles for image/include path menus
