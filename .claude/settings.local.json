@@ -149,7 +149,11 @@
       "Bash(npx knip:*)",
       "Bash(npm uninstall:*)",
       "Skill(debug)",
-      "Bash(npm version:*)"
+      "Bash(npm version:*)",
+      "Bash(./build.sh)",
+      "Bash(vsce package:*)",
+      "Bash(eslint:*)",
+      "Bash(npm info:*)"
     ],
     "deny": [],
     "ask": []
