@@ -323,18 +323,27 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             // Open/focus the kanban panel
             KanbanWebviewPanel.createOrShow(this._extensionUri, this._extensionContext, document);
 
-            // Wait a bit for the panel to be ready, then send scroll message
-            setTimeout(() => {
-                const panel = KanbanWebviewPanel.getPanelForDocument(boardUri);
-                if (panel) {
-                    panel.getPanel().webview.postMessage({
+            // Use document.uri.toString() to match how panels are stored in the map
+            const panelKey = document.uri.toString();
+            const panel = KanbanWebviewPanel.getPanelForDocument(panelKey);
+
+            if (panel) {
+                // Reveal the panel first
+                const webviewPanel = panel.getPanel();
+                webviewPanel.reveal(undefined, false);
+
+                // Send scroll message after a short delay to ensure webview is ready
+                setTimeout(() => {
+                    webviewPanel.webview.postMessage({
                         type: 'scrollToElement',
                         columnId,
                         taskId,
                         highlight: true
                     });
-                }
-            }, 500);
+                }, 300);
+            } else {
+                console.error(`[Dashboard] Panel not found for document: ${panelKey}`);
+            }
         } catch (error) {
             console.error(`[Dashboard] Error navigating to task:`, error);
         }
