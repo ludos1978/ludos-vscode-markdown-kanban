@@ -316,46 +316,20 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
      * Handle navigation to a specific task
      */
     private async _handleNavigate(boardUri: string, columnId: string, taskId: string): Promise<void> {
-        console.log(`[Dashboard] _handleNavigate called:`, { boardUri, columnId, taskId });
-
         try {
             const uri = vscode.Uri.parse(boardUri);
-            console.log(`[Dashboard] Parsed URI:`, uri.toString());
-
             const document = await vscode.workspace.openTextDocument(uri);
-            console.log(`[Dashboard] Document opened:`, document.uri.toString());
 
             // Open/focus the kanban panel
             KanbanWebviewPanel.createOrShow(this._extensionUri, this._extensionContext, document);
-            console.log(`[Dashboard] createOrShow called`);
 
             // Use document.uri.toString() to match how panels are stored in the map
             const panelKey = document.uri.toString();
-            console.log(`[Dashboard] Looking for panel with key:`, panelKey);
-
-            // List all panel keys for debugging
-            const allPanels = KanbanWebviewPanel.getAllPanels();
-            console.log(`[Dashboard] All panels (${allPanels.length}):`, allPanels.map(p => p.getCurrentDocumentUri()?.toString()));
-
             const panel = KanbanWebviewPanel.getPanelForDocument(panelKey);
-            console.log(`[Dashboard] Panel found:`, !!panel);
 
             if (panel) {
-                // Reveal the panel first
-                const webviewPanel = panel.getPanel();
-                webviewPanel.reveal(undefined, false);
-                console.log(`[Dashboard] Panel revealed`);
-
-                // Send scroll message after a short delay to ensure webview is ready
-                setTimeout(() => {
-                    console.log(`[Dashboard] Sending scrollToElement message:`, { columnId, taskId });
-                    webviewPanel.webview.postMessage({
-                        type: 'scrollToElement',
-                        columnId,
-                        taskId,
-                        highlight: true
-                    });
-                }, 300);
+                // Use the panel's scrollToElement method which handles timing properly
+                panel.scrollToElement(columnId, taskId, true);
             } else {
                 console.error(`[Dashboard] Panel not found for document: ${panelKey}`);
             }
@@ -732,7 +706,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
 
         function navigateToTask(boardUri, columnId, taskId) {
-            console.log('[Dashboard Webview] navigateToTask called:', { boardUri, columnId, taskId });
             vscode.postMessage({
                 type: 'dashboardNavigate',
                 boardUri,

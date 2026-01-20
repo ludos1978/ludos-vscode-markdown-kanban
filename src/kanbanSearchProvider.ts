@@ -210,20 +210,15 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             return;
         }
 
-        // Send scroll message to the main kanban webview
-        const scrollMessage: ScrollToElementMessage = {
-            type: 'scrollToElement',
-            columnId: message.columnId,
-            taskId: message.taskId,
-            highlight: true,
-            elementPath: message.elementPath,
-            elementType: message.elementType,
-            field: message.field
-        };
-
-        const webviewPanel = panel.getPanel();
-        webviewPanel.reveal(undefined, false);
-        webviewPanel.webview.postMessage(scrollMessage);
+        // Use the panel's scrollToElement method which handles timing properly
+        panel.scrollToElement(
+            message.columnId,
+            message.taskId,
+            true,
+            message.elementPath,
+            message.elementType,
+            message.field
+        );
     }
 
     /**

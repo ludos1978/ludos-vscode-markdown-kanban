@@ -23,7 +23,7 @@ import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
-import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage } from './core/bridge/MessageTypes';
+import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage, ScrollToElementMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { cleanupAutoExportSubscription } from './commands';
 import {
@@ -82,6 +82,7 @@ export class KanbanWebviewPanel {
     private _unsavedChangesService: UnsavedChangesService | null = null;
     private _webviewUpdateService: WebviewUpdateService | null = null;
     private _fileContextMissing: boolean = false;
+    private _pendingScrollRequest: ScrollToElementMessage | null = null;
 
     public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
@@ -228,6 +229,42 @@ export class KanbanWebviewPanel {
     public getPanelId(): string { return this._context.panelId; }
     public getPanel(): vscode.WebviewPanel { return this._panel; }
     public hasUnsavedChanges(): boolean { return this._fileRegistry.getMainFile()?.hasUnsavedChanges() || false; }
+
+    /**
+     * Scroll to and highlight an element in the kanban board.
+     * If the webview isn't ready yet, the request is queued and sent when ready.
+     */
+    public scrollToElement(
+        columnId: string,
+        taskId?: string,
+        highlight: boolean = true,
+        elementPath?: string,
+        elementType?: string,
+        field?: 'columnTitle' | 'taskTitle' | 'description'
+    ): void {
+        const message: ScrollToElementMessage = {
+            type: 'scrollToElement',
+            columnId,
+            taskId,
+            highlight,
+            elementPath,
+            elementType,
+            field
+        };
+
+        // Reveal the panel first
+        this._panel.reveal(undefined, false);
+
+        if (this._context.webviewReady) {
+            // Webview is ready, send immediately
+            logger.debug('[KanbanWebviewPanel.scrollToElement] Sending immediately:', { columnId, taskId });
+            this._panel.webview.postMessage(message);
+        } else {
+            // Queue the request to be sent when webview is ready
+            logger.debug('[KanbanWebviewPanel.scrollToElement] Queueing for later:', { columnId, taskId });
+            this._pendingScrollRequest = message;
+        }
+    }
     public getCanonicalMainFilePath(): string | undefined {
         const uriString = this._context.lastDocumentUri || this._context.trackedDocumentUri;
         if (uriString) {
@@ -495,6 +532,19 @@ export class KanbanWebviewPanel {
         logger.debug('[KanbanWebviewPanel._handleWebviewReady] wasAlreadyReady:', wasAlreadyReady);
         const refreshConfiguration = () => { void this.refreshConfiguration(); };
 
+        // Helper to send pending scroll request after a delay (to allow DOM to update)
+        const sendPendingScroll = () => {
+            if (this._pendingScrollRequest) {
+                const scrollRequest = this._pendingScrollRequest;
+                this._pendingScrollRequest = null;
+                // Delay to ensure DOM has been updated with board content
+                setTimeout(() => {
+                    logger.debug('[KanbanWebviewPanel._handleWebviewReady] Sending pending scroll request:', scrollRequest);
+                    this._panel.webview.postMessage(scrollRequest);
+                }, 100);
+            }
+        };
+
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         logger.debug('[KanbanWebviewPanel._handleWebviewReady] pendingUpdate:', pendingUpdate);
         if (pendingUpdate) {
@@ -502,6 +552,7 @@ export class KanbanWebviewPanel {
             this._fileManager.sendFileInfo();
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
             refreshConfiguration();
+            sendPendingScroll();
             return;
         }
 
@@ -509,11 +560,13 @@ export class KanbanWebviewPanel {
         if (wasAlreadyReady) {
             // Already handled webviewReady before - skip duplicate
             logger.debug('[KanbanWebviewPanel._handleWebviewReady] Duplicate webviewReady - skipping');
+            sendPendingScroll();
             return;
         }
 
         // First ready without pending update - nothing to do
         refreshConfiguration();
+        sendPendingScroll();
         logger.debug('[KanbanWebviewPanel._handleWebviewReady] First ready, no pending update - configuration refreshed');
     }
 
