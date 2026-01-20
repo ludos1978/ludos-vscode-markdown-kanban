@@ -4013,7 +4013,8 @@ if (!webviewEventListenersInitialized) {
             break;
 
         case 'scrollToElement':
-            // Handle scroll-to-element request from search sidebar
+            // Handle scroll-to-element request from search sidebar or dashboard
+            console.log('[Webview] scrollToElement received:', { columnId: message.columnId, taskId: message.taskId, highlight: message.highlight });
             scrollToAndHighlight(
                 message.columnId,
                 message.taskId,
@@ -4435,13 +4436,18 @@ function performEditorRedo() {
  * @param {boolean} [highlight] - Whether to add highlight animation
  */
 function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, elementType, field) {
+    console.log('[Webview] scrollToAndHighlight called:', { columnId, taskId, highlight, elementPath, elementType, field });
+
     let targetElement = null;
     const columnElement = columnId
         ? document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`)
         : null;
+    console.log('[Webview] columnElement found:', !!columnElement, columnElement?.dataset?.columnId);
+
     const taskElement = columnElement && taskId
         ? columnElement.querySelector(`.task-item[data-task-id="${taskId}"]`)
         : null;
+    console.log('[Webview] taskElement found:', !!taskElement, taskElement?.dataset?.taskId);
 
     const escapeSelector = (value) => {
         if (typeof value !== 'string') return '';

@@ -3,6 +3,9 @@
   - list all tags (for example #todo )
   - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
 
+- [ ] Dashboard fixes:
+  - the "right-click a .md file in explorer ..." can be hidden after one has been added.
+
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
 
 - [ ] why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?

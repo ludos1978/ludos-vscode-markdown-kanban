@@ -316,24 +316,39 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
      * Handle navigation to a specific task
      */
     private async _handleNavigate(boardUri: string, columnId: string, taskId: string): Promise<void> {
+        console.log(`[Dashboard] _handleNavigate called:`, { boardUri, columnId, taskId });
+
         try {
             const uri = vscode.Uri.parse(boardUri);
+            console.log(`[Dashboard] Parsed URI:`, uri.toString());
+
             const document = await vscode.workspace.openTextDocument(uri);
+            console.log(`[Dashboard] Document opened:`, document.uri.toString());
 
             // Open/focus the kanban panel
             KanbanWebviewPanel.createOrShow(this._extensionUri, this._extensionContext, document);
+            console.log(`[Dashboard] createOrShow called`);
 
             // Use document.uri.toString() to match how panels are stored in the map
             const panelKey = document.uri.toString();
+            console.log(`[Dashboard] Looking for panel with key:`, panelKey);
+
+            // List all panel keys for debugging
+            const allPanels = KanbanWebviewPanel.getAllPanels();
+            console.log(`[Dashboard] All panels (${allPanels.length}):`, allPanels.map(p => p.getCurrentDocumentUri()?.toString()));
+
             const panel = KanbanWebviewPanel.getPanelForDocument(panelKey);
+            console.log(`[Dashboard] Panel found:`, !!panel);
 
             if (panel) {
                 // Reveal the panel first
                 const webviewPanel = panel.getPanel();
                 webviewPanel.reveal(undefined, false);
+                console.log(`[Dashboard] Panel revealed`);
 
                 // Send scroll message after a short delay to ensure webview is ready
                 setTimeout(() => {
+                    console.log(`[Dashboard] Sending scrollToElement message:`, { columnId, taskId });
                     webviewPanel.webview.postMessage({
                         type: 'scrollToElement',
                         columnId,
@@ -510,9 +525,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     <div class="dashboard-container">
         <!-- Upcoming Items Section -->
         <div class="section">
-            <div class="section-header" onclick="toggleSection('upcoming')">
+            <div class="section-header" data-section="upcoming">
                 <span>Upcoming Items</span>
-                <button class="refresh-btn" onclick="event.stopPropagation(); refresh()" title="Refresh">↻</button>
+                <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
             </div>
             <div class="section-content" id="upcoming-content">
                 <div class="empty-message" id="upcoming-empty">No upcoming items</div>
@@ -522,7 +537,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         <!-- Tags Section -->
         <div class="section">
-            <div class="section-header" onclick="toggleSection('tags')">
+            <div class="section-header" data-section="tags">
                 <span>Tags by Board</span>
             </div>
             <div class="section-content" id="tags-content">
@@ -533,7 +548,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         <!-- Boards Configuration Section -->
         <div class="section">
-            <div class="section-header" onclick="toggleSection('boards')">
+            <div class="section-header" data-section="boards">
                 <span>Configured Boards</span>
             </div>
             <div class="section-content" id="boards-content">
@@ -551,6 +566,22 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Setup section toggle handlers
+            document.querySelectorAll('.section-header[data-section]').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    // Don't toggle if clicking on a button inside
+                    if (e.target.closest('button')) return;
+                    const sectionId = header.getAttribute('data-section');
+                    toggleSection(sectionId);
+                });
+            });
+
+            // Setup refresh button
+            document.getElementById('refresh-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                refresh();
+            });
+
             vscode.postMessage({ type: 'dashboardReady' });
         });
 
@@ -596,10 +627,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                 html += '<div class="date-group">';
                 html += '<div class="date-group-header">' + escapeHtml(date) + '</div>';
                 groupItems.forEach(item => {
-                    html += '<div class="upcoming-item" onclick="navigateToTask(\\'';
-                    html += escapeHtml(item.boardUri) + '\\', \\'';
-                    html += escapeHtml(item.columnId) + '\\', \\'';
-                    html += escapeHtml(item.taskId) + '\\')">';
+                    html += '<div class="upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
+                    html += 'data-column-id="' + escapeHtml(item.columnId) + '" ';
+                    html += 'data-task-id="' + escapeHtml(item.taskId) + '">';
                     html += '<span class="upcoming-title">' + escapeHtml(item.taskTitle) + '</span>';
                     html += '<span class="upcoming-board">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
                     html += '</div>';
@@ -608,6 +638,16 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             }
 
             container.innerHTML = html;
+
+            // Add click listeners to upcoming items (CSP doesn't allow inline onclick)
+            container.querySelectorAll('.upcoming-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const boardUri = item.getAttribute('data-board-uri');
+                    const columnId = item.getAttribute('data-column-id');
+                    const taskId = item.getAttribute('data-task-id');
+                    navigateToTask(boardUri, columnId, taskId);
+                });
+            });
         }
 
         function renderTagsByBoard() {
@@ -651,18 +691,34 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             let html = '';
             boards.forEach(board => {
                 const name = board.uri.split('/').pop().replace('.md', '');
-                html += '<div class="board-config">';
+                html += '<div class="board-config" data-board-uri="' + escapeHtml(board.uri) + '">';
                 html += '<span class="board-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span>';
-                html += '<select class="timeframe-select" onchange="updateTimeframe(\\'' + escapeHtml(board.uri) + '\\', this.value)">';
+                html += '<select class="timeframe-select" data-board-uri="' + escapeHtml(board.uri) + '">';
                 html += '<option value="3"' + (board.timeframe === 3 ? ' selected' : '') + '>3 days</option>';
                 html += '<option value="7"' + (board.timeframe === 7 ? ' selected' : '') + '>7 days</option>';
                 html += '<option value="30"' + (board.timeframe === 30 ? ' selected' : '') + '>30 days</option>';
                 html += '</select>';
-                html += '<button class="remove-btn" onclick="removeBoard(\\'' + escapeHtml(board.uri) + '\\')" title="Remove">✕</button>';
+                html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';
                 html += '</div>';
             });
 
             container.innerHTML = html;
+
+            // Add event listeners for timeframe selects
+            container.querySelectorAll('.timeframe-select').forEach(select => {
+                select.addEventListener('change', () => {
+                    const boardUri = select.getAttribute('data-board-uri');
+                    updateTimeframe(boardUri, select.value);
+                });
+            });
+
+            // Add event listeners for remove buttons
+            container.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const boardUri = btn.getAttribute('data-board-uri');
+                    removeBoard(boardUri);
+                });
+            });
         }
 
 
@@ -676,6 +732,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
 
         function navigateToTask(boardUri, columnId, taskId) {
+            console.log('[Dashboard Webview] navigateToTask called:', { boardUri, columnId, taskId });
             vscode.postMessage({
                 type: 'dashboardNavigate',
                 boardUri,
