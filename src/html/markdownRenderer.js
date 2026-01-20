@@ -1741,9 +1741,10 @@ async function processDiagramQueue() {
                 element.appendChild(menuBtn);
             } else {
                 // Use data-file-path for unified path handling across all media types
+                // Use data-action for event delegation instead of inline onclick
                 element.innerHTML = `<span class="image-path-overlay-container" data-file-path="${decodedPath.replace(/"/g, '&quot;')}">
                     <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" />
-                    <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+                    <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
                 </span>`;
             }
 
@@ -2392,7 +2393,7 @@ function renderMarkdown(text, includeContext) {
             // Use data-file-path for unified path handling across all media types
             return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${videoWithError}
-                <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+                <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
             </div>`;
         };
 
@@ -2436,7 +2437,7 @@ function renderMarkdown(text, includeContext) {
             // Use data-file-path for unified path handling across all media types
             return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${audioWithError}
-                <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+                <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
             </div>`;
         };
 
@@ -2624,7 +2625,7 @@ function renderMarkdown(text, includeContext) {
             // Use data-file-path for unified path handling across all media types
             return `<span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${imgTag}
-                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+                <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
             </span>`;
         };
         
@@ -2695,9 +2696,7 @@ function renderMarkdown(text, includeContext) {
             }
             // Check if this was a local file link that needs the burger menu
             if (openToken && openToken._isLocalFileLink) {
-                const escapedPath = openToken._escapedPath;
-                console.log('[LINK-RENDER] Adding burger menu for local file link:', escapedPath);
-                return `</a><button class="link-menu-btn" onclick="event.stopPropagation(); event.preventDefault(); toggleLinkPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button></span>`;
+                return `</a><button class="link-menu-btn" data-action="link-menu" title="Path options">☰</button></span>`;
             }
             return '</a>';
         };

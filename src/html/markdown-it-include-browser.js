@@ -52,7 +52,7 @@
 
     return `<span class="include-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}" data-include-type="${clickHandler}"${isBroken ? ` data-include-error="true"` : ''}>
         <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="${linkTooltip}">${escapeHtml(displayText)}</span>
-        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="${menuTooltip}">☰</button>
+        <button class="include-menu-btn" data-action="include-menu" title="${menuTooltip}">☰</button>
         <div class="include-path-menu">
             <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath(this, '${escapedPath}')">📄 Open</button>
             <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
@@ -108,7 +108,7 @@
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
            onerror="handleMediaNotFound(this, '${escapedPath}', 'image')"
            style="max-width: 100%; height: auto;">
-      <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+      <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
     </span>`;
   }
 
@@ -128,7 +128,7 @@
              style="max-width: 100%; height: auto;">
         Your browser does not support the video tag.
       </video>
-      <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+      <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
     </span>`;
   }
 

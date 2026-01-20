@@ -1122,6 +1122,13 @@ function setupMediaPathEventDelegation() {
             case 'toggle-menu':
                 toggleMediaNotFoundMenu(container, mediaType);
                 break;
+            case 'image-menu':
+            case 'video-menu':
+            case 'link-menu':
+            case 'include-menu':
+                // Handle working media menu toggle (not broken/not-found)
+                togglePathMenu(container, filePath, mediaType);
+                break;
             case 'reveal':
                 revealPathInExplorer(filePath);
                 break;
