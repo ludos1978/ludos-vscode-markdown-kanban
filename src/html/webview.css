@@ -468,7 +468,7 @@ body {
   font-size: 11px;
   font-weight: normal;
   white-space: nowrap;
-  z-index: 10000;
+  z-index: 2000;
   pointer-events: none;
   border: 1px solid var(--vscode-editorWidget-border, #454545);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -483,7 +483,7 @@ body {
   transform: translateX(-50%);
   border: 4px solid transparent;
   border-bottom-color: var(--vscode-editorWidget-border, #454545);
-  z-index: 10001;
+  z-index: 2001;
   pointer-events: none;
 }
 
@@ -564,7 +564,7 @@ body.marp-settings-hidden .donut-menu-submenu .marp-menu-panel {
   border: 1px solid var(--vscode-dropdown-border);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  z-index: 10000;
+  z-index: 2000;
   padding: 4px 0;
   padding-top: 8px; /* Extra padding at top for visual gap */
   margin-top: 0; /* No gap - continuous hover zone */
@@ -826,7 +826,7 @@ body.marp-settings-hidden .donut-menu-submenu .marp-menu-panel {
 .processes-menu-dropdown {
   padding: 8px;
   min-width: 220px;
-  z-index: 2147483647;
+  z-index: 5000;
 }
 
 .processes-menu.active .processes-menu-dropdown {
@@ -2922,7 +2922,7 @@ button.file-bar-menu-item {
   border-radius: 3px;
   transition: background-color 0.2s ease;
   position: relative;
-  z-index: 100001;
+  z-index: 10;
 }
 
 /* Tag chip text truncates */
@@ -2961,7 +2961,7 @@ button.file-bar-menu-item {
   text-overflow: ellipsis;
   min-width: 0;
   position: relative;
-  z-index: 100002;
+  z-index: 10;
   /* Ensure buttons are always interactive */
   touch-action: manipulation;
   user-select: none;
@@ -3343,7 +3343,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   overflow: hidden;
   text-overflow: ellipsis;
   flex-shrink: 0;
-  z-index: 999999 !important;
+  z-index: 100;
   position: relative !important;
 }
 
@@ -4405,7 +4405,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   height: 3px;
   background-color: var(--vscode-focusBorder);
   border-radius: 2px;
-  z-index: 10000; /* Above everything */
+  z-index: 2000; /* Above everything */
   pointer-events: none;
   display: none;
   box-shadow: 0 0 6px var(--vscode-focusBorder);
@@ -5214,7 +5214,7 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
     border: 1px solid var(--vscode-menu-border);
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    z-index: 10000;
+    z-index: 2000;
     min-width: 150px;
     padding: 4px 0;
 }
@@ -6152,7 +6152,7 @@ figcaption {
   position: fixed;
   top: 20px;
   right: 20px;
-  z-index: 9999;
+  z-index: 2000;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6242,7 +6242,7 @@ figcaption {
   background: rgba(0, 0, 0, 0.5);
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 2000;
 }
 
 .file-context-overlay {
@@ -6735,7 +6735,7 @@ figcaption {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 10000;
+    z-index: 2000;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
@@ -6758,7 +6758,7 @@ figcaption {
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 200ms ease, transform 200ms ease;
-    z-index: 12000;
+    z-index: 2500;
     pointer-events: none;
 }
 
@@ -7188,7 +7188,7 @@ figcaption {
     display: inline-block !important;
     background: #666 !important;
     color: white !important;
-    z-index: 9999 !important;
+    z-index: 2000 !important;
     vertical-align: middle !important;
 }
 
@@ -7337,7 +7337,7 @@ figcaption {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.6);
-    z-index: 10001;
+    z-index: 2001;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7768,7 +7768,7 @@ figcaption {
   border: 1px solid var(--vscode-dropdown-border);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 2147483640;
+  z-index: 5000;
   padding: 8px;
   min-width: 300px;
   max-width: 400px;
@@ -7858,7 +7858,7 @@ figcaption {
 }
 
 .marp-global-menu-dropdown {
-  z-index: 2147483640;
+  z-index: 5000;
   padding: 0;
   min-width: 320px;
   max-width: 450px;
@@ -8159,7 +8159,7 @@ figcaption {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 2000;
   backdrop-filter: blur(2px);
 }
 
@@ -8320,7 +8320,7 @@ figcaption {
    ============================================================================ */
 .donut-submenu {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 5000;
   pointer-events: all;
   visibility: hidden;
   display: flex;
