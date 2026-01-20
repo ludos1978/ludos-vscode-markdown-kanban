@@ -1,16 +1,9 @@
-- [ ] i want a side panel that. for each kanban panel that is within it.
+- [ ] i want an addiitonal side panel that. for each kanban panel that is within it.
   - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
   - list all tags (for example #todo )
   - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
 
-
-- [ ] where is FileCommands.handleOpenFileLink used? can it be removed if it's unused?
-
-- [x] it sometimes happens that the "drop-indicator active" is not removed properly! check the codepaths that it's allways cleaned up!
-
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
-
-- [ ] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
 
 - [ ] why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?
 
@@ -61,6 +54,12 @@ A column can have multiple query tags:
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
+
+- [x] where is FileCommands.handleOpenFileLink used? can it be removed if it's unused?
+
+- [x] it sometimes happens that the "drop-indicator active" is not removed properly! check the codepaths that it's allways cleaned up!
+
+- [x] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
 
 - [x] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 
