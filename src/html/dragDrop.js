@@ -3164,14 +3164,9 @@ function updateStackBottomDropZones(stackElement = null) {
             }
 
             if (columnFooter) {
-                cumulativeTop += columnFooter.offsetHeight;
-                // Footer bars are inside footer but can overflow (footer has fixed height: 4px)
-                // So we need to measure them separately
-                // Check for both .stacked-footer-bars (stacked columns) and .footer-bars-container (non-stacked)
-                const footerBarsContainer = columnFooter.querySelector('.footer-bars-container');
-                if (footerBarsContainer) {
-                    cumulativeTop += footerBarsContainer.offsetHeight;
-                }
+                // Use scrollHeight to capture overflow from footer-bars-container
+                // (footer has fixed CSS height: 4px, but bars can overflow)
+                cumulativeTop += columnFooter.scrollHeight;
             }
         });
 

@@ -675,7 +675,9 @@ function updateStackLayoutCore(stackElement = null) {
                 const t2 = perfEnabled ? performance.now() : 0;
                 const headerHeight = header ? header.offsetHeight : 0;
                 const t3 = perfEnabled ? performance.now() : 0;
-                const footerHeight = footer ? footer.offsetHeight : 0;
+                // Use scrollHeight for footer to capture overflow from footer-bars-container
+                // (footer has fixed CSS height: 4px, but bars can overflow)
+                const footerHeight = footer ? footer.scrollHeight : 0;
                 const t4 = perfEnabled ? performance.now() : 0;
 
                 // Measure the actual content height on column-content for accurate measurement
@@ -683,16 +685,12 @@ function updateStackLayoutCore(stackElement = null) {
                 const contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
                 const t5 = perfEnabled ? performance.now() : 0;
 
-                const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
-                const footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
-                const t6 = perfEnabled ? performance.now() : 0;
-
                 const columnMargin = col.querySelector('.column-margin');
                 const marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
-                const t7 = perfEnabled ? performance.now() : 0;
+                const t6 = perfEnabled ? performance.now() : 0;
 
                 if (perfEnabled && measureTimings) {
-                    const colTotal = t7 - colMeasureStart;
+                    const colTotal = t6 - colMeasureStart;
                     // Only log if this column took >5ms (likely caused the reflow)
                     if (colTotal > 5) {
                         const colId = col.getAttribute('data-column-id') || `col-${idx}`;
@@ -702,14 +700,13 @@ function updateStackLayoutCore(stackElement = null) {
                             header: Math.round((t3 - t2) * 10) / 10,
                             footer: Math.round((t4 - t3) * 10) / 10,
                             content: Math.round((t5 - t4) * 10) / 10,
-                            footerBars: Math.round((t6 - t5) * 10) / 10,
-                            margin: Math.round((t7 - t6) * 10) / 10,
+                            margin: Math.round((t6 - t5) * 10) / 10,
                             total: Math.round(colTotal * 10) / 10
                         });
                     }
                 }
 
-                const totalHeight = columnHeaderHeight + headerHeight + footerHeight + footerBarsHeight + contentHeight;
+                const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
 
                 columnData.push({
                     col,
@@ -722,7 +719,6 @@ function updateStackLayoutCore(stackElement = null) {
                     footerHeight,
                     contentHeight,
                     totalHeight,
-                    footerBarsHeight,
                     marginHeight,
                     isVerticallyFolded,
                     isHorizontallyFolded
