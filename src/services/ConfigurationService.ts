@@ -75,7 +75,7 @@ export class ConfigurationService {
         openLinksInNewTab: false,
         pathGeneration: 'absolute' as 'relative' | 'absolute',
         mediaIndexScanScope: 'allWorkspaces',
-        dateLocale: 'auto' as 'auto' | 'de-DE' | 'de-AT' | 'de-CH' | 'en-US' | 'en-GB' | 'fr-FR' | 'iso',
+        dateLocale: 'de-DE' as 'auto' | 'de-DE' | 'de-AT' | 'de-CH' | 'en-US' | 'en-GB' | 'fr-FR' | 'iso',
         whitespace: '4px',
         maxRowHeight: 0,
         taskMinHeight: 'auto',

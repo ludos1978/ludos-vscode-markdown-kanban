@@ -29,9 +29,9 @@ class TagUtils {
         // Store prefixes for external access
         this.prefixes = TAG_PREFIXES;
 
-        // Date locale configuration (default: auto-detect)
+        // Date locale configuration (default: de-DE for European DD.MM.YYYY format)
         // Supported: 'auto', 'de-DE', 'de-AT', 'de-CH', 'en-US', 'en-GB', 'fr-FR', 'iso'
-        this.dateLocale = 'auto';
+        this.dateLocale = 'de-DE';
 
         // Resolved locale (actual locale used after auto-detection)
         this._resolvedLocale = null;
@@ -315,9 +315,7 @@ class TagUtils {
     }
 
     /**
-     * Extract date tag from text with locale-aware parsing
-     * Uses smart detection: if first number > 31, it's a year; if > 12, it's a day
-     * Falls back to locale preference for ambiguous cases
+     * Extract date tag from text with strict locale-based parsing
      * @param {string} text - Text to extract date tag from
      * @returns {Object|null} Object with {year, month, day} or null if not found
      */
@@ -337,19 +335,32 @@ class TagUtils {
 
         if (parts.length === 2) {
             // Format: DD.MM or MM/DD (day-month only, current year assumed)
+            if (this.isLocaleDayFirst()) {
+                // European: DD.MM
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10);
+            } else {
+                // US: MM/DD
+                month = parseInt(parts[0], 10);
+                day = parseInt(parts[1], 10);
+            }
+            year = currentYear;
+        } else {
+            // 3 parts - determine format based on which part has 4 digits
             const firstNum = parseInt(parts[0], 10);
             const secondNum = parseInt(parts[1], 10);
+            const thirdNum = parseInt(parts[2], 10);
+            const firstLen = parts[0].length;
+            const thirdLen = parts[2].length;
 
-            // Smart detection: if first > 12, it must be day (DD.MM)
-            if (firstNum > 12) {
-                day = firstNum;
+            if (firstLen === 4) {
+                // ISO format: YYYY-MM-DD
+                year = firstNum;
                 month = secondNum;
-            } else if (secondNum > 12) {
-                // Second > 12 means it's day, so first is month (MM/DD)
-                month = firstNum;
-                day = secondNum;
-            } else {
-                // Ambiguous (both <= 12), use locale preference
+                day = thirdNum;
+            } else if (thirdLen === 4) {
+                // Year at end: DD.MM.YYYY or MM/DD/YYYY
+                year = thirdNum;
                 if (this.isLocaleDayFirst()) {
                     day = firstNum;
                     month = secondNum;
@@ -357,63 +368,15 @@ class TagUtils {
                     month = firstNum;
                     day = secondNum;
                 }
-            }
-            year = currentYear;
-        } else {
-            // 3 parts - determine format based on which part has 4 digits or value ranges
-            const firstNum = parseInt(parts[0], 10);
-            const secondNum = parseInt(parts[1], 10);
-            const thirdNum = parseInt(parts[2], 10);
-            const firstLen = parts[0].length;
-            const thirdLen = parts[2].length;
-
-            if (firstLen === 4 || firstNum > 31) {
-                // ISO format: YYYY-MM-DD (first is 4 digits or > 31)
-                year = firstNum;
-                month = secondNum;
-                day = thirdNum;
-            } else if (thirdLen === 4 || thirdNum > 31) {
-                // Year at end: DD.MM.YYYY or MM/DD/YYYY
-                year = thirdLen === 4 ? thirdNum : (thirdNum < 100 ? 2000 + thirdNum : thirdNum);
-
-                // Smart detection for day vs month
-                if (firstNum > 12) {
-                    // First > 12, must be day: DD.MM.YYYY
-                    day = firstNum;
-                    month = secondNum;
-                } else if (secondNum > 12) {
-                    // Second > 12, must be day: MM.DD.YYYY (unusual but handle it)
-                    month = firstNum;
-                    day = secondNum;
-                } else {
-                    // Ambiguous, use locale preference
-                    if (this.isLocaleDayFirst()) {
-                        day = firstNum;
-                        month = secondNum;
-                    } else {
-                        month = firstNum;
-                        day = secondNum;
-                    }
-                }
             } else {
                 // Short year format: DD.MM.YY or MM/DD/YY
                 year = thirdNum < 100 ? 2000 + thirdNum : thirdNum;
-
-                // Smart detection for day vs month
-                if (firstNum > 12) {
+                if (this.isLocaleDayFirst()) {
                     day = firstNum;
                     month = secondNum;
-                } else if (secondNum > 12) {
+                } else {
                     month = firstNum;
                     day = secondNum;
-                } else {
-                    if (this.isLocaleDayFirst()) {
-                        day = firstNum;
-                        month = secondNum;
-                    } else {
-                        month = firstNum;
-                        day = secondNum;
-                    }
                 }
             }
         }

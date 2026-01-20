@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.103.5",
+  "version": "0.103.6",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -73,7 +73,7 @@
             "fr-FR",
             "iso"
           ],
-          "default": "auto",
+          "default": "de-DE",
           "description": "Date format locale for parsing temporal tags. 'auto' detects from system locale. European locales (de-*, fr-*, en-GB) use DD.MM.YYYY format, en-US uses MM/DD/YYYY, iso uses YYYY-MM-DD.",
           "enumDescriptions": [
             "Auto-detect from system/browser locale",
