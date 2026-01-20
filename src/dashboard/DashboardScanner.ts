@@ -215,21 +215,30 @@ export class DashboardScanner {
                     }
                 }
 
-                // Skip upcoming item check if column is outside timeframe
-                if (!columnWithinTimeframe) {
-                    continue;
-                }
+                // Check task's temporal tags (title + description)
+                const taskTemporal = this._extractTemporalInfo(taskText);
 
-                // Check task's temporal tags
-                const taskTemporal = this._extractTemporalInfo(task.title || '');
                 if (taskTemporal) {
                     temporalTasks++;
 
-                    // For time slots, use column's date if task doesn't have its own date
+                    // Determine effective date for this task
                     let effectiveDate = taskTemporal.date;
-                    if (taskTemporal.timeSlot && !taskTemporal.week && columnDate) {
-                        // Time slot inherits date from column
-                        effectiveDate = columnDate;
+
+                    // For time slots only (no date/week in task itself)
+                    if (taskTemporal.timeSlot && !taskTemporal.week) {
+                        if (columnTemporal && columnDate) {
+                            // Column has temporal tag - time slot inherits from column
+                            if (!columnWithinTimeframe) {
+                                // Column is outside timeframe - gates this time slot
+                                continue;
+                            }
+                            effectiveDate = columnDate;
+                        }
+                        // If no column temporal tag, time slot uses "today" (already set)
+                    } else if (columnTemporal && columnTemporal.date && !columnWithinTimeframe) {
+                        // Task has date/week tag, column also has temporal tag outside timeframe
+                        // Column gates the task
+                        continue;
                     }
 
                     if (effectiveDate && isWithinTimeframe(effectiveDate, timeframeDays)) {
@@ -248,10 +257,6 @@ export class DashboardScanner {
                             rawTitle: task.title || ''
                         });
                     }
-                } else if (columnTemporal && columnWithinTimeframe) {
-                    // Task has no temporal tag but column does - include if column is in timeframe
-                    // This catches tasks that inherit their timing from the column
-                    temporalTasks++;
                 }
             }
         }
