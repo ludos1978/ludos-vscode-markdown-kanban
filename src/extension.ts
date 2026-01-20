@@ -3,6 +3,7 @@ import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { KanbanSearchProvider } from './kanbanSearchProvider';
+import { KanbanDashboardProvider } from './kanbanDashboardProvider';
 import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
@@ -62,6 +63,30 @@ export function activate(context: vscode.ExtensionContext) {
 			KanbanSearchProvider.viewType,
 			searchProvider
 		)
+	);
+
+	// Initialize kanban dashboard sidebar
+	const dashboardProvider = new KanbanDashboardProvider(context.extensionUri, context);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			KanbanDashboardProvider.viewType,
+			dashboardProvider
+		)
+	);
+
+	// Register dashboard commands
+	context.subscriptions.push(
+		vscode.commands.registerCommand('markdown-kanban.dashboard.addBoard', async (item: any) => {
+			if (item?.uri) {
+				const uriString = item.uri.toString ? item.uri.toString() : String(item.uri);
+				await dashboardProvider.addBoard(uriString);
+			}
+		}),
+		vscode.commands.registerCommand('markdown-kanban.dashboard.removeBoard', async (boardUri: string) => {
+			if (boardUri) {
+				await dashboardProvider.removeBoard(boardUri);
+			}
+		})
 	);
 
 	let fileListenerEnabled = true;

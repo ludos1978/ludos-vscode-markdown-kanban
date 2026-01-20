@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.103.17",
+  "version": "0.104.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -85,6 +85,43 @@
             "French (France) - DD/MM/YYYY",
             "ISO 8601 - YYYY-MM-DD"
           ]
+        },
+        "markdown-kanban.dashboard.boards": {
+          "type": "array",
+          "default": [],
+          "description": "List of kanban boards to include in the Dashboard panel",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uri": {
+                "type": "string",
+                "description": "File URI of the kanban board"
+              },
+              "timeframe": {
+                "type": "number",
+                "enum": [3, 7, 30],
+                "default": 7,
+                "description": "Timeframe in days for showing upcoming items"
+              },
+              "tagFilters": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": [],
+                "description": "Tags to filter/highlight"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether this board is visible in the dashboard"
+              }
+            }
+          }
+        },
+        "markdown-kanban.dashboard.defaultTimeframe": {
+          "type": "number",
+          "enum": [3, 7, 30],
+          "default": 7,
+          "description": "Default timeframe in days for new boards added to the Dashboard"
         },
         "markdown-kanban.templates.showBar": {
           "type": "boolean",
@@ -4529,10 +4566,23 @@
           "type": "webview",
           "id": "kanbanSearch",
           "name": "Kanban Search"
+        },
+        {
+          "type": "webview",
+          "id": "kanbanDashboard",
+          "name": "Dashboard"
         }
       ]
     },
     "commands": [
+      {
+        "command": "markdown-kanban.dashboard.addBoard",
+        "title": "Add to Kanban Dashboard"
+      },
+      {
+        "command": "markdown-kanban.dashboard.removeBoard",
+        "title": "Remove from Kanban Dashboard"
+      },
       {
         "command": "markdown-kanban.openKanban",
         "title": "Kanban"
@@ -4644,6 +4694,11 @@
           "command": "markdown-kanban.sidebar.removeFile",
           "when": "view == kanbanBoardsSidebar && viewItem == kanbanBoard",
           "group": "inline"
+        },
+        {
+          "command": "markdown-kanban.dashboard.addBoard",
+          "when": "view == kanbanBoardsSidebar && viewItem == kanbanBoard",
+          "group": "dashboard"
         }
       ],
       "explorer/context": [
