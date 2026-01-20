@@ -10,7 +10,8 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 import {
     UpcomingItem,
     BoardTagSummary,
-    TagInfo
+    TagInfo,
+    TagSearchResult
 } from './DashboardTypes';
 
 // Date locale configuration - matches frontend tagUtils.js
@@ -376,5 +377,91 @@ export class DashboardScanner {
         }
 
         return result;
+    }
+
+    /**
+     * Search a board for all tasks containing a specific tag
+     * @param board - The parsed kanban board
+     * @param boardUri - URI of the board file
+     * @param boardName - Display name of the board
+     * @param searchTag - The tag to search for (e.g., "#project", "@person", "!date")
+     * @returns Array of matching tasks
+     */
+    static searchByTag(
+        board: KanbanBoard,
+        boardUri: string,
+        boardName: string,
+        searchTag: string
+    ): TagSearchResult[] {
+        const results: TagSearchResult[] = [];
+        const normalizedSearch = searchTag.toLowerCase();
+        console.log('[DashboardScanner.searchByTag] START - Searching for:', searchTag, 'normalized:', normalizedSearch);
+        console.log('[DashboardScanner.searchByTag] Board object:', board ? 'exists' : 'null/undefined');
+        console.log('[DashboardScanner.searchByTag] Board valid:', board?.valid);
+        console.log('[DashboardScanner.searchByTag] Board title:', board?.title);
+        console.log('[DashboardScanner.searchByTag] Board columns:', board?.columns ? 'exists' : 'null/undefined');
+        console.log('[DashboardScanner.searchByTag] Board has', board?.columns?.length || 0, 'columns');
+
+        let columnIndex = 0;
+        for (const column of board.columns || []) {
+            const columnTitle = column.title || '';
+            console.log('[DashboardScanner.searchByTag] Column[' + columnIndex + ']:', columnTitle, 'has', column.tasks?.length || 0, 'tasks');
+
+            // Check if column title contains the search tag
+            const columnTags = extractTags(columnTitle);
+            const columnHasTag = columnTags.some(t => t.name.toLowerCase().includes(normalizedSearch));
+            if (columnHasTag) {
+                console.log('[DashboardScanner.searchByTag] Column has matching tag in title');
+            }
+
+            let taskIndex = 0;
+            for (const task of column.tasks || []) {
+                const taskText = (task.title || '') + ' ' + (task.description || '');
+                const tags = extractTags(taskText);
+                if (tags.length > 0) {
+                    console.log('[DashboardScanner.searchByTag] Task[' + taskIndex + ']:', task.title?.substring(0, 50), 'tags:', tags.map(t => t.name).join(', '));
+                }
+
+                // Check if any tag in task matches the search
+                let taskMatched = false;
+                for (const tag of tags) {
+                    const matches = tag.name.toLowerCase().includes(normalizedSearch);
+                    if (matches) {
+                        console.log('[DashboardScanner.searchByTag] MATCH (task):', tag.name, 'in task:', task.title);
+                        results.push({
+                            boardUri,
+                            boardName,
+                            columnIndex,
+                            columnTitle,
+                            taskIndex,
+                            taskTitle: task.title || '',
+                            matchedTag: tag.name
+                        });
+                        taskMatched = true;
+                        break; // Only add task once even if multiple tags match
+                    }
+                }
+
+                // If task didn't match but column has the tag, include the task
+                if (!taskMatched && columnHasTag) {
+                    const matchingColumnTag = columnTags.find(t => t.name.toLowerCase().includes(normalizedSearch));
+                    console.log('[DashboardScanner.searchByTag] MATCH (column):', matchingColumnTag?.name, 'for task:', task.title);
+                    results.push({
+                        boardUri,
+                        boardName,
+                        columnIndex,
+                        columnTitle,
+                        taskIndex,
+                        taskTitle: task.title || '',
+                        matchedTag: matchingColumnTag?.name || searchTag
+                    });
+                }
+                taskIndex++;
+            }
+            columnIndex++;
+        }
+
+        console.log('[DashboardScanner.searchByTag] Found', results.length, 'results');
+        return results;
     }
 }

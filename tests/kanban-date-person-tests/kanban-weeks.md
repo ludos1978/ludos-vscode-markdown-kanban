@@ -35,6 +35,7 @@ kanban-plugin: board
   !23:00-24:00
   
 - [ ] Task with time slots in description                                           
+  !00:00-06:00
   !06:00-12:00                                                                 
   !12:00-18:00                                                                 
   !18:00-24:00

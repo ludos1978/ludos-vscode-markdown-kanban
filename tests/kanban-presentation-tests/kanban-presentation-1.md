@@ -4,7 +4,7 @@ kanban-plugin: board
 
 ---
 
-## # Heading 1 in Columntitle #green
+## # Heading 1 in Columntitle #green #todo
 - [ ] ## Heading 2 in Tasktitle #blue
   some long text
   
@@ -44,7 +44,7 @@ kanban-plugin: board
 
 ## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!! #stack
 
-## second #stack
+## second #todo #stack
 - [ ] test
 
 ## !!!include(fail1.md)!!!

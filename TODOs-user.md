@@ -4,9 +4,11 @@
   - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
 
 - [ ] Dashboard fixes:
-  - the "right-click a .md file in explorer ..." can be hidden after one has been added.
-  - i want to select or enter a tag, then all tags of this type get searched and listed
-  - it doesnt list the upcoming week tags and time tags
+  - [x] the "right-click a .md file in explorer ..." can be hidden after one has been added.
+  - [x] i want to select or enter a tag, then all tags of this type get searched and listed
+  - [x] i dont want a list of tags to click. i want a dropdown that allows adding the existing tags or enter tags manually that should be searched within the kanban and list all occurances.
+  - [x] it doesnt list the upcoming week tags and time tags
+  - [ ] the upcoming items from the date search should be sorted by first occurance (by time). separated each day by a horizontal line. make suggestions how to label the days!
 
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
 

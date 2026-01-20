@@ -97,6 +97,8 @@ export interface DashboardData {
     boardSummaries: BoardTagSummary[];
     /** Current dashboard configuration */
     config: DashboardConfig;
+    /** Items matching configured tag filters */
+    taggedItems: TagSearchResult[];
 }
 
 // Message types for dashboard webview communication
@@ -153,6 +155,61 @@ export interface DashboardNavigateMessage {
 }
 
 /**
+ * Result from tag search
+ */
+export interface TagSearchResult {
+    /** File URI of the board containing this task */
+    boardUri: string;
+    /** Display name of the board */
+    boardName: string;
+    /** Column index (0-based) for navigation */
+    columnIndex: number;
+    /** Column title */
+    columnTitle: string;
+    /** Task index (0-based) within column */
+    taskIndex: number;
+    /** Task title */
+    taskTitle: string;
+    /** The tag that matched the search */
+    matchedTag: string;
+}
+
+/**
+ * Request to search for tasks by tag
+ */
+export interface DashboardTagSearchMessage {
+    type: 'dashboardTagSearch';
+    tag: string;
+}
+
+/**
+ * Request to add a tag filter to a board
+ */
+export interface DashboardAddTagFilterMessage {
+    type: 'dashboardAddTagFilter';
+    boardUri: string;
+    tag: string;
+}
+
+/**
+ * Request to remove a tag filter from a board
+ */
+export interface DashboardRemoveTagFilterMessage {
+    type: 'dashboardRemoveTagFilter';
+    boardUri: string;
+    tag: string;
+}
+
+/**
+ * Tag search results from backend to webview
+ */
+export interface DashboardTagSearchResultsMessage {
+    type: 'dashboardTagSearchResults';
+    tag: string;
+    results: TagSearchResult[];
+}
+
+/**
  * Data sent from backend to dashboard webview
  */
 export interface DashboardDataMessage {
@@ -177,11 +234,15 @@ export type DashboardIncomingMessage =
     | DashboardAddBoardMessage
     | DashboardRemoveBoardMessage
     | DashboardUpdateConfigMessage
-    | DashboardNavigateMessage;
+    | DashboardNavigateMessage
+    | DashboardTagSearchMessage
+    | DashboardAddTagFilterMessage
+    | DashboardRemoveTagFilterMessage;
 
 /**
  * Union type for all dashboard messages from backend to webview
  */
 export type DashboardOutgoingMessage =
     | DashboardDataMessage
-    | DashboardConfigUpdatedMessage;
+    | DashboardConfigUpdatedMessage
+    | DashboardTagSearchResultsMessage;

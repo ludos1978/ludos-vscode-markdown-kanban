@@ -21,6 +21,7 @@ import {
     UpcomingItem,
     BoardTagSummary,
     TagInfo,
+    TagSearchResult,
     DashboardIncomingMessage
 } from './dashboard/DashboardTypes';
 import { DashboardScanner } from './dashboard/DashboardScanner';
@@ -93,6 +94,15 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'dashboardNavigate':
                     await this._handleNavigate(message.boardUri, message.columnIndex, message.taskIndex);
+                    break;
+                case 'dashboardTagSearch':
+                    await this._handleTagSearch(message.tag);
+                    break;
+                case 'dashboardAddTagFilter':
+                    await this._addTagFilter(message.boardUri, message.tag);
+                    break;
+                case 'dashboardRemoveTagFilter':
+                    await this._removeTagFilter(message.boardUri, message.tag);
                     break;
             }
         });
@@ -234,6 +244,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         const upcomingItems: UpcomingItem[] = [];
         const boardSummaries: BoardTagSummary[] = [];
+        const taggedItems: TagSearchResult[] = [];
 
         for (const boardConfig of this._config.boards) {
             if (!boardConfig.enabled) continue;
@@ -243,6 +254,25 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                 if (result) {
                     upcomingItems.push(...result.upcomingItems);
                     boardSummaries.push(result.summary);
+
+                    // Collect items matching configured tag filters
+                    console.log('[Dashboard] Board config:', boardConfig.uri, 'tagFilters:', boardConfig.tagFilters);
+                    console.log('[Dashboard] result.board exists:', result.board ? 'yes' : 'no');
+                    console.log('[Dashboard] result.board.columns:', result.board?.columns?.length || 0);
+                    if (boardConfig.tagFilters && boardConfig.tagFilters.length > 0 && result.board) {
+                        const boardName = path.basename(vscode.Uri.parse(boardConfig.uri).fsPath, '.md');
+                        for (const tagFilter of boardConfig.tagFilters) {
+                            console.log('[Dashboard] Searching for tag:', tagFilter, 'in board:', boardName);
+                            const matches = DashboardScanner.searchByTag(
+                                result.board,
+                                boardConfig.uri,
+                                boardName,
+                                tagFilter
+                            );
+                            console.log('[Dashboard] Found', matches.length, 'matches for', tagFilter);
+                            taggedItems.push(...matches);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error(`[Dashboard] Error scanning board ${boardConfig.uri}:`, error);
@@ -259,10 +289,20 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             return 0;
         });
 
+        // Remove duplicate tagged items (same task might match multiple tags)
+        const uniqueTaggedItems = taggedItems.filter((item, index, self) =>
+            index === self.findIndex(t =>
+                t.boardUri === item.boardUri &&
+                t.columnIndex === item.columnIndex &&
+                t.taskIndex === item.taskIndex
+            )
+        );
+
         const data: DashboardData = {
             upcomingItems,
             boardSummaries,
-            config: this._config
+            config: this._config,
+            taggedItems: uniqueTaggedItems
         };
 
         this._view.webview.postMessage({
@@ -277,6 +317,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     private async _scanBoard(boardConfig: DashboardBoardConfig): Promise<{
         upcomingItems: UpcomingItem[];
         summary: BoardTagSummary;
+        board: import('./markdownParser').KanbanBoard;
     } | null> {
         try {
             const uri = vscode.Uri.parse(boardConfig.uri);
@@ -300,12 +341,17 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             const boardName = path.basename(uri.fsPath, '.md');
 
             // Use DashboardScanner to extract data
-            return DashboardScanner.scanBoard(
+            const scanResult = DashboardScanner.scanBoard(
                 board,
                 boardConfig.uri,
                 boardName,
                 boardConfig.timeframe
             );
+
+            return {
+                ...scanResult,
+                board
+            };
         } catch (error) {
             console.error(`[Dashboard] Error scanning board ${boardConfig.uri}:`, error);
             return null;
@@ -335,6 +381,92 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             }
         } catch (error) {
             console.error(`[Dashboard] Error navigating to task:`, error);
+        }
+    }
+
+    /**
+     * Handle tag search request
+     */
+    private async _handleTagSearch(tag: string): Promise<void> {
+        if (!this._view || !tag.trim()) return;
+
+        const results: TagSearchResult[] = [];
+
+        for (const boardConfig of this._config.boards) {
+            if (!boardConfig.enabled) continue;
+
+            try {
+                const uri = vscode.Uri.parse(boardConfig.uri);
+                if (!fs.existsSync(uri.fsPath)) continue;
+
+                const content = fs.readFileSync(uri.fsPath, 'utf-8');
+                const basePath = path.dirname(uri.fsPath);
+                const parseResult = MarkdownKanbanParser.parseMarkdown(content, basePath, undefined, uri.fsPath);
+
+                if (!parseResult?.board) continue;
+
+                const boardName = path.basename(uri.fsPath, '.md');
+                const boardResults = DashboardScanner.searchByTag(
+                    parseResult.board,
+                    boardConfig.uri,
+                    boardName,
+                    tag
+                );
+                results.push(...boardResults);
+            } catch (error) {
+                console.error(`[Dashboard] Error searching board ${boardConfig.uri}:`, error);
+            }
+        }
+
+        this._view.webview.postMessage({
+            type: 'dashboardTagSearchResults',
+            tag,
+            results
+        });
+    }
+
+    /**
+     * Add a tag filter to a board
+     */
+    private async _addTagFilter(boardUri: string, tag: string): Promise<void> {
+        console.log('[Dashboard] _addTagFilter called:', boardUri, 'tag:', tag);
+        const boardIndex = this._config.boards.findIndex(b => b.uri === boardUri);
+        if (boardIndex === -1) {
+            console.log('[Dashboard] Board not found in config');
+            return;
+        }
+
+        const board = this._config.boards[boardIndex];
+        if (!board.tagFilters) {
+            board.tagFilters = [];
+        }
+
+        // Don't add duplicates
+        if (!board.tagFilters.includes(tag)) {
+            board.tagFilters.push(tag);
+            console.log('[Dashboard] Tag added, new filters:', board.tagFilters);
+            await this._saveConfig();
+            this._refreshData();
+        } else {
+            console.log('[Dashboard] Tag already exists');
+        }
+    }
+
+    /**
+     * Remove a tag filter from a board
+     */
+    private async _removeTagFilter(boardUri: string, tag: string): Promise<void> {
+        const boardIndex = this._config.boards.findIndex(b => b.uri === boardUri);
+        if (boardIndex === -1) return;
+
+        const board = this._config.boards[boardIndex];
+        if (!board.tagFilters) return;
+
+        const tagIndex = board.tagFilters.indexOf(tag);
+        if (tagIndex !== -1) {
+            board.tagFilters.splice(tagIndex, 1);
+            await this._saveConfig();
+            this._refreshData();
         }
     }
 
@@ -493,6 +625,143 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             padding-bottom: 4px;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
+        .tag-search-container {
+            margin-bottom: 8px;
+        }
+        .tag-search-input {
+            width: 100%;
+            padding: 6px 8px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 3px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        .tag-search-input:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+            border-color: var(--vscode-focusBorder);
+        }
+        .tag-search-result {
+            padding: 6px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 4px;
+        }
+        .tag-search-result:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+        .tag-search-result-title {
+            font-size: 13px;
+        }
+        .tag-search-result-location {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.7;
+        }
+        .tag-search-result-tag {
+            font-size: 11px;
+            color: var(--vscode-badge-foreground);
+            background: var(--vscode-badge-background);
+            padding: 1px 4px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .tag-search-header {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .board-config-item {
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .board-config-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            cursor: pointer;
+            background: var(--vscode-sideBar-background);
+        }
+        .board-config-header:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+        .board-config-toggle {
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+        .board-config-toggle.expanded {
+            transform: rotate(90deg);
+        }
+        .board-config-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .board-config-body {
+            padding: 8px;
+            display: none;
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+        .board-config-body.expanded {
+            display: block;
+        }
+        .board-config-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .board-config-row:last-child {
+            margin-bottom: 0;
+        }
+        .board-config-label {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            width: 60px;
+        }
+        .board-tag-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .board-tag-filter {
+            font-size: 11px;
+            padding: 2px 6px;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .board-tag-filter-remove {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .board-tag-filter-remove:hover {
+            opacity: 1;
+        }
+        .board-tag-input {
+            flex: 1;
+            padding: 4px 6px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 3px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -509,16 +778,19 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             </div>
         </div>
 
-        <!-- Tags Section -->
+        <!-- Tagged Items Section -->
         <div class="section">
-            <div class="section-header" data-section="tags">
-                <span>Tags by Board</span>
+            <div class="section-header" data-section="tagged">
+                <span>Tagged Items</span>
             </div>
-            <div class="section-content" id="tags-content">
-                <div class="empty-message" id="tags-empty">No boards configured</div>
-                <div id="tags-list"></div>
+            <div class="section-content" id="tagged-content">
+                <div class="empty-message" id="tagged-empty">No tag filters configured</div>
+                <div id="tagged-list"></div>
             </div>
         </div>
+
+        <!-- Hidden datalist for tag suggestions -->
+        <datalist id="tag-suggestions"></datalist>
 
         <!-- Boards Configuration Section -->
         <div class="section">
@@ -571,7 +843,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         function renderDashboard() {
             if (!dashboardData) return;
             renderUpcomingItems();
-            renderTagsByBoard();
+            renderTaggedItems();
+            populateTagSuggestions();
             renderBoardsConfig();
         }
 
@@ -624,33 +897,90 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             });
         }
 
-        function renderTagsByBoard() {
-            const container = document.getElementById('tags-list');
-            const emptyMsg = document.getElementById('tags-empty');
+        function populateTagSuggestions() {
+            const datalist = document.getElementById('tag-suggestions');
             const summaries = dashboardData.boardSummaries || [];
 
-            if (summaries.length === 0) {
+            // Collect all unique tags from all boards
+            const allTags = new Map();
+            summaries.forEach(summary => {
+                (summary.tags || []).forEach(tag => {
+                    if (!allTags.has(tag.name)) {
+                        allTags.set(tag.name, tag);
+                    } else {
+                        // Merge counts
+                        allTags.get(tag.name).count += tag.count;
+                    }
+                });
+            });
+
+            // Sort by count descending and create options
+            const sortedTags = Array.from(allTags.values()).sort((a, b) => b.count - a.count);
+            datalist.innerHTML = sortedTags.map(tag =>
+                '<option value="' + escapeHtml(tag.name) + '">' + escapeHtml(tag.name) + ' (' + tag.count + ')</option>'
+            ).join('');
+        }
+
+        function renderTaggedItems() {
+            const section = document.querySelector('[data-section="tagged"]')?.closest('.section');
+            const container = document.getElementById('tagged-list');
+            const emptyMsg = document.getElementById('tagged-empty');
+            const items = dashboardData.taggedItems || [];
+
+            // Check if any boards have tag filters configured
+            const hasTagFilters = (dashboardData.config?.boards || []).some(b => b.tagFilters && b.tagFilters.length > 0);
+
+            // Hide entire section if no tag filters configured
+            if (!hasTagFilters) {
+                if (section) section.style.display = 'none';
+                return;
+            }
+
+            if (section) section.style.display = 'block';
+
+            if (items.length === 0) {
                 container.innerHTML = '';
+                emptyMsg.textContent = 'No tasks match configured tag filters';
                 emptyMsg.style.display = 'block';
                 return;
             }
 
             emptyMsg.style.display = 'none';
 
-            let html = '';
-            summaries.forEach(summary => {
-                html += '<div style="margin-bottom: 12px;">';
-                html += '<div style="font-weight: 600; margin-bottom: 4px;">' + escapeHtml(summary.boardName) + '</div>';
-                html += '<div class="tag-cloud">';
-                summary.tags.slice(0, 20).forEach(tag => {
-                    const typeClass = tag.type === 'person' ? 'person' : (tag.type === 'temporal' ? 'temporal' : '');
-                    html += '<span class="tag-item ' + typeClass + '">' + escapeHtml(tag.name) + ' (' + tag.count + ')</span>';
-                });
-                html += '</div>';
-                html += '</div>';
+            // Group by matched tag
+            const groups = {};
+            items.forEach(item => {
+                const tagKey = item.matchedTag || 'Other';
+                if (!groups[tagKey]) groups[tagKey] = [];
+                groups[tagKey].push(item);
             });
 
+            let html = '';
+            for (const [tag, groupItems] of Object.entries(groups)) {
+                html += '<div class="date-group">';
+                html += '<div class="date-group-header">' + escapeHtml(tag) + ' (' + groupItems.length + ')</div>';
+                groupItems.forEach(item => {
+                    html += '<div class="tag-search-result" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
+                    html += 'data-column-index="' + item.columnIndex + '" ';
+                    html += 'data-task-index="' + item.taskIndex + '">';
+                    html += '<span class="tag-search-result-title">' + escapeHtml(item.taskTitle) + '</span>';
+                    html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
             container.innerHTML = html;
+
+            // Add click listeners
+            container.querySelectorAll('.tag-search-result').forEach(item => {
+                item.addEventListener('click', () => {
+                    const boardUri = item.getAttribute('data-board-uri');
+                    const columnIndex = parseInt(item.getAttribute('data-column-index'), 10);
+                    const taskIndex = parseInt(item.getAttribute('data-task-index'), 10);
+                    navigateToTask(boardUri, columnIndex, taskIndex);
+                });
+            });
         }
 
         function renderBoardsConfig() {
@@ -663,20 +993,70 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             }
 
             let html = '';
-            boards.forEach(board => {
+            boards.forEach((board, index) => {
                 const name = board.uri.split('/').pop().replace('.md', '');
-                html += '<div class="board-config" data-board-uri="' + escapeHtml(board.uri) + '">';
-                html += '<span class="board-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span>';
+                const tagFilters = board.tagFilters || [];
+
+                html += '<div class="board-config-item" data-board-uri="' + escapeHtml(board.uri) + '">';
+
+                // Header (clickable to expand/collapse)
+                html += '<div class="board-config-header">';
+                html += '<span class="board-config-toggle">▶</span>';
+                html += '<span class="board-config-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span>';
+                html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';
+                html += '</div>';
+
+                // Body (expandable)
+                html += '<div class="board-config-body">';
+
+                // Timeframe row
+                html += '<div class="board-config-row">';
+                html += '<span class="board-config-label">Timeframe:</span>';
                 html += '<select class="timeframe-select" data-board-uri="' + escapeHtml(board.uri) + '">';
                 html += '<option value="3"' + (board.timeframe === 3 ? ' selected' : '') + '>3 days</option>';
                 html += '<option value="7"' + (board.timeframe === 7 ? ' selected' : '') + '>7 days</option>';
                 html += '<option value="30"' + (board.timeframe === 30 ? ' selected' : '') + '>30 days</option>';
                 html += '</select>';
-                html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';
+                html += '</div>';
+
+                // Tag filters row
+                html += '<div class="board-config-row" style="flex-direction: column; align-items: stretch;">';
+                html += '<div style="display: flex; align-items: center; gap: 8px;">';
+                html += '<span class="board-config-label">Tags:</span>';
+                html += '<input type="text" class="board-tag-input" data-board-uri="' + escapeHtml(board.uri) + '" ';
+                html += 'list="tag-suggestions" placeholder="Add tag...">';
+                html += '</div>';
+
+                // Current tag filters
+                if (tagFilters.length > 0) {
+                    html += '<div class="board-tag-filters">';
+                    tagFilters.forEach(tag => {
+                        html += '<span class="board-tag-filter" data-board-uri="' + escapeHtml(board.uri) + '" data-tag="' + escapeHtml(tag) + '">';
+                        html += escapeHtml(tag);
+                        html += '<span class="board-tag-filter-remove">✕</span>';
+                        html += '</span>';
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';
+                html += '</div>';
                 html += '</div>';
             });
 
             container.innerHTML = html;
+
+            // Add event listeners for board header toggle
+            container.querySelectorAll('.board-config-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    if (e.target.closest('.remove-btn')) return;
+                    const item = header.closest('.board-config-item');
+                    const toggle = header.querySelector('.board-config-toggle');
+                    const body = item.querySelector('.board-config-body');
+                    toggle.classList.toggle('expanded');
+                    body.classList.toggle('expanded');
+                });
+            });
 
             // Add event listeners for timeframe selects
             container.querySelectorAll('.timeframe-select').forEach(select => {
@@ -688,9 +1068,44 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
             // Add event listeners for remove buttons
             container.querySelectorAll('.remove-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const boardUri = btn.getAttribute('data-board-uri');
                     removeBoard(boardUri);
+                });
+            });
+
+            // Add event listeners for tag input
+            container.querySelectorAll('.board-tag-input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const boardUri = input.getAttribute('data-board-uri');
+                    const tag = e.target.value.trim();
+                    if (tag) {
+                        addTagFilter(boardUri, tag);
+                        e.target.value = '';
+                    }
+                });
+                // Also handle Enter key for custom tags
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const boardUri = input.getAttribute('data-board-uri');
+                        const tag = e.target.value.trim();
+                        if (tag) {
+                            addTagFilter(boardUri, tag);
+                            e.target.value = '';
+                        }
+                    }
+                });
+            });
+
+            // Add event listeners for tag filter removal
+            container.querySelectorAll('.board-tag-filter-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const filter = btn.closest('.board-tag-filter');
+                    const boardUri = filter.getAttribute('data-board-uri');
+                    const tag = filter.getAttribute('data-tag');
+                    removeTagFilter(boardUri, tag);
                 });
             });
         }
@@ -726,6 +1141,22 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({
                 type: 'dashboardRemoveBoard',
                 boardUri
+            });
+        }
+
+        function addTagFilter(boardUri, tag) {
+            vscode.postMessage({
+                type: 'dashboardAddTagFilter',
+                boardUri,
+                tag
+            });
+        }
+
+        function removeTagFilter(boardUri, tag) {
+            vscode.postMessage({
+                type: 'dashboardRemoveTagFilter',
+                boardUri,
+                tag
             });
         }
 
