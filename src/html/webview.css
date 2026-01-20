@@ -4419,6 +4419,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 .markdown-content a {
   color: var(--vscode-textLink-foreground);
   text-decoration: none;
+  word-break: break-all;
 }
 
 .markdown-content a:hover {

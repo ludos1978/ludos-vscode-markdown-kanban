@@ -1,6 +1,83 @@
-- [ ] o this implementation. activate a scroll locking on the target, if it doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys , release the locking as well. 
+- [x] it sometimes happens that the "drop-indicator active" is not removed properly! check the codepaths that it's allways cleaned up!
 
-- [ ] when i "search for file" with "replace all paths with the same directory" it says there is 0 files found. but it must at least find the one i am searching for. i am sure all files are there, but someting goes wrong while searching.
+- [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
+
+- [ ] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
+
+- [ ] why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?
+
+- [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
+
+- [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
+
+- [ ] add a table editor that allows sorting of content by each category.
+
+- [ ] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
+
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+
+- [ ] would it be possible to take a screenshot of a webpage if a link is added to the board?
+
+  1. Open Graph images (simplest) - Fetch og:image meta tags from URLs. Most websites provide preview images. No screenshot needed, just an HTTP fetch + HTML parsing. 
+  2. Puppeteer/Playwright (full screenshots) - Run headless browser in extension backend to capture actual screenshots. Heavier dependency (~100-400MB), slower, but gives real screenshots.
+
+- [ ] #### Combined Queries
+
+A column can have multiple query tags:
+
+```markdown
+- Reto This Week ?@reto ?.w15
+```
+
+### Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | AND | `#gather_Reto&day<3` |
+| `\|` | OR | `#gather_Reto\|Anita` |
+| `=` | EQUAL | `#gather_day=0` |
+| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
+| `<` | LESS THAN | `#gather_day<7` |
+| `>` | GREATER THAN | `#gather_day>0` |
+
+### Date Properties
+
+| Property | Description | Values |
+|----------|-------------|--------|
+| `day` | Days from today | -2, -1, 0, 1, 2, ... |
+| `weekday` | Day name | mon, tue, wed, ... |
+| `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
+| `month` | Month name | jan, feb, mar, ... |
+| `monthnum` | Month number | 1 to 12 |
+
+### ?ungathered
+
+Collects all cards that didn't match any gather rule:
+
+- [x] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
+
+
+- [x] the pinned headers are not on top anymore! why is translateZ not working anymore to fixate column-title them above the column-content?
+
+
+- [x] we need a better style for the task item "- [ ]" and "- [x]" in markdown. it should allow being toggled outside the edit mode (and modify the data)!
+
+- [x] editor view:
+  can we add a dedicated task edit view. it is added to the burger menu of a task (edit task) at the top. it opens a overlay with which fills 80% of width and height with an increased font size (configurable in a burger menu in the overlay editor). the overlay editor can only be closed by alt+enter or pressing save or escape or clicks outside the view. drop events (of external files should behave as direct link creation within the editor). the editor has 3 view modes. - markdown only mode - dual mode, where markdown is written left and the preview is on the right side. - wysiwyg mode where we re-use the wysiwyg editor, but with an additional tools pane at the top (adding image links, etc. as in a typical wysiwyg editor.) 
+
+
+- [x] wysiwyg errors:
+  - pressing outside the edit field with the mouse should close the editor. it doesnt currently.
+
+
+
+- [x] can we change the image-path-overlay-container from div to span?
+
+- [x] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
+
+- [x] check the code for any timeout calls, i want to minimize usage of timeout!
+
+- [x] when i "search for file" with "replace all paths with the same directory" it says there is 0 files found. but it must at least find the one i am searching for. i am sure all files are there, but someting goes wrong while searching.
 @logs/vscode-app-1768683549969.log is the log
 the path found is "/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_World_n_Level_Design/_TOPICs_RESEARCH/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/"
 this is the task description """---:
@@ -38,82 +115,6 @@ this is the task description """---:
 :---
 
 <br>"""
-
-- [ ] ok, we have most features we require implemented. now can we make tests for all use cases that are really using the code (frontend to backend) maybe also a test that runs be run from within the application. that uses some standardized boards that call the functions and verify the changes done to the data? or what would you suggest to verify that all the features are working properly?
-
-- [ ] the pinned headers are not on top anymore! why is translateZ not working anymore to fixate column-title them above the column-content?
-
-- why does it need the includeContext in 10 places in the message types? is there possibly a opportunity for a refactor to unify this?
-
-- [ ] we need a better style for the task item "- [ ]" and "- [x]" in markdown. it should allow being toggled outside the edit mode (and modify the data)!
-
-
-editor view:
-- can we add a dedicated task edit view. it is added to the burger menu of a task (edit task) at the top. it opens a overlay with which fills 80% of width and height with an increased font size (configurable in a burger menu in the overlay editor). the overlay editor can only be closed by alt+enter or pressing save or escape or clicks outside the view. drop events (of external files should behave as direct link creation within the editor). the editor has 3 view modes. - markdown only mode - dual mode, where markdown is written left and the preview is on the right side. - wysiwyg mode where we re-use the wysiwyg editor, but with an additional tools pane at the top (adding image links, etc. as in a typical wysiwyg editor.) 
-
-
-wysiwyg errors:
-- pressing outside the edit field with the mouse should close the editor. it doesnt currently.
-- 
-
-
-- [x] can we change the image-path-overlay-container from div to span?
-
-- [x] when debug is disabled, all normal logs must be disabled, only error and immporant warnings might be logged out!
-
-- [x] check the code for any timeout calls, i want to minimize usage of timeout!
-
-- [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
-
-
-- [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
-
-- [ ] add a table editor that allows sorting of content by each category.
-
-- [ ] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
-
-- [x] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
-
-- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
-
-- [ ] would it be possible to take a screenshot of a webpage if a link is added to the board?
-
-  1. Open Graph images (simplest) - Fetch og:image meta tags from URLs. Most websites provide preview images. No screenshot needed, just an HTTP fetch + HTML
-  parsing. 
-  2. Puppeteer/Playwright (full screenshots) - Run headless browser in extension backend to capture actual screenshots. Heavier dependency (~100-400MB), slower, but gives real screenshots.
-
-- [ ] #### Combined Queries
-
-A column can have multiple query tags:
-
-```markdown
-- Reto This Week ?@reto ?.w15
-```
-
-### Operators
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `&` | AND | `#gather_Reto&day<3` |
-| `\|` | OR | `#gather_Reto\|Anita` |
-| `=` | EQUAL | `#gather_day=0` |
-| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
-| `<` | LESS THAN | `#gather_day<7` |
-| `>` | GREATER THAN | `#gather_day>0` |
-
-### Date Properties
-
-| Property | Description | Values |
-|----------|-------------|--------|
-| `day` | Days from today | -2, -1, 0, 1, 2, ... |
-| `weekday` | Day name | mon, tue, wed, ... |
-| `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
-| `month` | Month name | jan, feb, mar, ... |
-| `monthnum` | Month number | 1 to 12 |
-
-### ?ungathered
-
-Collects all cards that didn't match any gather rule:
 
 - [x] the debug option must be stored across instances.
 
