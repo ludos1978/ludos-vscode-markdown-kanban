@@ -155,7 +155,9 @@ body {
 .image-path-overlay-container:hover .image-menu-btn,
 .video-path-overlay-container:hover .video-menu-btn,
 .diagram-overlay-container:hover .diagram-menu-btn,
-.include-path-overlay-container:hover .include-menu-btn {
+.include-path-overlay-container:hover .include-menu-btn,
+/* Diagram placeholders wrap the overlay container, so need to show button when hovering on placeholder */
+.diagram-placeholder:hover .image-menu-btn {
   opacity: 1;
 }
 
@@ -170,20 +172,27 @@ body {
   color: var(--vscode-errorForeground, #f48771) !important;
 }
 
-/* Unified ERROR state for all broken overlay menu buttons - FULL styling */
-.include-error .include-path-overlay-container .include-menu-btn,
-.include-container.include-error .include-path-overlay-container .include-menu-btn,
-.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
-.task-item.include-error .include-path-overlay-container .include-menu-btn,
+/* Unified ERROR state for all broken/not-found menu buttons - FULL styling */
+/* Overlay containers with .xxx-broken class */
 .image-path-overlay-container.image-broken .image-menu-btn,
 .video-path-overlay-container.video-broken .video-menu-btn,
 .include-path-overlay-container.include-broken .include-menu-btn,
-.link-path-overlay-container.link-broken .link-menu-btn {
+.link-path-overlay-container.link-broken .link-menu-btn,
+/* Standalone not-found containers */
+.image-not-found .image-menu-btn,
+.video-not-found .video-menu-btn,
+.link-not-found .link-menu-btn,
+.include-not-found .include-menu-btn,
+/* Legacy include-error patterns */
+.include-error .include-path-overlay-container .include-menu-btn,
+.include-container.include-error .include-path-overlay-container .include-menu-btn,
+.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
+.task-item.include-error .include-path-overlay-container .include-menu-btn {
   position: absolute !important;
-  top: 4px !important;
-  right: 4px !important;
-  width: 22px !important;
-  height: 22px !important;
+  top: 2px !important;
+  right: 2px !important;
+  width: 18px !important;
+  height: 18px !important;
   margin: 0 !important;
   opacity: 1 !important;
   background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.3)) !important;
@@ -199,15 +208,22 @@ body {
   outline-offset: 0 !important;
 }
 
-/* Hover states for broken overlay menu buttons */
-.include-error .include-path-overlay-container .include-menu-btn:hover,
-.include-container.include-error .include-path-overlay-container .include-menu-btn:hover,
-.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn:hover,
-.task-item.include-error .include-path-overlay-container .include-menu-btn:hover,
+/* Hover states for broken/not-found menu buttons */
+/* Overlay containers with .xxx-broken class */
 .image-path-overlay-container.image-broken .image-menu-btn:hover,
 .video-path-overlay-container.video-broken .video-menu-btn:hover,
 .include-path-overlay-container.include-broken .include-menu-btn:hover,
-.link-path-overlay-container.link-broken .link-menu-btn:hover {
+.link-path-overlay-container.link-broken .link-menu-btn:hover,
+/* Standalone not-found containers */
+.image-not-found .image-menu-btn:hover,
+.video-not-found .video-menu-btn:hover,
+.link-not-found .link-menu-btn:hover,
+.include-not-found .include-menu-btn:hover,
+/* Legacy include-error patterns */
+.include-error .include-path-overlay-container .include-menu-btn:hover,
+.include-container.include-error .include-path-overlay-container .include-menu-btn:hover,
+.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn:hover,
+.task-item.include-error .include-path-overlay-container .include-menu-btn:hover {
   background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.5)) !important;
 }
 
@@ -1341,7 +1357,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: inline-flex;
   align-items: center;
   position: relative;
-  padding: 8px 12px;
+  padding: 4px 6px;
   padding-right: 36px; /* Space for burger menu */
   background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
   border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
@@ -1368,8 +1384,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
 .include-not-found-text {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* white-space: nowrap; */
   font-size: 1.0em;
+  line-break: anywhere;
 }
 /* Standalone not-found containers - all media types */
 .image-not-found-container,
@@ -1404,6 +1421,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
   border-radius: 3px;
   box-sizing: border-box;
+  min-height: 22px;
 }
 
 .include-path-overlay-container.include-broken[data-include-type="column"]:hover,
@@ -1426,45 +1444,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
   width: 100%;
 }
 
-/* Burger menu button inside the not-found box - top-right corner - all media types */
-.image-not-found .image-menu-btn,
-.video-not-found .video-menu-btn,
-.link-not-found .link-menu-btn,
-.include-not-found .include-menu-btn,
-.image-path-overlay-container.image-broken .image-not-found .image-menu-btn,
-.video-path-overlay-container.video-broken .video-not-found .video-menu-btn,
-.link-path-overlay-container.link-broken .link-not-found .link-menu-btn,
-.include-path-overlay-container.include-broken .include-not-found .include-menu-btn {
-  position: absolute !important;
-  top: 4px;
-  right: 4px;
-  width: 22px !important;
-  height: 22px !important;
-  margin: 0;
-  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.3)) !important;
-  border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.4)) !important;
-  border-radius: 3px !important;
-  color: var(--vscode-errorForeground, #f48771) !important;
-  font-size: 12px !important;
-  cursor: pointer;
-  opacity: 1 !important;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  outline: none !important;
-  outline-offset: 0 !important;
-}
-
-.image-not-found .image-menu-btn:hover,
-.video-not-found .video-menu-btn:hover,
-.link-not-found .link-menu-btn:hover,
-.include-not-found .include-menu-btn:hover,
-.image-path-overlay-container.image-broken .image-not-found .image-menu-btn:hover,
-.video-path-overlay-container.video-broken .video-not-found .video-menu-btn:hover,
-.link-path-overlay-container.link-broken .link-not-found .link-menu-btn:hover,
-.include-path-overlay-container.include-broken .include-not-found .include-menu-btn:hover {
-  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.5)) !important;
-}
+/* Note: Burger menu button styling is now consolidated at the top of the file
+   in the "Unified ERROR state for all broken/not-found menu buttons" section */
 
 /* Not-found dropdown menus - all media types */
 .image-not-found-menu,
@@ -1537,7 +1518,7 @@ figure:has(.diagram-placeholder .image-not-found) {
 .task-item {
   /* background-color: var(--task-background); */
   border-radius: 4px;
-	/* gap: var(--whitespace-div4); */
+	gap: var(--whitespace-div4);
   margin-bottom: var(--whitespace-div2);
   min-height: var(--task-height);
   transition: all 0.2s ease;
@@ -1546,7 +1527,7 @@ figure:has(.diagram-placeholder .image-not-found) {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding-bottom: 4px;
+  padding-bottom: var(--whitespace-div2);
 }
 
 /* CRITICAL FIX: Prevent task content from being draggable (only drag handle should be draggable) */
@@ -4455,7 +4436,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   word-wrap: break-word;
   max-height: inherit;
   max-width: inherit;
-  flex-shrink: 0;
+  /* flex-shrink: 0; */
 }
 
 .special-char-overlay {
