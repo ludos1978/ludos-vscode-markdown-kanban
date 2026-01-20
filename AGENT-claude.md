@@ -14,6 +14,7 @@
   - only stop for questions that the user must answer.
 - for every larger action you take. think about the positive and negative outcome of implementing it and the positive and negative outcome of not implementing it. Do not consider the work involved to do it, only the result of the work you would do. weight both sides against each other before taking action. only implement the change if its more then 60% positive! It does not matter how hard the task is, only weight in the impact on the expected result!
 - if a thought is a result of unfounded and illogical reasoning, then trash it. Only consider thoughts that are helping towards a good product.
+- When refactoring multiple classes or functions together into one, do not use wrappers. Instead fix he callers!
 
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.

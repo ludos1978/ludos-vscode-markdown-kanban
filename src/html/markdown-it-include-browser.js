@@ -104,7 +104,7 @@
     const isAbsolute = isAbsolutePath(filePath);
     const brokenClass = isBroken ? ' image-broken' : '';
 
-    return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}" style="display: inline-block;">
+    return `<span class="image-path-overlay-container${brokenClass}" data-image-path="${escapeHtml(filePath)}">
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
            onerror="handleMediaNotFound(this, '${escapedPath}', 'image')"
            style="max-width: 100%; height: auto;">
@@ -120,10 +120,9 @@
    */
   function generateVideoIncludeHtml(filePath, isBroken) {
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    const isAbsolute = isAbsolutePath(filePath);
     const brokenClass = isBroken ? ' video-broken' : '';
 
-    return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}" style="display: inline-block;">
+    return `<span class="video-path-overlay-container${brokenClass}" data-video-path="${escapeHtml(filePath)}">
       <video src="${escapeHtml(filePath)}" controls
              onerror="handleMediaNotFound(this, '${escapedPath}', 'video')"
              style="max-width: 100%; height: auto;">
@@ -131,6 +130,48 @@
       </video>
       <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
     </span>`;
+  }
+
+  /**
+   * Generate HTML for a broken include (file not found)
+   * @param {string} filePath - Path to the include file
+   * @returns {string} HTML string
+   */
+  function generateBrokenIncludeHtml(filePath) {
+    const fileName = filePath.split('/').pop() || filePath;
+    const displayText = formatIncludeLabel(fileName);
+    const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
+
+    return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
+      <div class="include-title-bar">
+        ${includeLink}
+      </div>
+      <div class="include-content-area">
+        <div class="broken-include-placeholder">Include file not found</div>
+      </div>
+    </div>`;
+  }
+
+  /**
+   * Generate HTML for a successfully loaded include container
+   * @param {string} filePath - Path to the include file
+   * @param {string} includeDir - Directory of the include file
+   * @param {string} renderedContent - The rendered markdown content
+   * @returns {string} HTML string
+   */
+  function generateIncludeContainerHtml(filePath, includeDir, renderedContent) {
+    const fileName = filePath.split('/').pop() || filePath;
+    const displayText = formatIncludeLabel(fileName);
+    const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
+
+    return `<div class="include-container" data-include-file="${escapeHtml(filePath)}" data-include-dir="${escapeHtml(includeDir)}">
+      <div class="include-title-bar">
+        ${includeLink}
+      </div>
+      <div class="include-content-area">
+        ${renderedContent}
+      </div>
+    </div>`;
   }
 
   function markdownItInclude(md, options = {}) {
@@ -233,18 +274,7 @@
 
       // If content is null and marked as broken, show error state
       if (content === null && isBrokenInclude) {
-        const fileName = filePath.split('/').pop() || filePath;
-        const displayText = formatIncludeLabel(fileName);
-        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
-
-        return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
-          <div class="include-title-bar">
-            ${includeLink}
-          </div>
-          <div class="include-content-area">
-            <div class="broken-include-placeholder">Include file not found</div>
-          </div>
-        </div>`;
+        return generateBrokenIncludeHtml(filePath);
       }
 
       // If content is null (not loaded yet), show placeholder with data attribute for targeted update
@@ -262,21 +292,7 @@
       // Render the content as markdown
       try {
         const rendered = md.render(content);
-
-        // Create filename display (show just the basename) with burger menu
-        const fileName = filePath.split('/').pop() || filePath;
-        const displayText = formatIncludeLabel(fileName);
-        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
-
-        // Build bordered container with title bar
-        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}" data-include-dir="${escapeHtml(includeDir)}">
-          <div class="include-title-bar">
-            ${includeLink}
-          </div>
-          <div class="include-content-area">
-            ${rendered}
-          </div>
-        </div>`;
+        return generateIncludeContainerHtml(filePath, includeDir, rendered);
       } catch (error) {
         console.error('[include-block] Error rendering included content from file:', filePath);
         console.error('[include-block] Content length:', content ? content.length : 0);
@@ -356,17 +372,7 @@
         // Create filename display (show just the basename) with burger menu
         const fileName = filePath.split('/').pop() || filePath;
         const displayText = formatIncludeLabel(fileName);
-        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
-
-        // Build bordered container with title bar
-        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}" data-include-dir="${escapeHtml(includeDir)}">
-          <div class="include-title-bar">
-            ${includeLink}
-          </div>
-          <div class="include-content-area">
-            ${rendered}
-          </div>
-        </div>`;
+        return generateIncludeContainerHtml(filePath, includeDir, rendered);
       } catch (error) {
         console.error('Error rendering included content:', error);
         return `<span class="include-error" title="Error rendering included content">Error including: ${escapeHtml(filePath)}</span>`;
@@ -393,22 +399,10 @@
       }
 
       // Check if this is a broken include (file not found)
-      // This happens when backend responds with error and we re-render
       const isBrokenInclude = brokenIncludeCache.has(filePath);
       log('[include_placeholder renderer] isBrokenInclude:', isBrokenInclude);
       if (isBrokenInclude) {
-        const fileName = filePath.split('/').pop() || filePath;
-        const displayText = formatIncludeLabel(fileName);
-        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular', true);
-
-        return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
-          <div class="include-title-bar">
-            ${includeLink}
-          </div>
-          <div class="include-content-area">
-            <div class="broken-include-placeholder">Include file not found</div>
-          </div>
-        </div>`;
+        return generateBrokenIncludeHtml(filePath);
       }
 
       return `<span class="include-placeholder" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +

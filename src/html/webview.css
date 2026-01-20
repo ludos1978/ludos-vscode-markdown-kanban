@@ -110,6 +110,13 @@ body {
   cursor: not-allowed;
 }
 
+/* Base styling for overlay containers */
+.image-path-overlay-container,
+.video-path-overlay-container {
+  display: inline-block;
+  position: relative;
+}
+
 /* Color variants - Overlay (semi-transparent buttons on content) */
 /* Shared base for ALL overlay menu buttons: image, video, diagram, include */
 .btn-overlay-icon,
@@ -152,30 +159,56 @@ body {
   opacity: 1;
 }
 
-/* Include ERROR state: RED colors (like broken images should have been) */
+/* ============================================================================
+   UNIFIED ERROR STYLING - All broken/error elements use the same appearance
+   ============================================================================ */
+
+/* Unified error text color for all broken link text */
 .include-path-overlay-container.include-broken .columninclude-link,
-.include-path-overlay-container.include-broken .include-filename-link, 
+.include-path-overlay-container.include-broken .include-filename-link,
+.link-path-overlay-container.link-broken .markdown-link {
+  color: var(--vscode-errorForeground, #f48771) !important;
+}
+
+/* Unified ERROR state for all broken overlay menu buttons - FULL styling */
 .include-error .include-path-overlay-container .include-menu-btn,
 .include-container.include-error .include-path-overlay-container .include-menu-btn,
 .kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn,
 .task-item.include-error .include-path-overlay-container .include-menu-btn,
 .image-path-overlay-container.image-broken .image-menu-btn,
 .video-path-overlay-container.video-broken .video-menu-btn,
-.include-path-overlay-container.include-broken .include-menu-btn { /*  ,
-.include-error .column-title */
+.include-path-overlay-container.include-broken .include-menu-btn,
+.link-path-overlay-container.link-broken .link-menu-btn {
+  position: absolute !important;
+  top: 4px !important;
+  right: 4px !important;
+  width: 22px !important;
+  height: 22px !important;
+  margin: 0 !important;
   opacity: 1 !important;
-  outline: 2px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
-  outline-offset: -1px !important;
-  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
-  border-radius: 2px;
-  background-color: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
-  color: var(--vscode-errorForeground, #f88) !important;
-  border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
+  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.3)) !important;
+  border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.4)) !important;
+  border-radius: 3px !important;
+  color: var(--vscode-errorForeground, #f48771) !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
-.include-error .include-path-overlay-container .include-menu-btn,
-.task-item.include-error .include-path-overlay-container .include-menu-btn,
-.include-path-overlay-container.include-broken .include-menu-btn {
+/* Hover states for broken overlay menu buttons */
+.include-error .include-path-overlay-container .include-menu-btn:hover,
+.include-container.include-error .include-path-overlay-container .include-menu-btn:hover,
+.kanban-full-height-column.include-error .include-path-overlay-container .include-menu-btn:hover,
+.task-item.include-error .include-path-overlay-container .include-menu-btn:hover,
+.image-path-overlay-container.image-broken .image-menu-btn:hover,
+.video-path-overlay-container.video-broken .video-menu-btn:hover,
+.include-path-overlay-container.include-broken .include-menu-btn:hover,
+.link-path-overlay-container.link-broken .link-menu-btn:hover {
+  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.5)) !important;
 }
 
 /* ============================================
@@ -1296,13 +1329,15 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 /* ============================================================================
-   UNIFIED MEDIA NOT FOUND STYLES (images, videos, audio)
+   UNIFIED NOT-FOUND STYLES (images, videos, links, includes)
    Uses ERROR colors (red) consistently for broken/missing files
    ============================================================================ */
 
-/* Base styles for all media not-found placeholders */
+/* Base styles for all not-found placeholders */
 .image-not-found,
-.video-not-found {
+.video-not-found,
+.link-not-found,
+.include-not-found {
   display: inline-flex;
   align-items: center;
   position: relative;
@@ -1310,7 +1345,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   padding-right: 36px; /* Space for burger menu */
   background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
   border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
-  border-radius: 4px;
+  border-radius: 3px;
   color: var(--vscode-errorForeground, #f48771);
   font-size: 0.9em;
   cursor: pointer;
@@ -1319,49 +1354,87 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .image-not-found:hover,
-.video-not-found:hover {
+.video-not-found:hover,
+.link-not-found:hover,
+.include-not-found:hover {
   background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.15));
   border-color: var(--vscode-errorBorder, rgba(255, 0, 0, 0.6));
 }
 
 /* Text inside not-found placeholders */
 .image-not-found-text,
-.video-not-found-text {
+.video-not-found-text,
+.link-not-found-text,
+.include-not-found-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 1.0em;
 }
-
-/* Standalone not-found containers - full width with burger menu in top-right */
+/* Standalone not-found containers - all media types */
 .image-not-found-container,
-.video-not-found-container {
+.video-not-found-container,
+.link-not-found-container,
+.include-not-found-container {
   position: relative;
   display: block;
   width: 100%;
 }
 
-/* Full width for standalone containers */
-.image-not-found-container > .image-not-found,
-.video-not-found-container > .video-not-found {
+/* Full width for broken overlay containers - all media types */
+.image-path-overlay-container.image-broken,
+.video-path-overlay-container.video-broken,
+.link-path-overlay-container.link-broken,
+.include-path-overlay-container.include-broken {
   display: block;
   width: 100%;
 }
 
-/* Fit-content for broken images inside overlay containers (e.g., diagrams) */
-.image-path-overlay-container.image-broken > .image-not-found,
-.video-path-overlay-container.video-broken > .video-not-found {
+/* Column/task/regular broken includes - inline error styling (no .include-not-found wrapper) */
+.include-path-overlay-container.include-broken[data-include-type="column"],
+.include-path-overlay-container.include-broken[data-include-type="task"],
+.include-path-overlay-container.include-broken[data-include-type="regular"] {
   display: inline-flex;
+  align-items: center;
+  position: relative;
   width: auto;
-  max-width: 100%;
+  padding: 4px 8px;
+  padding-right: 32px; /* Space for burger menu */
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+  border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
+  border-radius: 3px;
+  box-sizing: border-box;
 }
 
-/* Burger menu button inside the not-found box - top-right corner */
-/* Higher specificity selectors to override overlay container styles */
+.include-path-overlay-container.include-broken[data-include-type="column"]:hover,
+.include-path-overlay-container.include-broken[data-include-type="task"]:hover,
+.include-path-overlay-container.include-broken[data-include-type="regular"]:hover {
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.15));
+  border-color: var(--vscode-errorBorder, rgba(255, 0, 0, 0.6));
+}
+
+/* Full width for all broken displays - all media types */
+.image-not-found-container > .image-not-found,
+.video-not-found-container > .video-not-found,
+.link-not-found-container > .link-not-found,
+.include-not-found-container > .include-not-found,
+.image-path-overlay-container.image-broken > .image-not-found,
+.video-path-overlay-container.video-broken > .video-not-found,
+.link-path-overlay-container.link-broken > .link-not-found,
+.include-path-overlay-container.include-broken > .include-not-found {
+  display: block;
+  width: 100%;
+}
+
+/* Burger menu button inside the not-found box - top-right corner - all media types */
 .image-not-found .image-menu-btn,
 .video-not-found .video-menu-btn,
+.link-not-found .link-menu-btn,
+.include-not-found .include-menu-btn,
 .image-path-overlay-container.image-broken .image-not-found .image-menu-btn,
-.video-path-overlay-container.video-broken .video-not-found .video-menu-btn {
+.video-path-overlay-container.video-broken .video-not-found .video-menu-btn,
+.link-path-overlay-container.link-broken .link-not-found .link-menu-btn,
+.include-path-overlay-container.include-broken .include-not-found .include-menu-btn {
   position: absolute !important;
   top: 4px;
   right: 4px;
@@ -1384,14 +1457,20 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .image-not-found .image-menu-btn:hover,
 .video-not-found .video-menu-btn:hover,
+.link-not-found .link-menu-btn:hover,
+.include-not-found .include-menu-btn:hover,
 .image-path-overlay-container.image-broken .image-not-found .image-menu-btn:hover,
-.video-path-overlay-container.video-broken .video-not-found .video-menu-btn:hover {
+.video-path-overlay-container.video-broken .video-not-found .video-menu-btn:hover,
+.link-path-overlay-container.link-broken .link-not-found .link-menu-btn:hover,
+.include-path-overlay-container.include-broken .include-not-found .include-menu-btn:hover {
   background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.5)) !important;
 }
 
-/* Not-found dropdown menus */
+/* Not-found dropdown menus - all media types */
 .image-not-found-menu,
-.video-not-found-menu {
+.video-not-found-menu,
+.link-not-found-menu,
+.include-not-found-menu {
   display: none;
   position: absolute;
   top: 100%;
@@ -1407,36 +1486,24 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .image-not-found-menu.visible,
-.video-not-found-menu.visible {
+.video-not-found-menu.visible,
+.link-not-found-menu.visible,
+.include-not-found-menu.visible {
   display: block;
 }
 
 .image-not-found-menu .image-path-menu-item,
-.video-not-found-menu .video-path-menu-item {
+.video-not-found-menu .video-path-menu-item,
+.link-not-found-menu .link-path-menu-item,
+.include-not-found-menu .include-path-menu-item {
   pointer-events: auto;
 }
 
 .image-not-found-menu .image-path-menu-item:not(.disabled):not(:disabled),
-.video-not-found-menu .video-path-menu-item:not(.disabled):not(:disabled) {
+.video-not-found-menu .video-path-menu-item:not(.disabled):not(:disabled),
+.link-not-found-menu .link-path-menu-item:not(.disabled):not(:disabled),
+.include-not-found-menu .include-path-menu-item:not(.disabled):not(:disabled) {
   cursor: pointer;
-}
-
-/* Diagram/PDF page load error (used in slideshows) */
-.diagram-error {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
-  border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
-  border-radius: 4px;
-  color: var(--vscode-errorForeground, #f48771);
-  font-size: 0.9em;
-  box-sizing: border-box;
-}
-
-.diagram-error .error-icon {
-  font-size: 1.2em;
-  margin-right: 8px;
 }
 
 /* Broken diagram placeholders should fit content, not expand */
@@ -1455,11 +1522,6 @@ figure:has(.diagram-placeholder .image-not-found) {
   max-width: 100%;
 }
 
-.diagram-error .error-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* ============================================================================
    VIDEO PATH OVERLAY CONTAINER
@@ -1854,11 +1916,10 @@ body.section-height-limited .task-section figure img {
   opacity: 0.5;
 }
 
-/* Broken column include - placeholder message */
+/* Broken column include - placeholder message - uses unified error colors */
 .broken-include-placeholder {
-  color: var(--vscode-descriptionForeground);
+  color: var(--vscode-errorForeground, #f48771);
   font-style: italic;
-  opacity: 0.5;
   padding: 12px 8px;
   text-align: center;
   cursor: not-allowed;
@@ -4601,18 +4662,8 @@ blockquote {
   background: rgba(0, 0, 0, 0.7);
 }
 
-/* Link broken state - show menu button with error styling */
-.link-path-overlay-container.link-broken .link-menu-btn {
-  opacity: 1 !important;
-  outline: 2px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.6)) !important;
-  outline-offset: -1px !important;
-  background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.2)) !important;
-  border-radius: 2px;
-}
-
-/* Link broken state - style the link text */
+/* Link broken state - strikethrough (button styling in unified section at top) */
 .link-path-overlay-container.link-broken .markdown-link {
-  color: var(--vscode-errorForeground, #f48771) !important;
   text-decoration: line-through;
 }
 
@@ -5886,30 +5937,7 @@ s {
 
 .include-container.include-error .include-title-bar {
     border-bottom-color: var(--vscode-inputValidation-errorBorder, rgba(255, 0, 0, 0.4));
-    padding-right: 32px; /* Space for burger menu */
-}
-
-.include-container.include-error .broken-include-placeholder {
-    color: var(--vscode-errorForeground, #f48771);
-    opacity: 1;
-}
-
-/* Burger menu in top-right corner for broken includes */
-.include-container.include-error .include-menu-btn {
-    position: absolute !important;
-    top: 4px;
-    right: 4px;
-    width: 22px !important;
-    height: 22px !important;
-    background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.3)) !important;
-    border: 1px solid var(--vscode-errorBorder, rgba(255, 0, 0, 0.4)) !important;
-    color: var(--vscode-errorForeground, #f48771) !important;
-    font-size: 12px !important;
-    opacity: 1 !important;
-}
-
-.include-container.include-error .include-menu-btn:hover {
-    background: var(--vscode-errorBackground, rgba(255, 0, 0, 0.5)) !important;
+    padding-right: 32px; /* Space for burger menu (positioned in unified error section at top) */
 }
 
 .included-content-inline {

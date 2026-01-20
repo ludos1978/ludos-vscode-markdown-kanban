@@ -1413,10 +1413,16 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
 
         } catch (error) {
             console.error('[EPUB Slideshow] Failed to load page:', error);
-            imageContainer.innerHTML = `<div class="diagram-error">
-                <span class="error-icon">⚠️</span>
-                <span class="error-text">Failed to load EPUB page ${pageNumber}</span>
-            </div>`;
+            // Use unified .image-not-found structure for consistent error styling
+            const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
+            const escapedPath = filePath.replace(/"/g, '&quot;');
+            const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${escapedPath}">
+                <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load EPUB page ${pageNumber}: ${filePath}">
+                    <span class="image-not-found-text">📚 ${escapedShortPath} (page ${pageNumber})</span>
+                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
+                </span>
+            </span>`;
         }
     };
 
@@ -1573,10 +1579,16 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
 
         } catch (error) {
             console.error(`[PDF Slideshow] Failed to load page ${pageNumber}:`, error);
-            imageContainer.innerHTML = `<div class="diagram-error">
-                <span class="error-icon">⚠️</span>
-                <span class="error-text">Failed to load page ${pageNumber}</span>
-            </div>`;
+            // Use unified .image-not-found structure for consistent error styling
+            const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
+            const escapedPath = filePath.replace(/"/g, '&quot;');
+            const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-image-path="${escapedPath}">
+                <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load PDF page ${pageNumber}: ${filePath}">
+                    <span class="image-not-found-text">📄 ${escapedShortPath} (page ${pageNumber})</span>
+                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
+                </span>
+            </span>`;
         }
     };
 
@@ -1725,8 +1737,9 @@ async function processDiagramQueue() {
                 element.appendChild(img);
                 element.appendChild(menuBtn);
             } else {
-                element.innerHTML = `<span class="image-path-overlay-container">
-                    <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath}" />
+                // Use data-image-path for consistency with MEDIA_TYPE_CONFIG.image.pathDataAttr
+                element.innerHTML = `<span class="image-path-overlay-container" data-image-path="${decodedPath.replace(/"/g, '&quot;')}">
+                    <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" />
                     <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
                 </span>`;
             }
@@ -2373,7 +2386,8 @@ function renderMarkdown(text, includeContext) {
             );
 
             // Wrap with overlay container for path conversion menu (similar to images)
-            return `<div class="video-path-overlay-container" data-original-src="${escapeHtml(originalSrc)}">
+            // Use data-video-path for consistency with MEDIA_TYPE_CONFIG.video.pathDataAttr
+            return `<div class="video-path-overlay-container" data-video-path="${escapeHtml(originalSrc)}">
                 ${videoWithError}
                 <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;
@@ -2416,7 +2430,8 @@ function renderMarkdown(text, includeContext) {
             );
 
             // Wrap with overlay container for path conversion menu (same as video)
-            return `<div class="video-path-overlay-container" data-original-src="${escapeHtml(originalSrc)}">
+            // Use data-video-path for consistency with MEDIA_TYPE_CONFIG.video.pathDataAttr
+            return `<div class="video-path-overlay-container" data-video-path="${escapeHtml(originalSrc)}">
                 ${audioWithError}
                 <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;

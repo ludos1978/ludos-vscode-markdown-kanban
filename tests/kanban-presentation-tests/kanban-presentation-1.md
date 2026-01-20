@@ -53,11 +53,19 @@ kanban-plugin: board
 - [ ] !!!include(fail2.md)!!!
 - [ ] Task with broken include
   !!!include(fail3.md)!!! 
+
+## #stack
+- [ ] Proteus-Nodeland_preview-[h2OqQ6-ESp4]-480p
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-ksanban-obsidian/tests/kanban-presentation-tests/Media/Proteus-Nodeland_preview-%5Bh2OqQ6-ESp4%5D-480p.mp4)
+- [ ] included-excalidraw
+  ![](./a/root-include-2-MEDIA/included-excalidraw.excalidraw)
 - [ ] #pink
   ![fail-image](fail.jpg)
   
   
   
   
+- [ ] 
+  ![](/Usears/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg)
 
 

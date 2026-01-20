@@ -460,17 +460,22 @@ function toggleLinkPathMenu(container, linkPath) {
 }
 
 /**
- * Toggle the image-not-found menu visibility
+ * Toggle the not-found menu visibility for any media type
+ * @param {HTMLElement} container - The container element
+ * @param {'image'|'video'} mediaType - The media type
  */
-function toggleImageNotFoundMenu(container) {
-    // Close any other open menus except this container's own menu
+function toggleMediaNotFoundMenu(container, mediaType = 'image') {
     closeAllPathMenus();
 
-    const menu = container.querySelector('.image-not-found-menu');
+    const config = MEDIA_TYPE_CONFIG[mediaType];
+    if (!config) return;
+
+    // Look for both standalone menu and overlay menu
+    const menu = container.querySelector(`.${config.notFoundMenuClass}`) ||
+                 container.querySelector(`.${mediaType}-path-menu`);
     if (menu) {
         menu.classList.toggle('visible');
 
-        // Close menu when clicking outside
         if (menu.classList.contains('visible')) {
             const closeHandler = (e) => {
                 if (!container.contains(e.target)) {
@@ -480,8 +485,15 @@ function toggleImageNotFoundMenu(container) {
             };
             setTimeout(() => document.addEventListener('click', closeHandler), 0);
         }
+    } else {
+        // For overlay containers, create a floating menu
+        const filePath = container.dataset[config.pathDataAttr];
+        if (filePath) {
+            togglePathMenu(container, filePath, mediaType);
+        }
     }
 }
+
 
 // ============================================================================
 // BROKEN IMAGE HANDLING
@@ -531,10 +543,30 @@ const MEDIA_TYPE_CONFIG = {
         mediaLabel: 'video'
     },
     link: {
+        emoji: '🔗',
         containerClass: 'link-path-overlay-container',
+        notFoundClass: 'link-not-found',
+        notFoundContainerClass: 'link-not-found-container',
+        notFoundTextClass: 'link-not-found-text',
+        notFoundMenuClass: 'link-not-found-menu',
         brokenClass: 'link-broken',
+        menuBtnClass: 'link-menu-btn',
+        menuItemClass: 'link-path-menu-item',
         pathDataAttr: 'linkPath',
         mediaLabel: 'link'
+    },
+    include: {
+        emoji: '📎',
+        containerClass: 'include-path-overlay-container',
+        notFoundClass: 'include-not-found',
+        notFoundContainerClass: 'include-not-found-container',
+        notFoundTextClass: 'include-not-found-text',
+        notFoundMenuClass: 'include-not-found-menu',
+        brokenClass: 'include-broken',
+        menuBtnClass: 'include-menu-btn',
+        menuItemClass: 'include-path-menu-item',
+        pathDataAttr: 'includePath',
+        mediaLabel: 'include'
     }
 };
 
@@ -657,31 +689,36 @@ function handleMediaNotFound(element, originalSrc, mediaType) {
         existingOverlay.classList.add(config.brokenClass);
 
         const shortPath = getShortDisplayPath(originalSrc);
-        const htmlEscapedPath = escapeHtmlForBroken(originalSrc);
-        const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
 
         const placeholder = document.createElement('span');
         placeholder.className = config.notFoundClass;
         placeholder.dataset.originalSrc = originalSrc;
         placeholder.title = `${config.mediaLabel.charAt(0).toUpperCase() + config.mediaLabel.slice(1)} not found: ${originalSrc}`;
-        // Include burger menu button for all media types
-        placeholder.innerHTML = `
-            <span class="${config.notFoundTextClass}">${config.emoji} ${escapeHtmlForBroken(shortPath)}</span>
-            <button class="${config.menuBtnClass}" data-action="toggle-menu" title="Path options">☰</button>
-        `;
+        placeholder.innerHTML = `<span class="${config.notFoundTextClass}">${config.emoji} ${escapeHtmlForBroken(shortPath)}</span>`;
+
+        // Get reference to the existing button before inserting placeholder
+        const existingButton = existingOverlay.querySelector(`.${config.menuBtnClass}`);
 
         element.parentElement.insertBefore(placeholder, element);
         element.style.display = 'none';
 
-        // For images, upgrade the overlay menu
+        // For images, also upgrade the overlay menu (this modifies placeholder.innerHTML)
         if (mediaType === 'image') {
             upgradeImageOverlayToBroken(existingOverlay, placeholder, originalSrc);
-        } else if (mediaType === 'video') {
-            // For videos, add the dropdown menu after the placeholder
-            const menuHtml = generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config);
-            placeholder.insertAdjacentHTML('afterend', menuHtml);
-            // Store path on overlay container for event delegation
-            existingOverlay.dataset.videoPath = originalSrc;
+        }
+
+        // Move the existing overlay button inside the placeholder AFTER upgradeImageOverlayToBroken
+        // (which replaces innerHTML), so the button doesn't get removed
+        if (existingButton) {
+            existingButton.removeAttribute('onclick');
+            existingButton.dataset.action = 'toggle-menu';
+            // Set onclick to stop propagation and toggle menu
+            // (event delegation at document level runs too late - after parent handlers)
+            existingButton.onclick = (e) => {
+                e.stopPropagation();
+                toggleMediaNotFoundMenu(existingOverlay, mediaType);
+            };
+            placeholder.appendChild(existingButton);
         }
         return;
     }
@@ -925,29 +962,6 @@ function upgradeAllSimpleImageNotFoundPlaceholders() {
 
 }
 
-/**
- * Toggle the video-not-found menu visibility
- */
-function toggleVideoNotFoundMenu(container) {
-    // Close any other open menus except this container's own menu
-    closeAllPathMenus();
-
-    const menu = container.querySelector('.video-not-found-menu');
-    if (menu) {
-        menu.classList.toggle('visible');
-
-        // Close menu when clicking outside
-        if (menu.classList.contains('visible')) {
-            const closeHandler = (e) => {
-                if (!container.contains(e.target)) {
-                    menu.classList.remove('visible');
-                    document.removeEventListener('click', closeHandler);
-                }
-            };
-            setTimeout(() => document.addEventListener('click', closeHandler), 0);
-        }
-    }
-}
 
 /**
  * Normalize a path for comparison
@@ -1045,27 +1059,49 @@ function updatePathInDOM(oldPath, newPath, direction) {
 // ============================================================================
 
 /**
- * Set up event delegation for image-not-found menu actions
+ * Determine media type from container classes
+ * @param {HTMLElement} container - The container element
+ * @returns {{type: string, filePath: string}|null}
+ */
+function getMediaTypeFromContainer(container) {
+    for (const [type, config] of Object.entries(MEDIA_TYPE_CONFIG)) {
+        if (container.classList.contains(config.containerClass) ||
+            container.classList.contains(config.notFoundContainerClass)) {
+            const filePath = container.dataset[config.pathDataAttr];
+            return { type, filePath };
+        }
+    }
+    return null;
+}
+
+/**
+ * Set up event delegation for all not-found menu actions (image, video, link, include)
  * This is more robust than inline onclick handlers for paths with special characters
  */
-function setupImagePathEventDelegation() {
+function setupMediaPathEventDelegation() {
     document.addEventListener('click', (e) => {
         const target = e.target;
         const action = target.dataset?.action;
 
         if (!action) return;
 
-        // Find the container to get the image path
-        // Check both container types: standalone broken images and broken images in overlay
-        const container = target.closest('.image-not-found-container') || target.closest('.image-path-overlay-container');
+        // Find the container - check all media types
+        const containerSelectors = Object.values(MEDIA_TYPE_CONFIG)
+            .flatMap(c => [`.${c.containerClass}`, `.${c.notFoundContainerClass}`])
+            .join(', ');
+        const container = target.closest(containerSelectors);
 
         if (!container) {
             return;
         }
 
-        const imagePath = container.dataset.imagePath;
+        // Determine media type and get file path
+        const mediaInfo = getMediaTypeFromContainer(container);
+        if (!mediaInfo) return;
 
-        if (!imagePath && action !== 'toggle-menu') {
+        const { type: mediaType, filePath } = mediaInfo;
+
+        if (!filePath && action !== 'toggle-menu') {
             return;
         }
 
@@ -1077,46 +1113,51 @@ function setupImagePathEventDelegation() {
 
         e.stopPropagation();
 
+        // Close any visible menus selector - all media types
+        const menuSelector = Object.values(MEDIA_TYPE_CONFIG)
+            .flatMap(c => [`.${c.notFoundMenuClass}.visible`, `.${mediaType}-path-menu.visible`])
+            .join(', ');
+
         switch (action) {
             case 'toggle-menu':
-                toggleImageNotFoundMenu(container);
+                toggleMediaNotFoundMenu(container, mediaType);
                 break;
             case 'reveal':
-                revealPathInExplorer(imagePath);
+                revealPathInExplorer(filePath);
                 break;
             case 'search':
             case 'search-overlay':
-                // Close the menu first
-                const searchMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
+                const searchMenu = container.querySelector(menuSelector);
                 if (searchMenu) searchMenu.classList.remove('visible');
-                searchForFile(imagePath, taskId, columnId);
+                searchForFile(filePath, taskId, columnId);
                 break;
             case 'browse':
             case 'browse-overlay':
-                // Close the menu first
-                const browseMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
+                const browseMenu = container.querySelector(menuSelector);
                 if (browseMenu) browseMenu.classList.remove('visible');
-                browseForImage(imagePath, taskId, columnId);
+                browseForImage(filePath, taskId, columnId);
                 break;
             case 'to-relative':
                 if (!target.disabled) {
-                    convertSinglePath(imagePath, 'relative', true);
+                    convertSinglePath(filePath, 'relative', true);
                 }
                 break;
             case 'to-absolute':
                 if (!target.disabled) {
-                    convertSinglePath(imagePath, 'absolute', true);
+                    convertSinglePath(filePath, 'absolute', true);
                 }
                 break;
             case 'delete':
-                // Close the menu first
-                const deleteMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
+                const deleteMenu = container.querySelector(menuSelector);
                 if (deleteMenu) deleteMenu.classList.remove('visible');
-                deleteFromMarkdown(imagePath);
+                deleteFromMarkdown(filePath);
                 break;
         }
     });
 }
+
+// Alias for backwards compatibility
+const setupImagePathEventDelegation = setupMediaPathEventDelegation;
 
 /**
  * Set up MutationObserver to automatically upgrade simple placeholders when they're added to the DOM
@@ -1213,8 +1254,7 @@ window.toggleImagePathMenu = toggleImagePathMenu;
 window.toggleIncludePathMenu = toggleIncludePathMenu;
 window.toggleVideoPathMenu = toggleVideoPathMenu;
 window.toggleLinkPathMenu = toggleLinkPathMenu;
-window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
-window.toggleVideoNotFoundMenu = toggleVideoNotFoundMenu;
+window.toggleMediaNotFoundMenu = toggleMediaNotFoundMenu;
 
 // Unified broken media handling
 window.handleMediaNotFound = handleMediaNotFound;
