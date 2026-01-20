@@ -148,7 +148,8 @@
       "Bash(npx jscpd:*)",
       "Bash(npx knip:*)",
       "Bash(npm uninstall:*)",
-      "Skill(debug)"
+      "Skill(debug)",
+      "Bash(npm version:*)"
     ],
     "deny": [],
     "ask": []
