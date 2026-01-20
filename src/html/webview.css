@@ -4032,7 +4032,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 /* single-row layout: rows without nested rows get full height */
-.kanban-row:not(:has(.kanban-row)) {
+.kanban-board:not(.multi-row) .kanban-row:not(:has(.kanban-row)) {
   height: 100%;
 }
 
