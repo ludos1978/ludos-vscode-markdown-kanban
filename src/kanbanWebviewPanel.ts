@@ -23,7 +23,7 @@ import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
-import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage, ScrollToElementMessage } from './core/bridge/MessageTypes';
+import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage, ScrollToElementMessage, ScrollToElementByIndexMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { cleanupAutoExportSubscription } from './commands';
 import {
@@ -82,7 +82,7 @@ export class KanbanWebviewPanel {
     private _unsavedChangesService: UnsavedChangesService | null = null;
     private _webviewUpdateService: WebviewUpdateService | null = null;
     private _fileContextMissing: boolean = false;
-    private _pendingScrollRequest: ScrollToElementMessage | null = null;
+    private _pendingScrollRequest: ScrollToElementMessage | ScrollToElementByIndexMessage | null = null;
 
     public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
@@ -264,6 +264,36 @@ export class KanbanWebviewPanel {
         } else {
             // Queue the request to be sent when webview is ready
             console.log('[KanbanWebviewPanel.scrollToElement] Queueing for later');
+            this._pendingScrollRequest = message;
+        }
+    }
+
+    /**
+     * Scroll to and highlight an element by position index.
+     * Used by dashboard for position-based navigation (since IDs change on each parse).
+     */
+    public scrollToElementByIndex(
+        columnIndex: number,
+        taskIndex?: number,
+        highlight: boolean = true
+    ): void {
+        const message: ScrollToElementByIndexMessage = {
+            type: 'scrollToElementByIndex',
+            columnIndex,
+            taskIndex,
+            highlight
+        };
+
+        // Reveal the panel first
+        this._panel.reveal(undefined, false);
+
+        console.log('[KanbanWebviewPanel.scrollToElementByIndex] webviewReady:', this._context.webviewReady, 'columnIndex:', columnIndex, 'taskIndex:', taskIndex);
+
+        if (this._context.webviewReady) {
+            console.log('[KanbanWebviewPanel.scrollToElementByIndex] Sending immediately');
+            this._panel.webview.postMessage(message);
+        } else {
+            console.log('[KanbanWebviewPanel.scrollToElementByIndex] Queueing for later');
             this._pendingScrollRequest = message;
         }
     }

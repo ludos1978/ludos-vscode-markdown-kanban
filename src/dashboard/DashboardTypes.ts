@@ -37,12 +37,12 @@ export interface UpcomingItem {
     boardUri: string;
     /** Display name of the board (filename) */
     boardName: string;
-    /** Column ID containing the task */
-    columnId: string;
+    /** Column index (0-based) for position-based navigation */
+    columnIndex: number;
     /** Column title */
     columnTitle: string;
-    /** Task ID */
-    taskId: string;
+    /** Task index (0-based) within column for position-based navigation */
+    taskIndex: number;
     /** Task title (may include tags) */
     taskTitle: string;
     /** The temporal tag that matched (e.g., "!20.1.2026") */
@@ -148,8 +148,8 @@ export interface DashboardUpdateConfigMessage {
 export interface DashboardNavigateMessage {
     type: 'dashboardNavigate';
     boardUri: string;
-    columnId: string;
-    taskId: string;
+    columnIndex: number;
+    taskIndex: number;
 }
 
 /**

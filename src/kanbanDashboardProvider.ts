@@ -92,7 +92,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     );
                     break;
                 case 'dashboardNavigate':
-                    await this._handleNavigate(message.boardUri, message.columnId, message.taskId);
+                    await this._handleNavigate(message.boardUri, message.columnIndex, message.taskIndex);
                     break;
             }
         });
@@ -315,7 +315,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     /**
      * Handle navigation to a specific task
      */
-    private async _handleNavigate(boardUri: string, columnId: string, taskId: string): Promise<void> {
+    private async _handleNavigate(boardUri: string, columnIndex: number, taskIndex: number): Promise<void> {
         try {
             const uri = vscode.Uri.parse(boardUri);
             const document = await vscode.workspace.openTextDocument(uri);
@@ -328,8 +328,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             const panel = KanbanWebviewPanel.getPanelForDocument(panelKey);
 
             if (panel) {
-                // Use the panel's scrollToElement method which handles timing properly
-                panel.scrollToElement(columnId, taskId, true);
+                // Use position-based scroll which looks up elements by index
+                panel.scrollToElementByIndex(columnIndex, taskIndex, true);
             } else {
                 console.error(`[Dashboard] Panel not found for document: ${panelKey}`);
             }
@@ -602,8 +602,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                 html += '<div class="date-group-header">' + escapeHtml(date) + '</div>';
                 groupItems.forEach(item => {
                     html += '<div class="upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
-                    html += 'data-column-id="' + escapeHtml(item.columnId) + '" ';
-                    html += 'data-task-id="' + escapeHtml(item.taskId) + '">';
+                    html += 'data-column-index="' + item.columnIndex + '" ';
+                    html += 'data-task-index="' + item.taskIndex + '">';
                     html += '<span class="upcoming-title">' + escapeHtml(item.taskTitle) + '</span>';
                     html += '<span class="upcoming-board">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
                     html += '</div>';
@@ -617,9 +617,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             container.querySelectorAll('.upcoming-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const boardUri = item.getAttribute('data-board-uri');
-                    const columnId = item.getAttribute('data-column-id');
-                    const taskId = item.getAttribute('data-task-id');
-                    navigateToTask(boardUri, columnId, taskId);
+                    const columnIndex = parseInt(item.getAttribute('data-column-index'), 10);
+                    const taskIndex = parseInt(item.getAttribute('data-task-index'), 10);
+                    navigateToTask(boardUri, columnIndex, taskIndex);
                 });
             });
         }
@@ -705,12 +705,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ type: 'dashboardRefresh' });
         }
 
-        function navigateToTask(boardUri, columnId, taskId) {
+        function navigateToTask(boardUri, columnIndex, taskIndex) {
             vscode.postMessage({
                 type: 'dashboardNavigate',
                 boardUri,
-                columnId,
-                taskId
+                columnIndex,
+                taskIndex
             });
         }
 

@@ -1853,6 +1853,17 @@ export interface ScrollToElementMessage extends BaseMessage {
     field?: 'columnTitle' | 'taskTitle' | 'description';
 }
 
+/**
+ * Scroll to element by index and highlight (Backend -> Main Webview)
+ * Used by dashboard for position-based navigation (since IDs change on each parse)
+ */
+export interface ScrollToElementByIndexMessage extends BaseMessage {
+    type: 'scrollToElementByIndex';
+    columnIndex: number;
+    taskIndex?: number;
+    highlight: boolean;
+}
+
 // ============= PROCESSES MESSAGES =============
 
 /**
@@ -1962,6 +1973,7 @@ export type OutgoingMessage =
     | MediaIndexScanCancelledMessage
     // Search messages
     | ScrollToElementMessage
+    | ScrollToElementByIndexMessage
     | SearchResultsMessage;
 
 /**

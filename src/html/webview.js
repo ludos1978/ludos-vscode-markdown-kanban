@@ -4024,6 +4024,12 @@ if (!webviewEventListenersInitialized) {
                 message.field
             );
             break;
+
+        case 'scrollToElementByIndex':
+            // Handle position-based scroll request from dashboard (IDs change on each parse)
+            console.log('[Webview] scrollToElementByIndex received:', message.columnIndex, message.taskIndex);
+            scrollToAndHighlightByIndex(message.columnIndex, message.taskIndex, message.highlight);
+            break;
     }
 });
 } // End of webviewEventListenersInitialized guard
@@ -4426,6 +4432,54 @@ function performEditorRedo() {
         activeElement.focus();
         document.execCommand('redo');
     }
+}
+
+/**
+ * Scroll to and highlight an element by position index
+ * Used by the Dashboard for position-based navigation (since IDs change on each parse)
+ * @param {number} columnIndex - The 0-based column index
+ * @param {number} [taskIndex] - Optional 0-based task index within the column
+ * @param {boolean} [highlight] - Whether to add highlight animation
+ */
+function scrollToAndHighlightByIndex(columnIndex, taskIndex, highlight = true) {
+    console.log('[scrollToAndHighlightByIndex] START columnIndex:', columnIndex, 'taskIndex:', taskIndex);
+
+    // Get all columns (excluding hidden ones like backlog)
+    const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column[data-column-id]'));
+    console.log('[scrollToAndHighlightByIndex] Total columns found:', allColumns.length);
+
+    if (columnIndex < 0 || columnIndex >= allColumns.length) {
+        console.warn('[scrollToAndHighlightByIndex] Column index out of range:', columnIndex, 'total:', allColumns.length);
+        return;
+    }
+
+    const columnElement = allColumns[columnIndex];
+    const columnId = columnElement?.getAttribute('data-column-id');
+    console.log('[scrollToAndHighlightByIndex] Found column at index', columnIndex, 'with ID:', columnId);
+
+    let targetElement = columnElement;
+    let taskId = undefined;
+
+    if (taskIndex !== undefined && columnElement) {
+        const allTasks = Array.from(columnElement.querySelectorAll('.task-item[data-task-id]'));
+        console.log('[scrollToAndHighlightByIndex] Tasks in column:', allTasks.length);
+
+        if (taskIndex >= 0 && taskIndex < allTasks.length) {
+            targetElement = allTasks[taskIndex];
+            taskId = targetElement?.getAttribute('data-task-id');
+            console.log('[scrollToAndHighlightByIndex] Found task at index', taskIndex, 'with ID:', taskId);
+        } else {
+            console.warn('[scrollToAndHighlightByIndex] Task index out of range:', taskIndex, 'total:', allTasks.length);
+        }
+    }
+
+    if (!targetElement) {
+        console.warn('[scrollToAndHighlightByIndex] Could not find element at indices', { columnIndex, taskIndex });
+        return;
+    }
+
+    // Delegate to the main scroll function using the found IDs
+    scrollToAndHighlight(columnId, taskId, highlight);
 }
 
 /**
