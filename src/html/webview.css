@@ -4776,11 +4776,8 @@ blockquote {
   flex-shrink: 0;
 }
 
-/* COLUMN/TASK INCLUDES: Always show menu button for Search for File functionality */
-.include-path-overlay-container[data-include-type="column"] .include-menu-btn,
-.include-path-overlay-container[data-include-type="task"] .include-menu-btn {
-  opacity: 1 !important;
-}
+/* COLUMN/TASK INCLUDES: Show menu button on hover for working includes
+   Broken includes get opacity: 1 from the unified error styles at top of file */
 
 /* Broken state styles are in the unified overlay button section at top of file */
 
