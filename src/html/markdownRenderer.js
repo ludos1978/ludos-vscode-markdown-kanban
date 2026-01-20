@@ -609,25 +609,25 @@ function temporalTagPlugin(md, options = {}) {
             tagType = 'timeSlot';
             pos += tagContent.length;
         }
-        // 2. Week with year: YYYY.wNN or YYYY-wNN
+        // 2. Week with year: YYYY.wNN, YYYY-wNN, YYYY.kwNN, YYYY-kwNN
         else {
-            const weekYearMatch = remaining.match(/^(\d{4})[-.]?[wW](\d{1,2})(?=\s|$)/);
+            const weekYearMatch = remaining.match(/^(\d{4})[-.]?(?:[wW]|[kK][wW])(\d{1,2})(?=\s|$)/);
             if (weekYearMatch) {
                 tagContent = weekYearMatch[0];
                 tagType = 'week';
                 pos += tagContent.length;
             }
-            // 3. Week without year: wNN or WNN
+            // 3. Week without year: wNN, WNN, kwNN, KW4 (German Kalenderwoche)
             else {
-                const weekMatch = remaining.match(/^[wW](\d{1,2})(?=\s|$)/);
+                const weekMatch = remaining.match(/^(?:[wW]|[kK][wW])(\d{1,2})(?=\s|$)/);
                 if (weekMatch) {
                     tagContent = weekMatch[0];
                     tagType = 'week';
                     pos += tagContent.length;
                 }
-                // 4. Date: YYYY.MM.DD or YYYY-MM-DD or YYYY/MM/DD
+                // 4. Date: YYYY.MM.DD, DD.MM.YYYY, DD.MM.YY, or DD.MM (multiple formats)
                 else {
-                    const dateMatch = remaining.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?=\s|$)/);
+                    const dateMatch = remaining.match(/^(\d{1,4})[-./](\d{1,2})(?:[-./](\d{2,4}))?(?=\s|$)/);
                     if (dateMatch) {
                         tagContent = dateMatch[0];
                         tagType = 'date';
