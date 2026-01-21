@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.105.2",
+  "version": "0.105.3",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -4842,8 +4842,8 @@
     "prosemirror-schema-list": "^1.2.3",
     "prosemirror-state": "^1.4.3",
     "prosemirror-view": "^1.33.6",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "sql.js": "^1.13.0"
   },
   "extensionDependencies": [
