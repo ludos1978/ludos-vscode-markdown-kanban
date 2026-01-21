@@ -348,7 +348,9 @@ window.handleEmptyColumnDragStart = function(e) {
 window.handleEmptyColumnDragEnd = function(e) {
     // IMPORTANT: Do NOT reset state here - let the global dragend handler process the drop first!
     // Just clean up the visual feedback on the source element.
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 };
 
 // =============================================================================
@@ -398,7 +400,9 @@ window.handleClipboardColumnDragStart = function(e) {
 window.handleClipboardColumnDragEnd = function(e) {
     // IMPORTANT: Do NOT reset state here - let the global dragend handler process the drop first!
     // Just clean up the visual feedback on the source element.
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 };
 
 // =============================================================================
@@ -449,7 +453,9 @@ window.handleTemplateMenuDragStart = function(e) {
 window.handleTemplateMenuDragEnd = function(e) {
     // IMPORTANT: Do NOT reset state here - let the global dragend handler process the drop first!
     // Just clean up the visual feedback on the source element.
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 };
 
 // =============================================================================
