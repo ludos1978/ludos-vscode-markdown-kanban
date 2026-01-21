@@ -4841,16 +4841,28 @@ function scrollToAndHighlight(columnId, taskId, highlight = true, elementPath, e
 
     // Add highlight animation if requested
     if (highlight) {
+        // For column-level highlights, highlight only inner elements (not the full-height wrapper or stack)
+        const isColumnElement = targetElement.classList.contains('kanban-full-height-column');
+        let elementsToHighlight = [targetElement];
+
+        if (isColumnElement) {
+            // Highlight only the inner column parts: header, title, content, footer
+            const innerElements = targetElement.querySelectorAll('.column-header, .column-title, .column-content, .column-footer');
+            if (innerElements.length > 0) {
+                elementsToHighlight = Array.from(innerElements);
+            }
+        }
+
         // Remove any existing highlight
-        targetElement.classList.remove('search-highlight');
+        elementsToHighlight.forEach(el => el.classList.remove('search-highlight'));
         // Force reflow to restart animation
-        void targetElement.offsetWidth;
+        elementsToHighlight.forEach(el => void el.offsetWidth);
         // Add highlight class
-        targetElement.classList.add('search-highlight');
+        elementsToHighlight.forEach(el => el.classList.add('search-highlight'));
 
         // Remove the highlight after animation completes
         setTimeout(() => {
-            targetElement.classList.remove('search-highlight');
+            elementsToHighlight.forEach(el => el.classList.remove('search-highlight'));
         }, 2000);
     }
 }

@@ -670,6 +670,13 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             display: inline-block;
         }
+        .tag-search-result.column-match {
+            border-left: 2px solid var(--vscode-editorInfo-foreground);
+            padding-left: 6px;
+        }
+        .tag-search-result.column-match .tag-search-result-title {
+            font-style: italic;
+        }
         .tag-search-header {
             font-weight: 600;
             font-size: 12px;
@@ -960,11 +967,19 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                 html += '<div class="date-group">';
                 html += '<div class="date-group-header">' + escapeHtml(tag) + ' (' + groupItems.length + ')</div>';
                 groupItems.forEach(item => {
-                    html += '<div class="tag-search-result" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
+                    const isColumnMatch = item.taskIndex === -1;
+                    html += '<div class="tag-search-result' + (isColumnMatch ? ' column-match' : '') + '" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
                     html += 'data-column-index="' + item.columnIndex + '" ';
                     html += 'data-task-index="' + item.taskIndex + '">';
-                    html += '<span class="tag-search-result-title">' + escapeHtml(item.taskTitle) + '</span>';
-                    html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
+                    if (isColumnMatch) {
+                        // Column-level match - show column title
+                        html += '<span class="tag-search-result-title">[Column] ' + escapeHtml(item.columnTitle) + '</span>';
+                        html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + '</span>';
+                    } else {
+                        // Task-level match - show task title
+                        html += '<span class="tag-search-result-title">' + escapeHtml(item.taskTitle) + '</span>';
+                        html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
+                    }
                     html += '</div>';
                 });
                 html += '</div>';
@@ -985,12 +1000,27 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         function renderBoardsConfig() {
             const container = document.getElementById('boards-list');
+            const hint = document.querySelector('.add-board-hint');
             const boards = dashboardData.config?.boards || [];
+
+            // Show hint only when no boards configured
+            if (hint) {
+                hint.style.display = boards.length === 0 ? 'block' : 'none';
+            }
 
             if (boards.length === 0) {
                 container.innerHTML = '<div class="empty-message">No boards added yet</div>';
                 return;
             }
+
+            // Save expanded state before re-rendering
+            const expandedBoards = new Set();
+            container.querySelectorAll('.board-config-item').forEach(item => {
+                const body = item.querySelector('.board-config-body');
+                if (body && body.classList.contains('expanded')) {
+                    expandedBoards.add(item.getAttribute('data-board-uri'));
+                }
+            });
 
             let html = '';
             boards.forEach((board, index) => {
@@ -1045,6 +1075,17 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             });
 
             container.innerHTML = html;
+
+            // Restore expanded state
+            container.querySelectorAll('.board-config-item').forEach(item => {
+                const uri = item.getAttribute('data-board-uri');
+                if (expandedBoards.has(uri)) {
+                    const toggle = item.querySelector('.board-config-toggle');
+                    const body = item.querySelector('.board-config-body');
+                    if (toggle) toggle.classList.add('expanded');
+                    if (body) body.classList.add('expanded');
+                }
+            });
 
             // Add event listeners for board header toggle
             container.querySelectorAll('.board-config-header').forEach(header => {

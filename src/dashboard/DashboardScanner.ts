@@ -409,10 +409,14 @@ export class DashboardScanner {
 
             // Check if column title contains the search tag
             const columnTags = extractTags(columnTitle);
-            const columnHasTag = columnTags.some(t => t.name.toLowerCase().includes(normalizedSearch));
+            const columnMatchingTag = columnTags.find(t => t.name.toLowerCase().includes(normalizedSearch));
+            const columnHasTag = !!columnMatchingTag;
             if (columnHasTag) {
-                console.log('[DashboardScanner.searchByTag] Column has matching tag in title');
+                console.log('[DashboardScanner.searchByTag] Column has matching tag in title:', columnMatchingTag?.name);
             }
+
+            // Track if any task in this column matched directly
+            let anyTaskMatchedDirectly = false;
 
             let taskIndex = 0;
             for (const task of column.tasks || []) {
@@ -423,7 +427,6 @@ export class DashboardScanner {
                 }
 
                 // Check if any tag in task matches the search
-                let taskMatched = false;
                 for (const tag of tags) {
                     const matches = tag.name.toLowerCase().includes(normalizedSearch);
                     if (matches) {
@@ -437,27 +440,28 @@ export class DashboardScanner {
                             taskTitle: task.title || '',
                             matchedTag: tag.name
                         });
-                        taskMatched = true;
+                        anyTaskMatchedDirectly = true;
                         break; // Only add task once even if multiple tags match
                     }
                 }
-
-                // If task didn't match but column has the tag, include the task
-                if (!taskMatched && columnHasTag) {
-                    const matchingColumnTag = columnTags.find(t => t.name.toLowerCase().includes(normalizedSearch));
-                    console.log('[DashboardScanner.searchByTag] MATCH (column):', matchingColumnTag?.name, 'for task:', task.title);
-                    results.push({
-                        boardUri,
-                        boardName,
-                        columnIndex,
-                        columnTitle,
-                        taskIndex,
-                        taskTitle: task.title || '',
-                        matchedTag: matchingColumnTag?.name || searchTag
-                    });
-                }
                 taskIndex++;
             }
+
+            // If column has the tag but no tasks matched directly, add a column-level result
+            // Use taskIndex = -1 to indicate this is a column match, not a task match
+            if (columnHasTag && !anyTaskMatchedDirectly) {
+                console.log('[DashboardScanner.searchByTag] MATCH (column-level):', columnMatchingTag?.name, 'for column:', columnTitle);
+                results.push({
+                    boardUri,
+                    boardName,
+                    columnIndex,
+                    columnTitle,
+                    taskIndex: -1,  // -1 indicates column-level match
+                    taskTitle: '',  // No specific task
+                    matchedTag: columnMatchingTag?.name || searchTag
+                });
+            }
+
             columnIndex++;
         }
 
