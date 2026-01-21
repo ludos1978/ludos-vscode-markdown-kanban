@@ -965,10 +965,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             const datalist = document.getElementById('tag-suggestions');
             const summaries = dashboardData.boardSummaries || [];
 
-            // Collect all unique tags from all boards
+            // Collect all unique tags from all boards (exclude temporal/time tags)
             const allTags = new Map();
             summaries.forEach(summary => {
                 (summary.tags || []).forEach(tag => {
+                    // Skip temporal tags (start with !)
+                    if (tag.type === 'temporal') return;
                     if (!allTags.has(tag.name)) {
                         allTags.set(tag.name, tag);
                     } else {
