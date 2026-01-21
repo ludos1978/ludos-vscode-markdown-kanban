@@ -1067,9 +1067,12 @@ export class ExportService {
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
 
-        // Convert based on format option ONLY
+        // Convert based on format option AND convertToPresentation flag
         // Formats: 'kanban', 'presentation', or 'document'
-        if (options.format === 'presentation') {
+        // IMPORTANT: Only convert if convertToPresentation is true
+        // This prevents double-conversion of files that are already in presentation format
+        // (e.g., included files that don't have 'kanban-plugin: board' in their YAML)
+        if (options.format === 'presentation' && convertToPresentation) {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
@@ -1082,7 +1085,7 @@ export class ExportService {
                     localClasses: options.marpLocalClasses || marpConfig.localClasses || []
                 }
             });
-        } else if (options.format === 'document') {
+        } else if (options.format === 'document' && convertToPresentation) {
             // Document format for Pandoc export (DOCX, ODT, EPUB)
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir);
             const pageBreaks = options.documentPageBreaks || 'continuous';
@@ -1637,6 +1640,7 @@ export class ExportService {
 
         // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Marp processing
         // This ensures diagrams work in PDF exports
+        // IMPORTANT: Must preprocess ALL markdown files in export folder (main + includes)
         let processedMarkdownPath = markdownPath;
         let preprocessCleanup: (() => Promise<void>) | undefined;
 
@@ -1653,7 +1657,38 @@ export class ExportService {
             // Create diagram preprocessor (mermaidService may be undefined if not provided)
             const preprocessor = new DiagramPreprocessor(mermaidService, panel);
 
-            // Preprocess diagrams
+            // STEP 1: Preprocess ALL include files in the export folder
+            // This ensures diagrams inside included files are also converted to SVG
+            const allFiles = fs.readdirSync(dir);
+            const includeFiles = allFiles.filter(f =>
+                f.endsWith('.md') &&
+                f !== `${baseName}.md` &&
+                !f.endsWith('.preprocessed.md')
+            );
+
+            for (const includeFile of includeFiles) {
+                const includeFilePath = path.join(dir, includeFile);
+                const includeBaseName = path.basename(includeFile, '.md');
+
+                try {
+                    const includeResult = await preprocessor.preprocess(
+                        includeFilePath,
+                        dir,
+                        includeBaseName
+                    );
+
+                    // If diagrams were processed, overwrite the include file
+                    if (includeResult.diagramFiles.length > 0) {
+                        await fs.promises.writeFile(includeFilePath, includeResult.processedMarkdown, 'utf8');
+                        logger.debug(`[ExportService] Preprocessed diagrams in include file: ${includeFile}`);
+                    }
+                } catch (includeError) {
+                    console.error(`[ExportService] Failed to preprocess include file ${includeFile}:`, includeError);
+                    // Continue with other files
+                }
+            }
+
+            // STEP 2: Preprocess the main file
             const preprocessResult = await preprocessor.preprocess(
                 markdownPath,
                 dir,
@@ -1817,6 +1852,7 @@ export class ExportService {
 
         // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Pandoc processing
         // This ensures Mermaid, PlantUML, Excalidraw, Draw.io diagrams work in document exports
+        // IMPORTANT: Must preprocess ALL markdown files in export folder (main + includes)
         let processedMarkdownPath = markdownPath;
         let preprocessCleanup: (() => Promise<void>) | undefined;
 
@@ -1830,7 +1866,38 @@ export class ExportService {
             // Create diagram preprocessor
             const preprocessor = new DiagramPreprocessor(mermaidService, panel);
 
-            // Preprocess diagrams
+            // STEP 1: Preprocess ALL include files in the export folder
+            // This ensures diagrams inside included files are also converted to SVG
+            const allFiles = fs.readdirSync(dir);
+            const includeFiles = allFiles.filter(f =>
+                f.endsWith('.md') &&
+                f !== `${baseName}.md` &&
+                !f.endsWith('.preprocessed.md')
+            );
+
+            for (const includeFile of includeFiles) {
+                const includeFilePath = path.join(dir, includeFile);
+                const includeBaseName = path.basename(includeFile, '.md');
+
+                try {
+                    const includeResult = await preprocessor.preprocess(
+                        includeFilePath,
+                        dir,
+                        includeBaseName
+                    );
+
+                    // If diagrams were processed, overwrite the include file
+                    if (includeResult.diagramFiles.length > 0) {
+                        await fs.promises.writeFile(includeFilePath, includeResult.processedMarkdown, 'utf8');
+                        logger.debug(`[ExportService] Preprocessed diagrams in include file: ${includeFile}`);
+                    }
+                } catch (includeError) {
+                    console.error(`[ExportService] Failed to preprocess include file ${includeFile}:`, includeError);
+                    // Continue with other files
+                }
+            }
+
+            // STEP 2: Preprocess the main file
             const preprocessResult = await preprocessor.preprocess(
                 markdownPath,
                 dir,

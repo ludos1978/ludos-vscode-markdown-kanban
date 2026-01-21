@@ -5,6 +5,91 @@
 const mdItContainer = require("markdown-it-container");
 
 // ============================================
+// YAML Stripping Include Plugin
+// ============================================
+// Pre-processes !!!include(path)!!! to strip YAML frontmatter from included files
+// This MUST run BEFORE markdown-it-include to prevent YAML from breaking slide parsing
+// Issue: When included files have YAML headers (---\nmarp: true\n---), the --- lines
+// are interpreted as slide separators, causing only YAML to show up as a "slide"
+const fs = require('fs');
+const path = require('path');
+
+const yamlStrippingIncludePlugin = (md, options = {}) => {
+  const originalParse = md.parse.bind(md);
+
+  md.parse = (src, env) => {
+    // Process !!!include(path)!!! patterns and strip YAML from included content
+    const includePattern = /!!!include\(([^)]+)\)!!!/g;
+    const processedIncludes = new Set();
+
+    // Get the root directory for resolving paths
+    // Use env.root if available, otherwise use current working directory
+    const rootDir = (env && env.root) || process.cwd();
+
+    // Recursively process includes
+    const processIncludes = (content, currentDir) => {
+      return content.replace(includePattern, (match, includePath) => {
+        // Trim whitespace and decode URI components
+        includePath = includePath.trim();
+        try {
+          includePath = decodeURIComponent(includePath);
+        } catch (e) {
+          // If decode fails, use as-is
+        }
+
+        // Resolve path relative to current file's directory
+        let resolvedPath;
+        if (path.isAbsolute(includePath)) {
+          resolvedPath = includePath;
+        } else {
+          resolvedPath = path.resolve(currentDir, includePath);
+        }
+
+        // Check for circular includes
+        if (processedIncludes.has(resolvedPath)) {
+          console.warn(`[Engine] Circular include detected: ${resolvedPath}`);
+          return match; // Return original to avoid infinite loop
+        }
+
+        // Check if file exists
+        if (!fs.existsSync(resolvedPath)) {
+          console.warn(`[Engine] Include file not found: ${resolvedPath}`);
+          return match; // Return original, markdown-it-include will handle the error
+        }
+
+        processedIncludes.add(resolvedPath);
+
+        try {
+          let fileContent = fs.readFileSync(resolvedPath, 'utf8');
+
+          // Strip YAML frontmatter if present
+          // Match: ---\n ... \n---\n at the start of the file
+          // Allow trailing spaces/tabs after --- (common from editors)
+          const yamlMatch = fileContent.match(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n/);
+          if (yamlMatch) {
+            fileContent = fileContent.substring(yamlMatch[0].length);
+          }
+
+          // Recursively process nested includes in the included file
+          const includeDir = path.dirname(resolvedPath);
+          fileContent = processIncludes(fileContent, includeDir);
+
+          return fileContent;
+        } catch (err) {
+          console.error(`[Engine] Error reading include file ${resolvedPath}:`, err);
+          return match; // Return original on error
+        }
+      });
+    };
+
+    // Process the source content
+    const processedSrc = processIncludes(src, rootDir);
+
+    return originalParse(processedSrc, env);
+  };
+};
+
+// ============================================
 // Speaker Note Plugin: Convert ;; to <!-- -->
 // ============================================
 // Converts lines starting with ;; to HTML comments (speaker notes)
@@ -708,10 +793,16 @@ module.exports = ({ marp }) => {
   // Apply speaker note plugin first (;; to <!-- --> conversion)
   marp.use(speakerNotePlugin);
 
+  // Apply YAML-stripping include plugin BEFORE markdown-it-include
+  // This plugin processes !!!include()!!! patterns and strips YAML frontmatter
+  // from included files to prevent YAML headers from breaking Marp slide parsing
+  marp.use(yamlStrippingIncludePlugin);
+
   // Apply all other plugins
   marp
     // https://www.npmjs.com/package/markdown-it-include
-    // !!!include(path)!!!
+    // !!!include(path)!!! - NOTE: yamlStrippingIncludePlugin processes includes first,
+    // so markdown-it-include acts as a fallback for any unprocessed patterns
     .use(require("markdown-it-include"))
 
     // https://www.npmjs.com/package/markdown-it-strikethrough-alt
