@@ -515,17 +515,25 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-indent {
             display: flex;
             flex-shrink: 0;
+            height: 22px;
         }
         .indent-guide {
             width: 8px;
             height: 22px;
             box-sizing: border-box;
+            position: relative;
         }
-        .indent-guide.active {
-            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
+        .indent-guide::before {
+            content: '';
+            position: absolute;
+            left: 3px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--vscode-tree-indentGuidesStroke);
         }
         .tree-twistie {
-            width: 16px;
+            width: 20px;
             height: 22px;
             display: flex;
             align-items: center;
@@ -914,7 +922,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             for (const [date, groupItems] of Object.entries(groups)) {
                 // Date group header - level 1
                 html += '<div class="tree-row date-group-header">';
-                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-indent"><div class="indent-guide"></div></div>';
                 html += '<div class="tree-twistie"></div>';
                 html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(date) + '</span></div>';
                 html += '</div>';
@@ -922,7 +930,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                 groupItems.forEach(item => {
                     html += '<div class="tree-row upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
                     html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
-                    html += '<div class="tree-indent"><div class="indent-guide active"></div><div class="indent-guide active"></div></div>';
+                    html += '<div class="tree-indent"><div class="indent-guide"></div><div class="indent-guide"></div></div>';
                     html += '<div class="tree-twistie"></div>';
                     html += '<div class="tree-contents"><div class="tree-label">';
                     html += '<span class="tree-label-name">' + escapeHtml(item.taskTitle) + '</span>';
@@ -1007,7 +1015,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             for (const [tag, groupItems] of Object.entries(groups)) {
                 // Tag group header - level 1
                 html += '<div class="tree-row date-group-header">';
-                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-indent"><div class="indent-guide"></div></div>';
                 html += '<div class="tree-twistie"></div>';
                 html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(tag) + ' (' + groupItems.length + ')</span></div>';
                 html += '</div>';
@@ -1016,7 +1024,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     const isColumnMatch = item.taskIndex === -1;
                     html += '<div class="tree-row tag-search-result' + (isColumnMatch ? ' column-match' : '') + '" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
                     html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
-                    html += '<div class="tree-indent"><div class="indent-guide active"></div><div class="indent-guide active"></div></div>';
+                    html += '<div class="tree-indent"><div class="indent-guide"></div><div class="indent-guide"></div></div>';
                     html += '<div class="tree-twistie"></div>';
                     html += '<div class="tree-contents"><div class="tree-label">';
                     if (isColumnMatch) {
@@ -1076,7 +1084,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
                 // Header (clickable to expand/collapse) - tree row style
                 html += '<div class="tree-row board-config-header">';
-                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-indent"><div class="indent-guide"></div></div>';
                 html += '<div class="tree-twistie collapsible board-config-toggle"></div>';
                 html += '<div class="tree-contents"><span class="tree-label-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span></div>';
                 html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';

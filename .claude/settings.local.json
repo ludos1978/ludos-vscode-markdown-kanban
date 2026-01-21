@@ -155,7 +155,8 @@
       "Bash(eslint:*)",
       "Bash(npm info:*)",
       "Bash(npm prune:*)",
-      "Bash(npx vsce:*)"
+      "Bash(npx vsce:*)",
+      "Skill(refactor)"
     ],
     "deny": [],
     "ask": []
