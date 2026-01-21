@@ -7920,6 +7920,10 @@ figcaption {
 .pdf-slideshow-wrapper {
   position: relative;
   display: block;
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .pdf-slideshow-wrapper .image-menu-btn {
@@ -7933,6 +7937,9 @@ figcaption {
   flex-direction: column;
   gap: 10px;
   margin: 10px 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .pdf-slideshow-image {
@@ -7944,12 +7951,16 @@ figcaption {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
   padding: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .pdf-slideshow-image img {
   max-width: 100%;
   height: auto;
   display: block;
+  object-fit: contain;
 }
 
 .pdf-slideshow-loading {
@@ -7967,6 +7978,9 @@ figcaption {
   background: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .pdf-slideshow-title {
