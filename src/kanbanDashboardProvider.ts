@@ -575,10 +575,15 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             overflow: hidden;
         }
         .section-header {
+            padding-left: 8px;
+        }
+        .section-header h3 {
+            margin: 0;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: var(--vscode-sideBarSectionHeader-foreground);
-            padding-left: 8px;
         }
         .section-content {
             display: block;
@@ -750,7 +755,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             <div class="tree-row section-header" data-section="upcoming">
                 <div class="tree-twistie collapsible expanded"></div>
                 <div class="tree-contents">
-                    <span>Upcoming</span>
+                    <h3>Upcoming</h3>
                 </div>
                 <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
             </div>
@@ -765,7 +770,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             <div class="tree-row section-header" data-section="tagged">
                 <div class="tree-twistie collapsible expanded"></div>
                 <div class="tree-contents">
-                    <span>Tagged Items</span>
+                    <h3>Tagged Items</h3>
                 </div>
             </div>
             <div class="section-content" id="tagged-content">
@@ -782,7 +787,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             <div class="tree-row section-header" data-section="boards">
                 <div class="tree-twistie collapsible expanded"></div>
                 <div class="tree-contents">
-                    <span>Boards</span>
+                    <h3>Boards</h3>
                 </div>
             </div>
             <div class="section-content" id="boards-content">
