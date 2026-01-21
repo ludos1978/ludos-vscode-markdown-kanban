@@ -1,6 +1,7 @@
 /**
  * Search Panel JavaScript
  * Frontend logic for the Kanban Search sidebar panel
+ * Uses VS Code explorer tree styling (same as Dashboard)
  */
 
 (function() {
@@ -48,6 +49,9 @@
         diagram: 'Diagrams',
         text: 'Text Matches'
     };
+
+    // Track folded state per type
+    const foldedGroups = new Set();
 
     /**
      * Initialize the panel
@@ -199,7 +203,7 @@
     }
 
     /**
-     * Display search results
+     * Display search results using tree-row structure
      */
     function displayResults(results, searchType) {
         hideStatus();
@@ -230,7 +234,7 @@
             grouped[type].push(result);
         });
 
-        // Render grouped results
+        // Render grouped results using tree structure
         let indexCounter = 0;
         Object.keys(grouped).forEach(type => {
             const group = grouped[type];
@@ -253,15 +257,12 @@
         }
     }
 
-    // Track folded state per type
-    const foldedGroups = new Set();
-
     /**
-     * Create a result group element
+     * Create a result group element using tree structure
      */
     function createResultGroup(type, items, searchType, startIndex = 0) {
         const group = document.createElement('div');
-        group.className = 'result-group';
+        group.className = 'tree-group';
         group.dataset.type = type;
 
         // Check if this group should be folded (persisted state)
@@ -270,23 +271,23 @@
             group.classList.add('folded');
         }
 
-        // Header with fold toggle
+        // Header using tree-row structure
         const header = document.createElement('div');
-        header.className = 'result-group-header';
+        header.className = 'tree-row tree-group-toggle';
         header.innerHTML = `
-            <span class="result-group-fold-toggle codicon codicon-chevron-${isFolded ? 'right' : 'down'}"></span>
-            <span class="codicon codicon-${typeIcons[type] || 'file'}"></span>
-            <span class="result-group-label">${typeLabels[type] || type}</span>
-            <span class="result-group-count">${items.length}</span>
+            <div class="tree-indent"><div class="indent-guide"></div></div>
+            <div class="tree-twistie collapsible ${isFolded ? '' : 'expanded'}"></div>
+            <div class="tree-contents">
+                <span class="tree-label-name">${escapeHtml(typeLabels[type] || type)} (${items.length})</span>
+            </div>
         `;
 
         // Click handler to toggle fold
         header.addEventListener('click', () => {
             const isNowFolded = group.classList.toggle('folded');
-            const toggleIcon = header.querySelector('.result-group-fold-toggle');
-            if (toggleIcon) {
-                toggleIcon.classList.remove('codicon-chevron-down', 'codicon-chevron-right');
-                toggleIcon.classList.add(isNowFolded ? 'codicon-chevron-right' : 'codicon-chevron-down');
+            const twistie = header.querySelector('.tree-twistie');
+            if (twistie) {
+                twistie.classList.toggle('expanded', !isNowFolded);
             }
             // Persist fold state
             if (isNowFolded) {
@@ -298,9 +299,9 @@
 
         group.appendChild(header);
 
-        // Items container (for easier folding)
+        // Items container
         const itemsContainer = document.createElement('div');
-        itemsContainer.className = 'result-group-items';
+        itemsContainer.className = 'tree-group-items';
         items.forEach((item, offset) => {
             const itemEl = createResultItem(item, searchType, startIndex + offset);
             itemsContainer.appendChild(itemEl);
@@ -311,49 +312,42 @@
     }
 
     /**
-     * Create a result item element
+     * Create a result item element using tree-row structure with 2 lines
      */
     function createResultItem(item, searchType, resultIndex) {
         const el = document.createElement('div');
-        el.className = 'result-item';
+        el.className = 'tree-row';
         el.dataset.resultIndex = String(resultIndex);
-        el.addEventListener('click', () => {
-            navigateToIndex(resultIndex, { focus: true, scroll: true });
-        });
 
         const isBroken = searchType === 'broken';
-        const iconClass = isBroken ? 'broken' : 'text';
-        const iconName = isBroken ? 'warning' : typeIcons[item.type] || 'quote';
 
+        // Main content (title)
         let mainContent = '';
         if (item.path) {
             mainContent = escapeHtml(item.path);
         } else if (item.matchText) {
             mainContent = escapeHtml(item.matchText);
+        } else if (item.context) {
+            mainContent = highlightMatch(item.context, item.matchText);
         }
 
-        let contextHtml = '';
-        if (item.context) {
-            contextHtml = `<div class="result-item-context">${highlightMatch(item.context, item.matchText)}</div>`;
-        }
-
+        // Location (second line)
         const locationText = formatLocation(item.location);
 
         el.innerHTML = `
-            <div class="result-item-main">
-                <div class="result-item-icon ${iconClass}">
-                    <span class="codicon codicon-${iconName}"></span>
+            <div class="tree-indent"><div class="indent-guide"></div><div class="indent-guide"></div></div>
+            <div class="tree-twistie"></div>
+            <div class="tree-contents">
+                <div class="tree-label-2line">
+                    <span class="entry-title ${isBroken ? 'result-icon-broken' : ''}">${mainContent}</span>
+                    <span class="entry-location">${locationText}</span>
                 </div>
-                <div class="result-item-content">
-                    <div class="result-item-path">${mainContent}</div>
-                    ${contextHtml}
-                </div>
-            </div>
-            <div class="result-item-location">
-                <span class="codicon codicon-location"></span>
-                ${locationText}
             </div>
         `;
+
+        el.addEventListener('click', () => {
+            navigateToIndex(resultIndex, { focus: true, scroll: true });
+        });
 
         resultElements[resultIndex] = el;
         return el;
@@ -419,7 +413,7 @@
     function formatLocation(location) {
         let text = escapeHtml(location.columnTitle);
         if (location.taskTitle) {
-            text += ` > ${escapeHtml(location.taskTitle)}`;
+            text += ' / ' + escapeHtml(location.taskTitle);
         }
         if (location.field === 'description') {
             text += ' (description)';

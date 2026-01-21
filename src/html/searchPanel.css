@@ -1,15 +1,8 @@
 /**
  * Search Panel Styles
  * Styles for the Kanban Search sidebar panel
+ * Matches VS Code explorer tree styling (same as Dashboard)
  */
-
-/* VS Code theme variables */
-:root {
-    --container-padding: 8px;
-    --input-height: 26px;
-    --button-height: 26px;
-    --border-radius: 2px;
-}
 
 * {
     box-sizing: border-box;
@@ -19,7 +12,7 @@ body {
     padding: 0;
     margin: 0;
     font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
+    font-size: 13px;
     color: var(--vscode-foreground);
     background-color: var(--vscode-sideBar-background);
 }
@@ -29,8 +22,6 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: var(--container-padding);
-    gap: 8px;
 }
 
 /* Mode Toggle */
@@ -38,8 +29,9 @@ body {
     display: flex;
     gap: 4px;
     background: var(--vscode-input-background);
-    border-radius: var(--border-radius);
+    border-radius: 2px;
     padding: 2px;
+    margin: 8px;
 }
 
 .mode-btn {
@@ -54,7 +46,7 @@ body {
     color: var(--vscode-foreground);
     font-size: 11px;
     cursor: pointer;
-    border-radius: var(--border-radius);
+    border-radius: 2px;
     transition: background-color 0.1s;
 }
 
@@ -67,24 +59,21 @@ body {
     color: var(--vscode-button-foreground);
 }
 
-.mode-btn .codicon {
-    font-size: 12px;
-}
-
 /* Search Input */
 .search-input-container {
     display: flex;
     gap: 4px;
+    padding: 0 8px 8px 8px;
 }
 
 .search-input {
     flex: 1;
-    height: var(--input-height);
+    height: 26px;
     padding: 0 8px;
     border: 1px solid var(--vscode-input-border, transparent);
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
-    border-radius: var(--border-radius);
+    border-radius: 2px;
     outline: none;
     font-size: inherit;
 }
@@ -98,13 +87,13 @@ body {
 }
 
 .search-btn {
-    width: var(--button-height);
-    height: var(--button-height);
+    width: 26px;
+    height: 26px;
     padding: 0;
     border: none;
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    border-radius: var(--border-radius);
+    border-radius: 2px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -118,16 +107,17 @@ body {
 /* Find Broken Button */
 .find-broken-container {
     display: flex;
+    padding: 0 8px 8px 8px;
 }
 
 .find-broken-btn {
     flex: 1;
-    height: var(--button-height);
+    height: 26px;
     padding: 0 12px;
     border: none;
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
-    border-radius: var(--border-radius);
+    border-radius: 2px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -138,10 +128,6 @@ body {
 
 .find-broken-btn:hover {
     background: var(--vscode-button-secondaryHoverBackground);
-}
-
-.find-broken-btn .codicon {
-    font-size: 14px;
 }
 
 /* Status Message */
@@ -160,7 +146,8 @@ body {
     color: var(--vscode-errorForeground);
     background: var(--vscode-inputValidation-errorBackground);
     border: 1px solid var(--vscode-inputValidation-errorBorder);
-    border-radius: var(--border-radius);
+    border-radius: 2px;
+    margin: 0 8px;
 }
 
 .status-message.warning {
@@ -208,150 +195,176 @@ body {
     overflow-x: hidden;
 }
 
-/* Result Group */
-.result-group {
-    margin-bottom: 8px;
-}
+/* ========== Tree View Styles (matching Dashboard) ========== */
 
-.result-group-header {
+/* Tree row base styles - matches VS Code monaco-tl-row */
+.tree-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--vscode-descriptionForeground);
-    background: var(--vscode-sideBarSectionHeader-background);
-    position: sticky;
-    top: 0;
-    z-index: 1;
+    min-height: 22px;
+    line-height: 22px;
     cursor: pointer;
-    user-select: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    width: 100%;
+    position: relative;
 }
 
-.result-group-header:hover {
+.tree-row:hover {
     background: var(--vscode-list-hoverBackground);
 }
 
-.result-group-header .codicon {
-    font-size: 12px;
-}
-
-.result-group-fold-toggle {
-    font-size: 14px !important;
-    opacity: 0.7;
-    transition: transform 0.15s ease;
-}
-
-.result-group-header:hover .result-group-fold-toggle {
-    opacity: 1;
-}
-
-.result-group-count {
-    margin-left: auto;
-    font-weight: normal;
-    opacity: 0.7;
-}
-
-/* Folded state */
-.result-group.folded .result-group-items {
-    display: none;
-}
-
-.result-group-items {
-    /* Container for items - allows easy fold/unfold */
-}
-
-/* Result Item */
-.result-item {
-    display: flex;
-    flex-direction: column;
-    padding: 6px 8px;
-    cursor: pointer;
-    border-bottom: 1px solid var(--vscode-widget-border, transparent);
-}
-
-.result-item:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-
-.result-item:active {
-    background: var(--vscode-list-activeSelectionBackground);
-}
-
-.result-item.active {
+.tree-row.active {
     background: var(--vscode-list-activeSelectionBackground);
     color: var(--vscode-list-activeSelectionForeground);
 }
 
-.result-item-main {
+/* Indent guides - matches VS Code monaco-tl-indent */
+.tree-indent {
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
+    flex-shrink: 0;
+    align-self: stretch;
 }
 
-.result-item-icon {
-    flex-shrink: 0;
+.indent-guide {
+    width: 8px;
+    box-sizing: border-box;
+    border-right: 1px solid transparent;
+}
+
+/* Show indent guides on hover like VS Code */
+.results-list:hover .indent-guide {
+    border-right-color: var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
+}
+
+/* Twistie - matches VS Code monaco-tl-twistie */
+.tree-twistie {
     width: 16px;
-    height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
-.result-item-icon .codicon {
-    font-size: 14px;
+.tree-twistie.collapsible::before {
+    font-family: codicon;
+    content: '\eab6';
+    font-size: 16px;
+    color: var(--vscode-foreground);
+    opacity: 0.8;
+    transition: transform 0.1s ease-out;
 }
 
-.result-item-icon.broken .codicon {
+.tree-twistie.collapsible.expanded::before {
+    transform: rotate(90deg);
+}
+
+/* Contents - matches VS Code monaco-tl-contents */
+.tree-contents {
+    flex: 1;
+    overflow: hidden;
+    min-height: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Label - matches VS Code monaco-icon-label */
+.tree-label {
+    display: flex;
+    align-items: baseline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.tree-label-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+}
+
+.tree-label-description {
+    opacity: 0.6;
+    margin-left: 0.5em;
+    font-size: 0.9em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Two-line entry layout */
+.tree-row:has(.tree-label-2line) {
+    min-height: 36px;
+}
+
+.tree-row:has(.tree-label-2line) .tree-contents {
+    padding: 2px 0;
+}
+
+.tree-label-2line {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: 100%;
+    line-height: 1.3;
+}
+
+.tree-label-2line .entry-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tree-label-2line .entry-location {
+    opacity: 0.6;
+    font-size: 0.9em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Section headers - matches VS Code pane-header */
+.section-header {
+    padding-left: 4px;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-sideBarSectionHeader-foreground);
+}
+
+.section-content {
+    display: block;
+    padding-left: 8px;
+}
+
+/* Tree group for foldable sections */
+.tree-group-items {
+    display: block;
+}
+
+.tree-group.folded .tree-group-items {
+    display: none;
+}
+
+/* Result type icon colors */
+.result-icon-broken {
     color: var(--vscode-errorForeground);
 }
 
-.result-item-icon.text .codicon {
+.result-icon-text {
     color: var(--vscode-textLink-foreground);
 }
 
-.result-item-content {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.result-item-path {
-    font-family: var(--vscode-editor-font-family);
-    font-size: 12px;
-    color: var(--vscode-foreground);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.result-item-context {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-}
-
-.result-item-context .highlight {
+/* Match highlight */
+.highlight {
     background: var(--vscode-editor-findMatchHighlightBackground);
     color: var(--vscode-foreground);
-}
-
-.result-item-location {
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.result-item-location .codicon {
-    font-size: 10px;
 }
 
 /* Loading State */
@@ -419,3 +432,5 @@ body {
 .codicon-quote::before { content: '\eb41'; }
 .codicon-location::before { content: '\eb11'; }
 .codicon-info::before { content: '\ea74'; }
+.codicon-chevron-right::before { content: '\eab6'; }
+.codicon-chevron-down::before { content: '\eab4'; }
