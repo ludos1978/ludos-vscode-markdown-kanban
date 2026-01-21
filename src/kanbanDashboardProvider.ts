@@ -519,23 +519,20 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-indent {
             display: flex;
             flex-shrink: 0;
+            align-self: stretch;
         }
         .indent-guide {
-            width: 12px;
-            height: 22px;
+            width: 8px;
             box-sizing: border-box;
             border-right: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
         }
         /* Twistie - matches VS Code monaco-tl-twistie */
         .tree-twistie {
             width: 16px;
-            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            padding-right: 6px;
-            transform: translateX(3px);
         }
         .tree-twistie.collapsible::before {
             font-family: codicon;
@@ -578,19 +575,44 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             white-space: nowrap;
             flex-shrink: 0;
         }
-        /* Individual entry indicator - light dash */
-        .upcoming-item .tree-label-name::before,
-        .tag-search-result .tree-label-name::before {
+        /* Two-line entry layout */
+        .tree-row:has(.tree-label-2line) {
+            min-height: 40px;
+        }
+        .tree-row:has(.tree-label-2line) .tree-contents {
+            padding: 4px 0;
+        }
+        .tree-label-2line {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            width: 100%;
+            line-height: 1.3;
+        }
+        .tree-label-2line .entry-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tree-label-2line .entry-title::before {
             content: '–';
             margin-right: 6px;
             opacity: 0.4;
+        }
+        .tree-label-2line .entry-location {
+            opacity: 0.6;
+            font-size: 0.9em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding-left: 16px;
         }
         /* Section headers - matches VS Code pane-header */
         .section {
             overflow: hidden;
         }
         .section-header {
-            padding-left: 0;
+            padding-left: 8px;
         }
         .section-header h3 {
             margin: 0;
@@ -602,7 +624,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
         .section-content {
             display: block;
-            padding-left: 0;
+            padding-left: 16px;
         }
         .section-content.collapsed {
             display: none;
@@ -902,9 +924,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
                     html += '<div class="tree-indent"><div class="indent-guide"></div><div class="indent-guide"></div></div>';
                     html += '<div class="tree-twistie"></div>';
-                    html += '<div class="tree-contents"><div class="tree-label">';
-                    html += '<span class="tree-label-name">' + escapeHtml(item.taskTitle) + '</span>';
-                    html += '<span class="tree-label-description">' + escapeHtml(item.boardName) + '</span>';
+                    html += '<div class="tree-contents"><div class="tree-label-2line">';
+                    html += '<span class="entry-title">' + escapeHtml(item.taskTitle) + '</span>';
+                    html += '<span class="entry-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
                     html += '</div></div>';
                     html += '</div>';
                 });
@@ -1017,13 +1039,13 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
                     html += '<div class="tree-indent"><div class="indent-guide"></div><div class="indent-guide"></div></div>';
                     html += '<div class="tree-twistie"></div>';
-                    html += '<div class="tree-contents"><div class="tree-label">';
+                    html += '<div class="tree-contents"><div class="tree-label-2line">';
                     if (isColumnMatch) {
-                        html += '<span class="tree-label-name">[Col] ' + escapeHtml(item.columnTitle) + '</span>';
+                        html += '<span class="entry-title">[Col] ' + escapeHtml(item.columnTitle) + '</span>';
                     } else {
-                        html += '<span class="tree-label-name">' + escapeHtml(item.taskTitle) + '</span>';
+                        html += '<span class="entry-title">' + escapeHtml(item.taskTitle) + '</span>';
                     }
-                    html += '<span class="tree-label-description">' + escapeHtml(item.boardName) + '</span>';
+                    html += '<span class="entry-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
                     html += '</div></div>';
                     html += '</div>';
                 });
