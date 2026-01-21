@@ -44,3 +44,4 @@ tmp/**
 !src/html/**
 !imgs/**
 !node_modules/@vscode/codicons/**
+node_modules_backup/**
