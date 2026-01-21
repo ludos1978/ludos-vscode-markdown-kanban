@@ -937,38 +937,20 @@ function insertColumnBefore(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column
+    // Extract row tag from reference column (only #row tag - #stack handled by normalizeAllStackTags)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
         if (rowMatch) {
             tags = ` ${rowMatch[0]}`;
         }
-
-        // CRITICAL: Check if reference has #stack BEFORE modifying it
-        const hasStack = /#stack\b/i.test(referenceColumn.title);
-
-        // New column gets #stack only if reference already had it
-        if (hasStack) {
-            tags += ' #stack';
-        }
-
-        // Reference column gets #stack tag if it doesn't have it
-        if (!hasStack) {
-            const trimmedTitle = referenceColumn.title.trim();
-            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
-
-            // Update the reference column title in the DOM
-            if (typeof updateColumnTitleDisplay === 'function') {
-                updateColumnTitleDisplay(columnId);
-            }
-        }
     }
 
     // Cache-first: Create new column and insert before reference column
+    // Note: #stack tags will be normalized after DOM update by normalizeAllStackTags()
     const newColumn = {
         id: `temp-column-before-${Date.now()}`,
-        title: tags.trim(), // Row tag only (NO #stack tag)
+        title: tags.trim(),
         tasks: []
     };
 
@@ -985,25 +967,20 @@ function insertColumnAfter(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag and stack tag from reference column
+    // Extract row tag from reference column (only #row tag - #stack handled by normalizeAllStackTags)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
         if (rowMatch) {
             tags = ` ${rowMatch[0]}`;
         }
-
-        // Only add #stack if reference column already has it (joining existing stack)
-        const hasStack = /#stack\b/i.test(referenceColumn.title);
-        if (hasStack) {
-            tags += ' #stack';
-        }
     }
 
     // Cache-first: Create new column and insert after reference column
+    // Note: #stack tags will be normalized after DOM update by normalizeAllStackTags()
     const newColumn = {
         id: `temp-column-after-${Date.now()}`,
-        title: tags.trim(), // Row tag and #stack tag
+        title: tags.trim(),
         tasks: []
     };
 
@@ -2098,6 +2075,12 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
         // Use incremental DOM update instead of full redraw
         if (typeof window.addSingleColumnToDOM === 'function') {
             const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex, referenceColumnId);
+
+            // Normalize #stack tags based on DOM structure
+            // This ensures proper stacking when inserting before/after columns
+            if (typeof window.normalizeAllStackTags === 'function') {
+                window.normalizeAllStackTags();
+            }
 
             // Focus the newly created column and start editing its title
             if (columnElement) {
