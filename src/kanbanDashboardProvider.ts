@@ -524,7 +524,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .indent-guide {
             width: 8px;
             box-sizing: border-box;
-            border-right: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
+            border-right: 1px solid transparent;
+        }
+        /* Show indent guides on hover like VS Code */
+        .section-content:hover .indent-guide {
+            border-right-color: var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
         }
         /* Twistie - matches VS Code monaco-tl-twistie */
         .tree-twistie {
@@ -577,10 +581,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
         /* Two-line entry layout */
         .tree-row:has(.tree-label-2line) {
-            min-height: 40px;
+            min-height: 36px;
         }
         .tree-row:has(.tree-label-2line) .tree-contents {
-            padding: 4px 0;
+            padding: 2px 0;
         }
         .tree-label-2line {
             display: flex;
@@ -594,25 +598,19 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .tree-label-2line .entry-title::before {
-            content: '–';
-            margin-right: 6px;
-            opacity: 0.4;
-        }
         .tree-label-2line .entry-location {
             opacity: 0.6;
             font-size: 0.9em;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            padding-left: 16px;
         }
         /* Section headers - matches VS Code pane-header */
         .section {
             overflow: hidden;
         }
         .section-header {
-            padding-left: 8px;
+            padding-left: 4px;
         }
         .section-header h3 {
             margin: 0;
@@ -624,7 +622,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
         .section-content {
             display: block;
-            padding-left: 16px;
+            padding-left: 8px;
         }
         .section-content.collapsed {
             display: none;
