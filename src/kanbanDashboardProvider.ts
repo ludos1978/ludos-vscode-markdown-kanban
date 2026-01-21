@@ -493,7 +493,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         body {
             padding: 0;
             font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
+            font-size: 13px;
             color: var(--vscode-foreground);
         }
         .dashboard-container {
@@ -575,7 +575,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             overflow: hidden;
         }
         .section-header {
-            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: var(--vscode-sideBarSectionHeader-foreground);
@@ -602,7 +601,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-badge-background);
             color: var(--vscode-badge-foreground);
             border-radius: 10px;
-            font-size: 11px;
         }
         .tag-item.person {
             background: var(--vscode-terminal-ansiCyan);
@@ -653,7 +651,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             padding: 12px;
             text-align: center;
             color: var(--vscode-descriptionForeground);
-            font-size: 11px;
             margin-top: 8px;
             border: 1px dashed var(--vscode-panel-border);
             border-radius: 4px;
@@ -678,7 +675,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
-            font-size: 13px;
             box-sizing: border-box;
         }
         .tag-search-input:focus {
@@ -690,7 +686,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             font-style: italic;
         }
         .tag-search-header {
-            font-size: 12px;
             color: var(--vscode-descriptionForeground);
             margin-bottom: 8px;
             padding-bottom: 4px;
@@ -708,13 +703,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             align-items: center;
             gap: 4px;
             margin-bottom: 4px;
-            font-size: 12px;
         }
         .board-config-row:last-child {
             margin-bottom: 0;
         }
         .board-config-label {
-            font-size: 11px;
             color: var(--vscode-descriptionForeground);
             width: 60px;
         }
@@ -725,7 +718,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             margin-top: 4px;
         }
         .board-tag-filter {
-            font-size: 11px;
             padding: 2px 6px;
             background: var(--vscode-badge-background);
             color: var(--vscode-badge-foreground);
@@ -748,7 +740,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
-            font-size: 12px;
         }
     </style>
 </head>
@@ -868,13 +859,16 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
             let html = '';
             for (const [date, groupItems] of Object.entries(groups)) {
-                // Date group header - level 1
-                html += '<div class="tree-row date-group-header">';
+                // Date group container
+                html += '<div class="tree-group">';
+                // Date group header - level 1 (foldable)
+                html += '<div class="tree-row date-group-header tree-group-toggle">';
                 html += '<div class="tree-indent"><div class="indent-guide"></div></div>';
-                html += '<div class="tree-twistie"></div>';
+                html += '<div class="tree-twistie collapsible expanded"></div>';
                 html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(date) + '</span></div>';
                 html += '</div>';
-                // Items - level 2
+                // Items container - level 2
+                html += '<div class="tree-group-items">';
                 groupItems.forEach(item => {
                     html += '<div class="tree-row upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
                     html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
@@ -886,17 +880,35 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     html += '</div></div>';
                     html += '</div>';
                 });
+                html += '</div></div>';
             }
 
             container.innerHTML = html;
 
-            // Add click listeners to upcoming items (CSP doesn't allow inline onclick)
+            // Add click listeners to upcoming items
             container.querySelectorAll('.upcoming-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const boardUri = item.getAttribute('data-board-uri');
                     const columnIndex = parseInt(item.getAttribute('data-column-index'), 10);
                     const taskIndex = parseInt(item.getAttribute('data-task-index'), 10);
                     navigateToTask(boardUri, columnIndex, taskIndex);
+                });
+            });
+
+            // Add click listeners to toggle date groups
+            container.querySelectorAll('.tree-group-toggle').forEach(toggle => {
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const group = toggle.closest('.tree-group');
+                    const twistie = toggle.querySelector('.tree-twistie');
+                    const items = group.querySelector('.tree-group-items');
+                    if (twistie.classList.contains('expanded')) {
+                        twistie.classList.remove('expanded');
+                        items.style.display = 'none';
+                    } else {
+                        twistie.classList.add('expanded');
+                        items.style.display = 'block';
+                    }
                 });
             });
         }
@@ -961,13 +973,16 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
             let html = '';
             for (const [tag, groupItems] of Object.entries(groups)) {
-                // Tag group header - level 1
-                html += '<div class="tree-row date-group-header">';
+                // Tag group container
+                html += '<div class="tree-group">';
+                // Tag group header - level 1 (foldable)
+                html += '<div class="tree-row tree-group-toggle">';
                 html += '<div class="tree-indent"><div class="indent-guide"></div></div>';
-                html += '<div class="tree-twistie"></div>';
+                html += '<div class="tree-twistie collapsible expanded"></div>';
                 html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(tag) + ' (' + groupItems.length + ')</span></div>';
                 html += '</div>';
-                // Items - level 2
+                // Items container - level 2
+                html += '<div class="tree-group-items">';
                 groupItems.forEach(item => {
                     const isColumnMatch = item.taskIndex === -1;
                     html += '<div class="tree-row tag-search-result' + (isColumnMatch ? ' column-match' : '') + '" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
@@ -984,17 +999,35 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
                     html += '</div></div>';
                     html += '</div>';
                 });
+                html += '</div></div>';
             }
 
             container.innerHTML = html;
 
-            // Add click listeners
+            // Add click listeners for items
             container.querySelectorAll('.tag-search-result').forEach(item => {
                 item.addEventListener('click', () => {
                     const boardUri = item.getAttribute('data-board-uri');
                     const columnIndex = parseInt(item.getAttribute('data-column-index'), 10);
                     const taskIndex = parseInt(item.getAttribute('data-task-index'), 10);
                     navigateToTask(boardUri, columnIndex, taskIndex);
+                });
+            });
+
+            // Add click listeners to toggle tag groups
+            container.querySelectorAll('.tree-group-toggle').forEach(toggle => {
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const group = toggle.closest('.tree-group');
+                    const twistie = toggle.querySelector('.tree-twistie');
+                    const items = group.querySelector('.tree-group-items');
+                    if (twistie.classList.contains('expanded')) {
+                        twistie.classList.remove('expanded');
+                        items.style.display = 'none';
+                    } else {
+                        twistie.classList.add('expanded');
+                        items.style.display = 'block';
+                    }
                 });
             });
         }
