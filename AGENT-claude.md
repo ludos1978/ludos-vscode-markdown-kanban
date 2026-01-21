@@ -2,6 +2,8 @@
 - Dont modify the AGENT.md, except on explicit user request which must mention the AGENT.md filename!
 - Dont solve problems that are not given explicitly in the task. If additional changes are required to make it work the way to intend, then you are obliged to ask the user for permission.
 - for any new function you want to create, explain why you need to add a new one and why you cannot modify the most similar ones to be reused. You must verify all functions for similar features and logic before adding any new function. This is very important!
+- bump version in package.json & package-lock.json
+- check that all logs are removed or use logger (severe problems) after a problem has been solved properly
 - if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
 - You may not add any functions, except if have not checked all the existing functions before for similar functionality or ones that might easily be extended to cover the feature. There must absoletely be no multiple functions that handle similar functions. Check the full code before you add any a new function.
 - For every task make 3 suggestions how to solve or approach the issue, each with an expected quality/probability that it properly solves the problem. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
