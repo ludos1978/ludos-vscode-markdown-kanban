@@ -1658,6 +1658,25 @@ function setupGlobalDragAndDrop() {
         // Reset RAF throttle flags
         dragState.columnDragoverPending = false;
         dragState.documentDragoverPending = false;
+
+        // Reset templateDragState (in case processTemplateColumnDrop wasn't called)
+        templateDragState.isDragging = false;
+        templateDragState.templatePath = null;
+        templateDragState.templateName = null;
+        templateDragState.isEmptyColumn = false;
+        templateDragState.isClipboardColumn = false;
+        templateDragState.clipboardContent = null;
+        templateDragState.targetRow = null;
+        templateDragState.targetPosition = null;
+        templateDragState.targetColumnId = null;
+        templateDragState.isDropZone = false;
+        templateDragState.lastInStackTarget = null;
+
+        // Remove board template-dragging class
+        const boardElement = document.getElementById('kanban-board');
+        if (boardElement) {
+            boardElement.classList.remove('template-dragging');
+        }
     }
 
     // ============================================================================
@@ -1666,7 +1685,7 @@ function setupGlobalDragAndDrop() {
 
     // Global dragend handler - UNIFIED APPROACH
     document.addEventListener('dragend', function(e) {
-        // DIAGNOSTIC: Reset log flags for next drag session
+        // Reset log flags for next drag session
         window._dragoverLogCount = 0;
         window._currentDragSessionLogged = false;
         window._dropAtEndLogged = false;
@@ -1683,28 +1702,8 @@ function setupGlobalDragAndDrop() {
         const wasTemplateColumnDrag = typeof templateDragState !== 'undefined' &&
             templateDragState.isDragging &&
             (templateDragState.isEmptyColumn || templateDragState.isClipboardColumn || templateDragState.templatePath);
+
         const droppedOutside = e.dataTransfer?.dropEffect === 'none';
-
-        const leftView = dragState.leftView;
-
-        // Get current position for debugging
-        const currentTaskParent = wasTask ? dragState.draggedTask?.parentNode : null;
-        const currentColumnParent = wasColumn ? dragState.draggedColumn?.parentNode : null;
-
-        // Log for debugging (only if state changed)
-        const timeSinceLeftView = dragState.leftViewTimestamp ? Date.now() - dragState.leftViewTimestamp : null;
-        const logData = {
-            dropEffect: e.dataTransfer?.dropEffect,
-            wasDragging: wasDragging,
-            wasTask: wasTask,
-            wasColumn: wasColumn,
-            leftView: leftView,
-            timeSinceLeftView: timeSinceLeftView,
-            taskMovedFromOriginal: wasTask && currentTaskParent !== dragState.originalTaskParent,
-            columnMovedFromOriginal: wasColumn && currentColumnParent !== dragState.originalColumnParent
-        };
-
-        // dragLogger.always('[dragend] State captured', logData);
 
         // 2. DECIDE: RESTORE OR PROCESS
         let shouldRestore = false;
@@ -1713,19 +1712,11 @@ function setupGlobalDragAndDrop() {
             // Only restore if explicitly dropped outside window (dropEffect === 'none')
             // Do NOT restore based on leftView since we can't detect re-entry in VS Code webviews
             shouldRestore = droppedOutside;
-
-            // dragLogger.always('[dragend] Decision', {
-            //     shouldRestore,
-            //     reason: shouldRestore ? 'dropped outside window' : 'process drop'
-            // });
-        } else {
-            // dragLogger.always('[dragend] SKIPPING - wasDragging is false (already cleaned up by dragleave?)');
         }
 
         // 3. EXECUTE RESTORATION OR PROCESSING
         if (shouldRestore) {
             // RESTORE - user dragged outside or cancelled
-            // dragLogger.always('[dragend] Executing RESTORE path');
             if (wasTask) {
                 restoreTaskToOriginalPosition();
             }
@@ -1734,7 +1725,6 @@ function setupGlobalDragAndDrop() {
             }
         } else if (wasDragging || wasTemplateColumnDrag) {
             // PROCESS - valid drop, process the changes
-            // dragLogger.always('[dragend] Executing PROCESS path');
             if (wasTask) {
                 processTaskDrop();
             }
@@ -1742,8 +1732,12 @@ function setupGlobalDragAndDrop() {
                 processColumnDrop();
             }
             // Handle template column drags (empty column, clipboard column, or template)
-            if (wasTemplateColumnDrag && dragState.dropTargetStack) {
-                processTemplateColumnDrop();
+            if (wasTemplateColumnDrag) {
+                if (dragState.dropTargetStack) {
+                    processTemplateColumnDrop();
+                } else {
+                    console.warn('[dragend] No dropTargetStack for template drag - column not created');
+                }
             }
         }
 
@@ -1776,6 +1770,18 @@ function setupGlobalDragAndDrop() {
                 // Store references before cleanup
                 const droppedTask = dragState.draggedTask;
                 const droppedColumn = dragState.draggedColumn;
+
+                // Check if this is a template drag (empty column, clipboard column, or template)
+                // Template drags should NOT be cancelled on dragleave - they need dropTargetStack preserved
+                const isTemplateDrag = typeof templateDragState !== 'undefined' &&
+                    templateDragState.isDragging &&
+                    (templateDragState.isEmptyColumn || templateDragState.isClipboardColumn || templateDragState.templatePath);
+
+                if (isTemplateDrag) {
+                    // Don't reset state for template drags - let dragend handle them
+                    // This preserves dropTargetStack for processTemplateColumnDrop()
+                    return;
+                }
 
                 // dragLogger.always('Cursor left view - restoration state', {
                 //     hasTask: !!droppedTask,
@@ -3417,7 +3423,9 @@ function setupColumnDragAndDrop() {
             const stillTaskDrag = currentMode === dragDropStateMachine.states.TASK;
             const stillClipboardDrag = currentMode === dragDropStateMachine.states.CLIPBOARD;
             const stillEmptyCardDrag = currentMode === dragDropStateMachine.states.EMPTY_CARD;
-            if (!stillColumnDrag && !stillTemplateDrag && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {return;}
+            if (!stillColumnDrag && !stillTemplateDrag && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {
+                return;
+            }
 
             const board = document.getElementById('kanban-board');
             if (!board) {return;}
@@ -3451,7 +3459,9 @@ function setupColumnDragAndDrop() {
                     foundRow = board;
                 }
             }
-            if (!foundRow) {return;}
+            if (!foundRow) {
+                return;
+            }
 
             // STEP 2: Within that ROW, find STACK by X coordinate (direct DOM query)
             let foundStack = null;

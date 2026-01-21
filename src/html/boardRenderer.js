@@ -3147,159 +3147,125 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
     // Create the column element
     const columnElement = createColumnElement(column, columnIndex);
 
-    // Check if board is in multi-row mode
-    const isMultiRow = boardElement.classList.contains('multi-row');
+    // All boards use row/stack structure - find the correct row container
+    const columnRow = getColumnRow(column.title);
 
-    if (isMultiRow) {
-        // In multi-row mode, columns must be inserted into the correct row container
-        // Determine which row this column belongs to based on its title
-        const columnRow = getColumnRow(column.title);
+    // Find the row container
+    let rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
 
-        // Find the row container
-        let rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
+    // If row doesn't exist, create it
+    if (!rowContainer) {
+        rowContainer = document.createElement('div');
+        rowContainer.className = 'kanban-row';
+        rowContainer.setAttribute('data-row-number', columnRow);
 
-        // If row doesn't exist, create it
-        if (!rowContainer) {
-            rowContainer = document.createElement('div');
-            rowContainer.className = 'kanban-row';
-            rowContainer.setAttribute('data-row-number', columnRow);
+        // Insert the row in the correct position
+        const existingRows = Array.from(boardElement.querySelectorAll('.kanban-row'));
+        const insertBeforeRow = existingRows.find(r => parseInt(r.getAttribute('data-row-number')) > columnRow);
 
-            // Insert the row in the correct position
-            const existingRows = Array.from(boardElement.querySelectorAll('.kanban-row'));
-            const insertBeforeRow = existingRows.find(r => parseInt(r.getAttribute('data-row-number')) > columnRow);
-
-            if (insertBeforeRow) {
-                boardElement.insertBefore(rowContainer, insertBeforeRow);
-            } else {
-                boardElement.appendChild(rowContainer);
-            }
-
-            // Add the "Add Column" button to the new row
-            const addColumnBtn = document.createElement('button');
-            addColumnBtn.className = 'add-column-btn multi-row-add-btn';
-            addColumnBtn.textContent = '+ Add Column';
-            addColumnBtn.onclick = () => addColumn(columnRow);
-            rowContainer.appendChild(addColumnBtn);
-
-            // Add drop zone spacer
-            const dropZoneSpacer = document.createElement('div');
-            dropZoneSpacer.className = 'row-drop-zone-spacer';
-            rowContainer.appendChild(dropZoneSpacer);
+        if (insertBeforeRow) {
+            boardElement.insertBefore(rowContainer, insertBeforeRow);
+        } else {
+            boardElement.appendChild(rowContainer);
         }
 
-        // Find the correct position to insert within this row based on data model order
-        // Get all columns in the data model that should be in this row, in order
-        const columnsInThisRow = window.cachedBoard.columns.filter(col => {
-            return getColumnRow(col.title) === columnRow;
-        });
+        // Add the "Add Column" button to the new row
+        const addColumnBtn = document.createElement('button');
+        addColumnBtn.className = 'add-column-btn multi-row-add-btn';
+        addColumnBtn.textContent = '+ Add Column';
+        addColumnBtn.onclick = () => addColumn(columnRow);
+        rowContainer.appendChild(addColumnBtn);
 
-        // Find where the new column should be positioned within this row
-        const positionInRow = columnsInThisRow.findIndex(col => col.id === column.id);
+        // Add drop zone spacer
+        const dropZoneSpacer = document.createElement('div');
+        dropZoneSpacer.className = 'row-drop-zone-spacer';
+        rowContainer.appendChild(dropZoneSpacer);
+    }
 
-        // Find the stack by looking ONLY at the reference column
-        let targetStack = null;
-        let insertBeforeColumn = null;
-        let insertAfterColumn = null;
+    // Find the correct position to insert within this row based on data model order
+    // Get all columns in the data model that should be in this row, in order
+    const columnsInThisRow = window.cachedBoard.columns.filter(col => {
+        return getColumnRow(col.title) === columnRow;
+    });
 
-        const allStacks = rowContainer.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+    // Find where the new column should be positioned within this row
+    const positionInRow = columnsInThisRow.findIndex(col => col.id === column.id);
 
-        // If we have a reference column ID, find it in the DOM
-        if (referenceColumnId) {
+    // Find the stack by looking ONLY at the reference column
+    let targetStack = null;
+    let insertBeforeColumn = null;
+    let insertAfterColumn = null;
+
+    const allStacks = rowContainer.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+
+    // If we have a reference column ID, find it in the DOM
+    if (referenceColumnId) {
+        for (const stack of allStacks) {
+            const refColumnElement = stack.querySelector(`[data-column-id="${referenceColumnId}"]`);
+            if (refColumnElement) {
+                targetStack = stack;
+
+                // Determine if we're inserting before or after based on position
+                const refColumnIndex = columnsInThisRow.findIndex(c => c.id === referenceColumnId);
+                if (positionInRow < refColumnIndex) {
+                    // Inserting before the reference column
+                    insertBeforeColumn = refColumnElement;
+                } else {
+                    // Inserting after the reference column
+                    insertAfterColumn = refColumnElement;
+                }
+                break;
+            }
+        }
+    }
+
+    if (targetStack) {
+        // Add to existing stack
+        if (insertBeforeColumn) {
+            targetStack.insertBefore(columnElement, insertBeforeColumn);
+        } else if (insertAfterColumn) {
+            // Insert after the reference column
+            if (insertAfterColumn.nextSibling) {
+                targetStack.insertBefore(columnElement, insertAfterColumn.nextSibling);
+            } else {
+                targetStack.appendChild(columnElement);
+            }
+        } else {
+            targetStack.appendChild(columnElement);
+        }
+    } else {
+        // No adjacent columns found - create a new stack
+        const stackContainer = document.createElement('div');
+        stackContainer.className = 'kanban-column-stack';
+        stackContainer.appendChild(columnElement);
+
+        // Find the correct position to insert the new stack
+        let insertBeforeStack = null;
+        if (positionInRow >= 0 && positionInRow < columnsInThisRow.length - 1) {
+            // Get the column that should come after the new column in the data model
+            const nextColumnId = columnsInThisRow[positionInRow + 1].id;
+
+            // Find the DOM stack containing that column
             for (const stack of allStacks) {
-                const refColumnElement = stack.querySelector(`[data-column-id="${referenceColumnId}"]`);
-                if (refColumnElement) {
-                    targetStack = stack;
-
-                    // Determine if we're inserting before or after based on position
-                    const refColumnIndex = columnsInThisRow.findIndex(c => c.id === referenceColumnId);
-                    if (positionInRow < refColumnIndex) {
-                        // Inserting before the reference column
-                        insertBeforeColumn = refColumnElement;
-                    } else {
-                        // Inserting after the reference column
-                        insertAfterColumn = refColumnElement;
-                    }
+                const stackColumn = stack.querySelector(`[data-column-id="${nextColumnId}"]`);
+                if (stackColumn) {
+                    insertBeforeStack = stack;
                     break;
                 }
             }
         }
 
-        if (targetStack) {
-            // Add to existing stack
-            if (insertBeforeColumn) {
-                targetStack.insertBefore(columnElement, insertBeforeColumn);
-            } else if (insertAfterColumn) {
-                // Insert after the reference column
-                if (insertAfterColumn.nextSibling) {
-                    targetStack.insertBefore(columnElement, insertAfterColumn.nextSibling);
-                } else {
-                    targetStack.appendChild(columnElement);
-                }
-            } else {
-                targetStack.appendChild(columnElement);
-            }
+        if (insertBeforeStack) {
+            // Insert before the found stack
+            rowContainer.insertBefore(stackContainer, insertBeforeStack);
         } else {
-            // No adjacent columns found - create a new stack
-            const stackContainer = document.createElement('div');
-            stackContainer.className = 'kanban-column-stack';
-            stackContainer.appendChild(columnElement);
-
-            // Find the correct position to insert the new stack
-            let insertBeforeStack = null;
-            if (positionInRow >= 0 && positionInRow < columnsInThisRow.length - 1) {
-                // Get the column that should come after the new column in the data model
-                const nextColumnId = columnsInThisRow[positionInRow + 1].id;
-
-                // Find the DOM stack containing that column
-                for (const stack of allStacks) {
-                    const stackColumn = stack.querySelector(`[data-column-id="${nextColumnId}"]`);
-                    if (stackColumn) {
-                        insertBeforeStack = stack;
-                        break;
-                    }
-                }
-            }
-
-            if (insertBeforeStack) {
-                // Insert before the found stack
-                rowContainer.insertBefore(stackContainer, insertBeforeStack);
+            // Insert before the "Add Column" button (at the end of row)
+            const addColumnBtn = rowContainer.querySelector('.add-column-btn');
+            if (addColumnBtn) {
+                rowContainer.insertBefore(stackContainer, addColumnBtn);
             } else {
-                // Insert before the "Add Column" button (at the end of row)
-                const addColumnBtn = rowContainer.querySelector('.add-column-btn');
-                if (addColumnBtn) {
-                    rowContainer.insertBefore(stackContainer, addColumnBtn);
-                } else {
-                    // Fallback: append to the end of row
-                    rowContainer.appendChild(stackContainer);
-                }
-            }
-        }
-    } else {
-        // Single-row mode: insert directly into boardElement
-        const directChildren = Array.from(boardElement.children).filter(child =>
-            child.classList.contains('kanban-full-height-column') ||
-            child.classList.contains('kanban-column-stack') ||
-            child.classList.contains('column-drop-zone-stack')
-        );
-
-        try {
-            if (insertIndex >= 0 && insertIndex < directChildren.length) {
-                const referenceNode = directChildren[insertIndex];
-                if (referenceNode && referenceNode.parentNode === boardElement) {
-                    boardElement.insertBefore(columnElement, referenceNode);
-                } else {
-                    boardElement.appendChild(columnElement);
-                }
-            } else {
-                boardElement.appendChild(columnElement);
-            }
-        } catch (error) {
-            console.error('[addSingleColumnToDOM] Error inserting column:', error);
-            try {
-                boardElement.appendChild(columnElement);
-            } catch (appendError) {
-                console.error('[addSingleColumnToDOM] Error appending column:', appendError);
-                return null;
+                // Fallback: append to the end of row
+                rowContainer.appendChild(stackContainer);
             }
         }
     }
@@ -3319,18 +3285,10 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
         setupTaskDragAndDropForColumn(columnElement);
     }
 
-    // Recreate drop zones for the row/board that was modified
-    if (isMultiRow) {
-        const columnRow = getColumnRow(column.title);
-        const rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
-        if (rowContainer && typeof window.cleanupAndRecreateDropZones === 'function') {
-            window.cleanupAndRecreateDropZones(rowContainer);
-        }
-    } else {
-        // For single-row boards, recreate drop zones for the entire board
-        if (typeof window.cleanupAndRecreateDropZones === 'function') {
-            window.cleanupAndRecreateDropZones(boardElement);
-        }
+    // Recreate drop zones for the row that was modified
+    const rowContainerForDropZones = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
+    if (rowContainerForDropZones && typeof window.cleanupAndRecreateDropZones === 'function') {
+        window.cleanupAndRecreateDropZones(rowContainerForDropZones);
     }
 
     return columnElement;
