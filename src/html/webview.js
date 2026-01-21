@@ -4460,16 +4460,24 @@ function scrollToAndHighlightByIndex(columnIndex, taskIndex, highlight = true) {
     let targetElement = columnElement;
     let taskId = undefined;
 
-    if (taskIndex !== undefined && columnElement) {
+    if (taskIndex !== undefined && taskIndex >= 0 && columnElement) {
+        // Task match - find the specific task
         const allTasks = Array.from(columnElement.querySelectorAll('.task-item[data-task-id]'));
         console.log('[scrollToAndHighlightByIndex] Tasks in column:', allTasks.length);
 
-        if (taskIndex >= 0 && taskIndex < allTasks.length) {
+        if (taskIndex < allTasks.length) {
             targetElement = allTasks[taskIndex];
             taskId = targetElement?.getAttribute('data-task-id');
             console.log('[scrollToAndHighlightByIndex] Found task at index', taskIndex, 'with ID:', taskId);
         } else {
             console.warn('[scrollToAndHighlightByIndex] Task index out of range:', taskIndex, 'total:', allTasks.length);
+        }
+    } else if (taskIndex === -1 && columnElement) {
+        // Column match (taskIndex === -1) - target the column header for centering
+        const columnHeader = columnElement.querySelector('.column-header');
+        if (columnHeader) {
+            console.log('[scrollToAndHighlightByIndex] Column match - targeting column header');
+            targetElement = columnHeader;
         }
     }
 
@@ -4479,7 +4487,9 @@ function scrollToAndHighlightByIndex(columnIndex, taskIndex, highlight = true) {
     }
 
     // Delegate to the main scroll function using the found IDs
-    scrollToAndHighlight(columnId, taskId, highlight);
+    // For column matches, pass field='columnTitle' to help with highlighting
+    const field = (taskIndex === -1) ? 'columnTitle' : undefined;
+    scrollToAndHighlight(columnId, taskId, highlight, undefined, undefined, field);
 }
 
 /**
