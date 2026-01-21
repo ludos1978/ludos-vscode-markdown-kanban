@@ -575,7 +575,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             overflow: hidden;
         }
         .section-header {
-            font-weight: 700;
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -669,9 +668,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .refresh-btn:hover {
             background: var(--vscode-list-hoverBackground);
         }
-        .date-group-header {
-            font-weight: 600;
-        }
         .tag-search-container {
             margin-bottom: 8px;
         }
@@ -694,7 +690,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             font-style: italic;
         }
         .tag-search-header {
-            font-weight: 600;
             font-size: 12px;
             color: var(--vscode-descriptionForeground);
             margin-bottom: 8px;
