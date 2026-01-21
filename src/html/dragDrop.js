@@ -2704,6 +2704,8 @@ function restoreTaskPosition() {
 
 function setupRowDragAndDrop() {
     const boardElement = document.getElementById('kanban-board');
+    if (!boardElement) return;
+
     const rows = boardElement.querySelectorAll('.kanban-row');
 
     rows.forEach(row => {
@@ -3076,9 +3078,11 @@ function cleanupEmptyStack(stack) {
  * Removes consecutive empty stacks and ensures drop zones before/between/after content stacks
  */
 function cleanupAndRecreateDropZones(container) {
-    // Get all stacks
+    if (!container) return;
+
+    // Get all stacks (filter for elements with classList to be safe)
     const allStacks = Array.from(container.children).filter(child =>
-        child.classList.contains('kanban-column-stack')
+        child && child.classList && child.classList.contains('kanban-column-stack')
     );
 
     // Separate content stacks from drop-zone stacks
@@ -3253,8 +3257,9 @@ function updateColumnTitleDisplay(columnId) {
  * Side effects: Makes column headers draggable
  */
 function setupColumnDragAndDrop() {
-
     const boardElement = document.getElementById('kanban-board');
+    if (!boardElement) return;
+
     const columns = boardElement.querySelectorAll('.kanban-full-height-column');
 
     columns.forEach(column => {
