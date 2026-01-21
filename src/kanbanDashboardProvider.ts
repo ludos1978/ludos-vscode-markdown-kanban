@@ -476,12 +476,18 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const nonce = this._getNonce();
 
+        // Get URI for codicons CSS
+        const codiconsUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
+        );
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link href="${codiconsUri}" rel="stylesheet" />
     <title>Kanban Dashboard</title>
     <style>
         body {
@@ -525,14 +531,14 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+        }
+        .tree-twistie.collapsible::before {
             font-family: codicon;
+            content: '\\eab4';
             font-size: 16px;
             color: var(--vscode-foreground);
             opacity: 0.8;
-        }
-        .tree-twistie.collapsible::before {
-            content: '\eab4';
-            transition: transform 0.1s;
+            transition: transform 0.1s ease-out;
         }
         .tree-twistie.collapsible.expanded::before {
             transform: rotate(90deg);
@@ -719,7 +725,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             display: inline-block;
         }
         .tag-search-result.column-match {
-            border-left: 2px solid var(--vscode-editorInfo-foreground);
             padding-left: 6px;
         }
         .tag-search-result.column-match .tag-search-result-title {

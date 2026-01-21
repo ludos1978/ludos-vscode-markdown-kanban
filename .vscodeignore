@@ -43,3 +43,4 @@ tmp/**
 # Ensure necessary static resources are included
 !src/html/**
 !imgs/**
+!node_modules/@vscode/codicons/**
