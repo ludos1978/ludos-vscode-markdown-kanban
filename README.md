@@ -39,6 +39,8 @@ To use it, install the vsix into the visual studio code editor in the extensions
 
 You can use the editor without any of the external dependencies, but some features will not work.
 
+To make use of some of the presentation features built into the markdown editor you need to use the marp-engine-X.X.X.zip . Extract that and set the path in the ludos-markdown section in vscode settings. You can install your own modules or use the setup.command / setup.bat files to get the other required markdown-it plugins i use.
+
 For additional features you will need to install other addons as well:
 - marp
 - excalidraw

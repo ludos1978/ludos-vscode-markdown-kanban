@@ -25,3 +25,4 @@ function markdownItMedia(md, options) {
 }
 
 module.exports = { markdownItMedia };
+module.exports.default = markdownItMedia;
