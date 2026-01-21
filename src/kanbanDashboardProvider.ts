@@ -570,7 +570,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             font-size: 0.9em;
             white-space: pre;
         }
-        /* Section headers */
+        /* Section headers - matches VS Code pane-header */
         .section {
             overflow: hidden;
         }
@@ -580,9 +580,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: var(--vscode-sideBarSectionHeader-foreground);
+            padding-left: 8px;
         }
         .section-content {
             display: block;
+            padding-left: 8px;
         }
         .section-content.collapsed {
             display: none;
@@ -667,12 +669,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .refresh-btn:hover {
             background: var(--vscode-list-hoverBackground);
         }
-        .date-group {
-        }
         .date-group-header {
             font-weight: 600;
-        }
-        .date-group-items {
         }
         .tag-search-container {
             margin-bottom: 8px;
@@ -691,49 +689,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             outline: 1px solid var(--vscode-focusBorder);
             border-color: var(--vscode-focusBorder);
         }
-        .tag-search-result {
-            padding: 2px 0 2px 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
-            line-height: 22px;
-        }
-        .tag-search-result:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
-        .tag-search-result-title {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .tag-search-result-location {
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground);
-            opacity: 0.8;
-            flex-shrink: 0;
-        }
-        .tag-search-result-title-text {
-            font-size: 13px;
-        }
-        .tag-search-result-location {
-            font-size: 10px;
-            color: var(--vscode-descriptionForeground);
-            opacity: 0.7;
-        }
-        .tag-search-result-tag {
-            font-size: 11px;
-            color: var(--vscode-badge-foreground);
-            background: var(--vscode-badge-background);
-            padding: 1px 4px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-        .tag-search-result.column-match {
-            padding-left: 6px;
-        }
-        .tag-search-result.column-match .tag-search-result-title {
+        /* Column match indicator - italic for column-level matches */
+        .column-match .tree-label-name {
             font-style: italic;
         }
         .tag-search-header {
@@ -743,8 +700,6 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             margin-bottom: 8px;
             padding-bottom: 4px;
             border-bottom: 1px solid var(--vscode-panel-border);
-        }
-        .board-config-item {
         }
         .board-config-body {
             padding-left: 32px;
