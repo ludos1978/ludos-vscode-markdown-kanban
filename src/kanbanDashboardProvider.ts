@@ -520,9 +520,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             display: flex;
             flex-shrink: 0;
             height: 22px;
+            padding-left: 4px;
         }
         .indent-guide {
-            width: 8px;
+            width: 12px;
             height: 22px;
             box-sizing: border-box;
             border-left: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
@@ -579,14 +580,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             white-space: nowrap;
             flex-shrink: 0;
         }
-        /* Individual entry styling - subtle separator */
-        .upcoming-item,
-        .tag-search-result {
-            border-bottom: 1px solid var(--vscode-widget-border, transparent);
-        }
-        .upcoming-item:last-child,
-        .tag-search-result:last-child {
-            border-bottom: none;
+        /* Individual entry indicator - light dash */
+        .upcoming-item .tree-label-name::before,
+        .tag-search-result .tree-label-name::before {
+            content: '–';
+            margin-right: 6px;
+            opacity: 0.4;
         }
         /* Section headers - matches VS Code pane-header */
         .section {
