@@ -496,42 +496,57 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             gap: 16px;
         }
         .section {
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
             overflow: hidden;
         }
         .section-header {
-            padding: 8px 12px;
-            background: var(--vscode-sideBarSectionHeader-background);
+            padding: 2px 4px;
             font-weight: 600;
             display: flex;
-            justify-content: space-between;
             align-items: center;
             cursor: pointer;
+            gap: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
         }
         .section-header:hover {
             background: var(--vscode-list-hoverBackground);
         }
+        .section-toggle {
+            width: 16px;
+            text-align: center;
+            font-family: monospace;
+            opacity: 0.7;
+        }
+        .section-header.collapsed .section-toggle::before {
+            content: '>';
+        }
+        .section-header:not(.collapsed) .section-toggle::before {
+            content: 'v';
+        }
         .section-content {
-            padding: 8px;
+            padding-left: 8px;
+            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
+            margin-left: 7px;
+        }
+        .section-content.collapsed {
+            display: none;
         }
         .upcoming-item {
-            padding: 6px 8px;
+            padding: 2px 4px;
             cursor: pointer;
-            border-radius: 3px;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            font-size: 12px;
         }
         .upcoming-item:hover {
             background: var(--vscode-list-hoverBackground);
         }
         .upcoming-date {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
         }
         .upcoming-title {
-            font-size: 13px;
+            font-size: 12px;
         }
         .upcoming-board {
             font-size: 10px;
@@ -615,15 +630,14 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-list-hoverBackground);
         }
         .date-group {
-            margin-bottom: 12px;
+            margin-bottom: 4px;
         }
         .date-group-header {
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
-            margin-bottom: 4px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid var(--vscode-panel-border);
+            padding: 2px 4px;
+            background: var(--vscode-sideBarSectionHeader-background);
         }
         .tag-search-container {
             margin-bottom: 8px;
@@ -643,13 +657,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             border-color: var(--vscode-focusBorder);
         }
         .tag-search-result {
-            padding: 6px 8px;
+            padding: 2px 4px;
             cursor: pointer;
-            border-radius: 3px;
             display: flex;
             flex-direction: column;
-            gap: 2px;
-            margin-bottom: 4px;
+            font-size: 12px;
         }
         .tag-search-result:hover {
             background: var(--vscode-list-hoverBackground);
@@ -686,27 +698,30 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             border-bottom: 1px solid var(--vscode-panel-border);
         }
         .board-config-item {
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
-            margin-bottom: 8px;
+            margin-bottom: 2px;
         }
         .board-config-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 8px;
+            gap: 4px;
+            padding: 2px 4px;
             cursor: pointer;
-            background: var(--vscode-sideBar-background);
+            font-size: 12px;
         }
         .board-config-header:hover {
             background: var(--vscode-list-hoverBackground);
         }
         .board-config-toggle {
-            font-size: 10px;
-            transition: transform 0.2s;
+            width: 16px;
+            text-align: center;
+            font-family: monospace;
+            opacity: 0.7;
         }
-        .board-config-toggle.expanded {
-            transform: rotate(90deg);
+        .board-config-toggle::before {
+            content: '>';
+        }
+        .board-config-toggle.expanded::before {
+            content: 'v';
         }
         .board-config-name {
             flex: 1;
@@ -716,9 +731,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             font-weight: 500;
         }
         .board-config-body {
-            padding: 8px;
+            padding: 4px 4px 4px 8px;
             display: none;
-            border-top: 1px solid var(--vscode-panel-border);
+            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
+            margin-left: 7px;
         }
         .board-config-body.expanded {
             display: block;
@@ -726,8 +742,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .board-config-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 4px;
+            margin-bottom: 4px;
+            font-size: 12px;
         }
         .board-config-row:last-child {
             margin-bottom: 0;
@@ -776,8 +793,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         <!-- Upcoming Items Section -->
         <div class="section">
             <div class="section-header" data-section="upcoming">
-                <span>Upcoming Items</span>
-                <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
+                <span class="section-toggle"></span>
+                <span>Upcoming</span>
+                <button class="refresh-btn" id="refresh-btn" title="Refresh" style="margin-left: auto;">↻</button>
             </div>
             <div class="section-content" id="upcoming-content">
                 <div class="empty-message" id="upcoming-empty">No upcoming items</div>
@@ -788,6 +806,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         <!-- Tagged Items Section -->
         <div class="section">
             <div class="section-header" data-section="tagged">
+                <span class="section-toggle"></span>
                 <span>Tagged Items</span>
             </div>
             <div class="section-content" id="tagged-content">
@@ -802,12 +821,13 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         <!-- Boards Configuration Section -->
         <div class="section">
             <div class="section-header" data-section="boards">
-                <span>Configured Boards</span>
+                <span class="section-toggle"></span>
+                <span>Boards</span>
             </div>
             <div class="section-content" id="boards-content">
                 <div id="boards-list"></div>
                 <div class="add-board-hint">
-                    Right-click a .md file in Explorer or Kanban Boards sidebar → "Add to Dashboard"
+                    Right-click .md file → "Add to Dashboard"
                 </div>
             </div>
         </div>
@@ -1031,7 +1051,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
                 // Header (clickable to expand/collapse)
                 html += '<div class="board-config-header">';
-                html += '<span class="board-config-toggle">▶</span>';
+                html += '<span class="board-config-toggle"></span>';
                 html += '<span class="board-config-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span>';
                 html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';
                 html += '</div>';
@@ -1153,8 +1173,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
 
         function toggleSection(sectionId) {
+            const header = document.querySelector('.section-header[data-section="' + sectionId + '"]');
             const content = document.getElementById(sectionId + '-content');
-            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
         }
 
         function refresh() {

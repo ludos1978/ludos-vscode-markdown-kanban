@@ -345,16 +345,72 @@ export class DashboardScanner {
             hasExplicitDate?: boolean;
         } | null = null;
 
-        // Always check for time slot first (can be combined with date/week)
-        const timeMatch = text.match(/!(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
-        const timeSlot = timeMatch ? timeMatch[0] : undefined;
+        // Check for time slot first (can be combined with date/week)
+        // Supports: !HH:MM-HH:MM, !HHMM-HHMM, !HHMM, !HHam/pm
+        let timeSlot: string | undefined;
+
+        // Time range with colons: !09:00-17:00
+        const timeRangeColonMatch = text.match(/!(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+        if (timeRangeColonMatch) {
+            timeSlot = timeRangeColonMatch[0];
+        }
+
+        // Time range without colons: !1200-1400
+        if (!timeSlot) {
+            const timeRangeNoColonMatch = text.match(/!(\d{4})-(\d{4})/);
+            if (timeRangeNoColonMatch) {
+                const start = timeRangeNoColonMatch[1];
+                const end = timeRangeNoColonMatch[2];
+                const startHours = parseInt(start.substring(0, 2), 10);
+                const startMins = parseInt(start.substring(2, 4), 10);
+                const endHours = parseInt(end.substring(0, 2), 10);
+                const endMins = parseInt(end.substring(2, 4), 10);
+                // Validate both times
+                if (startHours < 24 && startMins < 60 && endHours < 24 && endMins < 60) {
+                    timeSlot = timeRangeNoColonMatch[0];
+                }
+            }
+        }
+
+        // 4-digit time: !1230 (not matching years like !2026 which are handled separately)
+        if (!timeSlot) {
+            const time4DigitMatch = text.match(/!(\d{4})(?![-./\d])/);
+            if (time4DigitMatch) {
+                const digits = time4DigitMatch[1];
+                const hours = parseInt(digits.substring(0, 2), 10);
+                const mins = parseInt(digits.substring(2, 4), 10);
+                // Only treat as time if hours < 24 and mins < 60 (exclude years like 2026)
+                if (hours < 24 && mins < 60) {
+                    timeSlot = time4DigitMatch[0];
+                }
+            }
+        }
+
+        // AM/PM time: !12pm, !9am (US locale)
+        if (!timeSlot && !isLocaleDayFirst()) {
+            const ampmMatch = text.match(/!(\d{1,2})(am|pm)/i);
+            if (ampmMatch) {
+                timeSlot = ampmMatch[0];
+            }
+        }
+
+        // Try to find year tag: !Y2026 or !J2026 (German "Jahr")
+        const yearTagMatch = text.match(/![YyJj](\d{4})/);
+        if (yearTagMatch) {
+            const year = parseInt(yearTagMatch[1], 10);
+            // Year tag represents Jan 1 of that year
+            const date = new Date(year, 0, 1);
+            result = { tag: yearTagMatch[0], date, year, timeSlot, hasExplicitDate: true };
+        }
 
         // Try to find date tag (most specific)
-        const dateMatch = text.match(/!(\d{1,4}[-./]\d{1,2}(?:[-./]\d{2,4})?)/);
-        if (dateMatch) {
-            const date = parseDateTag(dateMatch[0]);
-            if (date) {
-                result = { tag: dateMatch[0], date, timeSlot, hasExplicitDate: true };
+        if (!result) {
+            const dateMatch = text.match(/!(\d{1,4}[-./]\d{1,2}(?:[-./]\d{2,4})?)/);
+            if (dateMatch) {
+                const date = parseDateTag(dateMatch[0]);
+                if (date) {
+                    result = { tag: dateMatch[0], date, timeSlot, hasExplicitDate: true };
+                }
             }
         }
 
