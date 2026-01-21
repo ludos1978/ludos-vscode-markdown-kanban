@@ -504,7 +504,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-row {
             display: flex;
             align-items: center;
-            height: 22px;
+            min-height: 22px;
             line-height: 22px;
             cursor: pointer;
             box-sizing: border-box;
@@ -553,24 +553,40 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-contents {
             flex: 1;
             overflow: hidden;
-            height: 100%;
+            min-height: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         /* Label - matches VS Code monaco-icon-label */
         .tree-label {
             display: flex;
+            align-items: baseline;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         .tree-label-name {
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: pre;
+            white-space: nowrap;
+            flex-shrink: 1;
         }
         .tree-label-description {
-            opacity: 0.7;
+            opacity: 0.6;
             margin-left: 0.5em;
             font-size: 0.9em;
-            white-space: pre;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        /* Individual entry styling - subtle separator */
+        .upcoming-item,
+        .tag-search-result {
+            border-bottom: 1px solid var(--vscode-widget-border, transparent);
+        }
+        .upcoming-item:last-child,
+        .tag-search-result:last-child {
+            border-bottom: none;
         }
         /* Section headers - matches VS Code pane-header */
         .section {
@@ -698,9 +714,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             padding-bottom: 4px;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
+        /* Board config submenu */
         .board-config-body {
-            padding-left: 32px;
             display: none;
+            margin-left: 24px;
+            padding: 4px 0 8px 16px;
+            border-left: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
         }
         .board-config-body.expanded {
             display: block;
@@ -708,7 +727,8 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .board-config-row {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 8px;
+            min-height: 22px;
             margin-bottom: 4px;
         }
         .board-config-row:last-child {
@@ -716,7 +736,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
         .board-config-label {
             color: var(--vscode-descriptionForeground);
-            width: 60px;
+            min-width: 70px;
         }
         .board-tag-filters {
             display: flex;
@@ -729,7 +749,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-badge-background);
             color: var(--vscode-badge-foreground);
             border-radius: 3px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 4px;
         }
@@ -747,6 +767,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
+        }
+        /* Tree group for foldable sections */
+        .tree-group-items {
+            /* Prepare for 2-line entries if needed */
         }
     </style>
 </head>
