@@ -519,14 +519,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-indent {
             display: flex;
             flex-shrink: 0;
-            height: 22px;
-            padding-left: 4px;
         }
         .indent-guide {
             width: 12px;
             height: 22px;
             box-sizing: border-box;
-            border-left: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
+            border-right: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.4));
         }
         /* Twistie - matches VS Code monaco-tl-twistie */
         .tree-twistie {
@@ -592,7 +590,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             overflow: hidden;
         }
         .section-header {
-            padding-left: 8px;
+            padding-left: 0;
         }
         .section-header h3 {
             margin: 0;
@@ -604,7 +602,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         }
         .section-content {
             display: block;
-            padding-left: 8px;
+            padding-left: 0;
         }
         .section-content.collapsed {
             display: none;
