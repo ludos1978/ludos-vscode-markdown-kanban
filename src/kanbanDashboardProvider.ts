@@ -521,24 +521,16 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             width: 8px;
             height: 22px;
             box-sizing: border-box;
-            position: relative;
-        }
-        .indent-guide::before {
-            content: '';
-            position: absolute;
-            left: 3px;
-            top: 0;
-            bottom: 0;
-            width: 1px;
-            background: var(--vscode-tree-indentGuidesStroke);
+            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
         }
         .tree-twistie {
-            width: 20px;
+            width: 16px;
             height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            padding-right: 6px;
         }
         .tree-twistie.collapsible::before {
             font-family: codicon;
