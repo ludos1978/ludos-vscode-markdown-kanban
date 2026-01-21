@@ -156,7 +156,10 @@
       "Bash(npm info:*)",
       "Bash(npm prune:*)",
       "Bash(npx vsce:*)",
-      "Skill(refactor)"
+      "Skill(refactor)",
+      "Bash(unzip:*)",
+      "Bash(npm list:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
