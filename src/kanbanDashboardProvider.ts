@@ -500,7 +500,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             display: flex;
             flex-direction: column;
         }
-        /* Tree row base styles - matches VS Code monaco-list-row */
+        /* Tree row base styles - matches VS Code monaco-tl-row */
         .tree-row {
             display: flex;
             align-items: center;
@@ -510,6 +510,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             box-sizing: border-box;
             overflow: hidden;
             width: 100%;
+            position: relative;
         }
         .tree-row:hover {
             background: var(--vscode-list-hoverBackground);
@@ -535,6 +536,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             justify-content: center;
             flex-shrink: 0;
             padding-right: 6px;
+            transform: translateX(3px);
         }
         .tree-twistie.collapsible::before {
             font-family: codicon;
