@@ -500,29 +500,34 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             display: flex;
             flex-direction: column;
         }
-        /* Tree row base styles - matches VS Code explorer */
+        /* Tree row base styles - matches VS Code monaco-list-row */
         .tree-row {
             display: flex;
             align-items: center;
             height: 22px;
             line-height: 22px;
             cursor: pointer;
-            padding-right: 8px;
+            box-sizing: border-box;
+            overflow: hidden;
+            width: 100%;
         }
         .tree-row:hover {
             background: var(--vscode-list-hoverBackground);
         }
+        /* Indent guides - matches VS Code monaco-tl-indent */
         .tree-indent {
             display: flex;
             flex-shrink: 0;
             height: 22px;
         }
         .indent-guide {
+            display: inline-block;
             width: 8px;
-            height: 22px;
+            height: 100%;
             box-sizing: border-box;
             border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
         }
+        /* Twistie - matches VS Code monaco-tl-twistie */
         .tree-twistie {
             width: 16px;
             height: 22px;
@@ -543,26 +548,28 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .tree-twistie.collapsible.expanded::before {
             transform: rotate(90deg);
         }
+        /* Contents - matches VS Code monaco-tl-contents */
         .tree-contents {
             flex: 1;
             overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            height: 100%;
         }
+        /* Label - matches VS Code monaco-icon-label */
         .tree-label {
             display: flex;
-            align-items: center;
-            gap: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .tree-label-name {
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: nowrap;
+            white-space: pre;
         }
         .tree-label-description {
             opacity: 0.7;
+            margin-left: 0.5em;
             font-size: 0.9em;
-            flex-shrink: 0;
+            white-space: pre;
         }
         /* Section headers */
         .section {
