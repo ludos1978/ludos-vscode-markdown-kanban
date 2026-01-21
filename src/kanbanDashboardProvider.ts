@@ -485,7 +485,7 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     <title>Kanban Dashboard</title>
     <style>
         body {
-            padding: 8px;
+            padding: 0;
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
             color: var(--vscode-foreground);
@@ -493,65 +493,91 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
         .dashboard-container {
             display: flex;
             flex-direction: column;
-            gap: 16px;
         }
+        /* Tree row base styles - matches VS Code explorer */
+        .tree-row {
+            display: flex;
+            align-items: center;
+            height: 22px;
+            line-height: 22px;
+            cursor: pointer;
+            padding-right: 8px;
+        }
+        .tree-row:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+        .tree-indent {
+            display: flex;
+            flex-shrink: 0;
+        }
+        .indent-guide {
+            width: 8px;
+            height: 22px;
+            box-sizing: border-box;
+        }
+        .indent-guide.active {
+            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
+        }
+        .tree-twistie {
+            width: 16px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: codicon;
+            font-size: 16px;
+            color: var(--vscode-foreground);
+            opacity: 0.8;
+        }
+        .tree-twistie.collapsible::before {
+            content: '\eab4';
+            transition: transform 0.1s;
+        }
+        .tree-twistie.collapsible.expanded::before {
+            transform: rotate(90deg);
+        }
+        .tree-contents {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tree-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tree-label-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tree-label-description {
+            opacity: 0.7;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+        /* Section headers */
         .section {
             overflow: hidden;
         }
         .section-header {
-            padding: 2px 4px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            gap: 4px;
+            font-weight: 700;
             font-size: 11px;
             text-transform: uppercase;
-        }
-        .section-header:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
-        .section-toggle {
-            width: 16px;
-            text-align: center;
-            font-family: monospace;
-            opacity: 0.7;
-        }
-        .section-header.collapsed .section-toggle::before {
-            content: '>';
-        }
-        .section-header:not(.collapsed) .section-toggle::before {
-            content: 'v';
+            letter-spacing: 0.5px;
+            color: var(--vscode-sideBarSectionHeader-foreground);
         }
         .section-content {
-            padding-left: 8px;
-            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
-            margin-left: 7px;
+            display: block;
         }
         .section-content.collapsed {
             display: none;
         }
-        .upcoming-item {
-            padding: 2px 4px;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            font-size: 12px;
-        }
-        .upcoming-item:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
-        .upcoming-date {
-            font-size: 10px;
-            color: var(--vscode-descriptionForeground);
-        }
-        .upcoming-title {
-            font-size: 12px;
-        }
-        .upcoming-board {
-            font-size: 10px;
-            color: var(--vscode-descriptionForeground);
-            opacity: 0.7;
+        /* Column match indicator */
+        .column-match .tree-label-name {
+            font-style: italic;
         }
         .tag-cloud {
             display: flex;
@@ -630,14 +656,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-list-hoverBackground);
         }
         .date-group {
-            margin-bottom: 4px;
         }
         .date-group-header {
             font-weight: 600;
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground);
-            padding: 2px 4px;
-            background: var(--vscode-sideBarSectionHeader-background);
+        }
+        .date-group-items {
         }
         .tag-search-container {
             margin-bottom: 8px;
@@ -657,16 +680,29 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             border-color: var(--vscode-focusBorder);
         }
         .tag-search-result {
-            padding: 2px 4px;
+            padding: 2px 0 2px 4px;
             cursor: pointer;
             display: flex;
-            flex-direction: column;
-            font-size: 12px;
+            align-items: baseline;
+            gap: 6px;
+            line-height: 22px;
         }
         .tag-search-result:hover {
             background: var(--vscode-list-hoverBackground);
         }
         .tag-search-result-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tag-search-result-location {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        .tag-search-result-title-text {
             font-size: 13px;
         }
         .tag-search-result-location {
@@ -698,43 +734,10 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
             border-bottom: 1px solid var(--vscode-panel-border);
         }
         .board-config-item {
-            margin-bottom: 2px;
-        }
-        .board-config-header {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .board-config-header:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
-        .board-config-toggle {
-            width: 16px;
-            text-align: center;
-            font-family: monospace;
-            opacity: 0.7;
-        }
-        .board-config-toggle::before {
-            content: '>';
-        }
-        .board-config-toggle.expanded::before {
-            content: 'v';
-        }
-        .board-config-name {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-weight: 500;
         }
         .board-config-body {
-            padding: 4px 4px 4px 8px;
+            padding-left: 32px;
             display: none;
-            border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
-            margin-left: 7px;
         }
         .board-config-body.expanded {
             display: block;
@@ -792,10 +795,12 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
     <div class="dashboard-container">
         <!-- Upcoming Items Section -->
         <div class="section">
-            <div class="section-header" data-section="upcoming">
-                <span class="section-toggle"></span>
-                <span>Upcoming</span>
-                <button class="refresh-btn" id="refresh-btn" title="Refresh" style="margin-left: auto;">↻</button>
+            <div class="tree-row section-header" data-section="upcoming">
+                <div class="tree-twistie collapsible expanded"></div>
+                <div class="tree-contents">
+                    <span>Upcoming</span>
+                </div>
+                <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
             </div>
             <div class="section-content" id="upcoming-content">
                 <div class="empty-message" id="upcoming-empty">No upcoming items</div>
@@ -805,9 +810,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         <!-- Tagged Items Section -->
         <div class="section">
-            <div class="section-header" data-section="tagged">
-                <span class="section-toggle"></span>
-                <span>Tagged Items</span>
+            <div class="tree-row section-header" data-section="tagged">
+                <div class="tree-twistie collapsible expanded"></div>
+                <div class="tree-contents">
+                    <span>Tagged Items</span>
+                </div>
             </div>
             <div class="section-content" id="tagged-content">
                 <div class="empty-message" id="tagged-empty">No tag filters configured</div>
@@ -820,14 +827,16 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         <!-- Boards Configuration Section -->
         <div class="section">
-            <div class="section-header" data-section="boards">
-                <span class="section-toggle"></span>
-                <span>Boards</span>
+            <div class="tree-row section-header" data-section="boards">
+                <div class="tree-twistie collapsible expanded"></div>
+                <div class="tree-contents">
+                    <span>Boards</span>
+                </div>
             </div>
             <div class="section-content" id="boards-content">
                 <div id="boards-list"></div>
                 <div class="add-board-hint">
-                    Right-click .md file → "Add to Dashboard"
+                    Right-click .md → "Add to Dashboard"
                 </div>
             </div>
         </div>
@@ -898,17 +907,24 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
             let html = '';
             for (const [date, groupItems] of Object.entries(groups)) {
-                html += '<div class="date-group">';
-                html += '<div class="date-group-header">' + escapeHtml(date) + '</div>';
+                // Date group header - level 1
+                html += '<div class="tree-row date-group-header">';
+                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-twistie"></div>';
+                html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(date) + '</span></div>';
+                html += '</div>';
+                // Items - level 2
                 groupItems.forEach(item => {
-                    html += '<div class="upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
-                    html += 'data-column-index="' + item.columnIndex + '" ';
-                    html += 'data-task-index="' + item.taskIndex + '">';
-                    html += '<span class="upcoming-title">' + escapeHtml(item.taskTitle) + '</span>';
-                    html += '<span class="upcoming-board">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
+                    html += '<div class="tree-row upcoming-item" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
+                    html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
+                    html += '<div class="tree-indent"><div class="indent-guide active"></div><div class="indent-guide active"></div></div>';
+                    html += '<div class="tree-twistie"></div>';
+                    html += '<div class="tree-contents"><div class="tree-label">';
+                    html += '<span class="tree-label-name">' + escapeHtml(item.taskTitle) + '</span>';
+                    html += '<span class="tree-label-description">' + escapeHtml(item.boardName) + '</span>';
+                    html += '</div></div>';
                     html += '</div>';
                 });
-                html += '</div>';
             }
 
             container.innerHTML = html;
@@ -984,25 +1000,29 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
             let html = '';
             for (const [tag, groupItems] of Object.entries(groups)) {
-                html += '<div class="date-group">';
-                html += '<div class="date-group-header">' + escapeHtml(tag) + ' (' + groupItems.length + ')</div>';
+                // Tag group header - level 1
+                html += '<div class="tree-row date-group-header">';
+                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-twistie"></div>';
+                html += '<div class="tree-contents"><span class="tree-label-name">' + escapeHtml(tag) + ' (' + groupItems.length + ')</span></div>';
+                html += '</div>';
+                // Items - level 2
                 groupItems.forEach(item => {
                     const isColumnMatch = item.taskIndex === -1;
-                    html += '<div class="tag-search-result' + (isColumnMatch ? ' column-match' : '') + '" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
-                    html += 'data-column-index="' + item.columnIndex + '" ';
-                    html += 'data-task-index="' + item.taskIndex + '">';
+                    html += '<div class="tree-row tag-search-result' + (isColumnMatch ? ' column-match' : '') + '" data-board-uri="' + escapeHtml(item.boardUri) + '" ';
+                    html += 'data-column-index="' + item.columnIndex + '" data-task-index="' + item.taskIndex + '">';
+                    html += '<div class="tree-indent"><div class="indent-guide active"></div><div class="indent-guide active"></div></div>';
+                    html += '<div class="tree-twistie"></div>';
+                    html += '<div class="tree-contents"><div class="tree-label">';
                     if (isColumnMatch) {
-                        // Column-level match - show column title
-                        html += '<span class="tag-search-result-title">[Column] ' + escapeHtml(item.columnTitle) + '</span>';
-                        html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + '</span>';
+                        html += '<span class="tree-label-name">[Col] ' + escapeHtml(item.columnTitle) + '</span>';
                     } else {
-                        // Task-level match - show task title
-                        html += '<span class="tag-search-result-title">' + escapeHtml(item.taskTitle) + '</span>';
-                        html += '<span class="tag-search-result-location">' + escapeHtml(item.boardName) + ' / ' + escapeHtml(item.columnTitle) + '</span>';
+                        html += '<span class="tree-label-name">' + escapeHtml(item.taskTitle) + '</span>';
                     }
+                    html += '<span class="tree-label-description">' + escapeHtml(item.boardName) + '</span>';
+                    html += '</div></div>';
                     html += '</div>';
                 });
-                html += '</div>';
             }
 
             container.innerHTML = html;
@@ -1049,10 +1069,11 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
                 html += '<div class="board-config-item" data-board-uri="' + escapeHtml(board.uri) + '">';
 
-                // Header (clickable to expand/collapse)
-                html += '<div class="board-config-header">';
-                html += '<span class="board-config-toggle"></span>';
-                html += '<span class="board-config-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span>';
+                // Header (clickable to expand/collapse) - tree row style
+                html += '<div class="tree-row board-config-header">';
+                html += '<div class="tree-indent"><div class="indent-guide active"></div></div>';
+                html += '<div class="tree-twistie collapsible board-config-toggle"></div>';
+                html += '<div class="tree-contents"><span class="tree-label-name" title="' + escapeHtml(board.uri) + '">' + escapeHtml(name) + '</span></div>';
                 html += '<button class="remove-btn" data-board-uri="' + escapeHtml(board.uri) + '" title="Remove">✕</button>';
                 html += '</div>';
 
@@ -1174,8 +1195,9 @@ export class KanbanDashboardProvider implements vscode.WebviewViewProvider {
 
         function toggleSection(sectionId) {
             const header = document.querySelector('.section-header[data-section="' + sectionId + '"]');
+            const twistie = header.querySelector('.tree-twistie');
             const content = document.getElementById(sectionId + '-content');
-            header.classList.toggle('collapsed');
+            twistie.classList.toggle('expanded');
             content.classList.toggle('collapsed');
         }
 
