@@ -105,7 +105,10 @@ export class KanbanWebviewPanel {
             if (existingPanel?._panel) {
                 existingPanel._panel.reveal(column);
                 existingPanel._fileManager.sendFileInfo();
-                existingPanel.loadMarkdownFile(document);
+                // Only reload if board is not loaded - revealing existing panel should not trigger full reload
+                if (!existingPanel.getBoard()?.valid) {
+                    existingPanel.loadMarkdownFile(document);
+                }
                 return;
             }
         }
