@@ -403,7 +403,8 @@ export class PathCommands extends SwitchBasedCommand {
         logger.debug('[PathCommands.handleSearchForFile] START', {
             oldPath,
             taskId: message.taskId,
-            columnId: message.columnId
+            columnId: message.columnId,
+            includeContext: message.includeContext
         });
 
         // Get the main file's directory for the search
@@ -415,7 +416,26 @@ export class PathCommands extends SwitchBasedCommand {
         if (!mainFile) {
             return this.failure('No main file found');
         }
-        const basePath = path.dirname(mainFile.getPath());
+
+        // Use includeContext to determine the correct base path for search
+        // If in an include file, use the include file's directory
+        let basePath: string;
+        let sourceFile: string;
+        if (message.includeContext?.includeDir) {
+            basePath = message.includeContext.includeDir;
+            sourceFile = message.includeContext.includeFilePath || basePath;
+            logger.debug('[PathCommands.handleSearchForFile] Using includeContext for base path', {
+                basePath,
+                sourceFile
+            });
+        } else {
+            basePath = path.dirname(mainFile.getPath());
+            sourceFile = mainFile.getPath();
+            logger.debug('[PathCommands.handleSearchForFile] Using main file for base path', {
+                basePath,
+                sourceFile
+            });
+        }
 
         try {
             // Use FileSearchService to show custom webview search dialog
@@ -432,9 +452,6 @@ export class PathCommands extends SwitchBasedCommand {
                 content: file.getContent()
             }));
             fileSearchService.setTrackedFiles(trackedFiles);
-
-            // Determine source file: main file path (TODO: support includeContext for include files)
-            const sourceFile = mainFile.getPath();
 
             const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath, {
                 sourceFile
@@ -540,7 +557,22 @@ export class PathCommands extends SwitchBasedCommand {
         if (!mainFile) {
             return this.failure('No main file found');
         }
-        const basePath = path.dirname(mainFile.getPath());
+
+        // Use includeContext to determine the correct base path
+        // If in an include file, use the include file's directory
+        let basePath: string;
+        if (message.includeContext?.includeDir) {
+            basePath = message.includeContext.includeDir;
+            logger.debug('[PathCommands.handleBrowseForImage] Using includeContext for base path', {
+                basePath,
+                includeFilePath: message.includeContext.includeFilePath
+            });
+        } else {
+            basePath = path.dirname(mainFile.getPath());
+            logger.debug('[PathCommands.handleBrowseForImage] Using main file for base path', {
+                basePath
+            });
+        }
 
         // Open file dialog to select a new image
         const result = await vscode.window.showOpenDialog({

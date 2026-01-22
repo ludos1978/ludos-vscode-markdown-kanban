@@ -237,6 +237,7 @@ export class PresentationParser {
           mainFilePath: mainFilePath,
           mainDir: path.dirname(mainFilePath)
         };
+        console.log(`[PresentationParser] Set task includeContext: slideNum=${slide.slideNumber}, includeDir=${task.includeContext.includeDir}, includeFilePath=${includeFilePath}`);
       }
 
       return task;

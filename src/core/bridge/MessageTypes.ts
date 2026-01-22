@@ -1750,6 +1750,12 @@ export interface SearchForFileMessage extends BaseMessage {
     taskId?: string;
     columnId?: string;
     isColumnTitle?: boolean;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**
@@ -1769,6 +1775,12 @@ export interface BrowseForImageMessage extends BaseMessage {
     taskId?: string;
     columnId?: string;
     isColumnTitle?: boolean;
+    includeContext?: {
+        includeFilePath?: string;
+        includeDir?: string;
+        mainFilePath?: string;
+        mainDir?: string;
+    };
 }
 
 /**

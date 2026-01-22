@@ -2296,6 +2296,11 @@ function addDiagramFenceRenderer(md) {
 function renderMarkdown(text, includeContext) {
     if (!text) {return '';}
 
+    // DEBUG: Log includeContext received
+    if (includeContext) {
+        console.log('[renderMarkdown] includeContext received:', JSON.stringify(includeContext, null, 2));
+    }
+
     // Store includeContext for use by image renderer
     window.currentTaskIncludeContext = includeContext;
 
@@ -2349,8 +2354,12 @@ function renderMarkdown(text, includeContext) {
             const isWindowsAbsolute = isWindowsAbsolutePath(originalSrc);
             const isRelativePath = isRelativeResourcePath(originalSrc);
 
+            // DEBUG: Log path resolution
+            console.log('[resolveMediaSourcePath] originalSrc:', originalSrc, 'isRelativePath:', isRelativePath, 'includeContext:', includeContext ? { includeDir: includeContext.includeDir } : null);
+
             if (includeContext && isRelativePath) {
                 const resolvedPath = resolveRelativePath(includeContext.includeDir, safeDecodePath(originalSrc));
+                console.log('[resolveMediaSourcePath] Resolved relative path with includeContext:', resolvedPath);
                 return buildWebviewResourceUrl(resolvedPath, false);
             } else if (isRelativePath && window.currentFilePath) {
                 // Relative path in main file - resolve against document directory

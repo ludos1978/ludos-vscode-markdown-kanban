@@ -2677,7 +2677,7 @@ body.vscode-high-contrast-light .task-count {
   height: 18px;
   font-size: 14px;
   text-align: center;
-  line-height: 19px; /* slightly more than height to push icon down 1px */
+  line-height: 16px;
 }
 
 .donut-menu-btn:hover {

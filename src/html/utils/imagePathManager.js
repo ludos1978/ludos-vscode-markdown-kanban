@@ -247,6 +247,22 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
         }
     }
 
+    // Extract includeContext for correct path resolution in include files
+    let includeContext = null;
+    if (taskId && columnId && window.cachedBoard?.columns) {
+        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === taskId);
+        if (task?.includeContext) {
+            includeContext = task.includeContext;
+        }
+    }
+    if (!includeContext) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (overlayRef?.includeContext) {
+            includeContext = overlayRef.includeContext;
+        }
+    }
+
     const message = {
         type: 'searchForFile',
         filePath: filePath
@@ -254,6 +270,7 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     if (taskId) message.taskId = taskId;
     if (columnId) message.columnId = columnId;
     if (isColumnTitle === 'true') message.isColumnTitle = true;
+    if (includeContext) message.includeContext = includeContext;
 
     vscode.postMessage(message);
 }
@@ -308,6 +325,22 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
         }
     }
 
+    // Extract includeContext for correct path resolution in include files
+    let includeContext = null;
+    if (taskId && columnId && window.cachedBoard?.columns) {
+        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === taskId);
+        if (task?.includeContext) {
+            includeContext = task.includeContext;
+        }
+    }
+    if (!includeContext) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (overlayRef?.includeContext) {
+            includeContext = overlayRef.includeContext;
+        }
+    }
+
     const message = {
         type: 'browseForImage',
         oldPath: oldPath
@@ -315,6 +348,7 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
     if (taskId) message.taskId = taskId;
     if (columnId) message.columnId = columnId;
     if (isColumnTitle === 'true') message.isColumnTitle = true;
+    if (includeContext) message.includeContext = includeContext;
 
     vscode.postMessage(message);
 }

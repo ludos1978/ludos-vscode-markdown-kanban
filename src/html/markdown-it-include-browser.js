@@ -26,6 +26,27 @@
     return filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
   }
 
+  // Helper function to resolve relative path against base directory
+  // Similar to resolveRelativePath in markdownRenderer.js
+  function resolvePathForInclude(baseDir, relativePath) {
+    // Normalize path separators
+    const normalizedBase = baseDir.replace(/\\/g, '/');
+    const normalizedRel = relativePath.replace(/\\/g, '/');
+
+    const dirSegments = normalizedBase.split('/').filter(s => s);
+    const relSegments = normalizedRel.split('/').filter(s => s);
+
+    for (const segment of relSegments) {
+      if (segment === '..') {
+        dirSegments.pop();
+      } else if (segment !== '.') {
+        dirSegments.push(segment);
+      }
+    }
+
+    return '/' + dirSegments.join('/');
+  }
+
   // Helper to keep include labels consistent across all render paths
   function formatIncludeLabel(fileName, suffix = '') {
     return `!(${fileName})!${suffix ? ` ${suffix}` : ''}`;
@@ -285,9 +306,19 @@
       }
 
       // Set include context so relative paths in included content resolve correctly
-      const includeDir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
+      // CRITICAL: Must resolve to absolute path for image resolution to work correctly
+      let absoluteFilePath = filePath;
+      const isRelative = !isAbsolutePath(filePath);
+      if (isRelative && window.currentFilePath) {
+        // Resolve relative path against main file directory
+        const mainDir = window.currentFilePath.replace(/\\/g, '/');
+        const mainDirPath = mainDir.substring(0, mainDir.lastIndexOf('/'));
+        absoluteFilePath = resolvePathForInclude(mainDirPath, filePath);
+      }
+      const includeDir = absoluteFilePath.substring(0, absoluteFilePath.lastIndexOf('/')) || absoluteFilePath.substring(0, absoluteFilePath.lastIndexOf('\\'));
       const previousContext = window.currentTaskIncludeContext;
       window.currentTaskIncludeContext = { includeDir };
+      console.log('[include-block] Set includeContext for regular include:', { filePath, absoluteFilePath, includeDir, mainFilePath: window.currentFilePath });
 
       // Render the content as markdown
       try {
@@ -361,9 +392,19 @@
       }
 
       // Set include context so relative paths in included content resolve correctly
-      const includeDir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
+      // CRITICAL: Must resolve to absolute path for image resolution to work correctly
+      let absoluteFilePath = filePath;
+      const isRelative = !isAbsolutePath(filePath);
+      if (isRelative && window.currentFilePath) {
+        // Resolve relative path against main file directory
+        const mainDir = window.currentFilePath.replace(/\\/g, '/');
+        const mainDirPath = mainDir.substring(0, mainDir.lastIndexOf('/'));
+        absoluteFilePath = resolvePathForInclude(mainDirPath, filePath);
+      }
+      const includeDir = absoluteFilePath.substring(0, absoluteFilePath.lastIndexOf('/')) || absoluteFilePath.substring(0, absoluteFilePath.lastIndexOf('\\'));
       const previousContext = window.currentTaskIncludeContext;
       window.currentTaskIncludeContext = { includeDir };
+      console.log('[include_content] Set includeContext for inline include:', { filePath, absoluteFilePath, includeDir, mainFilePath: window.currentFilePath });
 
       // Render the content as markdown
       try {

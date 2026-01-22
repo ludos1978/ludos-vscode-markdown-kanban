@@ -382,6 +382,7 @@ export class IncludeLoadingProcessor {
             mainFilePath: mainFilePath,
             mainDir: path.dirname(mainFilePath)
         };
+        logger.debug(`[IncludeLoadingProcessor] Set task includeContext: taskId=${task.id}, includeDir=${task.includeContext.includeDir}, absolutePath=${absolutePath}`);
 
         if (newTitle !== undefined) {
             task.title = newTitle;
