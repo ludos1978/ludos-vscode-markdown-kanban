@@ -210,7 +210,7 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
  * @param {string} [columnId] - Optional column ID for targeted update
  * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
-function searchForFile(filePath, taskId, columnId, isColumnTitle) {
+function searchForFile(filePath, taskId, columnId, isColumnTitle, includeDirFromContainer) {
     // Lock container dimensions to prevent scroll position loss during board update
     // This uses the centralized dimension lock system from stackLayoutManager.js
     if (typeof window.lockContainerDimensions === 'function') {
@@ -248,18 +248,31 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     }
 
     // Extract includeContext for correct path resolution in include files
+    // Priority: 1. includeDirFromContainer (regular includes), 2. task.includeContext (task/column includes), 3. overlay ref
     let includeContext = null;
-    if (taskId && columnId && window.cachedBoard?.columns) {
+
+    // Check if we have includeDir from the include container (for regular includes)
+    if (includeDirFromContainer && includeDirFromContainer !== '' && includeDirFromContainer !== 'undefined') {
+        includeContext = { includeDir: includeDirFromContainer };
+        console.log('[searchForFile] Using includeDir from container:', includeDirFromContainer);
+    }
+
+    // If no container includeDir, try to get from task's includeContext (for task/column includes)
+    if (!includeContext && taskId && columnId && window.cachedBoard?.columns) {
         const column = window.cachedBoard.columns.find(c => c.id === columnId);
         const task = column?.tasks?.find(t => t.id === taskId);
         if (task?.includeContext) {
             includeContext = task.includeContext;
+            console.log('[searchForFile] Using includeContext from task:', task.includeContext);
         }
     }
+
+    // Fallback to overlay ref
     if (!includeContext) {
         const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
         if (overlayRef?.includeContext) {
             includeContext = overlayRef.includeContext;
+            console.log('[searchForFile] Using includeContext from overlay:', overlayRef.includeContext);
         }
     }
 
@@ -272,6 +285,7 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     if (isColumnTitle === 'true') message.isColumnTitle = true;
     if (includeContext) message.includeContext = includeContext;
 
+    console.log('[searchForFile] Sending message:', message);
     vscode.postMessage(message);
 }
 
@@ -306,7 +320,7 @@ function searchForIncludeFile(buttonElement, filePath, isColumnTitle) {
  * @param {string} [columnId] - Optional column ID for targeted update
  * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
-function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
+function browseForImage(oldPath, taskId, columnId, isColumnTitle, includeDirFromContainer) {
     closeAllPathMenus();
 
     if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
@@ -326,18 +340,31 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
     }
 
     // Extract includeContext for correct path resolution in include files
+    // Priority: 1. includeDirFromContainer (regular includes), 2. task.includeContext (task/column includes), 3. overlay ref
     let includeContext = null;
-    if (taskId && columnId && window.cachedBoard?.columns) {
+
+    // Check if we have includeDir from the include container (for regular includes)
+    if (includeDirFromContainer && includeDirFromContainer !== '' && includeDirFromContainer !== 'undefined') {
+        includeContext = { includeDir: includeDirFromContainer };
+        console.log('[browseForImage] Using includeDir from container:', includeDirFromContainer);
+    }
+
+    // If no container includeDir, try to get from task's includeContext (for task/column includes)
+    if (!includeContext && taskId && columnId && window.cachedBoard?.columns) {
         const column = window.cachedBoard.columns.find(c => c.id === columnId);
         const task = column?.tasks?.find(t => t.id === taskId);
         if (task?.includeContext) {
             includeContext = task.includeContext;
+            console.log('[browseForImage] Using includeContext from task:', task.includeContext);
         }
     }
+
+    // Fallback to overlay ref
     if (!includeContext) {
         const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
         if (overlayRef?.includeContext) {
             includeContext = overlayRef.includeContext;
+            console.log('[browseForImage] Using includeContext from overlay:', overlayRef.includeContext);
         }
     }
 
@@ -350,6 +377,7 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
     if (isColumnTitle === 'true') message.isColumnTitle = true;
     if (includeContext) message.includeContext = includeContext;
 
+    console.log('[browseForImage] Sending message:', message);
     vscode.postMessage(message);
 }
 
@@ -401,6 +429,11 @@ function togglePathMenu(container, filePath, mediaType) {
     const columnId = columnElement?.dataset?.columnId || '';
     const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
 
+    // Check if image is inside a regular include container (!!!include()!!! in description)
+    // If so, extract the includeDir from the container's data attribute
+    const includeContainer = container.closest('.include-container');
+    const includeDir = includeContainer?.dataset?.includeDir || '';
+
     // Determine if the item is broken based on media type
     let isBroken = false;
     if (mediaType === 'include') {
@@ -442,12 +475,13 @@ function togglePathMenu(container, filePath, mediaType) {
     // Valid: Open enabled
     // Search and Browse are ALWAYS enabled (user may want to change to different file)
     const openDisabled = isBroken;
+    const escapedIncludeDir = includeDir.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
     menu.innerHTML = `
         <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"`}>📄 Open</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-        <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
-        <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">🔎 Search for File</button>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">📂 Browse for File</button>
         <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
         <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
@@ -936,6 +970,10 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
     const taskId = taskElement?.dataset?.taskId;
     const columnId = columnElement?.dataset?.columnId;
 
+    // Check if image is inside a regular include container
+    const includeContainer = overlayContainer.closest('.include-container');
+    const includeDir = includeContainer?.dataset?.includeDir || '';
+
     // Find and update the existing menu
     const existingMenu = overlayContainer.querySelector('.image-path-menu');
 
@@ -958,7 +996,7 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
             // Use onclick closure - captures path and context safely
             searchBtn.onclick = function(e) {
                 e.stopPropagation();
-                searchForFile(originalSrc, taskId, columnId);
+                searchForFile(originalSrc, taskId, columnId, '', includeDir);
             };
         }
 
@@ -972,7 +1010,7 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
             // Use onclick closure - captures path and context safely
             browseBtn.onclick = function(e) {
                 e.stopPropagation();
-                browseForImage(originalSrc, taskId, columnId);
+                browseForImage(originalSrc, taskId, columnId, '', includeDir);
             };
         }
     }
@@ -1145,6 +1183,10 @@ function setupMediaPathEventDelegation() {
         const taskId = taskElement?.dataset?.taskId;
         const columnId = columnElement?.dataset?.columnId;
 
+        // Check if inside a regular include container
+        const includeContainer = container.closest('.include-container');
+        const includeDir = includeContainer?.dataset?.includeDir || '';
+
         e.stopPropagation();
 
         // Close any visible menus selector - all media types
@@ -1170,13 +1212,13 @@ function setupMediaPathEventDelegation() {
             case 'search-overlay':
                 const searchMenu = container.querySelector(menuSelector);
                 if (searchMenu) searchMenu.classList.remove('visible');
-                searchForFile(filePath, taskId, columnId);
+                searchForFile(filePath, taskId, columnId, '', includeDir);
                 break;
             case 'browse':
             case 'browse-overlay':
                 const browseMenu = container.querySelector(menuSelector);
                 if (browseMenu) browseMenu.classList.remove('visible');
-                browseForImage(filePath, taskId, columnId);
+                browseForImage(filePath, taskId, columnId, '', includeDir);
                 break;
             case 'to-relative':
                 if (!target.disabled) {

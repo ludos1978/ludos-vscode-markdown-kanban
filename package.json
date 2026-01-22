@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.108.1",
+  "version": "0.109.11",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -146,7 +146,7 @@
         "markdown-kanban.layoutPresets": {
           "type": "object",
           "default": {
-            "overview": {
+            "Overview": {
               "label": "Overview",
               "description": "Compact view for seeing many cards",
               "settings": {
@@ -204,7 +204,7 @@
               }
             }
           },
-          "description": "Layout presets configuration. Each preset should contain a 'label', 'description', and 'settings' object with layout options. Default presets (overview, normal, grid3x, focused) can be customized or overridden.",
+          "description": "Layout presets configuration. Each preset should contain a 'label', 'description', and 'settings' object with layout options. Default presets (Overview, normal, grid3x, focused) can be customized or overridden.",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -420,7 +420,7 @@
         "markdown-kanban.layoutPreset": {
           "type": "string",
           "enum": [
-            "overview",
+            "Overview",
             "normal",
             "grid3x",
             "focused"
@@ -558,7 +558,7 @@
                 }
               }
             },
-            "importance": {
+            "Importance": {
               "critical": {
                 "light": {
                   "text": "#000000",
@@ -608,7 +608,7 @@
                 }
               }
             },
-            "status": {
+            "Status": {
               "todo": {
                 "light": {
                   "text": "#000000",
@@ -801,7 +801,7 @@
                 }
               }
             },
-            "priority": {
+            "Priority": {
               "urgent": {
                 "light": {
                   "text": "#000000",
@@ -947,7 +947,7 @@
                 }
               }
             },
-            "positivity": {
+            "Positivity": {
               "++": {
                 "light": {
                   "text": "#ffffff",
@@ -1074,7 +1074,7 @@
                 }
               }
             },
-            "category": {
+            "Category": {
               "backend": {
                 "light": {
                   "text": "#000000",
@@ -1264,7 +1264,7 @@
                 }
               }
             },
-            "dark-colors": {
+            "Colors-Dark": {
               "dark-red": {
                 "light": {
                   "text": "#000000",
@@ -1410,7 +1410,7 @@
                 }
               }
             },
-            "colors": {
+            "Colors": {
               "red": {
                 "light": {
                   "text": "#000000",
@@ -1556,7 +1556,7 @@
                 }
               }
             },
-            "light-colors": {
+            "Colors-Light": {
               "light-red": {
                 "light": {
                   "text": "#000000",
@@ -1702,7 +1702,7 @@
                 }
               }
             },
-            "accessible-colors": {
+            "Colors-Accessible": {
               "accessible-indigo": {
                 "light": {
                   "text": "#000000",
@@ -1800,7 +1800,7 @@
                 }
               }
             },
-            "workflow": {
+            "Workflow": {
               "ideas": {
                 "headerBar": {
                   "height": "24px",
@@ -2054,7 +2054,7 @@
                 }
               }
             },
-            "organization": {
+            "Organization": {
               "intro": {
                 "border": {
                   "style": "solid",
@@ -2272,7 +2272,7 @@
                 }
               }
             },
-            "content-type-teaching": {
+            "Teaching-Content": {
               "slide": {
                 "light": {
                   "text": "#000000",
@@ -2434,9 +2434,189 @@
                   "text": "#ffffff",
                   "backgroundDark": "#F4A259"
                 }
+              },
+              "post-processing": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#CC79A7"
+                },
+                "light": {
+                  "background": "#9B233580",
+                  "text": "#000000",
+                  "backgroundDark": "#9B2335"
+                },
+                "dark": {
+                  "background": "#9B233580",
+                  "text": "#ffffff",
+                  "backgroundDark": "#9B2335"
+                }
+              },
+              "preparation": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#999933"
+                },
+                "light": {
+                  "background": "#56B4E980",
+                  "text": "#000000",
+                  "backgroundDark": "#56B4E9"
+                },
+                "dark": {
+                  "background": "#56B4E980",
+                  "text": "#ffffff",
+                  "backgroundDark": "#56B4E9"
+                }
+              },
+              "presentation": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#0072B2"
+                },
+                "light": {
+                  "background": "#E69F0080",
+                  "text": "#000000",
+                  "backgroundDark": "#E69F00"
+                },
+                "dark": {
+                  "background": "#E69F0080",
+                  "text": "#ffffff",
+                  "backgroundDark": "#E69F00"
+                }
+              },
+              "improve": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#D55E00"
+                },
+                "light": {
+                  "background": "#009E7380",
+                  "text": "#000000",
+                  "backgroundDark": "#009E73"
+                },
+                "dark": {
+                  "background": "#009E7380",
+                  "text": "#ffffff",
+                  "backgroundDark": "#009E73"
+                }
+              },
+              "integrate": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#CC6677"
+                },
+                "light": {
+                  "background": "#7B68EE80",
+                  "text": "#000000",
+                  "backgroundDark": "#7B68EE"
+                },
+                "dark": {
+                  "background": "#7B68EE80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#7B68EE"
+                }
+              },
+              "grading": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#882255"
+                },
+                "light": {
+                  "background": "#F0E44280",
+                  "text": "#000000",
+                  "backgroundDark": "#F0E442"
+                },
+                "dark": {
+                  "background": "#F0E44280",
+                  "text": "#ffffff",
+                  "backgroundDark": "#F0E442"
+                }
+              },
+              "exam": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#661100"
+                },
+                "light": {
+                  "background": "#CC331180",
+                  "text": "#000000",
+                  "backgroundDark": "#CC3311"
+                },
+                "dark": {
+                  "background": "#CC331180",
+                  "text": "#ffffff",
+                  "backgroundDark": "#CC3311"
+                }
+              },
+              "homework": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#004488"
+                },
+                "light": {
+                  "background": "#EE99AA80",
+                  "text": "#000000",
+                  "backgroundDark": "#EE99AA"
+                },
+                "dark": {
+                  "background": "#EE99AA80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#EE99AA"
+                }
+              },
+              "project": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#994455"
+                },
+                "light": {
+                  "background": "#6699CC80",
+                  "text": "#000000",
+                  "backgroundDark": "#6699CC"
+                },
+                "dark": {
+                  "background": "#6699CC80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#6699CC"
+                }
+              },
+              "administrative": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#555555"
+                },
+                "light": {
+                  "background": "#BBBBBB80",
+                  "text": "#000000",
+                  "backgroundDark": "#BBBBBB"
+                },
+                "dark": {
+                  "background": "#BBBBBB80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#BBBBBB"
+                }
               }
             },
-            "content-type-product": {
+            "Product-Content": {
               "story": {
                 "border": {
                   "style": "solid",
@@ -2546,7 +2726,7 @@
                 }
               }
             },
-            "complexity": {
+            "Complexity": {
               "trivial": {
                 "headerBar": {
                   "height": "6px",
@@ -2633,7 +2813,7 @@
                 }
               }
             },
-            "review-status": {
+            "Status-Review": {
               "needs-review": {
                 "footerBar": {
                   "height": "3px",
@@ -2754,7 +2934,7 @@
                 }
               }
             },
-            "time-estimate": {
+            "Time-Estimate": {
               "quick": {
                 "footerBar": {
                   "height": "3px",
@@ -2807,7 +2987,7 @@
                 }
               }
             },
-            "testing-status": {
+            "Status-Testing": {
               "untested": {
                 "cornerBadge": {
                   "label": "?",
@@ -2961,7 +3141,7 @@
                 }
               }
             },
-            "platform-teaching": {
+            "Teaching-Platform": {
               "online": {
                 "cornerBadge": {
                   "label": "🌐",
@@ -3058,7 +3238,7 @@
                 }
               }
             },
-            "platform-product": {
+            "Product-Platform": {
               "web": {
                 "cornerBadge": {
                   "label": "🌐",
@@ -3174,7 +3354,7 @@
                 }
               }
             },
-            "version": {
+            "Version": {
               "v1": {
                 "cornerBadge": {
                   "label": "v1",
@@ -3502,7 +3682,7 @@
                 }
               }
             },
-            "impact": {
+            "Impact": {
               "minor": {
                 "cornerBadge": {
                   "label": "○",
@@ -3580,7 +3760,7 @@
                 }
               }
             },
-            "type": {
+            "Type": {
               "bug": {
                 "light": {
                   "text": "#000000",
@@ -3972,8 +4152,8 @@
                 }
               }
             },
-            "schedule": {
-              "schedule": {
+            "Schedule": {
+              "Schedule": {
                 "headerBar": {
                   "height": "20px",
                   "label": "SCHEDULE",
@@ -4050,8 +4230,8 @@
                 }
               }
             },
-            "overview": {
-              "overview": {
+            "Overview": {
+              "Overview": {
                 "headerBar": {
                   "height": "20px",
                   "label": "OVERVIEW",
@@ -4109,8 +4289,8 @@
                 }
               }
             },
-            "example": {
-              "example": {
+            "Example": {
+              "Example": {
                 "headerBar": {
                   "height": "20px",
                   "label": "EXAMPLE",
@@ -4168,8 +4348,8 @@
                 }
               }
             },
-            "deliveries": {
-              "deliveries": {
+            "Deliveries": {
+              "Deliveries": {
                 "headerBar": {
                   "height": "20px",
                   "label": "DELIVERIES",
@@ -4235,92 +4415,92 @@
           "items": {
             "type": "string",
             "enum": [
-              "priority",
-              "positivity",
-              "status",
-              "workflow",
-              "organization",
-              "importance",
-              "type",
-              "category",
-              "dark-colors",
-              "colors",
-              "light-colors",
-              "accessible-colors",
-              "review-status",
-              "time-estimate",
-              "testing-status",
-              "platform-teaching",
-              "platform-product",
-              "content-type-teaching",
-              "content-type-product",
-              "complexity",
-              "version",
-              "impact",
-              "schedule",
-              "overview",
-              "example",
-              "deliveries"
+              "Priority",
+              "Positivity",
+              "Status",
+              "Workflow",
+              "Organization",
+              "Importance",
+              "Type",
+              "Category",
+              "Colors-Dark",
+              "Colors",
+              "Colors-Light",
+              "Colors-Accessible",
+              "Status-Review",
+              "Time-Estimate",
+              "Status-Testing",
+              "Teaching-Platform",
+              "Product-Platform",
+              "Teaching-Content",
+              "Product-Content",
+              "Complexity",
+              "Version",
+              "Impact",
+              "Schedule",
+              "Overview",
+              "Example",
+              "Deliveries"
             ]
           },
           "default": [
-            "workflow",
-            "positivity",
-            "colors",
-            "complexity"
+            "Workflow",
+            "Positivity",
+            "Colors",
+            "Complexity"
           ],
           "uniqueItems": true,
-          "markdownDescription": "**Column Tag Categories** - Select which categories appear in column burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Column Defaults (4):** workflow, positivity, colors, complexity"
+          "markdownDescription": "**Column Tag Categories** - Select which categories appear in column burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Column Defaults (4):** Workflow, Positivity, Colors, Complexity"
         },
         "markdown-kanban.enabledTagCategoriesTask": {
           "type": "array",
           "items": {
             "type": "string",
             "enum": [
-              "priority",
-              "positivity",
-              "status",
-              "workflow",
-              "organization",
-              "importance",
-              "type",
-              "category",
-              "dark-colors",
-              "colors",
-              "light-colors",
-              "accessible-colors",
-              "review-status",
-              "time-estimate",
-              "testing-status",
-              "platform-teaching",
-              "platform-product",
-              "content-type-teaching",
-              "content-type-product",
-              "complexity",
-              "version",
-              "impact",
-              "schedule",
-              "overview",
-              "example",
-              "deliveries"
+              "Priority",
+              "Positivity",
+              "Status",
+              "Workflow",
+              "Organization",
+              "Importance",
+              "Type",
+              "Category",
+              "Colors-Dark",
+              "Colors",
+              "Colors-Light",
+              "Colors-Accessible",
+              "Status-Review",
+              "Time-Estimate",
+              "Status-Testing",
+              "Teaching-Platform",
+              "Product-Platform",
+              "Teaching-Content",
+              "Product-Content",
+              "Complexity",
+              "Version",
+              "Impact",
+              "Schedule",
+              "Overview",
+              "Example",
+              "Deliveries"
             ]
           },
           "default": [
-            "positivity",
-            "status",
-            "colors",
-            "impact"
+            "Positivity",
+            "Status",
+            "Colors",
+            "Impact"
           ],
           "uniqueItems": true,
-          "markdownDescription": "**Task Tag Categories** - Select which categories appear in task burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Task Defaults (4):** positivity, status, colors, impact"
+          "markdownDescription": "**Task Tag Categories** - Select which categories appear in task burger menus. All 26 categories available. See 'Tag Category Reference' above for details.\n\n**Task Defaults (4):** Positivity, Status, Colors, Impact"
         },
         "markdown-kanban.customTagCategories": {
           "type": "object",
           "default": {},
-          "description": "Define custom tag categories. Each category should map category name to tag configurations. Example: {\"myCategory\": {\"myTag\": {\"border\": {\"color\": \"#FF0000\", \"width\": \"2px\", \"style\": \"solid\", \"position\": \"full\"}}}}",
+          "description": "Define custom tag categories. Each Category should map Category name to tag configurations. Example: {\"myCategory\": {\"myTag\": {\"border\": {\"color\": \"#FF0000\", \"width\": \"2px\", \"style\": \"solid\", \"position\": \"full\"}}}}",
           "additionalProperties": {
             "type": "object",
-            "description": "Custom tag category containing tag definitions",
+            "description": "Custom tag Category containing tag definitions",
             "additionalProperties": {
               "type": "object",
               "description": "Tag configuration with styling properties (border, headerBar, footerBar, cornerBadge, light, dark, etc.)"
@@ -4329,7 +4509,7 @@
         },
         "markdown-kanban.tagCategoryReference": {
           "type": "null",
-          "markdownDescription": "## Tag Category Reference\n\nAll 26 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n- `schedule` - Schedule phases: schedule, planning, preparation, verify\n- `overview` - Overview content: overview, information, presentation\n- `example` - Example content: example, tasks, homework\n- `deliveries` - Deliverables: deliveries, handouts, references\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `positivity` - Sentiment levels: ++ (very positive), + (positive), ø (neutral), - (negative), -- (very negative)\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
+          "markdownDescription": "## Tag Category Reference\n\nAll 26 tag categories available for both columns and tasks. Each Category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `Workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `Organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `Teaching-Content` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `Product-Content` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `Complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n- `Schedule` - Schedule phases: Schedule, planning, preparation, verify\n- `Overview` - Overview content: Overview, information, presentation\n- `Example` - Example content: Example, tasks, homework\n- `Deliveries` - Deliverables: Deliveries, handouts, references\n\n### Task-Optimized Categories (cornerBadge + background)\n- `Priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `Positivity` - Sentiment levels: ++ (very positive), + (positive), ø (neutral), - (negative), -- (very negative)\n- `Status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `Status-Review` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `Time-Estimate` - Time estimates: quick, medium-time, long\n- `Status-Testing` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `Teaching-Platform` - Teaching platforms: online, in-person, hybrid, async, sync\n- `Product-Platform` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `Impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `Importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `Category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `Colors-Dark` - 12 dark Colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `Colors` - 12 normal Colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `Colors-Light` - 12 light Colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `Colors-Accessible` - 8 WCAG Colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
         },
         "markdown-kanban.maxRowHeight": {
           "type": "number",

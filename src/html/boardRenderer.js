@@ -542,7 +542,7 @@ function generateTagMenuItems(id, type, columnId = null) {
 
     // Map group keys to config keys (kebab-case to camelCase)
     const groupKeyToConfigKey = (groupKey) => {
-        // Convert kebab-case to camelCase: 'content-type-teaching' -> 'contentTypeTeaching'
+        // Convert kebab-case to camelCase: 'Teaching-Content' -> 'teachingContent'
         return groupKey.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
     };
 

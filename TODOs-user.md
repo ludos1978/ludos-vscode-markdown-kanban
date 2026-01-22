@@ -1,14 +1,10 @@
+
+
 - [ ] i want an addiitonal side panel that. for each kanban panel that is within it.
   - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
   - list all tags (for example #todo )
   - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
 
-- [ ] Dashboard fixes:
-  - [x] the "right-click a .md file in explorer ..." can be hidden after one has been added.
-  - [x] i want to select or enter a tag, then all tags of this type get searched and listed
-  - [x] i dont want a list of tags to click. i want a dropdown that allows adding the existing tags or enter tags manually that should be searched within the kanban and list all occurances.
-  - [x] it doesnt list the upcoming week tags and time tags
-  - [ ] the upcoming items from the date search should be sorted by first occurance (by time). separated each day by a horizontal line. make suggestions how to label the days!
 
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
 
@@ -61,6 +57,20 @@ A column can have multiple query tags:
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
+
+- [x] Dashboard fixes:
+  - [x] the "right-click a .md file in explorer ..." can be hidden after one has been added.
+  - [x] i want to select or enter a tag, then all tags of this type get searched and listed
+  - [x] i dont want a list of tags to click. i want a dropdown that allows adding the existing tags or enter tags manually that should be searched within the kanban and list all occurances.
+  - [x] it doesnt list the upcoming week tags and time tags
+  - [x] the upcoming items from the date search should be sorted by first occurance (by time). separated each day by a horizontal line. make suggestions how to label the days!
+
+- [x] """index.html?id=d7665c81-a4e0-4c7e-9614-7466f476c528&parentId=20&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69 Uncaught TypeError: Cannot read properties of null (reading 'classList')
+    at index.html?id=d7665c81-a4e0-4c7e-9614-7466f476c528&parentId=20&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69:122
+20index.html?id=d7665c81-a4e0-4c7e-9614-7466f476c528&parentId=20&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69 Uncaught TypeError: Cannot read properties of null (reading 'classList')
+    at index.html?id=d7665c81-a4e0-4c7e-9614-7466f476c528&parentId=20&origin=bec83e72-0fbb-4300-a82d-52ad56865f64&swVersion=4&extensionId=ludos.ludos-kanban&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app:69:122"""
+
+- [x] Teaching-Content (formerly content-type-teaching) extended with "post-processing" "preparation" "presentation" "improve" "integrate" "grading" "exam" "homework" "project" "administrative"
 
 - [x] where is FileCommands.handleOpenFileLink used? can it be removed if it's unused?
 

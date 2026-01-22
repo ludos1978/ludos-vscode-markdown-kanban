@@ -250,14 +250,15 @@ function generateTagStyles() {
                     // Alpha affects blending but not the opaque color's luminance
                     const opaqueBackground = themeColors.background.length === 9 ? themeColors.background.substring(0, 7) : themeColors.background;
 
-                    // Calculate automatic text color based on background luminance
-                    const { textColor: tagTextColor, textShadow: tagTextShadow } =
-                        colorUtils ? colorUtils.getTextColorsForBackground(opaqueBackground) : { textColor: '#000000', textShadow: '' };
+                    // Calculate automatic text color and outline based on background luminance
+                    const { textColor: tagTextColor, textOutline: tagTextOutline } =
+                        colorUtils ? colorUtils.getTagTextColors(opaqueBackground) : { textColor: '#000000', textOutline: '' };
 
                     styles += `.kanban-tag[data-tag="${attrTagName}"] {
                         color: ${tagTextColor} !important;
                         background-color: ${themeColors.background} !important;
-                        border: 1px solid ${themeColors.background};${tagTextShadow ? `\n                        text-shadow: ${tagTextShadow};` : ''}
+                        border: 1px solid ${themeColors.background};
+                        text-shadow: ${tagTextOutline};
                     }\n`;
 
                     // Highlight lines/paragraphs containing this tag in descriptions

@@ -136,7 +136,9 @@ window.handleClipboardDragStart = function(e) {
 window.handleClipboardDragEnd = function(e) {
 
     // Clear visual feedback
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 
     // Clear drag state
     if (window.dragState) {
@@ -299,7 +301,9 @@ window.handleEmptyCardDragStart = function(e) {
 window.handleEmptyCardDragEnd = function(e) {
 
     // Clear visual feedback
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 
     // Clear drag state
     if (window.dragState) {
@@ -540,7 +544,9 @@ window.handleDiagramCardDragStart = function(e, diagramType) {
  */
 window.handleDiagramCardDragEnd = function(e) {
     // Clear visual feedback
-    e.target.classList.remove('dragging');
+    if (e.target?.classList) {
+        e.target.classList.remove('dragging');
+    }
 
     // Clear drag state
     diagramDragState.isDragging = false;

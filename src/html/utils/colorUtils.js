@@ -132,16 +132,32 @@ class ColorUtils {
 
     /**
      * Determine if dark text should be used on a background color
-     * Uses WCAG contrast guidelines with scientifically accurate threshold
+     * Uses WCAG contrast guidelines with theme-aware threshold
      * @param {string} backgroundColor - Background color
+     * @param {boolean} isDarkMode - Whether dark mode is active (optional, auto-detected if not provided)
      * @returns {boolean} True if dark text should be used
      */
-    shouldUseDarkText(backgroundColor) {
+    shouldUseDarkText(backgroundColor, isDarkMode = null) {
         const luminance = this.getLuminance(backgroundColor);
         // WCAG 2.0 standard: use threshold of sqrt(1.05 * 0.05) - 0.05 ≈ 0.179
         // This ensures contrast ratio >= 4.5:1 for both black and white text
-        // Simplified: luminance > 0.179 → use black text, otherwise white text
-        return luminance > 0.179;
+        // In dark mode, use a higher threshold (0.35) to favor white text more often
+        // for better readability against dark UI backgrounds
+        const darkMode = isDarkMode !== null ? isDarkMode : this._isDarkMode();
+        const threshold = darkMode ? 0.35 : 0.179;
+        return luminance > threshold;
+    }
+
+    /**
+     * Internal helper to detect dark mode
+     * @returns {boolean} True if dark mode is active
+     */
+    _isDarkMode() {
+        if (typeof document !== 'undefined' && document.body) {
+            return document.body.classList.contains('vscode-dark') ||
+                   document.body.classList.contains('vscode-high-contrast');
+        }
+        return false;
     }
 
     /**
@@ -195,6 +211,41 @@ class ColorUtils {
     }
 
     /**
+     * Get text outline shadow for tag pills
+     * Returns a crisp outline in the contrast color, with larger blur for low contrast
+     * @param {string} textColor - The text color being used
+     * @param {string} backgroundColor - The background color for contrast calculation
+     * @returns {string} CSS text-shadow value for outline effect
+     */
+    getTagTextOutline(textColor, backgroundColor) {
+        // Use opposite color for outline (white text gets black outline, vice versa)
+        const outlineColor = textColor === '#ffffff' ? '#222' : '#ddd';
+
+        // Calculate contrast ratio to determine outline strength
+        const ratio = this.getContrastRatio(textColor, backgroundColor);
+
+        // Use larger blur radius for low contrast, fewer layers (larger blur is softer)
+        // Good contrast (>7): 1px blur, 6 layers
+        // Medium (4.5-7): 3px blur, 4 layers
+        // Poor (<4.5): 5px blur, 2 layers
+        let blurRadius, layers;
+        if (ratio >= 7) {
+            blurRadius = 2;
+            layers = 3;
+        } else if (ratio >= 4.5) {
+            blurRadius = 4;
+            layers = 2;
+        } else {
+            blurRadius = 6;
+            layers = 1;
+        }
+
+        // Multiple layered shadows at same position create a crisp outline effect
+        const shadow = `${outlineColor} 0px 0px ${blurRadius}px`;
+        return Array(layers).fill(shadow).join(', ');
+    }
+
+    /**
      * Get both text color and text shadow for a background color
      * Combines getContrastText() and getContrastShadow() in a single call
      * to avoid duplicate luminance/contrast calculations
@@ -205,6 +256,18 @@ class ColorUtils {
         const textColor = this.getContrastText(backgroundColor);
         const textShadow = this.getContrastShadow(textColor, backgroundColor);
         return { textColor, textShadow };
+    }
+
+    /**
+     * Get text color and outline for tag pills with background colors
+     * Always includes outline shadow for better readability
+     * @param {string} backgroundColor - Background color of the tag
+     * @returns {Object} Object with textColor and textOutline properties
+     */
+    getTagTextColors(backgroundColor) {
+        const textColor = this.getContrastText(backgroundColor);
+        const textOutline = this.getTagTextOutline(textColor, backgroundColor);
+        return { textColor, textOutline };
     }
 }
 

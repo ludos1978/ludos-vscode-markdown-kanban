@@ -298,10 +298,19 @@ export class FileSearchWebview {
             if (seen.has(uri.fsPath)) { return false; }
             seen.add(uri.fsPath);
 
+            // Compute relative path: use _baseDir if available (for include files),
+            // otherwise fall back to workspace-relative path
+            let relativePath: string;
+            if (this._baseDir) {
+                relativePath = path.relative(this._baseDir, uri.fsPath);
+            } else {
+                relativePath = vscode.workspace.asRelativePath(uri.fsPath);
+            }
+
             pendingBatch.push({
                 label: path.basename(uri.fsPath),
                 fullPath: uri.fsPath,
-                relativePath: vscode.workspace.asRelativePath(uri.fsPath)
+                relativePath: relativePath
             });
 
             sendBatch(false);
