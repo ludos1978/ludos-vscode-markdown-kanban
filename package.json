@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.109.11",
+  "version": "0.110.6",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -2613,6 +2613,60 @@
                   "background": "#BBBBBB80",
                   "text": "#ffffff",
                   "backgroundDark": "#BBBBBB"
+                }
+              },
+              "excourse": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#20B2AA"
+                },
+                "light": {
+                  "background": "#48D1CC80",
+                  "text": "#000000",
+                  "backgroundDark": "#48D1CC"
+                },
+                "dark": {
+                  "background": "#48D1CC80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#48D1CC"
+                }
+              },
+              "revise": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#FF7F50"
+                },
+                "light": {
+                  "background": "#FFA07A80",
+                  "text": "#000000",
+                  "backgroundDark": "#FFA07A"
+                },
+                "dark": {
+                  "background": "#FFA07A80",
+                  "text": "#ffffff",
+                  "backgroundDark": "#FFA07A"
+                }
+              },
+              "verify": {
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "full",
+                  "color": "#32CD32"
+                },
+                "light": {
+                  "background": "#90EE9080",
+                  "text": "#000000",
+                  "backgroundDark": "#90EE90"
+                },
+                "dark": {
+                  "background": "#90EE9080",
+                  "text": "#ffffff",
+                  "backgroundDark": "#90EE90"
                 }
               }
             },

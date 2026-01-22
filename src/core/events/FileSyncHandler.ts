@@ -147,10 +147,10 @@ export class FileSyncHandler {
                         this._deps.emitBoardLoaded(board);
                     }
                 } else {
-                    // Normal path: send full board update (includes include content)
-                    console.log('[FileSyncHandler] Calling sendBoardUpdate(false, true)');
-                    this._deps.boardStore.invalidateCache();
-                    this._deps.sendBoardUpdate(false, true);
+                    // Use targeted include content update instead of full board refresh
+                    // The webview's updateIncludeFileCache handles re-rendering only affected tasks
+                    console.log('[FileSyncHandler] Sending targeted include content update (not full board refresh)');
+                    this._sendIncludeContentOnly();
 
                     // Emit board:loaded to trigger media tracking update
                     const board = this._deps.getBoard();

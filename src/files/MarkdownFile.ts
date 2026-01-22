@@ -845,6 +845,17 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         const hasChanged = diskContent !== this._baseline;
         if (hasChanged) {
+            // Debug: Log why change was detected
+            const baselineLen = this._baseline?.length ?? 0;
+            const diskLen = diskContent?.length ?? 0;
+            const isEmptyBaseline = baselineLen === 0;
+            console.log(`[${this.getFileType()}] checkForExternalChanges DETECTED CHANGE: ${this._relativePath}`, {
+                baselineLength: baselineLen,
+                diskLength: diskLen,
+                isEmptyBaseline,
+                baselinePreview: this._baseline?.substring(0, 50),
+                diskPreview: diskContent?.substring(0, 50)
+            });
             this._hasFileSystemChanges = true;
             this._emitChange('external');
         }

@@ -1487,6 +1487,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   cursor: pointer;
 }
 
+.diagram-placeholder {
+  width: 100%;
+}
+
 /* Broken diagram placeholders should fit content, not expand */
 .diagram-placeholder:has(.image-broken),
 .diagram-placeholder:has(.image-not-found) {

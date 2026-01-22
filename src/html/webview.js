@@ -1400,6 +1400,11 @@ function setColumnWidth(size) {
  */
 // Refactored layout rows functions using styleManager
 function applyLayoutRows(rows) {
+    // Skip if value unchanged to avoid unnecessary re-renders
+    if (rows === currentLayoutRows) {
+        return;
+    }
+
     currentLayoutRows = rows;
     window.currentLayoutRows = rows;
 

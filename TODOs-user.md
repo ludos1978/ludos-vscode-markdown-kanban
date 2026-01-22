@@ -1,4 +1,5 @@
 
+- [ ] add Excourse to the Teaching-Content 
 
 - [ ] i want an addiitonal side panel that. for each kanban panel that is within it.
   - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
