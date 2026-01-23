@@ -13,6 +13,73 @@
 const DEFAULT_EXPORT_FOLDER = '_Export';
 
 // =============================================================================
+// EXPORT FOLDER NAME GENERATION
+// =============================================================================
+
+/**
+ * Generate export folder name based on current selection
+ * Format: {shortfilename}-{export-range}-EXPORT-{timestamp}
+ * @param {Array} selectedLabels - Array of selected column labels
+ * @returns {string} The generated folder name (without workspace path)
+ */
+function generateExportFolderName(selectedLabels) {
+    // Get short filename (16 chars max)
+    const currentFilename = window.currentKanbanFile ?
+        window.currentKanbanFile.split('/').pop().replace('.md', '') : 'kanban';
+    const shortFilename = currentFilename.substring(0, 16);
+
+    // Generate export range from selected columns (32 chars max)
+    let exportRange;
+    if (!selectedLabels || selectedLabels.length === 0) {
+        exportRange = 'FULL';
+    } else if (exportTreeUI && exportTreeUI.tree && exportTreeUI.tree.selected) {
+        // All selected (root is selected)
+        exportRange = 'FULL';
+    } else {
+        // Join column names, limit to 32 chars
+        // Clean up special chars and join with underscores
+        const cleanedLabels = selectedLabels.map(label =>
+            label.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)
+        );
+        exportRange = cleanedLabels.join('_').substring(0, 32);
+        if (!exportRange) {
+            exportRange = 'SELECTED';
+        }
+    }
+
+    // Generate timestamp
+    const timestamp = window.DateUtils.generateTimestamp();
+
+    return `${shortFilename}-${exportRange}-EXPORT-${timestamp}`;
+}
+
+/**
+ * Update the export folder input with generated name
+ * Does not update if auto-export is active (live preview running)
+ */
+function updateExportFolderName() {
+    // Don't regenerate if auto-export/live-preview is active
+    if (autoExportActive) {
+        return;
+    }
+
+    const folderInput = document.getElementById('export-folder');
+    if (!folderInput) {
+        return;
+    }
+
+    // Get selected column labels
+    let selectedLabels = [];
+    if (exportTreeUI && exportTreeUI.tree) {
+        selectedLabels = window.ExportTreeBuilder.getSelectedColumnLabels(exportTreeUI.tree);
+    }
+
+    const workspacePath = getWorkspacePath();
+    const folderName = generateExportFolderName(selectedLabels);
+    folderInput.value = `${workspacePath}/${folderName}`;
+}
+
+// =============================================================================
 // STATE VARIABLES
 // =============================================================================
 
@@ -236,6 +303,11 @@ function initializeExportTree(preSelectNodeId = null) {
     // Always update visibility state when modal opens
     updateLinkHandlingOptionsVisibility();
 
+    // Set up selection change callback to update folder name
+    exportTreeUI.setSelectionChangeCallback(() => {
+        updateExportFolderName();
+    });
+
     // Select either the pre-selected node or full kanban
     if (preSelectNodeId) {
         exportTreeUI.tree = window.ExportTreeBuilder.toggleSelection(exportTreeUI.tree, preSelectNodeId, true);
@@ -243,6 +315,9 @@ function initializeExportTree(preSelectNodeId = null) {
     } else {
         exportTreeUI.selectAll();
     }
+
+    // Generate initial folder name based on selection
+    updateExportFolderName();
 }
 
 /**
@@ -672,18 +747,15 @@ function applyExportPreset() {
         return;
     }
 
-    const currentFilename = window.currentKanbanFile ?
-        window.currentKanbanFile.split('/').pop().replace('.md', '') : 'kanban';
-
     switch (preset) {
         case 'marp-presentation':
-            applyPresetMarpPresentation(currentFilename);
+            applyPresetMarpPresentation();
             break;
         case 'marp-pdf':
-            applyPresetMarpPdf(currentFilename);
+            applyPresetMarpPdf();
             break;
         case 'share-content':
-            applyPresetShareContent(currentFilename);
+            applyPresetShareContent();
             break;
     }
 
@@ -693,7 +765,7 @@ function applyExportPreset() {
 /**
  * Apply Marp Presentation preset
  */
-function applyPresetMarpPresentation(currentFilename) {
+function applyPresetMarpPresentation() {
     document.getElementById('export-format').value = 'presentation';
     document.getElementById('merge-includes').checked = false;
     document.getElementById('export-tag-visibility').value = 'none';
@@ -704,19 +776,16 @@ function applyPresetMarpPresentation(currentFilename) {
     document.getElementById('marp-preview').checked = true;
     document.getElementById('marp-pptx-editable').checked = false;
 
-    const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/${DEFAULT_EXPORT_FOLDER}`;
-    document.getElementById('export-folder').value = exportFolder;
-
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
     handleMarpOutputFormatChange();
+    updateExportFolderName();
 }
 
 /**
  * Apply Marp PDF preset
  */
-function applyPresetMarpPdf(currentFilename) {
+function applyPresetMarpPdf() {
     document.getElementById('export-format').value = 'presentation';
     document.getElementById('merge-includes').checked = false;
     document.getElementById('export-tag-visibility').value = 'none';
@@ -728,30 +797,21 @@ function applyPresetMarpPdf(currentFilename) {
     document.getElementById('marp-pptx-editable').checked = false;
     document.getElementById('speaker-note-mode').value = 'keep';
 
-    const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/${DEFAULT_EXPORT_FOLDER}`;
-    document.getElementById('export-folder').value = exportFolder;
-
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
     handleMarpOutputFormatChange();
+    updateExportFolderName();
 }
 
 /**
  * Apply Share Content preset
  */
-function applyPresetShareContent(currentFilename) {
-    const dateStr = window.DateUtils.generateDateOnly();
-
+function applyPresetShareContent() {
     document.getElementById('export-format').value = 'keep';
     document.getElementById('merge-includes').checked = false;
     document.getElementById('export-tag-visibility').value = 'all';
     document.getElementById('auto-export-on-save').checked = false;
     document.getElementById('use-marp').checked = false;
-
-    const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_${currentFilename}_${dateStr}`;
-    document.getElementById('export-folder').value = exportFolder;
 
     document.getElementById('link-handling-mode').value = 'pack-all';
     updateLinkHandlingOptionsVisibility();
@@ -762,6 +822,7 @@ function applyPresetShareContent(currentFilename) {
     document.getElementById('include-other-media').checked = true;
     document.getElementById('include-documents').checked = true;
     document.getElementById('file-size-limit').value = 100;
+    updateExportFolderName();
 }
 
 /**
@@ -2005,6 +2066,8 @@ window.applyPresetShareContent = applyPresetShareContent;
 window.saveLastExportSettings = saveLastExportSettings;
 window.resetPresetToCustom = resetPresetToCustom;
 window.addExportSettingChangeListeners = addExportSettingChangeListeners;
+window.generateExportFolderName = generateExportFolderName;
+window.updateExportFolderName = updateExportFolderName;
 
 // Marp functions
 window.checkMarpStatus = checkMarpStatus;

@@ -295,6 +295,29 @@ class ExportTreeBuilder {
         if (node.type === 'column') return `column-${node.columnIndex}`;
         return 'unknown';
     }
+
+    /**
+     * Get labels of selected columns for export folder naming
+     * Returns clean column titles without layout tags
+     */
+    static getSelectedColumnLabels(tree) {
+        const labels = [];
+
+        const traverse = (node) => {
+            if (node.type === 'column' && node.selected) {
+                // Extract clean title from "Column: Title" format
+                const cleanLabel = node.label.replace(/^Column:\s*/, '').trim();
+                if (cleanLabel) {
+                    labels.push(cleanLabel);
+                }
+            } else if (node.children) {
+                node.children.forEach(child => traverse(child));
+            }
+        };
+
+        traverse(tree);
+        return labels;
+    }
 }
 
 // Global window exposure
