@@ -99,6 +99,90 @@ export const PathPatterns = {
 };
 
 /**
+ * Embed content patterns
+ */
+export const EmbedPatterns = {
+    /**
+     * Markdown image with attributes: ![alt](url){.class key="value"}
+     * Captures: [1] = alt, [2] = url, [3] = title (optional), [4] = attributes (optional)
+     */
+    imageWithAttrs: () => /!\[([^\]]*)\]\(([^)\s"]+)(?:\s+"([^"]*)")?\)(\{[^}]+\})?/g,
+
+    /**
+     * Attribute block: {.class key="value" key2=value2}
+     * Captures the entire attribute block for parsing
+     */
+    attributeBlock: () => /\{([^}]+)\}/,
+
+    /**
+     * Individual attribute: key="value" or key=value or .class or #id
+     * Captures: [1] = key or class/id marker, [2] = value (if present)
+     */
+    attribute: () => /(?:\.(\w+)|#(\w+)|(\w+)=["']?([^"'\s}]+)["']?)/g,
+};
+
+/**
+ * Convert a domain pattern (with wildcards) to a regex
+ * Supports * as wildcard for any characters
+ * @param pattern Domain pattern like "miro.com/app/embed" or "codepen.io/* /embed"
+ * @returns RegExp that matches URLs containing this domain pattern
+ */
+export function domainPatternToRegex(pattern: string): RegExp {
+    // Escape special regex characters except *
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    // Convert * to regex wildcard
+    const regexPattern = escaped.replace(/\*/g, '[^/]*');
+    // Match anywhere in URL (after protocol)
+    return new RegExp(`^https?://(?:www\\.)?${regexPattern}`, 'i');
+}
+
+/**
+ * Check if a URL matches any of the known embed domain patterns
+ * @param url The URL to check
+ * @param domainPatterns Array of domain patterns (supports wildcards)
+ * @returns true if URL matches any pattern
+ */
+export function isEmbedUrl(url: string, domainPatterns: string[]): boolean {
+    if (!url || !url.startsWith('http')) {
+        return false;
+    }
+    return domainPatterns.some(pattern => domainPatternToRegex(pattern).test(url));
+}
+
+/**
+ * Parse attribute block string into key-value pairs
+ * @param attrString Attribute string like ".embed fallback=img.png width=100%"
+ * @returns Object with parsed attributes including special 'class' and 'id' keys
+ */
+export function parseAttributeBlock(attrString: string): { [key: string]: string } {
+    const attrs: { [key: string]: string } = {};
+    if (!attrString) return attrs;
+
+    // Remove surrounding braces if present
+    const content = attrString.replace(/^\{|\}$/g, '').trim();
+
+    // Match .class, #id, and key=value patterns
+    const classMatches = content.match(/\.(\w[\w-]*)/g);
+    if (classMatches) {
+        attrs.class = classMatches.map(m => m.slice(1)).join(' ');
+    }
+
+    const idMatch = content.match(/#(\w[\w-]*)/);
+    if (idMatch) {
+        attrs.id = idMatch[1];
+    }
+
+    // Match key=value or key="value" patterns
+    const kvPattern = /(\w[\w-]*)=["']?([^"'\s}]+)["']?/g;
+    let match;
+    while ((match = kvPattern.exec(content)) !== null) {
+        attrs[match[1]] = match[2];
+    }
+
+    return attrs;
+}
+
+/**
  * Convenience function to get all content patterns for asset extraction
  * Returns array of pattern factories in order: image, link, htmlImg, htmlMedia
  */

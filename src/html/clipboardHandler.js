@@ -75,7 +75,9 @@ window.handleClipboardDragStart = function(e) {
             mode: 'image'
         });
 
-        e.target.classList.add('dragging');
+        if (e.target?.classList) {
+            e.target.classList.add('dragging');
+        }
         return;
     }
     // Handle multiple files by passing pre-formatted links
@@ -92,7 +94,9 @@ window.handleClipboardDragStart = function(e) {
             mode: 'multiple-files'
         });
 
-        e.target.classList.add('dragging');
+        if (e.target?.classList) {
+            e.target.classList.add('dragging');
+        }
         return;
     }
 
@@ -123,7 +127,9 @@ window.handleClipboardDragStart = function(e) {
     e.dataTransfer.effectAllowed = 'copy';
 
     // Add visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 };
 
 /**
@@ -295,7 +301,9 @@ window.handleEmptyCardDragStart = function(e) {
     e.dataTransfer.effectAllowed = 'copy';
 
     // Add visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 };
 
 window.handleEmptyCardDragEnd = function(e) {
@@ -340,7 +348,9 @@ window.handleEmptyColumnDragStart = function(e) {
     e.dataTransfer.setData('text/plain', 'empty-column');
 
     // Visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 
     // Add class to board for drop zone highlighting
     const boardElement = document.getElementById('kanban-board');
@@ -392,7 +402,9 @@ window.handleClipboardColumnDragStart = function(e) {
     e.dataTransfer.setData('text/plain', 'clipboard-column');
 
     // Visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 
     // Add class to board for drop zone highlighting
     const boardElement = document.getElementById('kanban-board');
@@ -445,7 +457,9 @@ window.handleTemplateMenuDragStart = function(e) {
     }));
 
     // Visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 
     // Add class to board for drop zone highlighting
     const boardElement = document.getElementById('kanban-board');
@@ -536,7 +550,9 @@ window.handleDiagramCardDragStart = function(e, diagramType) {
     e.dataTransfer.effectAllowed = 'copy';
 
     // Add visual feedback
-    e.target.classList.add('dragging');
+    if (e.target?.classList) {
+        e.target.classList.add('dragging');
+    }
 };
 
 /**

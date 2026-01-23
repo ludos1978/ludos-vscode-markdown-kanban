@@ -30,6 +30,7 @@
     <script src="markdown-it-container-browser.js"></script>
     <script src="markdown-it-include-browser.js"></script>
     <script src="markdown-it-image-figures-browser.js"></script>
+    <script src="markdown-it-image-attrs-browser.js"></script>
 
     <!-- Note: Some plugins may not be available via CDN and would need bundling -->
     <!-- markdown-it-strikethrough-alt, markdown-it-underline, markdown-it-footnote-here, -->
@@ -832,7 +833,17 @@
 											</select>
 										</div>
 									</div>
-									<div class="help-text">Configure how speaker notes (;;), HTML comments (&lt;!-- --&gt;), and HTML tags (&lt;&gt;) are handled during export.</div>
+									<div class="export-field-row" style="margin-top: 8px;">
+										<div class="export-field-third">
+											<label for="embed-handling">Embeds (iframes):</label>
+											<select id="embed-handling" class="form-input">
+												<option value="url" selected>Show URL Link</option>
+												<option value="fallback">Use Fallback Image</option>
+												<option value="remove">Remove</option>
+											</select>
+										</div>
+									</div>
+									<div class="help-text">Configure how speaker notes (;;), HTML comments (&lt;!-- --&gt;), HTML tags (&lt;&gt;), and embedded content (iframes) are handled during export.</div>
 								</div>
 
 						<!-- Use Marp option (always visible but disabled when not presentation format) -->

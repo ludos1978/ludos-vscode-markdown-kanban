@@ -107,6 +107,225 @@ function updateSourceChildren(token, resolveSourcePath) {
     return { firstSource };
 }
 
+// ============================================================================
+// Embed Detection and Rendering
+// ============================================================================
+
+// Default known embed domains (can be overridden via configuration)
+let embedKnownDomains = [
+    'miro.com/app/live-embed',
+    'miro.com/app/embed',
+    'figma.com/embed',
+    'figma.com/file',
+    'figma.com/proto',
+    'youtube.com/embed',
+    'youtube-nocookie.com/embed',
+    'youtu.be',
+    'vimeo.com/video',
+    'player.vimeo.com',
+    'codepen.io/*/embed',
+    'codesandbox.io/embed',
+    'codesandbox.io/s',
+    'stackblitz.com/edit',
+    'jsfiddle.net/*/embedded',
+    'docs.google.com/presentation',
+    'docs.google.com/document',
+    'docs.google.com/spreadsheets',
+    'notion.so',
+    'airtable.com/embed',
+    'loom.com/embed',
+    'loom.com/share'
+];
+
+// Default iframe attributes (can be overridden via configuration)
+let embedDefaultIframeAttributes = {
+    width: '100%',
+    height: '500px',
+    frameborder: '0',
+    allowfullscreen: true,
+    loading: 'lazy',
+    allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture'
+};
+
+/**
+ * Update embed configuration from settings
+ * Called when configuration is received from the extension
+ */
+function updateEmbedConfig(config) {
+    if (config && config.knownDomains && Array.isArray(config.knownDomains)) {
+        embedKnownDomains = config.knownDomains;
+    }
+    if (config && config.defaultIframeAttributes && typeof config.defaultIframeAttributes === 'object') {
+        embedDefaultIframeAttributes = { ...embedDefaultIframeAttributes, ...config.defaultIframeAttributes };
+    }
+}
+
+// Expose the config update function globally for the webview to call
+window.updateEmbedConfig = updateEmbedConfig;
+
+/**
+ * Convert a domain pattern (with wildcards) to a regex
+ * @param {string} pattern - Domain pattern like "miro.com/app/embed" or "codepen.io/wildcard/embed"
+ * @returns {RegExp} Regex that matches URLs containing this domain pattern
+ */
+function domainPatternToRegex(pattern) {
+    // Escape special regex characters except *
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    // Convert * to regex wildcard
+    const regexPattern = escaped.replace(/\*/g, '[^/]*');
+    // Match anywhere in URL (after protocol)
+    return new RegExp(`^https?://(?:www\\.)?${regexPattern}`, 'i');
+}
+
+/**
+ * Check if a URL matches any of the known embed domain patterns
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if URL matches any pattern
+ */
+function isKnownEmbedUrl(url) {
+    if (!url || !url.startsWith('http')) {
+        return false;
+    }
+    return embedKnownDomains.some(pattern => domainPatternToRegex(pattern).test(url));
+}
+
+/**
+ * Detect if an image should be rendered as an embed
+ * Priority:
+ * 1. Explicit {.embed} class attribute
+ * 2. data-embed attribute from {embed} syntax
+ * 3. Known embed domain patterns
+ *
+ * @param {string} src - Image source URL
+ * @param {string} alt - Alt text (may contain fallback image path)
+ * @param {string} title - Title attribute
+ * @param {Object} token - Markdown-it token with potential _imageAttrs
+ * @returns {Object|null} Embed info or null if not an embed
+ */
+function detectEmbed(src, alt, title, token) {
+    // Skip non-URLs (local files should not be embeds)
+    if (!src || !src.startsWith('http')) {
+        return null;
+    }
+
+    // Get attributes from token (set by markdown-it-image-attrs plugin)
+    const imageAttrs = token._imageAttrs || {};
+    const tokenClass = token.attrGet('class') || '';
+    const dataEmbed = token.attrGet('data-embed');
+
+    // Priority 1: Explicit .embed class
+    const hasEmbedClass = tokenClass.includes('embed') || (imageAttrs.class && imageAttrs.class.includes('embed'));
+
+    // Priority 2: data-embed attribute
+    const hasDataEmbed = dataEmbed !== null && dataEmbed !== undefined;
+
+    // Priority 3: Known embed domain
+    const isKnownDomain = isKnownEmbedUrl(src);
+
+    if (!hasEmbedClass && !hasDataEmbed && !isKnownDomain) {
+        return null;
+    }
+
+    // Build embed info
+    const embedInfo = {
+        isEmbed: true,
+        url: src,
+        // Fallback: from attribute, or alt text if it looks like an image path
+        fallback: imageAttrs.fallback || token.attrGet('data-fallback') || (isImagePath(alt) ? alt : null),
+        // Dimensions: from attributes or defaults
+        width: imageAttrs.width || token.attrGet('data-width') || embedDefaultIframeAttributes.width,
+        height: imageAttrs.height || token.attrGet('data-height') || embedDefaultIframeAttributes.height,
+        // Other iframe attributes from token or defaults
+        frameborder: imageAttrs.frameborder || embedDefaultIframeAttributes.frameborder,
+        allowfullscreen: imageAttrs.allowfullscreen !== undefined ? imageAttrs.allowfullscreen : embedDefaultIframeAttributes.allowfullscreen,
+        loading: imageAttrs.loading || embedDefaultIframeAttributes.loading,
+        allow: imageAttrs.allow || embedDefaultIframeAttributes.allow,
+        // Any other custom attributes
+        customAttrs: {}
+    };
+
+    // Collect any other custom attributes from imageAttrs
+    const reservedKeys = ['class', 'id', 'fallback', 'width', 'height', 'frameborder', 'allowfullscreen', 'loading', 'allow', 'embed'];
+    Object.keys(imageAttrs).forEach(key => {
+        if (!reservedKeys.includes(key)) {
+            embedInfo.customAttrs[key] = imageAttrs[key];
+        }
+    });
+
+    return embedInfo;
+}
+
+/**
+ * Check if a string looks like an image path
+ * @param {string} str - String to check
+ * @returns {boolean} True if it looks like an image path
+ */
+function isImagePath(str) {
+    if (!str) return false;
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'];
+    const lower = str.toLowerCase();
+    return imageExtensions.some(ext => lower.endsWith(ext));
+}
+
+/**
+ * Render an embed as an iframe with container
+ * @param {Object} embedInfo - Embed information from detectEmbed
+ * @param {string} originalSrc - Original source URL
+ * @param {string} alt - Alt text
+ * @param {string} title - Title attribute
+ * @returns {string} HTML for the embed container
+ */
+function renderEmbed(embedInfo, originalSrc, alt, title) {
+    const { url, fallback, width, height, frameborder, allowfullscreen, loading, allow, customAttrs } = embedInfo;
+
+    // Build iframe attributes
+    let iframeAttrs = `src="${escapeHtml(url)}"`;
+    iframeAttrs += ` width="${escapeHtml(width)}"`;
+    iframeAttrs += ` height="${escapeHtml(height)}"`;
+    iframeAttrs += ` frameborder="${escapeHtml(String(frameborder))}"`;
+    if (allowfullscreen) {
+        iframeAttrs += ' allowfullscreen';
+    }
+    iframeAttrs += ` loading="${escapeHtml(loading)}"`;
+    if (allow) {
+        iframeAttrs += ` allow="${escapeHtml(allow)}"`;
+    }
+
+    // Add custom attributes
+    Object.keys(customAttrs).forEach(key => {
+        iframeAttrs += ` ${escapeHtml(key)}="${escapeHtml(customAttrs[key])}"`;
+    });
+
+    // Build data attributes for export handling
+    const dataAttrs = [
+        `data-embed-url="${escapeHtml(url)}"`,
+        fallback ? `data-embed-fallback="${escapeHtml(fallback)}"` : '',
+        alt && !isImagePath(alt) ? `data-embed-caption="${escapeHtml(alt)}"` : ''
+    ].filter(Boolean).join(' ');
+
+    // Extract domain for display
+    let domain = '';
+    try {
+        domain = new URL(url).hostname.replace('www.', '');
+    } catch (e) {
+        domain = 'embed';
+    }
+
+    // Build the title/label
+    const displayTitle = title || alt || domain;
+
+    return `<div class="embed-container" ${dataAttrs}>
+        <div class="embed-header">
+            <span class="embed-icon">🔗</span>
+            <span class="embed-title">${escapeHtml(displayTitle)}</span>
+            <button class="embed-menu-btn" data-action="embed-menu" title="Embed options">☰</button>
+        </div>
+        <div class="embed-frame-wrapper">
+            <iframe ${iframeAttrs}></iframe>
+        </div>
+    </div>`;
+}
+
 // Factory function to create markdown-it instance with all plugins
 // This is called once per configuration change, not per render
 function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
@@ -186,6 +405,9 @@ function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) 
         md.use(window.markdownItImageFigures, {
             figcaption: 'title'
         }); // Image figures with captions from title attribute
+    }
+    if (typeof window.markdownItImageAttrs !== 'undefined') {
+        md.use(window.markdownItImageAttrs); // ![alt](url){.class key=value} attribute support
     }
 
     // Note: Most other plugins can't be loaded via CDN due to CSP restrictions
@@ -2484,6 +2706,110 @@ function renderMarkdown(text, includeContext) {
         // Enhanced image renderer - dynamically resolves relative paths using includeContext
         md.renderer.rules.image = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
+
+            // Check for and consume {attrs} in the following tokens
+            // The attrs might be split across multiple text tokens (e.g., due to line breaks)
+            // We need to collect text from multiple tokens to find the complete {attrs} block
+            let attrText = '';
+            let tokensToConsume = [];
+            let foundClosingBrace = false;
+            let depth = 0;
+
+            for (let t = idx + 1; t < tokens.length && !foundClosingBrace; t++) {
+                const tok = tokens[t];
+                // Only process text tokens and softbreaks
+                if (tok.type === 'text') {
+                    const content = tok.content || '';
+                    tokensToConsume.push({ index: t, token: tok, originalContent: content });
+                    for (let c = 0; c < content.length; c++) {
+                        attrText += content[c];
+                        if (content[c] === '{') depth++;
+                        else if (content[c] === '}') {
+                            depth--;
+                            if (depth === 0) {
+                                foundClosingBrace = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if (tok.type === 'softbreak') {
+                    tokensToConsume.push({ index: t, token: tok, originalContent: '\n' });
+                    attrText += '\n';
+                } else {
+                    // Stop at non-text tokens
+                    break;
+                }
+            }
+
+            // Check if we found an attribute block
+            const trimmedAttrText = attrText.trimStart();
+            if (trimmedAttrText.startsWith('{') && foundClosingBrace) {
+                // Find the end of the attr block in the trimmed text
+                let endPos = -1;
+                depth = 0;
+                for (let j = 0; j < trimmedAttrText.length; j++) {
+                    if (trimmedAttrText[j] === '{') depth++;
+                    else if (trimmedAttrText[j] === '}') {
+                        depth--;
+                        if (depth === 0) { endPos = j; break; }
+                    }
+                }
+
+                if (endPos !== -1) {
+                    const attrBlock = trimmedAttrText.substring(0, endPos + 1);
+
+                    // Parse attributes
+                    const attrs = {};
+                    const content = attrBlock.replace(/^\{|\}$/g, '').trim();
+                    // Match .class patterns
+                    const classMatches = content.match(/\.(\w[\w-]*)/g);
+                    if (classMatches) attrs.class = classMatches.map(m => m.slice(1)).join(' ');
+                    // Match #id pattern
+                    const idMatch = content.match(/#(\w[\w-]*)/);
+                    if (idMatch) attrs.id = idMatch[1];
+                    // Match key=value patterns
+                    const kvPattern = /(\w[\w-]*)=["']?([^"'\s}]+)["']?/g;
+                    let match;
+                    while ((match = kvPattern.exec(content)) !== null) {
+                        attrs[match[1]] = match[2];
+                    }
+
+                    // Store on token for detectEmbed to use
+                    token._imageAttrs = attrs;
+                    // Apply attributes
+                    if (attrs.class) token.attrJoin('class', attrs.class);
+                    if (attrs.id) token.attrSet('id', attrs.id);
+                    Object.keys(attrs).forEach(key => {
+                        if (!['class', 'id'].includes(key)) {
+                            token.attrSet('data-' + key, attrs[key]);
+                        }
+                    });
+
+                    // Clear the content of all consumed tokens
+                    // Calculate how much of the attr block we've consumed
+                    let consumed = 0;
+                    const leadingWhitespace = attrText.length - trimmedAttrText.length;
+                    const totalToConsume = leadingWhitespace + endPos + 1;
+
+                    for (const item of tokensToConsume) {
+                        const tokContent = item.originalContent;
+                        if (consumed + tokContent.length <= totalToConsume) {
+                            // Entire token is consumed
+                            item.token.content = '';
+                            consumed += tokContent.length;
+                        } else if (consumed < totalToConsume) {
+                            // Partial token - keep the remainder
+                            const consumeFromThis = totalToConsume - consumed;
+                            item.token.content = tokContent.substring(consumeFromThis);
+                            consumed = totalToConsume;
+                        }
+                        // Mark as consumed for text renderer
+                        item.token._attrsConsumed = true;
+                    }
+
+                }
+            }
+
             const originalSrc = token.attrGet('src') || '';
             const title = token.attrGet('title') || '';
             const alt = token.content || '';
@@ -2594,6 +2920,12 @@ function renderMarkdown(text, includeContext) {
                 return createLoadingPlaceholder(diagramId, 'diagram-placeholder', `Loading ${diagramType} diagram...`);
             }
 
+            // Check if this is an embed URL (external iframe content)
+            const embedInfo = detectEmbed(originalSrc, alt, title, token);
+            if (embedInfo) {
+                return renderEmbed(embedInfo, originalSrc, alt, title);
+            }
+
             let displaySrc = originalSrc;
 
             // Check if we have includeContext and the path is relative
@@ -2668,6 +3000,25 @@ function renderMarkdown(text, includeContext) {
             </span>`;
         };
         
+        // Custom text renderer to handle consumed attribute blocks
+        md.renderer.rules.text = function(tokens, idx, options, env, renderer) {
+            const token = tokens[idx];
+            // Return the current content (which may have been cleared by image renderer)
+            return token.content || '';
+        };
+
+        // Custom softbreak renderer to skip consumed softbreaks
+        const originalSoftbreakRenderer = md.renderer.rules.softbreak;
+        md.renderer.rules.softbreak = function(tokens, idx, options, env, renderer) {
+            const token = tokens[idx];
+            // Skip if consumed by image attrs parsing
+            if (token._attrsConsumed) {
+                return '';
+            }
+            // Otherwise use default behavior
+            return originalSoftbreakRenderer ? originalSoftbreakRenderer(tokens, idx, options, env, renderer) : '<br>\n';
+        };
+
         // Enhanced link renderer
         // NOTE: Angle bracket autolinks <...> are NOT processed for path resolution because:
         //       - They are ONLY for URL autolinks (<http://...>) or email (<user@example.com>)

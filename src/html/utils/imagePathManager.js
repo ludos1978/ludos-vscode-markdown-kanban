@@ -30,6 +30,7 @@ function closeAllPathMenus() {
     document.getElementById('floating-include-path-menu')?.remove();
     document.getElementById('floating-video-path-menu')?.remove();
     document.getElementById('floating-link-path-menu')?.remove();
+    document.getElementById('floating-embed-menu')?.remove();
 }
 
 // ============================================================================
@@ -528,6 +529,105 @@ function toggleLinkPathMenu(container, linkPath) {
 }
 
 /**
+ * Toggle embed menu for iframe embeds
+ * @param {HTMLElement} container - The embed container element
+ */
+function toggleEmbedMenu(container) {
+    // Close any existing floating menus
+    closeAllPathMenus();
+    document.getElementById('floating-embed-menu')?.remove();
+
+    const button = container.querySelector('.embed-menu-btn');
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const embedUrl = container.dataset.embedUrl || '';
+    const embedFallback = container.dataset.embedFallback || '';
+    const embedCaption = container.dataset.embedCaption || '';
+
+    // Create floating menu
+    const menu = document.createElement('div');
+    menu.id = 'floating-embed-menu';
+    menu.className = 'image-path-menu visible';
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 2) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '999999';
+
+    menu.innerHTML = `
+        <button class="image-path-menu-item" data-action="open-embed-url">🌐 Open URL in browser</button>
+        <button class="image-path-menu-item" data-action="copy-embed-url">📋 Copy URL</button>
+        ${embedFallback ? `<button class="image-path-menu-item" data-action="open-fallback">📷 Open fallback image</button>` : ''}
+        <div class="image-path-menu-divider"></div>
+        <button class="image-path-menu-item" data-action="delete-embed">🗑️ Remove embed</button>
+    `;
+
+    // Store data on menu for action handling
+    menu.dataset.embedUrl = embedUrl;
+    menu.dataset.embedFallback = embedFallback;
+
+    // Handle menu actions
+    menu.addEventListener('click', (e) => {
+        const action = e.target.dataset?.action;
+        if (!action) return;
+
+        e.stopPropagation();
+        menu.remove();
+
+        switch (action) {
+            case 'open-embed-url':
+                if (embedUrl) {
+                    vscode.postMessage({ type: 'openExternal', url: embedUrl });
+                }
+                break;
+            case 'copy-embed-url':
+                if (embedUrl) {
+                    navigator.clipboard.writeText(embedUrl).then(() => {
+                        console.log('[Embed] URL copied to clipboard');
+                    }).catch(err => {
+                        console.error('[Embed] Failed to copy URL:', err);
+                    });
+                }
+                break;
+            case 'open-fallback':
+                if (embedFallback) {
+                    openPath(embedFallback);
+                }
+                break;
+            case 'delete-embed':
+                // Delete the embed markdown from source
+                // We need to find the original markdown syntax
+                // For now, send a message to delete by URL
+                vscode.postMessage({
+                    type: 'deleteFromMarkdown',
+                    path: embedUrl
+                });
+                break;
+        }
+    });
+
+    document.body.appendChild(menu);
+
+    // Adjust position if menu goes off screen
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
+    }
+    if (menuRect.bottom > window.innerHeight) {
+        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
+    }
+
+    // Close menu when clicking outside
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !container.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+/**
  * Toggle the not-found menu visibility for any media type
  * @param {HTMLElement} container - The container element
  * @param {'image'|'video'} mediaType - The media type
@@ -635,6 +735,19 @@ const MEDIA_TYPE_CONFIG = {
         menuItemClass: 'include-path-menu-item',
         pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'include'
+    },
+    embed: {
+        emoji: '🔗',
+        containerClass: 'embed-container',
+        notFoundClass: 'embed-not-found',
+        notFoundContainerClass: 'embed-not-found-container',
+        notFoundTextClass: 'embed-not-found-text',
+        notFoundMenuClass: 'embed-not-found-menu',
+        brokenClass: 'embed-broken',
+        menuBtnClass: 'embed-menu-btn',
+        menuItemClass: 'embed-menu-item',
+        pathDataAttr: 'embedUrl',  // Uses data-embed-url
+        mediaLabel: 'embed'
     }
 };
 
@@ -1173,7 +1286,14 @@ function setupMediaPathEventDelegation() {
 
         const { type: mediaType, filePath } = mediaInfo;
 
-        if (!filePath && action !== 'toggle-menu') {
+        // Stop propagation early to prevent task editing for any media action
+        // This must happen before any early returns
+        e.stopPropagation();
+
+        // Allow toggle-menu and embed-menu to proceed even without filePath
+        // (embed-menu gets URL from container data attributes)
+        const menuActions = ['toggle-menu', 'embed-menu'];
+        if (!filePath && !menuActions.includes(action)) {
             return;
         }
 
@@ -1186,8 +1306,6 @@ function setupMediaPathEventDelegation() {
         // Check if inside a regular include container
         const includeContainer = container.closest('.include-container');
         const includeDir = includeContainer?.dataset?.includeDir || '';
-
-        e.stopPropagation();
 
         // Close any visible menus selector - all media types
         const menuSelector = Object.values(MEDIA_TYPE_CONFIG)
@@ -1204,6 +1322,10 @@ function setupMediaPathEventDelegation() {
             case 'include-menu':
                 // Handle working media menu toggle (not broken/not-found)
                 togglePathMenu(container, filePath, mediaType);
+                break;
+            case 'embed-menu':
+                // Handle embed menu toggle
+                toggleEmbedMenu(container);
                 break;
             case 'reveal':
                 revealPathInExplorer(filePath);
@@ -1486,3 +1608,6 @@ window.toggleDiagramMenu = toggleDiagramMenu;
 window.convertDiagramToSVG = convertDiagramToSVG;
 window.copyDiagramSVG = copyDiagramSVG;
 window.copyDiagramCode = copyDiagramCode;
+
+// Embed menus
+window.toggleEmbedMenu = toggleEmbedMenu;

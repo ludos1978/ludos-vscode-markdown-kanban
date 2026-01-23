@@ -72,7 +72,7 @@ export class PlantUMLService {
                 // After esbuild bundling, __dirname points to dist/, so we need ../node_modules/
                 // (was ../../ which is wrong for bundled code)
                 const vendorPath = path.join(__dirname, '../node_modules/node-plantuml/vendor');
-                const plantumlJar = path.join(vendorPath, 'plantuml-modern.jar');  // Use modern v1.2024.7
+                const plantumlJar = path.join(vendorPath, 'plantuml.jar');
 
                 // Debug: log the resolved path
                 logger.debug('[PlantUML Service] JAR path:', plantumlJar);

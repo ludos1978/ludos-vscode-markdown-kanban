@@ -268,11 +268,11 @@ async function handleDiagramConvert(button, diagramType) {
 // Event delegation for convert buttons (wrapped in guard to prevent duplicates on webview revival)
 if (!webviewEventListenersInitialized) {
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('plantuml-convert-btn')) {
+        if (e.target?.classList?.contains('plantuml-convert-btn')) {
             handleDiagramConvert(e.target, 'plantuml');
         }
 
-        if (e.target.classList.contains('mermaid-convert-btn')) {
+        if (e.target?.classList?.contains('mermaid-convert-btn')) {
             handleDiagramConvert(e.target, 'mermaid');
         }
     });

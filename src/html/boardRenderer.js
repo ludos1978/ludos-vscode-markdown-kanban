@@ -2456,7 +2456,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
 // Global click handlers that check for Alt key
 function handleColumnTitleClick(event, columnId) {
     // Don't intercept clicks on media menu buttons - let event delegation handle them
-    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn, .embed-menu-btn');
     if (menuButton) {
         return; // Let event bubble to document-level event delegation
     }
@@ -2500,7 +2500,7 @@ function handleColumnTitleClick(event, columnId) {
 
 function handleTaskTitleClick(event, element, taskId, columnId) {
     // Don't intercept clicks on media menu buttons - let event delegation handle them
-    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn, .embed-menu-btn');
     if (menuButton) {
         return; // Let event bubble to document-level event delegation
     }
@@ -2534,7 +2534,7 @@ function handleDescriptionClick(event, element, taskId, columnId) {
     }
 
     // Don't intercept clicks on media menu buttons - let event delegation handle them
-    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn');
+    const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .include-menu-btn, .diagram-menu-btn, .embed-menu-btn');
     if (menuButton) {
         return; // Let event bubble to document-level event delegation
     }

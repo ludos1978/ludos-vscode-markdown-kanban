@@ -286,6 +286,7 @@ function initializeExportTree(preSelectNodeId = null) {
         setupStorageLinkedSelect('speaker-note-mode', 'kanban-speaker-note-mode');
         setupStorageLinkedSelect('html-comment-mode', 'kanban-html-comment-mode');
         setupStorageLinkedSelect('html-content-mode', 'kanban-html-content-mode');
+        setupStorageLinkedSelect('embed-handling', 'kanban-embed-handling');
 
         // Set up link handling mode dropdown
         const linkModeDropdown = document.getElementById('link-handling-mode');
@@ -424,6 +425,7 @@ function executeUnifiedExport() {
     const speakerNoteMode = document.getElementById('speaker-note-mode')?.value || 'comment';
     const htmlCommentMode = document.getElementById('html-comment-mode')?.value || 'remove';
     const htmlContentMode = document.getElementById('html-content-mode')?.value || 'keep';
+    const embedHandling = document.getElementById('embed-handling')?.value || 'url';
     const autoExportOnSave = document.getElementById('auto-export-on-save')?.checked || false;
     const useMarp = document.getElementById('use-marp')?.checked || false;
 
@@ -475,6 +477,7 @@ function executeUnifiedExport() {
         speakerNoteMode: speakerNoteMode,
         htmlCommentMode: htmlCommentMode,
         htmlContentMode: htmlContentMode,
+        embedHandling: embedHandling,
         linkHandlingMode: linkHandlingMode,
         packAssets: packAssets,
         packOptions: packOptions,

@@ -271,7 +271,8 @@ export class WebviewManager {
         const cspSource = panel.webview.cspSource;
 
         // Content Security Policy
-        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none'; worker-src blob:; child-src blob:;">`;
+        // frame-src https: allows external embeds (miro, figma, youtube, etc.)
+        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src https:; worker-src blob:; child-src blob:;">`;
 
         if (!html.includes('Content-Security-Policy')) {
             html = html.replace('<head>', `<head>\n    ${cspMeta}`);
@@ -386,7 +387,8 @@ export class WebviewManager {
             'markdown-it-abbr-browser.js',
             'markdown-it-container-browser.js',
             'markdown-it-include-browser.js',
-            'markdown-it-image-figures-browser.js'
+            'markdown-it-image-figures-browser.js',
+            'markdown-it-image-attrs-browser.js'
         ];
 
         jsFiles.forEach(jsFile => {

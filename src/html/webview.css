@@ -1518,6 +1518,105 @@ figure:has(.diagram-placeholder .image-not-found) {
   display: inline-block;
 }
 
+/* ============================================================================
+   EMBED CONTAINER - For iframe embeds (miro, figma, youtube, etc.)
+   ============================================================================ */
+
+.embed-container {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0.5em 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+.embed-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--vscode-titleBar-activeBackground, rgba(0, 0, 0, 0.1));
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-size: 0.85em;
+}
+
+.embed-icon {
+  flex-shrink: 0;
+}
+
+.embed-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+  opacity: 0.9;
+}
+
+.embed-menu-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  opacity: 0.5;
+  font-size: 1em;
+  border-radius: 3px;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.embed-menu-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.embed-frame-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 300px;
+  background: var(--vscode-editor-background);
+}
+
+.embed-frame-wrapper iframe {
+  display: block;
+  width: 100%;
+  border: none;
+}
+
+/* Responsive embed height adjustments */
+@media (max-width: 600px) {
+  .embed-frame-wrapper {
+    min-height: 200px;
+  }
+
+  .embed-frame-wrapper iframe {
+    height: 300px !important;
+  }
+}
+
+/* Embed container inside task description */
+.task-description .embed-container,
+.task-description-wysiwyg .embed-container {
+  margin: 0.5em 0;
+}
+
+/* Hide embed menu button until hover */
+.embed-container:not(:hover) .embed-menu-btn {
+  opacity: 0;
+}
+
+.embed-container:hover .embed-menu-btn {
+  opacity: 0.5;
+}
+
+.embed-container:hover .embed-menu-btn:hover {
+  opacity: 1;
+}
+
 /* Task items */
 .task-item {
   /* background-color: var(--task-background); */

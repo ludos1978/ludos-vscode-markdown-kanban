@@ -1,3 +1,19 @@
+- [ ] i would like a way to embed iframes in the pages. currently it possible to use html, but when exporting it as pdf it's a bad look.
+for example i have this html:
+"""
+<div style='position: relative; padding: 0px; height: 650px; overflow: hidden;'>
+    <iframe width="100%" height="100%" src="https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
+</div>
+"""
+but i'd rather have something like this:
+![](https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947 )
+
+and when rendering as pdf it should:
+- display a screenshot of the page 
+- just display the url
+- show a manually given image in the alt text
+
+what would you suggest how to implement it? 
 
 - [ ] add Excourse to the Teaching-Content 
 

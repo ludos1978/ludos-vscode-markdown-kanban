@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.110.9",
+  "version": "0.110.11",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -474,6 +474,66 @@
           ],
           "default": "html",
           "description": "How HTML content within the board should render."
+        },
+        "markdown-kanban.embed.knownDomains": {
+          "type": "array",
+          "default": [
+            "miro.com/app/live-embed",
+            "miro.com/app/embed",
+            "figma.com/embed",
+            "figma.com/file",
+            "figma.com/proto",
+            "youtube.com/embed",
+            "youtube-nocookie.com/embed",
+            "youtu.be",
+            "vimeo.com/video",
+            "player.vimeo.com",
+            "codepen.io/*/embed",
+            "codesandbox.io/embed",
+            "codesandbox.io/s",
+            "stackblitz.com/edit",
+            "jsfiddle.net/*/embedded",
+            "docs.google.com/presentation",
+            "docs.google.com/document",
+            "docs.google.com/spreadsheets",
+            "notion.so",
+            "airtable.com/embed",
+            "loom.com/embed",
+            "loom.com/share"
+          ],
+          "description": "URL patterns for auto-detecting embed URLs. Supports wildcards (*). URLs matching these patterns will be rendered as iframes.",
+          "items": {
+            "type": "string",
+            "description": "Domain pattern (e.g., 'miro.com/app/embed', 'youtube.com/embed')"
+          }
+        },
+        "markdown-kanban.embed.defaultIframeAttributes": {
+          "type": "object",
+          "default": {
+            "width": "100%",
+            "height": "500px",
+            "frameborder": "0",
+            "allowfullscreen": true,
+            "loading": "lazy",
+            "allow": "fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture"
+          },
+          "description": "Default attributes for rendered iframe embeds. Can be overridden per-embed using {key=value} syntax.",
+          "additionalProperties": true
+        },
+        "markdown-kanban.embed.exportHandling": {
+          "type": "string",
+          "enum": [
+            "url",
+            "fallback",
+            "remove"
+          ],
+          "default": "url",
+          "description": "How to handle embeds when exporting to PDF. 'url' shows a styled link, 'fallback' uses the fallback image if specified, 'remove' strips embeds entirely.",
+          "enumDescriptions": [
+            "Show a styled URL link box in place of the embed",
+            "Use the fallback image specified in alt text (falls back to URL if no image)",
+            "Remove embeds entirely from the export"
+          ]
         },
         "markdown-kanban.openLinksInNewTab": {
           "type": "boolean",
@@ -5033,7 +5093,6 @@
     "jest": "^30.1.3",
     "jest-environment-jsdom": "^30.1.2",
     "jscpd": "^4.0.7",
-    "knip": "^5.82.1",
     "markdown-it": "^14.0.1",
     "markdown-it-anchor": "^9.2.0",
     "markdown-it-checkboxes": "^1.0.0",
@@ -5064,6 +5123,7 @@
     "markdown-it-abbr": "^2.0.0",
     "markdown-it-container": "^4.0.0",
     "markdown-it-ins": "^4.0.0",
+    "markdown-it-attrs": "^4.2.0",
     "markdown-it-mark": "^4.0.0",
     "markdown-it-sub": "^2.0.0",
     "markdown-it-sup": "^2.0.0",

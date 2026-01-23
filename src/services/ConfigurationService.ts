@@ -56,6 +56,11 @@ export interface KanbanConfiguration {
     sidebar: {
         autoScan: boolean;
     };
+    embed: {
+        knownDomains: string[];
+        defaultIframeAttributes: { [key: string]: string | boolean | number };
+        exportHandling: 'url' | 'fallback' | 'remove';
+    };
 }
 
 /**
@@ -122,6 +127,41 @@ export class ConfigurationService {
         },
         sidebar: {
             autoScan: true
+        },
+        embed: {
+            knownDomains: [
+                'miro.com/app/live-embed',
+                'miro.com/app/embed',
+                'figma.com/embed',
+                'figma.com/file',
+                'figma.com/proto',
+                'youtube.com/embed',
+                'youtube-nocookie.com/embed',
+                'youtu.be',
+                'vimeo.com/video',
+                'player.vimeo.com',
+                'codepen.io/*/embed',
+                'codesandbox.io/embed',
+                'codesandbox.io/s',
+                'stackblitz.com/edit',
+                'jsfiddle.net/*/embedded',
+                'docs.google.com/presentation',
+                'docs.google.com/document',
+                'docs.google.com/spreadsheets',
+                'notion.so',
+                'airtable.com/embed',
+                'loom.com/embed',
+                'loom.com/share'
+            ],
+            defaultIframeAttributes: {
+                width: '100%',
+                height: '500px',
+                frameborder: '0',
+                allowfullscreen: true,
+                loading: 'lazy',
+                allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture'
+            },
+            exportHandling: 'url' as 'url' | 'fallback' | 'remove'
         }
     };
 

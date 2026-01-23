@@ -16,7 +16,7 @@ import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { generateTimestamp } from '../../constants/FileNaming';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
-import { MarkdownPatterns, HtmlPatterns, isUrl } from '../../shared/regexPatterns';
+import { MarkdownPatterns, HtmlPatterns, isUrl, isEmbedUrl, parseAttributeBlock } from '../../shared/regexPatterns';
 import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
@@ -94,6 +94,7 @@ export interface NewExportOptions {
     speakerNoteMode?: 'comment' | 'keep' | 'remove';  // How to handle ;; speaker notes
     htmlCommentMode?: 'remove' | 'keep';              // How to handle <!-- --> comments
     htmlContentMode?: 'keep' | 'remove';              // How to handle <tag> content
+    embedHandling?: 'url' | 'fallback' | 'remove' | 'iframe';  // How to handle embeds (iframe auto-used for HTML)
 
     // PANDOC: Document export options
     runPandoc?: boolean;                              // Use Pandoc for document export
@@ -287,8 +288,104 @@ export class ExportService {
     }
 
     /**
+     * Apply embed transformation based on export mode
+     * Handles ![alt](embed-url){.embed} and auto-detected embed URLs
+     *
+     * @param content - Markdown content
+     * @param mode - 'url' (show link), 'fallback' (use alt image), 'remove' (strip embeds), 'iframe' (HTML iframe)
+     * @returns Transformed content
+     */
+    private static applyEmbedTransform(content: string, mode: 'url' | 'fallback' | 'remove' | 'iframe'): string {
+        // Get embed domains from configuration
+        const config = ConfigurationService.getInstance();
+        const embedConfig = config.getConfig('embed');
+        const knownDomains = embedConfig?.knownDomains || [
+            'miro.com/app/live-embed',
+            'miro.com/app/embed',
+            'figma.com/embed',
+            'youtube.com/embed',
+            'vimeo.com/video'
+        ];
+        const defaultAttrs = embedConfig?.defaultIframeAttributes || {
+            width: '100%',
+            height: '500px',
+            frameborder: '0',
+            allowfullscreen: true
+        };
+
+        // Pattern to match markdown images with optional attributes
+        // ![alt](url){attrs} or ![alt](url "title"){attrs}
+        const imagePattern = /!\[([^\]]*)\]\(([^)\s"]+)(?:\s+"([^"]*)")?\)(\{[^}]+\})?/g;
+
+        return content.replace(imagePattern, (match, alt, url, title, attrsBlock) => {
+            // Parse attributes if present
+            const attrs = attrsBlock ? parseAttributeBlock(attrsBlock) : {};
+
+            // Check if this is an embed
+            const hasEmbedClass = attrs.class && attrs.class.includes('embed');
+            const hasEmbedAttr = 'embed' in attrs;
+            const isKnownEmbed = isEmbedUrl(url, knownDomains);
+
+            // If not an embed, return unchanged
+            if (!hasEmbedClass && !hasEmbedAttr && !isKnownEmbed) {
+                return match;
+            }
+
+            // Handle based on mode
+            if (mode === 'remove') {
+                // Remove embed entirely
+                return '';
+            }
+
+            // Get fallback image path
+            const fallbackPath = attrs.fallback || (this.isImagePath(alt) ? alt : null);
+
+            // Get readable title if available
+            const displayTitle = title || attrs.title || (alt && !this.isImagePath(alt) ? alt : null);
+
+            if (mode === 'iframe') {
+                // HTML mode: Generate actual iframe tag
+                const width = attrs.width || defaultAttrs.width;
+                const height = attrs.height || defaultAttrs.height;
+                const frameborder = attrs.frameborder ?? defaultAttrs.frameborder ?? '0';
+                const allowfullscreen = attrs.allowfullscreen ?? defaultAttrs.allowfullscreen;
+
+                let iframeAttrs = `src="${url}" width="${width}" height="${height}" frameborder="${frameborder}"`;
+                if (allowfullscreen) {
+                    iframeAttrs += ' allowfullscreen';
+                }
+
+                const titleHtml = displayTitle ? `<p><em>${displayTitle}</em></p>\n` : '';
+                return `${titleHtml}<iframe ${iframeAttrs}></iframe>`;
+            }
+
+            if (mode === 'fallback' && fallbackPath) {
+                // Replace with fallback image plus full URL below
+                const titleLine = displayTitle ? `*${displayTitle}*\n>\n> ` : '';
+                return `![](${fallbackPath})\n\n> ${titleLine}🔗 [${url}](${url})`;
+            }
+
+            // Default mode ('url'): Show full URL as visible clickable text
+            const titleLine = displayTitle ? `**${displayTitle}**\n>\n> ` : '';
+
+            // Return as a blockquote with the full URL visible and clickable
+            return `> 🔗 ${titleLine}[${url}](${url})`;
+        });
+    }
+
+    /**
+     * Check if a string looks like an image path
+     */
+    private static isImagePath(str: string): boolean {
+        if (!str) return false;
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'];
+        const lower = str.toLowerCase();
+        return imageExtensions.some(ext => lower.endsWith(ext));
+    }
+
+    /**
      * Apply all content transformations in correct order
-     * Order matters: speaker notes → HTML comments → HTML content
+     * Order matters: speaker notes → HTML comments → HTML content → embeds
      * Only applies for presentation format exports
      */
     private static applyContentTransformations(content: string, options: NewExportOptions): string {
@@ -312,6 +409,21 @@ export class ExportService {
         // 3. HTML content (remove or keep)
         if (options.htmlContentMode) {
             result = this.applyHtmlContentTransform(result, options.htmlContentMode);
+        }
+
+        // 4. Embed handling - different behavior based on output format
+        const marpFormat = options.marpFormat || 'html';
+        if (marpFormat === 'html') {
+            // HTML output: Convert embeds to actual iframe tags
+            result = this.applyEmbedTransform(result, 'iframe');
+        } else if (marpFormat === 'pdf' || marpFormat === 'pptx') {
+            // PDF/PPTX output: Use configured embed handling (url/fallback/remove)
+            if (options.embedHandling) {
+                result = this.applyEmbedTransform(result, options.embedHandling);
+            } else {
+                // Default to 'url' mode for PDF/PPTX
+                result = this.applyEmbedTransform(result, 'url');
+            }
         }
 
         return result;
