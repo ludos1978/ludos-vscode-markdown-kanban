@@ -726,6 +726,7 @@ function applyPresetMarpPdf(currentFilename) {
     document.getElementById('marp-browser').value = 'chrome';
     document.getElementById('marp-preview').checked = false;
     document.getElementById('marp-pptx-editable').checked = false;
+    document.getElementById('speaker-note-mode').value = 'keep';
 
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/${DEFAULT_EXPORT_FOLDER}`;
