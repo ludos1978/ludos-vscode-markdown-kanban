@@ -70,16 +70,16 @@ export const DiagramPatterns = {
     mermaid: () => /```mermaid\s*\n([\s\S]*?)\n```/g,
 
     /**
-     * Draw.io file reference: ![alt](path.drawio) or ![alt](path.dio)
-     * Captures: [1] = file path
+     * Draw.io file reference: ![alt](path.drawio) or ![alt](path.dio "title")
+     * Captures: [1] = file path, [2] = optional title
      */
-    drawio: () => /!\[[^\]]*\]\(([^)]+\.(?:drawio|dio))\)/g,
+    drawio: () => /!\[[^\]]*\]\(([^\s"]+\.(?:drawio|dio))(?:\s+"([^"]+)")?\)/g,
 
     /**
-     * Excalidraw file reference: ![alt](path.excalidraw) or ![alt](path.excalidraw.json/.svg)
-     * Captures: [1] = file path
+     * Excalidraw file reference: ![alt](path.excalidraw "title") or ![alt](path.excalidraw.json/.svg)
+     * Captures: [1] = file path, [2] = optional title
      */
-    excalidraw: () => /!\[[^\]]*\]\(([^)]+\.excalidraw(?:\.json|\.svg)?)\)/g,
+    excalidraw: () => /!\[[^\]]*\]\(([^\s"]+\.excalidraw(?:\.json|\.svg)?)(?:\s+"([^"]+)")?\)/g,
 };
 
 /**

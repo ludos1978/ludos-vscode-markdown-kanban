@@ -12,15 +12,19 @@ kanban-plugin: board
 - [ ] andreas-gucklhorn-mawU2PoJWfU-unsplash.jpg #cyan
   ---:
   
-  ![](Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg)
+  ![](Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg "image")
   
   
   :--:
   
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/yannis-papanastasopoulos-U6dnImauDAE-unsplash.jpg)
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/yannis-papanastasopoulos-U6dnImauDAE-unsplash.jpg "another image[^some]")
+  
   
   :---
-- [ ] Test 7: Pie Chart
+  
+  
+  [^some]: https://www.nouser.org/
+- [ ] 
   Test 7: Pie Chart #idea
   
   ```mermaid
@@ -30,6 +34,24 @@ kanban-plugin: board
       "Safari" : 12
       "Edge" : 8
   ```
+- [ ] 
+  Test 2: Class Diagram
+  
+  ```plantuml
+  class User {
+    +name: string
+    +email: string
+    +login()
+    +logout()
+  }
+  
+  class Admin {
+    +permissions: string[]
+    +grantAccess()
+  }
+  
+  User <|-- Admin
+  ```
 
 ## # A #red
 - [ ] #pink
@@ -38,8 +60,6 @@ kanban-plugin: board
   !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-1.md)!!!
 - [ ] drawio
   ![](./kanban-presentation-1-MEDIA/drawio.drawio)
-- [ ] 
-  ![](https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947)
 - [ ] 
   ![screenshot.png](https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947){height="650px"}
 

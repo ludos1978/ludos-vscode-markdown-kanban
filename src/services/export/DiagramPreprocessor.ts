@@ -19,12 +19,14 @@ interface DiagramBlock {
     fullMatch: string;
     id: string;
     filePath?: string;  // For file-based diagrams (draw.io, excalidraw)
+    title?: string;     // Optional title/caption from markdown syntax
 }
 
 interface RenderedDiagram {
     id: string;
     fileName: string;
     originalBlock: string;
+    title?: string;     // Preserved title for caption
 }
 
 export interface PreprocessResult {
@@ -136,7 +138,7 @@ export class DiagramPreprocessor {
         }
 
         // Extract draw.io diagram file references
-        // Pattern: ![alt](path/to/file.drawio) or ![alt](file.dio)
+        // Pattern: ![alt](path/to/file.drawio "title") or ![alt](file.dio)
         const drawioRegex = DiagramPatterns.drawio();
 
         while ((match = drawioRegex.exec(markdown)) !== null) {
@@ -146,12 +148,13 @@ export class DiagramPreprocessor {
                 code: '',  // File-based, no inline code
                 fullMatch: match[0],
                 id: `drawio-${drawioCounter}`,
-                filePath: match[1]
+                filePath: match[1],
+                title: match[2]  // Optional title from "..." in markdown
             });
         }
 
         // Extract excalidraw diagram file references
-        // Pattern: ![alt](path/to/file.excalidraw) or ![alt](file.excalidraw.json) or ![alt](file.excalidraw.svg)
+        // Pattern: ![alt](path/to/file.excalidraw "title") or ![alt](file.excalidraw.json) or ![alt](file.excalidraw.svg)
         const excalidrawRegex = DiagramPatterns.excalidraw();
 
         while ((match = excalidrawRegex.exec(markdown)) !== null) {
@@ -161,7 +164,8 @@ export class DiagramPreprocessor {
                 code: '',  // File-based, no inline code
                 fullMatch: match[0],
                 id: `excalidraw-${excalidrawCounter}`,
-                filePath: match[1]
+                filePath: match[1],
+                title: match[2]  // Optional title from "..." in markdown
             });
         }
 
@@ -383,11 +387,13 @@ export class DiagramPreprocessor {
                 // Check if output is up-to-date (skip re-rendering unchanged diagrams)
                 if (await this.isOutputUpToDate(absolutePath, outputPath)) {
                     log(`✓ Skipping ${diagram.id} (unchanged)`);
-                    return {
+                    const result: RenderedDiagram = {
                         id: diagram.id,
                         fileName,
                         originalBlock: diagram.fullMatch
                     };
+                    if (diagram.title) result.title = diagram.title;
+                    return result;
                 }
 
                 // Render using provided service function
@@ -397,11 +403,13 @@ export class DiagramPreprocessor {
                 // Save SVG file
                 await fs.promises.writeFile(outputPath, svg, 'utf8');
 
-                return {
+                const result: RenderedDiagram = {
                     id: diagram.id,
                     fileName,
                     originalBlock: diagram.fullMatch
                 };
+                if (diagram.title) result.title = diagram.title;
+                return result;
             } catch (error) {
                 console.error(`[DiagramPreprocessor] Failed to render ${diagram.id}:`, error);
                 return null;
@@ -460,8 +468,10 @@ export class DiagramPreprocessor {
         let result = markdown;
 
         // Replace each successfully rendered diagram with image reference
+        // Preserve title if present for caption support
         for (const diagram of rendered) {
-            const imageRef = `![${diagram.id}](${diagram.fileName})`;
+            const titlePart = diagram.title ? ` "${diagram.title}"` : '';
+            const imageRef = `![${diagram.id}](${diagram.fileName}${titlePart})`;
             result = result.replace(diagram.originalBlock, imageRef);
         }
 

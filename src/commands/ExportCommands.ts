@@ -200,14 +200,32 @@ export class ExportCommands extends SwitchBasedCommand {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `Exporting...`,
-                cancellable: false
-            }, async (progress) => {
+                cancellable: true
+            }, async (progress, token) => {
+                // Check for cancellation before starting
+                if (token.isCancellationRequested) {
+                    showInfo('Export cancelled.');
+                    return;
+                }
+
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 20, context, 'Processing content...');
                 }
                 progress.report({ increment: 20, message: 'Processing content...' });
 
-                const result = await ExportService.export(document!, options, board, webviewPanel, mermaidService);
+                // Check for cancellation before export
+                if (token.isCancellationRequested) {
+                    showInfo('Export cancelled.');
+                    return;
+                }
+
+                const result = await ExportService.export(document!, options, board, webviewPanel, mermaidService, token);
+
+                // Check for cancellation after export
+                if (token.isCancellationRequested) {
+                    showInfo('Export cancelled.');
+                    return;
+                }
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 90, context, 'Finalizing...');

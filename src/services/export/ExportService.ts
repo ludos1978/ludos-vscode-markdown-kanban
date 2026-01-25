@@ -290,25 +290,30 @@ export class ExportService {
     /**
      * Apply media caption transformation
      * Converts ![alt](media "caption") to show caption below the media
-     * Works for all media types: images, videos, audio
+     *
+     * Handles ALL media types: images, videos, audio, and any other files with titles
+     * We handle this here because markdown-it-image-figures doesn't work
+     * reliably inside multicolumn blocks and other nested contexts
      *
      * @param content - Markdown content
      * @returns Transformed content with visible captions
      */
     private static applyMediaCaptionTransform(content: string): string {
-        // Pattern to match markdown images/media with title (caption)
-        // ![alt](url "title") or ![alt](url "title"){attrs}
-        // Does NOT match if no title is present
-        const mediaWithTitlePattern = /!\[([^\]]*)\]\(([^)\s"]+)\s+"([^"]+)"\)(\{[^}]+\})?/g;
+        // Match any ![alt](path "caption") pattern
+        // Using non-greedy match for path to correctly capture the title
+        // Pattern: ![alt](path "caption") where path doesn't contain unescaped quotes
+        const mediaWithCaptionRegex = /!\[([^\]]*)\]\(([^"]+?)\s+"([^"]+)"\)/g;
 
-        return content.replace(mediaWithTitlePattern, (match, alt, url, title, attrsBlock) => {
-            // Keep the original media syntax but add caption below
-            // For Marp, we use a styled paragraph for the caption
-            const attrsStr = attrsBlock || '';
-            const mediaTag = `![${alt}](${url})${attrsStr}`;
-            const caption = `<p style="text-align: center; font-style: italic; font-size: 0.85em; color: #666; margin-top: 4px;">${title}</p>`;
-
-            return `${mediaTag}\n${caption}`;
+        // Replace media with caption: rebuild without title, add caption inline
+        // Use markdown italic (*caption*) so that footnote references and other markdown
+        // syntax inside the caption get processed by Marp
+        // No newline - keeps caption associated with the image
+        return content.replace(mediaWithCaptionRegex, (_match, alt, path, caption) => {
+            // Trim any trailing whitespace from path
+            const trimmedPath = path.trim();
+            // Rebuild media syntax without the title, add caption inline as italic markdown
+            // This allows footnote refs like [^1] to be processed
+            return `![${alt}](${trimmedPath}) *${caption}*`;
         });
     }
 
@@ -1066,7 +1071,11 @@ export class ExportService {
             return link; // No path found, return original
         }
 
-        // Clean the path (remove title attributes, etc.)
+        // Extract title attribute if present (e.g., 'path "title"' or "path 'title'")
+        const titleMatch = filePath.match(/\s+("[^"]*"|'[^']*')$/);
+        const titleAttr = titleMatch ? titleMatch[0] : ''; // Preserve the space + quotes
+
+        // Clean the path (remove title attributes)
         const cleanPath = filePath.replace(/\s+"[^"]*"$/, '').replace(/\s+'[^']*'$/, '');
 
         // Check if it's an absolute path or URL
@@ -1084,12 +1093,12 @@ export class ExportService {
         const exportedFileDir = path.dirname(exportedFilePath);
         const relativePath = toForwardSlashes(path.relative(exportedFileDir, absoluteTargetPath));
 
-        // Rebuild the link with the new path
+        // Rebuild the link with the new path, preserving the title attribute
         if (link.match(/^<(?:img|video|audio)/i)) {
             // Already handled above
             return link;
         } else {
-            return `${linkStart}${relativePath}${linkEnd}`;
+            return `${linkStart}${relativePath}${titleAttr}${linkEnd}`;
         }
     }
 
@@ -1653,6 +1662,9 @@ export class ExportService {
                 );
             }
 
+            // Apply content transformations (speaker notes, HTML comments, media captions, embeds)
+            result = this.applyContentTransformations(result, options);
+
             // Don't return early - continue to outputContent phase for Marp CLI execution
         }
         // Use file-based pipeline when:
@@ -2114,17 +2126,24 @@ export class ExportService {
      * @param board - Optional in-memory board object for presentation exports (avoids file parsing)
      * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
      * @param mermaidService - Optional MermaidExportService for panel-isolated Mermaid rendering
+     * @param cancellationToken - Optional cancellation token to abort the export
      */
     public static async export(
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
         board?: KanbanBoard,
         webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
-        mermaidService?: MermaidExportService
+        mermaidService?: MermaidExportService,
+        cancellationToken?: vscode.CancellationToken
     ): Promise<ExportResult> {
         try {
             // Clear tracking map for new export
             this.exportedFiles.clear();
+
+            // Check for cancellation
+            if (cancellationToken?.isCancellationRequested) {
+                return { success: false, message: 'Export cancelled.' };
+            }
 
             // PHASE 1: EXTRACTION
             // Extract content from file
@@ -2133,6 +2152,11 @@ export class ExportService {
                 options.columnIndexes
             );
 
+            // Check for cancellation
+            if (cancellationToken?.isCancellationRequested) {
+                return { success: false, message: 'Export cancelled.' };
+            }
+
             // PHASE 2: TRANSFORMATION
             const transformed = await this.transformContent(
                 extracted,
@@ -2140,6 +2164,11 @@ export class ExportService {
                 options,
                 board
             );
+
+            // Check for cancellation
+            if (cancellationToken?.isCancellationRequested) {
+                return { success: false, message: 'Export cancelled.' };
+            }
 
             // PHASE 3: OUTPUT
             const result = await this.outputContent(

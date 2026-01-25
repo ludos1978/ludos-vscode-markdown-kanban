@@ -1069,8 +1069,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
   position: fixed;
   top: calc(var(--whitespace) + 4px + 24px);
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: calc(100% - var(--whitespace) - 4px - 24px);
   overflow-x: auto;
   overflow-y: auto;
   overflow-anchor: none;
