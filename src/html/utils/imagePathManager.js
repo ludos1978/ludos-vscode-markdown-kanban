@@ -766,18 +766,78 @@ function escapeHtmlForBroken(str) {
  * @param {string} mediaType - 'image' or 'video'
  * @returns {HTMLElement} The placeholder element
  */
+/**
+ * Extract YouTube video ID from various URL formats
+ * @param {string} url - YouTube URL
+ * @returns {string|null} Video ID or null if not a YouTube URL
+ */
+function extractYouTubeVideoId(url) {
+    if (!url) return null;
+
+    // Match various YouTube URL formats:
+    // - youtube.com/watch?v=VIDEO_ID
+    // - youtu.be/VIDEO_ID
+    // - youtube.com/embed/VIDEO_ID
+    // - youtube-nocookie.com/embed/VIDEO_ID
+    const patterns = [
+        /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+    return null;
+}
+
 function createExternalUrlPlaceholder(originalSrc, mediaType) {
     const placeholder = document.createElement('span');
     placeholder.className = 'external-url-blocked';
     placeholder.dataset.externalUrl = originalSrc;
-    placeholder.title = `External ${mediaType} (Alt+click to open in browser)\n${originalSrc}`;
-    placeholder.innerHTML = `<span class="external-url-text">🔗 External ${mediaType} (Alt+click to open)</span>`;
+
+    // Extract domain for cleaner display
+    let domain = '';
+    let displayText = '';
+    try {
+        const urlObj = new URL(originalSrc);
+        domain = urlObj.hostname.replace('www.', '');
+    } catch (e) {
+        domain = 'link';
+    }
+
+    // Check for YouTube URLs and extract video ID
+    const youtubeVideoId = extractYouTubeVideoId(originalSrc);
+    if (youtubeVideoId) {
+        displayText = `YouTube: ${youtubeVideoId}`;
+        placeholder.title = `YouTube video (Alt+click to open in browser)\n${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🎬 ${escapeHtmlForBroken(displayText)} (Alt+click to open)</span>`;
+
+        // Fetch video title via oEmbed (no API key required)
+        fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${youtubeVideoId}&format=json`)
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (data && data.title) {
+                    const textSpan = placeholder.querySelector('.external-url-text');
+                    if (textSpan) {
+                        textSpan.innerHTML = `🎬 ${escapeHtmlForBroken(data.title)} (Alt+click to open)`;
+                    }
+                    placeholder.title = `YouTube: ${data.title}\n${originalSrc}`;
+                }
+            })
+            .catch(() => {
+                // Silently fail - keep showing video ID
+            });
+    } else {
+        displayText = domain;
+        placeholder.title = `External link (Alt+click to open in browser)\n${originalSrc}`;
+        placeholder.innerHTML = `<span class="external-url-text">🔗 ${escapeHtmlForBroken(displayText)} (Alt+click to open)</span>`;
+    }
     placeholder.style.cursor = 'pointer';
     placeholder.onclick = (e) => {
         if (e.altKey) {
             e.stopPropagation();
             e.preventDefault();
-            window.open(originalSrc, '_blank');
+            vscode.postMessage({ type: 'openExternal', url: originalSrc });
         }
     };
     return placeholder;

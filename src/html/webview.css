@@ -1617,6 +1617,38 @@ figure:has(.diagram-placeholder .image-not-found) {
   opacity: 1;
 }
 
+/* ============================================================================
+   MEDIA CAPTIONS - For images, videos, audio, and embeds
+   ============================================================================ */
+
+.media-figure {
+  margin: 0.5em 0;
+  padding: 0;
+  display: block;
+}
+
+.media-caption,
+.embed-caption {
+  display: block;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  font-style: italic;
+  background: var(--vscode-titleBar-activeBackground, rgba(0, 0, 0, 0.05));
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.media-figure .media-caption {
+  border: 1px solid var(--vscode-panel-border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
+.embed-caption {
+  border-radius: 0 0 6px 6px;
+}
+
 /* Task items */
 .task-item {
   /* background-color: var(--task-background); */

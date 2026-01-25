@@ -134,7 +134,10 @@ let embedKnownDomains = [
     'notion.so',
     'airtable.com/embed',
     'loom.com/embed',
-    'loom.com/share'
+    'loom.com/share',
+    'prezi.com/p/embed',
+    'prezi.com/v/embed',
+    'ars.particify.de/present'
 ];
 
 // Default iframe attributes (can be overridden via configuration)
@@ -144,7 +147,8 @@ let embedDefaultIframeAttributes = {
     frameborder: '0',
     allowfullscreen: true,
     loading: 'lazy',
-    allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture'
+    allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture',
+    referrerpolicy: 'strict-origin-when-cross-origin'
 };
 
 /**
@@ -240,12 +244,13 @@ function detectEmbed(src, alt, title, token) {
         allowfullscreen: imageAttrs.allowfullscreen !== undefined ? imageAttrs.allowfullscreen : embedDefaultIframeAttributes.allowfullscreen,
         loading: imageAttrs.loading || embedDefaultIframeAttributes.loading,
         allow: imageAttrs.allow || embedDefaultIframeAttributes.allow,
+        referrerpolicy: imageAttrs.referrerpolicy || embedDefaultIframeAttributes.referrerpolicy,
         // Any other custom attributes
         customAttrs: {}
     };
 
     // Collect any other custom attributes from imageAttrs
-    const reservedKeys = ['class', 'id', 'fallback', 'width', 'height', 'frameborder', 'allowfullscreen', 'loading', 'allow', 'embed'];
+    const reservedKeys = ['class', 'id', 'fallback', 'width', 'height', 'frameborder', 'allowfullscreen', 'loading', 'allow', 'referrerpolicy', 'embed'];
     Object.keys(imageAttrs).forEach(key => {
         if (!reservedKeys.includes(key)) {
             embedInfo.customAttrs[key] = imageAttrs[key];
@@ -276,7 +281,7 @@ function isImagePath(str) {
  * @returns {string} HTML for the embed container
  */
 function renderEmbed(embedInfo, originalSrc, alt, title) {
-    const { url, fallback, width, height, frameborder, allowfullscreen, loading, allow, customAttrs } = embedInfo;
+    const { url, fallback, width, height, frameborder, allowfullscreen, loading, allow, referrerpolicy, customAttrs } = embedInfo;
 
     // Build iframe attributes
     let iframeAttrs = `src="${escapeHtml(url)}"`;
@@ -289,6 +294,9 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
     iframeAttrs += ` loading="${escapeHtml(loading)}"`;
     if (allow) {
         iframeAttrs += ` allow="${escapeHtml(allow)}"`;
+    }
+    if (referrerpolicy) {
+        iframeAttrs += ` referrerpolicy="${escapeHtml(referrerpolicy)}"`;
     }
 
     // Add custom attributes
@@ -311,18 +319,22 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
         domain = 'embed';
     }
 
-    // Build the title/label
-    const displayTitle = title || alt || domain;
+    // Build the header label (use domain, not title - title goes in caption)
+    const headerLabel = domain;
+
+    // Build caption if title is provided
+    const captionHtml = title ? `<div class="embed-caption media-caption">${escapeHtml(title)}</div>` : '';
 
     return `<div class="embed-container" ${dataAttrs}>
         <div class="embed-header">
             <span class="embed-icon">🔗</span>
-            <span class="embed-title">${escapeHtml(displayTitle)}</span>
+            <span class="embed-title">${escapeHtml(headerLabel)}</span>
             <button class="embed-menu-btn" data-action="embed-menu" title="Embed options">☰</button>
         </div>
         <div class="embed-frame-wrapper">
             <iframe ${iframeAttrs}></iframe>
         </div>
+        ${captionHtml}
     </div>`;
 }
 
@@ -2615,6 +2627,9 @@ function renderMarkdown(text, includeContext) {
             // Get original source path before processing
             const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
+            // Get title for caption
+            const title = token.attrGet('title') || '';
+
             // Generate the base video HTML
             // Use plugin renderer if available, otherwise use fallback that properly handles children
             let videoHtml;
@@ -2625,8 +2640,14 @@ function renderMarkdown(text, includeContext) {
                 videoHtml = renderTokenWithChildren(token, renderer, options, env);
             }
 
+            // Build caption if title is provided
+            const captionHtml = title ? `<figcaption class="media-caption">${escapeHtml(title)}</figcaption>` : '';
+
             // Skip wrapping for data URLs and blob URLs
             if (!originalSrc || originalSrc.startsWith('data:') || originalSrc.startsWith('blob:')) {
+                if (title) {
+                    return `<figure class="media-figure">${videoHtml}${captionHtml}</figure>`;
+                }
                 return videoHtml;
             }
 
@@ -2652,6 +2673,15 @@ function renderMarkdown(text, includeContext) {
 
             // Wrap with overlay container for path conversion menu (similar to images)
             // Use data-file-path for unified path handling across all media types
+            if (title) {
+                return `<figure class="media-figure">
+                    <div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
+                        ${videoWithError}
+                        <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
+                    </div>
+                    ${captionHtml}
+                </figure>`;
+            }
             return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${videoWithError}
                 <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
@@ -2664,6 +2694,9 @@ function renderMarkdown(text, includeContext) {
             // Get original source path before processing
             const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
+            // Get title for caption
+            const title = token.attrGet('title') || '';
+
             // Use plugin renderer if available, otherwise use fallback that properly handles children
             let audioHtml;
             if (originalAudioRenderer) {
@@ -2673,8 +2706,14 @@ function renderMarkdown(text, includeContext) {
                 audioHtml = renderTokenWithChildren(token, renderer, options, env);
             }
 
+            // Build caption if title is provided
+            const captionHtml = title ? `<figcaption class="media-caption">${escapeHtml(title)}</figcaption>` : '';
+
             // Skip wrapping for data URLs and blob URLs
             if (!originalSrc || originalSrc.startsWith('data:') || originalSrc.startsWith('blob:')) {
+                if (title) {
+                    return `<figure class="media-figure">${audioHtml}${captionHtml}</figure>`;
+                }
                 return audioHtml;
             }
 
@@ -2696,6 +2735,15 @@ function renderMarkdown(text, includeContext) {
 
             // Wrap with overlay container for path conversion menu (same as video)
             // Use data-file-path for unified path handling across all media types
+            if (title) {
+                return `<figure class="media-figure">
+                    <div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
+                        ${audioWithError}
+                        <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
+                    </div>
+                    ${captionHtml}
+                </figure>`;
+            }
             return `<div class="video-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${audioWithError}
                 <button class="video-menu-btn" data-action="video-menu" title="Path options">☰</button>
@@ -2979,9 +3027,15 @@ function renderMarkdown(text, includeContext) {
             // Build the img tag
             const imgTag = `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" loading="lazy"${onerrorHandler} />`;
 
+            // Build caption if title is provided
+            const captionHtml = title ? `<figcaption class="media-caption">${escapeHtml(title)}</figcaption>` : '';
+
             // Skip overlay for data URLs and blob URLs (they don't need path conversion)
             const isDataOrBlob = displaySrc && (displaySrc.startsWith('data:') || displaySrc.startsWith('blob:'));
             if (isDataOrBlob) {
+                if (title) {
+                    return `<figure class="media-figure">${imgTag}${captionHtml}</figure>`;
+                }
                 return imgTag;
             }
 
@@ -2994,6 +3048,15 @@ function renderMarkdown(text, includeContext) {
             // Wrap with overlay container for path conversion menu
             // Menu is dynamically generated by toggleImagePathMenu to avoid stacking context issues
             // Use data-file-path for unified path handling across all media types
+            if (title) {
+                return `<figure class="media-figure">
+                    <span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
+                        ${imgTag}
+                        <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
+                    </span>
+                    ${captionHtml}
+                </figure>`;
+            }
             return `<span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
                 ${imgTag}
                 <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>

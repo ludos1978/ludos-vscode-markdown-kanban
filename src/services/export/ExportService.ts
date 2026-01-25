@@ -288,6 +288,31 @@ export class ExportService {
     }
 
     /**
+     * Apply media caption transformation
+     * Converts ![alt](media "caption") to show caption below the media
+     * Works for all media types: images, videos, audio
+     *
+     * @param content - Markdown content
+     * @returns Transformed content with visible captions
+     */
+    private static applyMediaCaptionTransform(content: string): string {
+        // Pattern to match markdown images/media with title (caption)
+        // ![alt](url "title") or ![alt](url "title"){attrs}
+        // Does NOT match if no title is present
+        const mediaWithTitlePattern = /!\[([^\]]*)\]\(([^)\s"]+)\s+"([^"]+)"\)(\{[^}]+\})?/g;
+
+        return content.replace(mediaWithTitlePattern, (match, alt, url, title, attrsBlock) => {
+            // Keep the original media syntax but add caption below
+            // For Marp, we use a styled paragraph for the caption
+            const attrsStr = attrsBlock || '';
+            const mediaTag = `![${alt}](${url})${attrsStr}`;
+            const caption = `<p style="text-align: center; font-style: italic; font-size: 0.85em; color: #666; margin-top: 4px;">${title}</p>`;
+
+            return `${mediaTag}\n${caption}`;
+        });
+    }
+
+    /**
      * Apply embed transformation based on export mode
      * Handles ![alt](embed-url){.embed} and auto-detected embed URLs
      *
@@ -385,7 +410,7 @@ export class ExportService {
 
     /**
      * Apply all content transformations in correct order
-     * Order matters: speaker notes → HTML comments → HTML content → embeds
+     * Order matters: speaker notes → HTML comments → HTML content → media captions → embeds
      * Only applies for presentation format exports
      */
     private static applyContentTransformations(content: string, options: NewExportOptions): string {
@@ -411,7 +436,10 @@ export class ExportService {
             result = this.applyHtmlContentTransform(result, options.htmlContentMode);
         }
 
-        // 4. Embed handling - different behavior based on output format
+        // 4. Media captions - convert ![alt](url "caption") to show caption below media
+        result = this.applyMediaCaptionTransform(result);
+
+        // 5. Embed handling - different behavior based on output format
         const marpFormat = options.marpFormat || 'html';
         if (marpFormat === 'html') {
             // HTML output: Convert embeds to actual iframe tags
