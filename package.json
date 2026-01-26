@@ -154,6 +154,7 @@
                 "cardHeight": "auto",
                 "sectionHeight": "auto",
                 "taskSectionHeight": "auto",
+                "rowHeight": "auto",
                 "fontSize": "0_5x",
                 "whitespace": "8px",
                 "tagVisibility": "allexcludinglayout",
@@ -168,8 +169,24 @@
                 "cardHeight": "auto",
                 "sectionHeight": "auto",
                 "taskSectionHeight": "auto",
+                "rowHeight": "auto",
                 "fontSize": "1x",
                 "whitespace": "8px",
+                "tagVisibility": "allexcludinglayout",
+                "arrowKeyFocusScroll": "center"
+              }
+            },
+            "larger": {
+              "label": "Larger",
+              "description": "Wide columns with larger text",
+              "settings": {
+                "columnWidth": "650px",
+                "cardHeight": "auto",
+                "sectionHeight": "auto",
+                "taskSectionHeight": "auto",
+                "rowHeight": "auto",
+                "fontSize": "1_5x",
+                "whitespace": "24px",
                 "tagVisibility": "allexcludinglayout",
                 "arrowKeyFocusScroll": "center"
               }
@@ -197,6 +214,7 @@
                 "cardHeight": "auto",
                 "sectionHeight": "auto",
                 "taskSectionHeight": "auto",
+                "rowHeight": "auto",
                 "fontSize": "1_25x",
                 "whitespace": "16px",
                 "tagVisibility": "allexcludinglayout",
