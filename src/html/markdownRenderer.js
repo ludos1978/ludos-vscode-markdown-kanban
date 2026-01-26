@@ -2624,6 +2624,101 @@ function renderMarkdown(text, includeContext) {
         md.renderer.rules.video = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
 
+            // Check for and consume {attrs} in the following tokens (similar to image renderer)
+            // Parse video-specific attributes: autoplay, loop, muted, controls, start, end, poster
+            let videoAttrs = {};
+            let attrText = '';
+            let tokensToConsume = [];
+            let foundClosingBrace = false;
+            let depth = 0;
+
+            for (let t = idx + 1; t < tokens.length && !foundClosingBrace; t++) {
+                const tok = tokens[t];
+                if (tok.type === 'text') {
+                    const content = tok.content || '';
+                    tokensToConsume.push({ index: t, token: tok, originalContent: content });
+                    for (let c = 0; c < content.length; c++) {
+                        attrText += content[c];
+                        if (content[c] === '{') depth++;
+                        else if (content[c] === '}') {
+                            depth--;
+                            if (depth === 0) {
+                                foundClosingBrace = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if (tok.type === 'softbreak') {
+                    tokensToConsume.push({ index: t, token: tok, originalContent: '\n' });
+                    attrText += '\n';
+                } else {
+                    break;
+                }
+            }
+
+            // Check if we found an attribute block
+            const trimmedAttrText = attrText.trimStart();
+            if (trimmedAttrText.startsWith('{') && foundClosingBrace) {
+                let endPos = -1;
+                depth = 0;
+                for (let j = 0; j < trimmedAttrText.length; j++) {
+                    if (trimmedAttrText[j] === '{') depth++;
+                    else if (trimmedAttrText[j] === '}') {
+                        depth--;
+                        if (depth === 0) { endPos = j; break; }
+                    }
+                }
+
+                if (endPos !== -1) {
+                    const attrBlock = trimmedAttrText.substring(0, endPos + 1);
+                    const content = attrBlock.replace(/^\{|\}$/g, '').trim();
+
+                    // Match .class patterns
+                    const classMatches = content.match(/\.(\w[\w-]*)/g);
+                    if (classMatches) videoAttrs.class = classMatches.map(m => m.slice(1)).join(' ');
+
+                    // Match #id pattern
+                    const idMatch = content.match(/#(\w[\w-]*)/);
+                    if (idMatch) videoAttrs.id = idMatch[1];
+
+                    // Match key=value patterns (for start, end, poster, width, height)
+                    const kvPattern = /(\w[\w-]*)=["']?([^"'\s}]+)["']?/g;
+                    let match;
+                    while ((match = kvPattern.exec(content)) !== null) {
+                        videoAttrs[match[1]] = match[2];
+                    }
+
+                    // Match boolean attributes (autoplay, loop, muted, controls)
+                    // These appear without =value in the attribute block
+                    const booleanAttrs = ['autoplay', 'loop', 'muted', 'controls'];
+                    for (const attr of booleanAttrs) {
+                        // Match standalone attribute (not followed by =)
+                        const boolPattern = new RegExp(`(?:^|\\s)${attr}(?:\\s|$|})`, 'i');
+                        if (boolPattern.test(content)) {
+                            videoAttrs[attr] = true;
+                        }
+                    }
+
+                    // Clear the content of consumed tokens
+                    let consumed = 0;
+                    const leadingWhitespace = attrText.length - trimmedAttrText.length;
+                    const totalToConsume = leadingWhitespace + endPos + 1;
+
+                    for (const item of tokensToConsume) {
+                        const tokContent = item.originalContent;
+                        if (consumed + tokContent.length <= totalToConsume) {
+                            item.token.content = '';
+                            consumed += tokContent.length;
+                        } else if (consumed < totalToConsume) {
+                            const consumeFromThis = totalToConsume - consumed;
+                            item.token.content = tokContent.substring(consumeFromThis);
+                            consumed = totalToConsume;
+                        }
+                        item.token._attrsConsumed = true;
+                    }
+                }
+            }
+
             // Get original source path before processing
             const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
@@ -2638,6 +2733,71 @@ function renderMarkdown(text, includeContext) {
             } else {
                 // Fallback: manually render video element with children (source tags)
                 videoHtml = renderTokenWithChildren(token, renderer, options, env);
+            }
+
+            // Apply video attributes from {attrs} block
+            if (Object.keys(videoAttrs).length > 0) {
+                // Build attribute string for injection
+                let attrString = '';
+
+                // Boolean attributes
+                if (videoAttrs.autoplay) attrString += ' autoplay';
+                if (videoAttrs.loop) attrString += ' loop';
+                if (videoAttrs.muted) attrString += ' muted';
+                if (videoAttrs.controls) attrString += ' controls';
+
+                // Start/end times - use both data attributes and URL fragments for maximum compatibility
+                // Data attributes work with the media plugin script, URL fragments (#t=) are native HTML5
+                if (videoAttrs.start) attrString += ` data-start-time="${escapeHtml(videoAttrs.start)}"`;
+                if (videoAttrs.end) attrString += ` data-end-time="${escapeHtml(videoAttrs.end)}"`;
+
+                // Add media fragment to source URLs for native browser support
+                // Format: #t=start or #t=start,end (times in seconds)
+                if (videoAttrs.start || videoAttrs.end) {
+                    const timeFragment = videoAttrs.start && videoAttrs.end
+                        ? `#t=${videoAttrs.start},${videoAttrs.end}`
+                        : videoAttrs.start
+                            ? `#t=${videoAttrs.start}`
+                            : `#t=0,${videoAttrs.end}`;
+                    // Add fragment to source src attributes
+                    videoHtml = videoHtml.replace(
+                        /<source([^>]*)\ssrc="([^"]+)"([^>]*)>/g,
+                        (match, before, src, after) => {
+                            // Only add fragment if not already present
+                            if (!src.includes('#t=')) {
+                                return `<source${before} src="${src}${timeFragment}"${after}>`;
+                            }
+                            return match;
+                        }
+                    );
+                }
+
+                // Poster image
+                if (videoAttrs.poster) {
+                    // Resolve poster path similar to video src
+                    let posterSrc = videoAttrs.poster;
+                    const posterIsRelative = isRelativeResourcePath(posterSrc);
+                    if (posterIsRelative && window.currentFilePath) {
+                        const decodedPoster = safeDecodePath(posterSrc);
+                        const docPath = window.currentFilePath.replace(/\\/g, '/');
+                        const lastSlash = docPath.lastIndexOf('/');
+                        const docDir = lastSlash > 0 ? docPath.substring(0, lastSlash) : '';
+                        const resolvedPoster = resolveRelativePath(docDir, decodedPoster);
+                        posterSrc = buildWebviewResourceUrl(resolvedPoster, true);
+                    }
+                    attrString += ` poster="${escapeHtml(posterSrc)}"`;
+                }
+
+                // Dimensions
+                if (videoAttrs.width) attrString += ` width="${escapeHtml(videoAttrs.width)}"`;
+                if (videoAttrs.height) attrString += ` height="${escapeHtml(videoAttrs.height)}"`;
+
+                // Class and ID
+                if (videoAttrs.class) attrString += ` class="${escapeHtml(videoAttrs.class)}"`;
+                if (videoAttrs.id) attrString += ` id="${escapeHtml(videoAttrs.id)}"`;
+
+                // Inject attributes into the video tag
+                videoHtml = videoHtml.replace(/<video([^>]*)>/, `<video$1${attrString}>`);
             }
 
             // Build caption if title is provided
@@ -2691,6 +2851,99 @@ function renderMarkdown(text, includeContext) {
         md.renderer.rules.audio = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
 
+            // Check for and consume {attrs} in the following tokens (similar to video renderer)
+            // Parse audio-specific attributes: autoplay, loop, muted, controls, start, end
+            let audioAttrs = {};
+            let attrText = '';
+            let tokensToConsume = [];
+            let foundClosingBrace = false;
+            let depth = 0;
+
+            for (let t = idx + 1; t < tokens.length && !foundClosingBrace; t++) {
+                const tok = tokens[t];
+                if (tok.type === 'text') {
+                    const content = tok.content || '';
+                    tokensToConsume.push({ index: t, token: tok, originalContent: content });
+                    for (let c = 0; c < content.length; c++) {
+                        attrText += content[c];
+                        if (content[c] === '{') depth++;
+                        else if (content[c] === '}') {
+                            depth--;
+                            if (depth === 0) {
+                                foundClosingBrace = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if (tok.type === 'softbreak') {
+                    tokensToConsume.push({ index: t, token: tok, originalContent: '\n' });
+                    attrText += '\n';
+                } else {
+                    break;
+                }
+            }
+
+            // Check if we found an attribute block
+            const trimmedAttrText = attrText.trimStart();
+            if (trimmedAttrText.startsWith('{') && foundClosingBrace) {
+                let endPos = -1;
+                depth = 0;
+                for (let j = 0; j < trimmedAttrText.length; j++) {
+                    if (trimmedAttrText[j] === '{') depth++;
+                    else if (trimmedAttrText[j] === '}') {
+                        depth--;
+                        if (depth === 0) { endPos = j; break; }
+                    }
+                }
+
+                if (endPos !== -1) {
+                    const attrBlock = trimmedAttrText.substring(0, endPos + 1);
+                    const content = attrBlock.replace(/^\{|\}$/g, '').trim();
+
+                    // Match .class patterns
+                    const classMatches = content.match(/\.(\w[\w-]*)/g);
+                    if (classMatches) audioAttrs.class = classMatches.map(m => m.slice(1)).join(' ');
+
+                    // Match #id pattern
+                    const idMatch = content.match(/#(\w[\w-]*)/);
+                    if (idMatch) audioAttrs.id = idMatch[1];
+
+                    // Match key=value patterns (for start, end)
+                    const kvPattern = /(\w[\w-]*)=["']?([^"'\s}]+)["']?/g;
+                    let match;
+                    while ((match = kvPattern.exec(content)) !== null) {
+                        audioAttrs[match[1]] = match[2];
+                    }
+
+                    // Match boolean attributes (autoplay, loop, muted, controls)
+                    const booleanAttrs = ['autoplay', 'loop', 'muted', 'controls'];
+                    for (const attr of booleanAttrs) {
+                        const boolPattern = new RegExp(`(?:^|\\s)${attr}(?:\\s|$|})`, 'i');
+                        if (boolPattern.test(content)) {
+                            audioAttrs[attr] = true;
+                        }
+                    }
+
+                    // Clear the content of consumed tokens
+                    let consumed = 0;
+                    const leadingWhitespace = attrText.length - trimmedAttrText.length;
+                    const totalToConsume = leadingWhitespace + endPos + 1;
+
+                    for (const item of tokensToConsume) {
+                        const tokContent = item.originalContent;
+                        if (consumed + tokContent.length <= totalToConsume) {
+                            item.token.content = '';
+                            consumed += tokContent.length;
+                        } else if (consumed < totalToConsume) {
+                            const consumeFromThis = totalToConsume - consumed;
+                            item.token.content = tokContent.substring(consumeFromThis);
+                            consumed = totalToConsume;
+                        }
+                        item.token._attrsConsumed = true;
+                    }
+                }
+            }
+
             // Get original source path before processing
             const { firstSource: originalSrc } = updateSourceChildren(token, resolveMediaSourcePath);
 
@@ -2704,6 +2957,46 @@ function renderMarkdown(text, includeContext) {
             } else {
                 // Fallback: manually render audio element with children (source tags)
                 audioHtml = renderTokenWithChildren(token, renderer, options, env);
+            }
+
+            // Apply audio attributes from {attrs} block
+            if (Object.keys(audioAttrs).length > 0) {
+                let attrString = '';
+
+                // Boolean attributes
+                if (audioAttrs.autoplay) attrString += ' autoplay';
+                if (audioAttrs.loop) attrString += ' loop';
+                if (audioAttrs.muted) attrString += ' muted';
+                if (audioAttrs.controls) attrString += ' controls';
+
+                // Start/end times - use both data attributes and URL fragments for maximum compatibility
+                if (audioAttrs.start) attrString += ` data-start-time="${escapeHtml(audioAttrs.start)}"`;
+                if (audioAttrs.end) attrString += ` data-end-time="${escapeHtml(audioAttrs.end)}"`;
+
+                // Class and ID
+                if (audioAttrs.class) attrString += ` class="${escapeHtml(audioAttrs.class)}"`;
+                if (audioAttrs.id) attrString += ` id="${escapeHtml(audioAttrs.id)}"`;
+
+                // Inject attributes into the audio tag
+                audioHtml = audioHtml.replace(/<audio([^>]*)>/, `<audio$1${attrString}>`);
+
+                // Add media fragment to source URLs for native browser support
+                if (audioAttrs.start || audioAttrs.end) {
+                    const timeFragment = audioAttrs.start && audioAttrs.end
+                        ? `#t=${audioAttrs.start},${audioAttrs.end}`
+                        : audioAttrs.start
+                            ? `#t=${audioAttrs.start}`
+                            : `#t=0,${audioAttrs.end}`;
+                    audioHtml = audioHtml.replace(
+                        /<source([^>]*)\ssrc="([^"]+)"([^>]*)>/g,
+                        (match, before, src, after) => {
+                            if (!src.includes('#t=')) {
+                                return `<source${before} src="${src}${timeFragment}"${after}>`;
+                            }
+                            return match;
+                        }
+                    );
+                }
             }
 
             // Build caption if title is provided

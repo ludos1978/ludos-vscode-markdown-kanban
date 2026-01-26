@@ -1,3 +1,5 @@
+- [ ] Add some internal navigation functionality. it could use user defined tags such as #2.1 and somethink like <#2.1> or what would you suggest?
+
 - [ ] i would like a way to embed iframes in the pages. currently it possible to use html, but when exporting it as pdf it's a bad look.
 for example i have this html:
 """

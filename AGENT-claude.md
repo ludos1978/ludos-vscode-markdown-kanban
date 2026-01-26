@@ -93,4 +93,14 @@
 - If we worked on a problem which was not successfully solved, analyze what might have gone wrong and dont repeat the error.
 - dont write reports of the tasks you finish, except if the user specifically requests it, othervise the chat is enough to track the progress.
 
+## Project Specific
+
+The order of the columns is fixed using translateZ:
+- column-offset and column-margin is furtherst back but above kanban-full-height-column
+- column-content comes next
+- column-header and column-footer is one above
+- column-title is at the top                     
+ 
+
 ALL RULES IN THE AGENT.MD DO NOT NEED TO BE VERIFIED BY ASKING THE USER AGAIN.
+

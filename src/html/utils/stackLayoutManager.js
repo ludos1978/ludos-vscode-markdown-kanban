@@ -630,6 +630,14 @@ function updateStackLayoutCore(stackElement = null) {
     let measuredColumns = 0;
     const measureStart = perfEnabled ? performance.now() : 0;
 
+    // Count total columns across ALL stacks first for global z-index assignment
+    // This ensures column-titles from earlier stacks have higher z-index than later stacks
+    let totalColumnsAcrossStacks = 0;
+    stacks.forEach(stack => {
+        totalColumnsAcrossStacks += stack.querySelectorAll('.kanban-full-height-column').length;
+    });
+    let globalColumnIndex = 0;
+
     stacks.forEach(stack => {
         const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
         columnCount += columns.length;
@@ -772,13 +780,18 @@ function updateStackLayoutCore(stackElement = null) {
                     cumulativeStickyTop += data.footerHeight;
                 }
 
+                // Use global z-index so columns across ALL stacks have unique z-indexes
+                // Earlier columns (in DOM order across all stacks) get higher z-index
+                const zIndex = 1000000 + (totalColumnsAcrossStacks - globalColumnIndex);
+                globalColumnIndex++;
+
                 return {
                     ...data,
                     marginTop,
                     columnHeaderTop,
                     headerTop,
                     footerTop,
-                    zIndex: 1000000 + (expandedColumns.length - expandedIdx),
+                    zIndex,
                     isColumnSticky, // Store for bottom calculation
                     effectiveMode: isNoneMode ? 'none' : globalStickyMode
                 };
@@ -881,16 +894,18 @@ function updateStackLayoutCore(stackElement = null) {
                         }
                     }
 
-                    // Column title: in both full and title-only modes (not in none mode)
+                    // Column title: ALWAYS gets z-index to ensure it's above other columns' content
+                    // Position styles only apply in full and title-only modes (not in none mode)
                     if (header) {
+                        // Always set high z-index on column-title so it's above everything
+                        header.style.zIndex = zIndex;
+
                         if (!isNoneMode) {
                             header.style.top = `${headerTop}px`;
                             header.style.bottom = `${headerBottom}px`;
-                            header.style.zIndex = zIndex;
                         } else {
                             header.style.top = '';
                             header.style.bottom = '';
-                            header.style.zIndex = '';
                         }
                     }
 

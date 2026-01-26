@@ -1212,13 +1212,15 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  z-index: 10;
+  z-index: 1000001;
   background-color: var(--column-background);
   border-top: none;
   border-bottom: none;
   margin-bottom: 0;
   flex-direction: column;
   position: relative;
+  /* Force new stacking context to ensure title is above full-height column content */
+  transform: translateZ(10px);
 }
 
 /* Add dashed top and bottom borders with pseudo-elements */
@@ -3215,11 +3217,13 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack {
-	/* transform-style: preserve-3d; */
   display: grid;
   grid-template: 1fr / 1fr;
   position: relative;
-	height: 100%;
+  height: 100%;
+  /* preserve-3d enables children's translateZ to work; stack at z=0 */
+  transform-style: preserve-3d;
+  transform: translateZ(0px);
 }
 
 /* All columns in grid */
@@ -3227,6 +3231,9 @@ button.file-bar-menu-item {
   grid-row: 1;
   grid-column: 1;
   align-self: start;
+  /* preserve-3d needed so children's translateZ works; column at z=0 */
+  transform-style: preserve-3d;
+  transform: translateZ(0px);
 }
 
 /* Only expanded columns overlay with pointer-events */
@@ -3252,25 +3259,58 @@ button.file-bar-menu-item {
   z-index: 100;
 }
 
-.kanban-column-stack .kanban-full-height-column .column-content {
-  transform: translateZ(-0.08px);
+/* ==========================================================================
+   3D STACKING ORDER FOR STACKED COLUMNS - DO NOT MODIFY!
+   ==========================================================================
+
+   This stacking order uses CSS 3D transforms (translateZ) to ensure proper
+   layering of column elements across multiple stacked columns.
+
+   STACKING ORDER (back to front):
+   -----------------------------------------------------------------------
+   1. column-offset, column-margin: translateZ(0.1px)  - FURTHEST BACK
+   2. column-content             : translateZ(0.2px)
+   3. column-header, column-footer: translateZ(0.3px)
+   4. column-title               : translateZ(10px)   - ALWAYS ON TOP
+   -----------------------------------------------------------------------
+
+   CRITICAL SETUP:
+   - .kanban-column-stack: preserve-3d + translateZ(0) - creates 3D space
+   - .kanban-full-height-column: preserve-3d + translateZ(0) - passes 3D to children
+   - Child elements: only translateZ() for stacking (no preserve-3d)
+
+   Both stack and column need preserve-3d so grandchildren's translateZ works!
+
+   The column-title has a high translateZ(10px) to ensure it's ALWAYS
+   visible above all other content, including content from other columns.
+
+   DO NOT CHANGE THESE VALUES! They are carefully calibrated to:
+   - Keep column backgrounds behind interactive content
+   - Ensure column-title is always clickable and visible
+   - Maintain proper visual layering across stacked columns
+
+   ========================================================================== */
+
+.kanban-column-stack .kanban-full-height-column .column-offset,
+.kanban-column-stack .kanban-full-height-column .column-margin {
+  transform: translateZ(0.1px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  transform: translateZ(-0.11px);
 }
 
-.kanban-column-stack .kanban-full-height-column .column-header {
-  transform: translateZ(-0.133px);
+.kanban-column-stack .kanban-full-height-column .column-content {
+  transform: translateZ(0.2px);
 }
 
+.kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-footer {
-  transform: translateZ(-0.133px);
+  transform: translateZ(0.3px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
-	transform: translateZ(0.0px);
+  transform: translateZ(10px);
 }
 
 /* Stack sticky mode: titleonly - only title is sticky (only for columns with #sticky tag) */
