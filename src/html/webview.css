@@ -1851,9 +1851,11 @@ figure:has(.diagram-placeholder .image-not-found) {
   word-break: break-word;
   overflow-wrap: break-word;
   padding: 2px 4px;
+  border: 1px solid transparent;
   border-radius: 3px;
+  box-sizing: border-box;
   cursor: pointer;
-  min-height: 16px;
+  min-height: 20px;
   line-height: 1.4;
 }
 
@@ -1890,7 +1892,9 @@ figure:has(.diagram-placeholder .image-not-found) {
 
 .task-description-display {
   font-size: 13px;
+  border: 1px solid transparent;
   border-radius: 3px;
+  box-sizing: border-box;
   cursor: pointer;
   padding: 4px 8px;
   min-height: 20px;
@@ -2084,10 +2088,10 @@ body.section-height-limited .task-section figure img {
 
 .task-description-edit {
   font-size: 13px;
-  line-height: 1.4;
-  padding: 4px;
+  line-height: 1.25;
+  padding: 4px 8px;
   width: 100%;
-  min-height: 3em;
+  min-height: 20px;
   overflow-anchor: none; /* Prevent scroll adjustment when size changes */
   box-sizing: border-box;
   max-width: 100%;
