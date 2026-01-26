@@ -1850,11 +1850,11 @@ figure:has(.diagram-placeholder .image-not-found) {
   /* line-height: 1.4; */
   word-break: break-word;
   overflow-wrap: break-word;
-  padding: 1px 0;
+  padding: 2px 4px;
   border-radius: 3px;
   cursor: pointer;
   min-height: 16px;
-  line-height: 1.2;
+  line-height: 1.4;
 }
 
 .task-title-display:hover {
@@ -1889,10 +1889,10 @@ figure:has(.diagram-placeholder .image-not-found) {
 }
 
 .task-description-display {
+  font-size: 13px;
   border-radius: 3px;
   cursor: pointer;
-  padding-left: 8px;
-  padding-right: 8px;
+  padding: 4px 8px;
   min-height: 20px;
   line-height: 1.4;
   overflow-wrap: break-word;
