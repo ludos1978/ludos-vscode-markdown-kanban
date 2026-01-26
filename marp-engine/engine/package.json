@@ -1,0 +1,31 @@
+{
+  "name": "marp-engine",
+  "version": "1.0.0",
+  "description": "Marp engine with markdown-it plugins for Ludos Kanban",
+  "private": true,
+  "scripts": {
+    "setup": "npm install"
+  },
+  "dependencies": {
+    "@marp-team/marp-cli": "^4.1.1",
+    "@marp-team/marp-core": "^4.1.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-abbr": "^2.0.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-checkboxes": "^1.0.0",
+    "markdown-it-container": "^4.0.0",
+    "markdown-it-deflist": "^3.0.0",
+    "markdown-it-footnote-here": "^1.0.3",
+    "markdown-it-image-figures": "^2.1.1",
+    "markdown-it-include": "^2.0.0",
+    "markdown-it-ins": "^4.0.0",
+    "markdown-it-mark": "^4.0.0",
+    "markdown-it-multicolumn": "^0.1.5",
+    "markdown-it-strikethrough-alt": "^1.0.0",
+    "markdown-it-sub": "^2.0.0",
+    "markdown-it-sup": "^2.0.0",
+    "markdown-it-toc-done-right": "^4.2.0",
+    "markdown-it-underline": "^1.0.1",
+    "mermaid-it": "^0.5.2"
+  }
+}

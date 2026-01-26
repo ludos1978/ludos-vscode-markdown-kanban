@@ -11,20 +11,130 @@ import { logger } from '../../utils/logger';
  */
 export class PlantUMLService {
     private graphvizWarningShown = false;
+    private static resolvedJavaPath: string | null = null;
+    private static resolvedDotPath: string | null = null;
+
+    /**
+     * Get common installation paths for a CLI tool
+     */
+    private static getCommonPaths(cliName: string): string[] {
+        const platform = process.platform;
+
+        if (platform === 'darwin') {
+            return [
+                `/opt/homebrew/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+                `/opt/local/bin/${cliName}`,
+            ];
+        } else if (platform === 'win32') {
+            const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+            if (cliName === 'java') {
+                return [
+                    `${programFiles}\\Java\\jdk-*\\bin\\java.exe`,
+                    `${programFiles}\\Eclipse Adoptium\\*\\bin\\java.exe`,
+                    `${programFiles}\\Zulu\\*\\bin\\java.exe`,
+                ];
+            } else if (cliName === 'dot') {
+                return [
+                    `${programFiles}\\Graphviz\\bin\\dot.exe`,
+                ];
+            }
+            return [];
+        } else {
+            return [
+                `/usr/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+            ];
+        }
+    }
+
+    /**
+     * Test if a command is available (sync version)
+     */
+    private static testCommandSync(command: string, args: string[] = ['-V']): boolean {
+        try {
+            execSync(`"${command}" ${args.join(' ')}`, { stdio: 'pipe' });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve the path to a CLI tool, trying common paths
+     */
+    private static resolveCliPath(
+        cliName: string,
+        configKey: string,
+        cachedPath: string | null
+    ): string {
+        // Return cached path if available
+        if (cachedPath) {
+            return cachedPath;
+        }
+
+        // Try configured path first
+        const config = vscode.workspace.getConfiguration('markdown-kanban');
+        const configuredPath = config.get<string>(configKey, '');
+        if (configuredPath && this.testCommandSync(configuredPath)) {
+            return configuredPath;
+        }
+
+        // Try default command (relies on PATH)
+        if (this.testCommandSync(cliName)) {
+            return cliName;
+        }
+
+        // Try common installation paths
+        for (const commonPath of this.getCommonPaths(cliName)) {
+            if (this.testCommandSync(commonPath)) {
+                console.log(`[PlantUML Service] Found ${cliName} at: ${commonPath}`);
+                return commonPath;
+            }
+        }
+
+        // Fall back to default command
+        return cliName;
+    }
+
+    /**
+     * Get resolved Java path
+     */
+    private getJavaPath(): string {
+        if (!PlantUMLService.resolvedJavaPath) {
+            PlantUMLService.resolvedJavaPath = PlantUMLService.resolveCliPath(
+                'java',
+                'javaPath',
+                PlantUMLService.resolvedJavaPath
+            );
+        }
+        return PlantUMLService.resolvedJavaPath;
+    }
+
+    /**
+     * Get resolved Graphviz dot path
+     */
+    private getDotPath(): string {
+        if (!PlantUMLService.resolvedDotPath) {
+            PlantUMLService.resolvedDotPath = PlantUMLService.resolveCliPath(
+                'dot',
+                'graphvizPath',
+                PlantUMLService.resolvedDotPath
+            );
+        }
+        return PlantUMLService.resolvedDotPath;
+    }
 
     /**
      * Check if Graphviz is installed on the system
-     * Uses configured path or PATH
+     * Tries common paths as fallbacks
      * @returns true if Graphviz is available, false otherwise
      */
     private isGraphvizInstalled(): boolean {
-        // Check configured path or use PATH
-        const config = vscode.workspace.getConfiguration('markdown-kanban');
-        const graphvizPath = config.get<string>('graphvizPath', '');
-        const dotCmd = graphvizPath || 'dot';
+        const dotCmd = this.getDotPath();
 
         try {
-            execSync(`${dotCmd} -V`, { stdio: 'pipe' });
+            execSync(`"${dotCmd}" -V`, { stdio: 'pipe' });
             return true;
         } catch (error) {
             console.warn(`[PlantUML Service] Graphviz not found. Configure markdown-kanban.graphvizPath in settings.`);
@@ -95,10 +205,8 @@ export class PlantUMLService {
                     '-pipe'   // Read from stdin, write to stdout
                 ];
 
-                // Use configured java path or PATH
-                const config = vscode.workspace.getConfiguration('markdown-kanban');
-                const javaPath = config.get<string>('javaPath', '');
-                const javaCmd = javaPath || 'java';
+                // Use resolved java path (tries common paths as fallbacks)
+                const javaCmd = this.getJavaPath();
 
                 const child = spawn(javaCmd, args, {
                     stdio: ['pipe', 'pipe', 'pipe']

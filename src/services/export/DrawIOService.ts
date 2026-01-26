@@ -34,6 +34,23 @@ export class DrawIOService extends AbstractCLIService {
     }
 
     /**
+     * Override to add draw.io specific paths (app bundle on macOS)
+     */
+    protected getCommonPaths(): string[] {
+        const basePaths = super.getCommonPaths();
+
+        if (process.platform === 'darwin') {
+            // Add macOS app bundle path
+            return [
+                ...basePaths,
+                '/Applications/draw.io.app/Contents/MacOS/draw.io',
+            ];
+        }
+
+        return basePaths;
+    }
+
+    /**
      * Override to show platform-specific installation instructions
      */
     protected showCliWarning(): void {

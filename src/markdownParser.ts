@@ -59,7 +59,17 @@ export class MarkdownKanbanParser {
 
   // Include match detection handled directly via PluginRegistry.detectIncludes()
 
-  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
+  /**
+   * Parse kanban markdown content into a board structure
+   * @param content - Markdown content to parse
+   * @param basePath - Base path for resolving relative paths
+   * @param existingBoard - Existing board for ID preservation
+   * @param mainFilePath - Path to the main file for include resolution
+   * @param resolveIncludes - Whether to read and resolve include files (default: true)
+   *                          When false, includes are detected but not read, preventing
+   *                          duplicate content when exporting with mergeIncludes=false
+   */
+  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string, resolveIncludes: boolean = true): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
       // First parse with original content to preserve raw descriptions
       const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
@@ -164,23 +174,28 @@ export class MarkdownKanbanParser {
               }
             });
 
-            // Generate tasks from included files
+            // Generate tasks from included files (only when resolveIncludes is true)
+            // When resolveIncludes=false (e.g., exporting with mergeIncludes=false),
+            // we skip reading files to prevent duplicate content in the output
             const includeTasks: KanbanTask[] = [];
             let hasIncludeError = false;
-            for (const filePath of includeFiles) {
-              const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
-              try {
-                if (fs.existsSync(resolvedPath)) {
-                  const fileContent = fs.readFileSync(resolvedPath, 'utf8');
-                  const slideTasks = PresentationParser.parseMarkdownToTasks(fileContent, resolvedPath, mainFilePath);
-                  includeTasks.push(...slideTasks);
-                } else {
-                  console.warn(`[Parser] Column include file not found: ${resolvedPath}`);
+
+            if (resolveIncludes) {
+              for (const filePath of includeFiles) {
+                const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
+                try {
+                  if (fs.existsSync(resolvedPath)) {
+                    const fileContent = fs.readFileSync(resolvedPath, 'utf8');
+                    const slideTasks = PresentationParser.parseMarkdownToTasks(fileContent, resolvedPath, mainFilePath);
+                    includeTasks.push(...slideTasks);
+                  } else {
+                    console.warn(`[Parser] Column include file not found: ${resolvedPath}`);
+                    hasIncludeError = true;
+                  }
+                } catch (error) {
+                  console.error(`[Parser] Error processing column include ${filePath}:`, error);
                   hasIncludeError = true;
                 }
-              } catch (error) {
-                console.error(`[Parser] Error processing column include ${filePath}:`, error);
-                hasIncludeError = true;
               }
             }
 
@@ -300,7 +315,8 @@ export class MarkdownKanbanParser {
       }
 
       // Process task includes AFTER normal parsing
-      this.processTaskIncludes(board, basePath, taskIncludeFiles);
+      // Pass resolveIncludes to control file reading
+      this.processTaskIncludes(board, basePath, taskIncludeFiles, resolveIncludes);
 
       // Detect regular includes in task descriptions (not handled by parser, but tracked for file watching)
       this.detectRegularIncludes(board, includedFiles);
@@ -341,7 +357,7 @@ export class MarkdownKanbanParser {
     return frontmatter;
   }
 
-  private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[]): void {
+  private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[], resolveIncludes: boolean = true): void {
     for (const column of board.columns) {
       for (const task of column.tasks) {
         // Check if task title contains include syntax (location-based: task includes)
@@ -363,24 +379,28 @@ export class MarkdownKanbanParser {
           // The displayTitle shows file info in the UI, description contains the actual file content
           let fullFileContent = '';
 
-          for (const filePath of includeFiles) {
-            const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
-            try {
-              if (fs.existsSync(resolvedPath)) {
-                // Read COMPLETE file content WITHOUT modification
-                // Image paths will be rewritten at render time by markdown-it plugin
-                fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
-              } else {
-                console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
+          // Only read files when resolveIncludes is true
+          // When false (e.g., exporting with mergeIncludes=false), skip reading to prevent duplicate content
+          if (resolveIncludes) {
+            for (const filePath of includeFiles) {
+              const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
+              try {
+                if (fs.existsSync(resolvedPath)) {
+                  // Read COMPLETE file content WITHOUT modification
+                  // Image paths will be rewritten at render time by markdown-it plugin
+                  fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
+                } else {
+                  console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
+                  // Error details shown on hover via include badge
+                  fullFileContent = '';
+                  task.includeError = true;
+                }
+              } catch (error) {
+                console.error(`[Parser] Error processing task include ${filePath}:`, error);
                 // Error details shown on hover via include badge
                 fullFileContent = '';
                 task.includeError = true;
               }
-            } catch (error) {
-              console.error(`[Parser] Error processing task include ${filePath}:`, error);
-              // Error details shown on hover via include badge
-              fullFileContent = '';
-              task.includeError = true;
             }
           }
 
@@ -399,7 +419,7 @@ export class MarkdownKanbanParser {
           task.includeFiles = includeFiles.map(f => f.trim()); // Just trim whitespace, keep original casing
           task.originalTitle = task.title; // Keep original title with include syntax
           task.displayTitle = displayTitle; // UI metadata with placeholder for badge
-          task.description = fullFileContent; // COMPLETE file content
+          task.description = fullFileContent; // COMPLETE file content (empty when resolveIncludes=false)
         }
       }
     }

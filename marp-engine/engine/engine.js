@@ -720,66 +720,38 @@ function _fragment_plus(md) {
 // ---
 
 
+/**
+ * Custom image caption plugin
+ * Wraps images with title attribute in <figure> with <figcaption>
+ * Works in ALL contexts including multicolumn blocks (unlike markdown-it-image-figures)
+ */
 const _customImageCaption = (md) => {
-  // console.log(md.renderer.rules);
-  var old = md.renderer.rules.image;
+  // Store the default image renderer (or create a fallback)
+  const defaultRender = md.renderer.rules.image || function(tokens, idx, options, env, self) {
+    return self.renderToken(tokens, idx, options);
+  };
 
   md.renderer.rules.image = function (tokens, idx, options, env, self) {
-    let result = ``;
-    result += `<!-- type=${tokens[idx].type} -->`;
+    const token = tokens[idx];
 
-    if ("image" == tokens[idx].type) {
-      // if (tokens[idx].attrs[2]) {
-      let attrs = tokens[idx].attrs;
-      let content = tokens[idx].content;
-      let attrsTitle;
-      let attrsStyle;
-      let attrsSrc;
-      for (let i = 0; i < attrs.length; i++) {
-        if ("title" == attrs[i][0]) {
-          attrsTitle = attrs[i][1];
-        }
-        if ("style" == attrs[i][0]) {
-          attrsStyle = attrs[i][1];
-        }
-        if ("src" == attrs[i][0]) {
-          attrsSrc = attrs[i][1];
-        }
-      }
+    // Get the title attribute
+    const titleAttr = token.attrGet('title');
 
-      if (false) {
-        result += `<img `;
-        if (attrsSrc !== undefined) {
-          result += `src="${attrsSrc}" `;
-        }
-        if (attrsTitle !== undefined) {
-          result += `title="${attrsTitle}" `;
-        }
-        if (attrsStyle !== undefined) {
-          result += `style="${attrsStyle}" `;
-        }
-        result += `alt="${content}" />`;
-      }
+    // Render the image using the default renderer
+    const imgHtml = defaultRender(tokens, idx, options, env, self);
 
-      if (attrsTitle !== undefined) {
-        result += `<figcaption>${attrsTitle}</figcaption>`;
-      }
-
-      if (false) {
-        let test = "<!--";
-        for (let key in tokens[idx]) {
-          if (tokens[idx].hasOwnProperty(key)) {
-            // To ensure you're only listing own properties
-            //console.log(`Key: ${key}, Value: ${person[key]}`);
-            test += `, Key: ${key}, Value: ${tokens[idx][key]}`;
-          }
-        }
-        test += "-->";
-        result += test;
-      }
-
-      return old(tokens, idx, options, env, self) + result;
+    // If there's a title, wrap in figure with figcaption
+    if (titleAttr) {
+      // Escape HTML entities in the title to prevent XSS
+      const escapedTitle = titleAttr
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+      return `<figure class="image-figure">${imgHtml}<figcaption>${escapedTitle}</figcaption></figure>`;
     }
+
+    return imgHtml;
   };
 };
 
@@ -905,13 +877,12 @@ module.exports = ({ marp }) => {
     .use(require("markdown-it-footnote-here"))
 
     // https://www.npmjs.com/package/markdown-it-image-figures
-    // <figure><img ...></figure>
-    // figcaption: Set figcaption to true or "title" to use the title as a <figcaption> block after the image; 
-    // set figcaption to "alt" to use the alt text as a <figcaption>. 
-    // E.g.: ![This is an alt](fig.png "This is a title")
-    .use(require("markdown-it-image-figures"), {
-      figcaption: 'title'
-    })
+    // NOTE: DISABLED - replaced by _customImageCaption which works in ALL contexts
+    // including multicolumn blocks. markdown-it-image-figures only works for
+    // standalone paragraph images.
+    // .use(require("markdown-it-image-figures"), {
+    //   figcaption: 'title'
+    // })
 
     .use(mdItContainer, "note")
 		.use(mdItContainer, "comment")
@@ -960,9 +931,9 @@ module.exports = ({ marp }) => {
     // ~~~
     .use(require('mermaid-it'))
 
-    //
-    // 
-    // .use(_customImageCaption)
+    // Custom image caption plugin - wraps images with title in <figure>/<figcaption>
+    // Works in ALL contexts including multicolumn blocks
+    .use(_customImageCaption)
 
     // create fragmented list using the '+' character
     // + list
@@ -974,9 +945,8 @@ module.exports = ({ marp }) => {
     // .use(require('markdown-it-checkbox'));
     .use(require('markdown-it-checkboxes'))
 		
-		// this one works partially
-		.use(require('./markdown-it-deflist-modified.js').default);
-		// .use(require('markdown-it-deflist'))
+		// Definition lists: Term\n: Definition
+		.use(require('markdown-it-deflist'))
 
   // Wrap render for handout support (triggered by MARP_HANDOUT env var)
   wrapRenderForHandout(marp);

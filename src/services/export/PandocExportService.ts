@@ -29,6 +29,7 @@ export class PandocExportService {
 
     /**
      * Check if Pandoc is installed and available
+     * Tries common installation paths as fallbacks
      * @returns Promise that resolves to true if Pandoc is available
      */
     static async isPandocAvailable(): Promise<boolean> {
@@ -38,44 +39,20 @@ export class PandocExportService {
         }
 
         try {
-            const pandocPath = this.getPandocPath();
+            // This will try common paths and cache the result
+            const pandocPath = await this.resolvePandocPath();
 
-            return new Promise<boolean>((resolve) => {
-                const checkProcess = spawn(pandocPath, ['--version'], {
-                    stdio: ['ignore', 'pipe', 'pipe']
-                });
+            // Test if the resolved path works
+            const available = await this.testCommand(pandocPath);
 
-                let resolved = false;
+            this.availabilityChecked = true;
+            this.isAvailable = available;
 
-                checkProcess.on('error', () => {
-                    if (!resolved) {
-                        resolved = true;
-                        this.availabilityChecked = true;
-                        this.isAvailable = false;
-                        resolve(false);
-                    }
-                });
+            if (!available) {
+                logger.warn('[PandocExportService] Pandoc not found. Tried common installation paths.');
+            }
 
-                checkProcess.on('exit', (code) => {
-                    if (!resolved) {
-                        resolved = true;
-                        this.availabilityChecked = true;
-                        this.isAvailable = code === 0;
-                        resolve(code === 0);
-                    }
-                });
-
-                // Timeout after 5 seconds
-                setTimeout(() => {
-                    if (!resolved) {
-                        resolved = true;
-                        checkProcess.kill();
-                        this.availabilityChecked = true;
-                        this.isAvailable = false;
-                        resolve(false);
-                    }
-                }, 5000);
-            });
+            return available;
         } catch {
             this.availabilityChecked = true;
             this.isAvailable = false;
@@ -248,15 +225,113 @@ export class PandocExportService {
         return args;
     }
 
+    /** Cached resolved pandoc path */
+    private static resolvedPandocPath: string | null = null;
+
+    /**
+     * Get common installation paths for Pandoc
+     */
+    private static getCommonPandocPaths(): string[] {
+        const platform = process.platform;
+
+        if (platform === 'darwin') {
+            return [
+                '/opt/homebrew/bin/pandoc',
+                '/usr/local/bin/pandoc',
+                '/opt/local/bin/pandoc',
+            ];
+        } else if (platform === 'win32') {
+            const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+            const localAppData = process.env.LOCALAPPDATA || '';
+            return [
+                `${programFiles}\\Pandoc\\pandoc.exe`,
+                `${localAppData}\\Pandoc\\pandoc.exe`,
+            ];
+        } else {
+            return [
+                '/usr/bin/pandoc',
+                '/usr/local/bin/pandoc',
+            ];
+        }
+    }
+
+    /**
+     * Test if a command is available
+     */
+    private static async testCommand(command: string): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
+            const proc = spawn(command, ['--version'], {
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            proc.on('error', () => resolve(false));
+            proc.on('exit', (code) => resolve(code === 0));
+
+            setTimeout(() => {
+                proc.kill();
+                resolve(false);
+            }, 2000);
+        });
+    }
+
     /**
      * Get the configured or default Pandoc binary path
+     * Tries common installation paths as fallbacks
      * @returns Path to Pandoc binary
      */
-    private static getPandocPath(): string {
+    private static async resolvePandocPath(): Promise<string> {
+        // Return cached path if already resolved
+        if (this.resolvedPandocPath) {
+            return this.resolvedPandocPath;
+        }
+
+        // Build list of paths to try
+        const pathsToTry: string[] = [];
+
+        // First, try configured path
         try {
             const configService = ConfigurationService.getInstance();
             const configuredPath = configService.getNestedConfig('pandoc.path', '') as string;
+            if (configuredPath && configuredPath.trim()) {
+                pathsToTry.push(configuredPath.trim());
+            }
+        } catch {
+            // ConfigurationService may not be available in all contexts
+        }
 
+        // Then try default command (relies on PATH)
+        pathsToTry.push('pandoc');
+
+        // Finally, try common installation paths
+        pathsToTry.push(...this.getCommonPandocPaths());
+
+        // Test each path
+        for (const pandocPath of pathsToTry) {
+            if (await this.testCommand(pandocPath)) {
+                this.resolvedPandocPath = pandocPath;
+                logger.debug(`[PandocExportService] Found Pandoc at: ${pandocPath}`);
+                return pandocPath;
+            }
+        }
+
+        // Fall back to 'pandoc' even if not found (will fail later with better error)
+        return 'pandoc';
+    }
+
+    /**
+     * Get the configured or default Pandoc binary path (sync version for compatibility)
+     * @returns Path to Pandoc binary
+     */
+    private static getPandocPath(): string {
+        // Return cached path if available
+        if (this.resolvedPandocPath) {
+            return this.resolvedPandocPath;
+        }
+
+        // Try configured path first
+        try {
+            const configService = ConfigurationService.getInstance();
+            const configuredPath = configService.getNestedConfig('pandoc.path', '') as string;
             if (configuredPath && configuredPath.trim()) {
                 return configuredPath.trim();
             }
@@ -264,7 +339,7 @@ export class PandocExportService {
             // ConfigurationService may not be available in all contexts
         }
 
-        // Default to 'pandoc' which relies on system PATH
+        // Default to 'pandoc' - the async resolution will be done in isPandocAvailable
         return 'pandoc';
     }
 

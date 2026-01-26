@@ -34,6 +34,33 @@ export class PDFService extends AbstractCLIService {
     }
 
     /**
+     * Override to add poppler-specific paths
+     */
+    protected getCommonPaths(): string[] {
+        const cliName = this.getDefaultCliName();
+        const platform = process.platform;
+
+        if (platform === 'darwin') {
+            return [
+                `/opt/homebrew/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+                `/opt/local/bin/${cliName}`,
+            ];
+        } else if (platform === 'win32') {
+            const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+            return [
+                `${programFiles}\\poppler\\bin\\${cliName}.exe`,
+                `${programFiles}\\poppler-utils\\${cliName}.exe`,
+            ];
+        } else {
+            return [
+                `/usr/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+            ];
+        }
+    }
+
+    /**
      * Render a specific page from a PDF file to PNG
      * @param filePath Absolute path to .pdf file
      * @param pageNumber Page number to render (1-indexed)

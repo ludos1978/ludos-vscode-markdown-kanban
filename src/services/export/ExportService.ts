@@ -299,22 +299,10 @@ export class ExportService {
      * @returns Transformed content with visible captions
      */
     private static applyMediaCaptionTransform(content: string): string {
-        // Match any ![alt](path "caption") pattern
-        // Using non-greedy match for path to correctly capture the title
-        // Pattern: ![alt](path "caption") where path doesn't contain unescaped quotes
-        const mediaWithCaptionRegex = /!\[([^\]]*)\]\(([^"]+?)\s+"([^"]+)"\)/g;
-
-        // Replace media with caption: rebuild without title, add caption inline
-        // Use markdown italic (*caption*) so that footnote references and other markdown
-        // syntax inside the caption get processed by Marp
-        // No newline - keeps caption associated with the image
-        return content.replace(mediaWithCaptionRegex, (_match, alt, path, caption) => {
-            // Trim any trailing whitespace from path
-            const trimmedPath = path.trim();
-            // Rebuild media syntax without the title, add caption inline as italic markdown
-            // This allows footnote refs like [^1] to be processed
-            return `![${alt}](${trimmedPath}) *${caption}*`;
-        });
+        // Do NOT modify the content - captions should be handled by markdown-it-image-figures
+        // plugin in the Marp engine, not by extracting them here
+        // The ![alt](path "caption") syntax should remain intact for proper rendering
+        return content;
     }
 
     /**
@@ -516,25 +504,34 @@ export class ExportService {
         // Define include patterns and their replacement formats
         // If mergeIncludes is true, don't write separate files for ANY includes
         // Otherwise, write separate files for all include types
+        //
+        // IMPORTANT: Order matters! More specific patterns (column, task) MUST be processed
+        // BEFORE the generic pattern, otherwise the generic pattern will match all includes
+        // and the specific patterns will never run.
         const includePatterns = [
             {
-                pattern: INCLUDE_SYNTAX.REGEX,
-                replacement: (filename: string, _prefixTitle: string = '', _suffix: string = '') => `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
+                // COLUMN includes: ## Title !!!include(file.md)!!! tags
+                // Must be processed FIRST to preserve column header structure
+                pattern: this.COLUMN_INCLUDE_PATTERN,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}${prefixTitle ? ' ' : ''}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix ? ' ' + suffix : ''}`,
                 shouldWriteSeparateFile: !mergeIncludes,
-                includeType: 'include'
+                includeType: 'columninclude'
             },
             {
+                // TASK includes: - [ ] !!!include(file.md)!!!
+                // Must be processed BEFORE generic to preserve task structure
                 pattern: this.TASK_INCLUDE_PATTERN,
-                // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
                 replacement: (filename: string, prefixTitle: string = '', _suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },
             {
-                pattern: this.COLUMN_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
+                // GENERIC includes: !!!include(file.md)!!!
+                // Processed LAST to catch any remaining includes not matched by specific patterns
+                pattern: INCLUDE_SYNTAX.REGEX,
+                replacement: (filename: string, _prefixTitle: string = '', _suffix: string = '') => `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
-                includeType: 'columninclude' // Internal type identifier (position-based detection)
+                includeType: 'include'
             }
         ];
 
@@ -616,6 +613,18 @@ export class ExportService {
                         // When merging, use raw content without processing
                         // This preserves ## headers and slide structure
                         exportedContent = includeContent;
+
+                        // IMPORTANT: Rewrite paths in merged content
+                        // Paths in the include file are relative to the include file's directory
+                        // They need to be adjusted relative to the export folder or main file's directory
+                        const includeDir = path.dirname(resolvedPath);
+                        exportedContent = this.rewriteLinksForExport(
+                            exportedContent,
+                            includeDir,      // Source: include file's directory
+                            exportFolder,    // Target: export folder
+                            includeBasename, // Base name for asset subfolder
+                            true             // Use relative paths
+                        );
                     }
 
                     // If merging into kanban format and include is presentation format,
@@ -1180,28 +1189,33 @@ export class ExportService {
             mergeIncludes
         );
 
-        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
-        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
-        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
-        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
-            processedContent,
-            sourceDir,
-            exportFolder,
-            fileBasename,
-            true
-        ) : processedContent;
-
         // Filter assets based on options
         const assetsToInclude = this.filterAssets(assets, options);
 
-        // Process assets and update content (this also rewrites paths for packed assets)
-        const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            rewrittenContent,
+        // Process assets FIRST (copies files and updates their paths in content)
+        // This must happen before rewriteLinksForExport because:
+        // - findAssets captured originalPath from content (e.g., "Media/video.mp4")
+        // - processAssets looks for originalPath to replace with packed path
+        // - If rewriteLinksForExport runs first, it changes "Media/video.mp4" to "../Media/video.mp4"
+        // - Then processAssets can't find "Media/video.mp4" to replace!
+        const { modifiedContent: assetProcessedContent, notIncludedAssets } = await this.processAssets(
+            processedContent,
             assetsToInclude,
             assets,
             mediaFolder,
             fileBasename
         );
+
+        // Rewrite links based on linkHandlingMode (AFTER processing assets)
+        // This handles unpacked links - calculates correct relative paths from export location
+        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+        const modifiedContent = shouldRewriteLinks ? this.rewriteLinksForExport(
+            assetProcessedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            true
+        ) : assetProcessedContent;
 
         const stats = {
             includedCount: assetsToInclude.length,
@@ -1225,7 +1239,10 @@ export class ExportService {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
-            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir);
+            // When mergeIncludes=false, don't resolve includes during parsing
+            // This prevents duplicate content (includes will be processed by Marp engine)
+            const resolveIncludes = mergeIncludes;
+            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
             filteredContent = PresentationGenerator.fromBoard(board, {
                 includeMarpDirectives: true,
                 marp: {
@@ -1236,7 +1253,9 @@ export class ExportService {
             });
         } else if (options.format === 'document' && convertToPresentation) {
             // Document format for Pandoc export (DOCX, ODT, EPUB)
-            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir);
+            // When mergeIncludes=false, don't resolve includes during parsing
+            const resolveIncludes = mergeIncludes;
+            const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
             const pageBreaks = options.documentPageBreaks || 'continuous';
             filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {
                 tagVisibility: options.tagVisibility

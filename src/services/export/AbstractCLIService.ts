@@ -63,6 +63,39 @@ export abstract class AbstractCLIService {
     protected abstract getInstallationUrl(): string;
 
     /**
+     * Get common installation paths to try as fallbacks
+     * Override in subclasses to add tool-specific paths
+     */
+    protected getCommonPaths(): string[] {
+        const cliName = this.getDefaultCliName();
+        const platform = process.platform;
+
+        if (platform === 'darwin') {
+            // macOS: Homebrew (ARM and Intel), MacPorts, local bin
+            return [
+                `/opt/homebrew/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+                `/opt/local/bin/${cliName}`,
+            ];
+        } else if (platform === 'win32') {
+            // Windows: Common installation paths
+            const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+            const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+            return [
+                `${programFiles}\\${cliName}\\${cliName}.exe`,
+                `${programFilesX86}\\${cliName}\\${cliName}.exe`,
+            ];
+        } else {
+            // Linux: Common paths
+            return [
+                `/usr/bin/${cliName}`,
+                `/usr/local/bin/${cliName}`,
+                `/snap/bin/${cliName}`,
+            ];
+        }
+    }
+
+    /**
      * Check if CLI is available (with caching)
      */
     async isAvailable(): Promise<boolean> {
@@ -73,21 +106,33 @@ export abstract class AbstractCLIService {
         const config = vscode.workspace.getConfiguration('markdown-kanban');
         const customPath = config.get<string>(this.getConfigKey(), '');
 
-        // Build the CLI path
-        const cliName = customPath
-            ? path.join(customPath, this.getDefaultCliName())
-            : this.getDefaultCliName();
+        // Build paths to try (custom path first, then default command, then common paths)
+        const pathsToTry: string[] = [];
 
-        if (await this.testCliCommand(cliName)) {
-            this.cliPath = cliName;
-            this.isCliAvailable = true;
-            this.availabilityChecked = true;
-            return true;
+        if (customPath) {
+            pathsToTry.push(path.join(customPath, this.getDefaultCliName()));
+        }
+
+        // Try the command directly (relies on PATH)
+        pathsToTry.push(this.getDefaultCliName());
+
+        // Add common installation paths as fallbacks
+        pathsToTry.push(...this.getCommonPaths());
+
+        // Try each path
+        for (const cliPath of pathsToTry) {
+            if (await this.testCliCommand(cliPath)) {
+                this.cliPath = cliPath;
+                this.isCliAvailable = true;
+                this.availabilityChecked = true;
+                console.log(`[${this.getServiceName()}] Found CLI at: ${cliPath}`);
+                return true;
+            }
         }
 
         this.availabilityChecked = true;
         this.isCliAvailable = false;
-        console.warn(`[${this.getServiceName()}] ${this.getDefaultCliName()} CLI not found. Configure markdown-kanban.${this.getConfigKey()} in settings.`);
+        console.warn(`[${this.getServiceName()}] ${this.getDefaultCliName()} CLI not found. Tried: ${pathsToTry.join(', ')}. Configure markdown-kanban.${this.getConfigKey()} in settings.`);
         return false;
     }
 
