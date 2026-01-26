@@ -2677,22 +2677,6 @@ if (!webviewEventListenersInitialized) {
                 }
             }
 
-            // Unlock container dimensions if they were locked for a file operation
-            // This must happen regardless of render decisions (editing, skipRender, etc.)
-            console.log('[DimensionLock] boardUpdate: checking _pendingDimensionUnlock:', {
-                hasFlag: !!window._pendingDimensionUnlock,
-                flag: window._pendingDimensionUnlock,
-                hasUnlockFn: typeof window.unlockContainerDimensions === 'function'
-            });
-            if (window._pendingDimensionUnlock) {
-                console.log('[DimensionLock] boardUpdate: unlocking, operation:', window._pendingDimensionUnlock.operation);
-                requestAnimationFrame(() => {
-                    if (typeof window.unlockContainerDimensions === 'function') {
-                        window.unlockContainerDimensions();
-                    }
-                    window._pendingDimensionUnlock = null;
-                });
-            }
             break;
         case 'updateFileInfo':
             const previousDocumentPath = currentFileInfo?.documentPath;

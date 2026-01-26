@@ -1186,9 +1186,17 @@ function renderBoard(options = null) {
     window.isBoardRendering = true;
     window.boardRenderNonce = (window.boardRenderNonce || 0) + 1;
 
+    // Lock container dimensions during DOM manipulation to prevent scroll jumps
+    if (typeof window.lockContainerDimensions === 'function') {
+        window.lockContainerDimensions();
+    }
+
     const boardElement = getBoardElement();
     if (!boardElement) {
         window.isBoardRendering = false;
+        if (typeof window.unlockContainerDimensions === 'function') {
+            window.unlockContainerDimensions();
+        }
         console.error('Board element not found');
         return;
     }
@@ -1203,6 +1211,9 @@ function renderBoard(options = null) {
             ">
                 No board data available. Please open a Markdown file.
             </div>`;
+        if (typeof window.unlockContainerDimensions === 'function') {
+            window.unlockContainerDimensions();
+        }
         return;
     }
 
@@ -1427,6 +1438,11 @@ function renderBoard(options = null) {
 
     // Append all rows at once to minimize reflows
     boardElement.appendChild(fragment);
+
+    // Unlock container dimensions - synchronous DOM manipulation is complete
+    if (typeof window.unlockContainerDimensions === 'function') {
+        window.unlockContainerDimensions();
+    }
 
     // Apply folding states after rendering
     setTimeout(() => {

@@ -214,22 +214,6 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
 function searchForFile(filePath, taskId, columnId, isColumnTitle, includeDirFromContainer) {
     // Lock container dimensions to prevent scroll position loss during board update
     // This uses the centralized dimension lock system from stackLayoutManager.js
-    if (typeof window.lockContainerDimensions === 'function') {
-        window.lockContainerDimensions();
-        // Store flag so boardUpdate knows to unlock after render
-        window._pendingDimensionUnlock = {
-            operation: 'searchForFile',
-            timestamp: Date.now()
-        };
-        console.log('[DimensionLock] searchForFile: locked container dimensions, flag set:', window._pendingDimensionUnlock);
-        // Verify the flag is accessible
-        setTimeout(() => {
-            console.log('[DimensionLock] searchForFile: verify flag after 100ms:', window._pendingDimensionUnlock);
-        }, 100);
-    } else {
-        console.warn('[DimensionLock] searchForFile: lockContainerDimensions function not available!');
-    }
-
     closeAllPathMenus();
 
     if (taskId === 'undefined' || taskId === 'null' || taskId === '') {

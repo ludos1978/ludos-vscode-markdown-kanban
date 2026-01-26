@@ -29,32 +29,19 @@ let pendingStackElement = null;
  */
 const activeDimensionLocks = new Map();
 
-/** Maximum time a lock can be held before automatic release (5 seconds) */
-const LOCK_TIMEOUT_MS = 5000;
-
 /**
  * Lock an element's dimensions to its current size.
  * Prevents layout shifts during DOM updates.
- * Automatically unlocks after LOCK_TIMEOUT_MS to prevent stuck locks.
+ * If already locked, unlocks first to clear any stale locks.
  * @param {HTMLElement} element - Element to lock
  * @returns {Object|null} Lock object for unlocking, or null if element invalid
  */
 function lockElementDimensions(element) {
     if (!element) return null;
 
-    // If already locked, clear old timeout and refresh
+    // If already locked, unlock first to clear any stale lock
     if (activeDimensionLocks.has(element)) {
-        const existingLock = activeDimensionLocks.get(element);
-        if (existingLock.timeoutId) {
-            clearTimeout(existingLock.timeoutId);
-        }
-        // Refresh the timeout
-        existingLock.lockedAt = Date.now();
-        existingLock.timeoutId = setTimeout(() => {
-            console.warn('[DimensionLock] Auto-unlocking element after timeout (was locked for too long)');
-            unlockElementDimensions(element);
-        }, LOCK_TIMEOUT_MS);
-        return existingLock;
+        unlockElementDimensions(element);
     }
 
     const rect = element.getBoundingClientRect();
@@ -66,15 +53,8 @@ function lockElementDimensions(element) {
             minWidth: element.style.minWidth,
             minHeight: element.style.minHeight
         },
-        lockedAt: Date.now(),
-        timeoutId: null
+        lockedAt: Date.now()
     };
-
-    // Set automatic unlock timeout as safety mechanism
-    lock.timeoutId = setTimeout(() => {
-        console.warn('[DimensionLock] Auto-unlocking element after timeout (was locked for too long)');
-        unlockElementDimensions(element);
-    }, LOCK_TIMEOUT_MS);
 
     // Fix dimensions to current values
     element.style.width = rect.width + 'px';
@@ -99,12 +79,6 @@ function unlockElementDimensions(lockOrElement) {
 
     if (!lock) return;
 
-    // Clear the safety timeout since we're unlocking manually
-    if (lock.timeoutId) {
-        clearTimeout(lock.timeoutId);
-        lock.timeoutId = null;
-    }
-
     // Restore original styles
     element.style.width = lock.originalStyles.width;
     element.style.height = lock.originalStyles.height;
@@ -122,8 +96,6 @@ function unlockElementDimensions(lockOrElement) {
 function lockContainerDimensions() {
     const container = document.getElementById('kanban-container');
     if (!container) return null;
-
-    console.log('[DimensionLock] Locking container dimensions');
     return lockElementDimensions(container);
 }
 
@@ -133,7 +105,6 @@ function lockContainerDimensions() {
 function unlockContainerDimensions() {
     const container = document.getElementById('kanban-container');
     if (container) {
-        console.log('[DimensionLock] Unlocking container dimensions');
         unlockElementDimensions(container);
     }
 }
