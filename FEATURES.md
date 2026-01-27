@@ -215,4 +215,4 @@ the replacement file / link search helps finding files if the link to it is brok
 - the paths are generated relative to the file.
   - in the main file it's relative to the main file
   - in an included file it's relative to the included filepath
-- it only re-renders the parts of the kanban that has been modified.
+- it only re-renders the parts (columns/tasks) of the kanban that has been modified.

@@ -134,10 +134,17 @@
                 token.attrSet('id', attrs.id);
             }
 
-            // Apply other attributes as data-* attributes
+            // Apply other attributes
+            // Some attributes (width, height, style, loading, etc.) should be applied directly
+            // Others get prefixed with data-* for custom handling
+            const directAttrs = ['width', 'height', 'style', 'loading', 'decoding', 'title', 'alt'];
             Object.keys(attrs).forEach(key => {
                 if (!['class', 'id'].includes(key)) {
-                    token.attrSet('data-' + key, attrs[key]);
+                    if (directAttrs.includes(key)) {
+                        token.attrSet(key, attrs[key]);
+                    } else {
+                        token.attrSet('data-' + key, attrs[key]);
+                    }
                 }
             });
 

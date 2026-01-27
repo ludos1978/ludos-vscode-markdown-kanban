@@ -1222,7 +1222,7 @@ export class ExportService {
         });
 
         // Pattern to match all types of links
-        // 1. Markdown images: ![alt](path)
+        // 1. Markdown images: ![alt](path) optionally followed by {attrs}
         // 2. Markdown links: [text](path)
         // 3. HTML img/video/audio tags with src attribute
         // 4. Wiki-style links: [[path]] or [[path|text]]
@@ -1231,7 +1231,7 @@ export class ExportService {
         //       - Email autolinks: <user@example.com>
         //       - HTML tags: <br>, <hr>, etc.
         //       They are NEVER used for file paths in markdown!
-        const linkPattern = /(!\[[^\]]*\]\([^)]+\))|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])/g;
+        const linkPattern = /(!\[[^\]]*\]\([^)]+\)(?:\{[^}]+\})?)|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])/g;
 
         modifiedContent = modifiedContent.replace(linkPattern, (match) => {
             return this.processLink(match, sourceDir, exportFolder, fileBasename);
@@ -1260,12 +1260,25 @@ export class ExportService {
 
         // Extract path from different link types
         if (link.startsWith('![')) {
-            // Markdown image: ![alt](path)
-            const match = link.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+            // Markdown image: ![alt](path) optionally followed by {attrs}
+            const match = link.match(/^!\[([^\]]*)\]\(([^)]+)\)(\{[^}]+\})?/);
             if (match) {
                 const altText = match[1];
                 filePath = match[2];
-                linkStart = `![${altText}](`;
+                const attrBlock = match[3] || '';
+
+                // Convert {width=X height=Y} to Marp directives (w:X h:Y in alt text)
+                let marpDirectives = '';
+                if (attrBlock) {
+                    const widthMatch = attrBlock.match(/width=["']?([^"'\s}]+)["']?/);
+                    const heightMatch = attrBlock.match(/height=["']?([^"'\s}]+)["']?/);
+                    if (widthMatch) marpDirectives += ` w:${widthMatch[1]}`;
+                    if (heightMatch) marpDirectives += ` h:${heightMatch[1]}`;
+                }
+
+                // Add Marp directives to alt text for Marp compatibility
+                const newAltText = altText + marpDirectives;
+                linkStart = `![${newAltText}](`;
                 linkEnd = ')';
             }
         } else if (link.startsWith('[') && !link.startsWith('[[')) {

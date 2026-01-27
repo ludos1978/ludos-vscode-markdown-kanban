@@ -112,6 +112,10 @@ export class FileSearchWebview {
         baseDir?: string,
         options?: { showOpenMediaFolder?: boolean; sourceFile?: string }
     ): Promise<FileSearchResult | undefined> {
+        // Debug: log call stack to identify which code path triggered this
+        console.log('[FileSearchWebview] pickReplacementForBrokenLink CALLER:', new Error().stack?.split('\n').slice(1, 5).join('\n'));
+        console.log('[FileSearchWebview] pickReplacementForBrokenLink OPTIONS:', JSON.stringify({ originalPath: originalPath?.slice(-50), baseDir: baseDir?.slice(-50), sourceFile: options?.sourceFile?.slice(-50), showOpenMediaFolder: options?.showOpenMediaFolder }));
+
         if (!this._webview) {
             console.error('[FileSearchWebview] pickReplacementForBrokenLink: webview not set');
             throw new Error('Webview not set. Call setWebview() first.');

@@ -57,6 +57,7 @@ export class LinkReplacementHandler {
      */
     private async _handleLinkReplacement(event: LinkReplaceRequestedEvent): Promise<void> {
         const { originalPath, newPath, taskId, columnId, linkIndex } = event.data;
+        console.log('[LinkReplacementHandler._handleLinkReplacement] Event data:', JSON.stringify({ taskId, columnId, linkIndex, originalPath: originalPath?.slice(-30), newPath: newPath?.slice(-30) }));
 
         const board = this._deps.getBoard();
         if (!board || !board.valid) {
@@ -224,6 +225,8 @@ export class LinkReplacementHandler {
      * Send targeted update or request full board update
      */
     private _sendUpdate(board: KanbanBoard, taskId?: string, columnId?: string): void {
+        console.log('[LinkReplacementHandler._sendUpdate] Context:', JSON.stringify({ taskId, columnId, hasTaskId: !!taskId, hasColumnId: !!columnId }));
+
         // OPTIMIZATION: Send targeted update instead of full board redraw
         if (taskId && columnId) {
             const targetColumn = findColumn(board, columnId);

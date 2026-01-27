@@ -5,14 +5,14 @@ kanban-plugin: board
 ---
 
 ## # Heading 1 in Columntitle #green #todo
-- [ ] ## Heading 2 in Tasktitle #export-exclude #blue
+- [ ] ## Heading 2 in Tasktitle #export-exclude
   some long text
   
   Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 - [ ] andreas-gucklhorn-mawU2PoJWfU-unsplash.jpg #cyan
   ---:
   
-  ![](Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg "image")
+  ![](Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg "image"){height=200px}
   
   
   :--:

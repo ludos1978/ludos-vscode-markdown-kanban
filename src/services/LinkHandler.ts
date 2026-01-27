@@ -49,6 +49,7 @@ export class LinkHandler {
      * Enhanced file link handler with workspace-relative path support
      */
     public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution, mainFilePath?: string) {
+        console.log('[LinkHandler.handleFileLink] Received context:', JSON.stringify({ taskId, columnId, linkIndex, hasIncludeContext: !!includeContext }));
         try {
             if (href.startsWith('file://')) {
                 href = vscode.Uri.parse(href).fsPath;
@@ -301,6 +302,8 @@ export class LinkHandler {
      * unified MarkdownFileRegistry which is the single source of truth for files.
      */
     private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
+        console.log('[LinkHandler.applyLinkReplacement] Context:', JSON.stringify({ taskId, columnId, linkIndex, hasIncludeContext: !!includeContext }));
+
         // Generate path based on user configuration (relative or absolute)
         // Use include file's directory if from include, otherwise main file's directory
         const configuredPath = this._fileManager.generateConfiguredPath(
@@ -326,8 +329,12 @@ export class LinkHandler {
 
     /**
      * Enhanced wiki link handler with smart extension handling and workspace folder context
+     * @param documentName - The wiki link document name
+     * @param taskId - Optional task ID for targeted updates
+     * @param columnId - Optional column ID for targeted updates
+     * @param linkIndex - Optional link index for specific link replacement
      */
-    public async handleWikiLink(documentName: string) {
+    public async handleWikiLink(documentName: string, taskId?: string, columnId?: string, linkIndex?: number) {
         const allAttemptedPaths: string[] = [];
         let triedFilenames: string[] = [];
 
@@ -429,7 +436,8 @@ export class LinkHandler {
                 : undefined;
             const result = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
             if (result) {
-                await this.applyLinkReplacement(documentName, result.uri);
+                // Pass taskId, columnId, linkIndex for targeted updates
+                await this.applyLinkReplacement(documentName, result.uri, taskId, columnId, linkIndex);
                 return;
             }
         } catch (e) {

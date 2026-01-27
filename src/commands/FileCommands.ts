@@ -83,11 +83,14 @@ export class FileCommands extends SwitchBasedCommand {
         // Set up tracked files for file search (main + includes) before handling link
         const fileRegistry = context.getFileRegistry();
         let mainFilePath: string | undefined;
-        console.log('[FileCommands.handleOpenFileLink] START', {
-            href: message.href,
+        console.log('[FileCommands.handleOpenFileLink] START', JSON.stringify({
+            href: message.href?.slice(-30),
+            taskId: message.taskId,
+            columnId: message.columnId,
+            linkIndex: message.linkIndex,
             hasRegistry: !!fileRegistry,
-            includeContext: message.includeContext
-        });
+            hasIncludeContext: !!message.includeContext
+        }));
         if (fileRegistry) {
             const allFiles = fileRegistry.getAll();
             const trackedFiles = allFiles.map(file => ({
@@ -138,7 +141,12 @@ export class FileCommands extends SwitchBasedCommand {
      * Handle openWikiLink command
      */
     private async handleOpenWikiLink(message: OpenWikiLinkMessage, context: CommandContext): Promise<CommandResult> {
-        await context.linkHandler.handleWikiLink(message.documentName);
+        await context.linkHandler.handleWikiLink(
+            message.documentName,
+            message.taskId,
+            message.columnId,
+            message.linkIndex
+        );
         return this.success();
     }
 

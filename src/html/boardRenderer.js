@@ -2416,6 +2416,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
                 const hrefAttr = link.getAttribute('data-original-href') ? 'data-original-href' : 'href';
                 linkIndex = findElementIndex(link, containerElement, hrefAttr);
 
+                console.log('[boardRenderer.openFileLink] Sending message:', JSON.stringify({ taskId, columnId, linkIndex, href: href?.slice(-30) }));
                 vscode.postMessage({
                     type: 'openFileLink',
                     href: href,
