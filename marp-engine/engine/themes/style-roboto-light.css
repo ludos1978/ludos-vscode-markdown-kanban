@@ -442,6 +442,7 @@ section > .multicolumn > .multicolumn-column {
 
 /* an image or video with an reference */
 figure:has(img),
+figure:has(video),
 p:has(img),
 p:has(video) {
 	text-align: center;
@@ -1082,7 +1083,8 @@ section > p:has(img):not(:empty),
 section > p:has(img):not(:empty) > img,
 section > p:has(video):not(:empty),
 section > p:has(video):not(:empty) > video,
-section > figure:has(img):has(figcaption) {
+section > figure:has(img):has(figcaption),
+section > figure:has(video):has(figcaption) {
 	max-height: calc(720px - var(--vertical-border-height) - var(--top-border-height));
 }
 
