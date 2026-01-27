@@ -708,6 +708,12 @@ export class FileSearchWebview {
         const filesMissing: string[] = [];
         let lastUpdateTime = 0;
 
+        // Always include the original broken path's filename in the count
+        // The selected file IS the replacement, so it always "can be replaced"
+        const originalFilename = path.basename(decodedOriginalPath);
+        filesToReplace.push(originalFilename);
+        logger.debug('[FileSearchWebview._handleAnalyzeBatch] Including original file', { originalFilename });
+
         const sendUpdate = (scanning: boolean = true) => {
             this._webview?.postMessage({
                 type: 'fileSearchBatchAnalysis',

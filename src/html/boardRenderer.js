@@ -2310,6 +2310,14 @@ window.setupColumnResizeObserver = setupColumnResizeObserver;
 
 // Single function to handle opening links/images/wiki links
 function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
+    // Convert string 'undefined'/'null' to actual null (from HTML template literals)
+    if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
+        taskId = null;
+    }
+    if (columnId === 'undefined' || columnId === 'null' || columnId === '') {
+        columnId = null;
+    }
+
     const link = target.closest('a');
     const img = target.closest('img');
     const imageNotFound = target.closest('.image-not-found'); // Handle missing image placeholders

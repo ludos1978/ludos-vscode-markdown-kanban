@@ -154,17 +154,23 @@ export class FileManager {
 
     /**
      * Enhanced relative path generation that uses workspace folder names when appropriate
+     * @param filePath - The absolute path to convert to relative
+     * @param customBaseDir - Optional custom base directory (e.g., include file's directory)
      */
-    private getRelativePath(filePath: string): string {
-        // Get document directory from document or registry
-        let documentDir: string | undefined;
-        if (this._document) {
-            documentDir = path.dirname(this._document.uri.fsPath);
-        } else {
-            // Fall back to registry path when document is closed
-            const registryPath = this._getMainFilePath?.();
-            if (registryPath) {
-                documentDir = path.dirname(registryPath);
+    private getRelativePath(filePath: string, customBaseDir?: string): string {
+        // Use custom base directory if provided (e.g., for include files)
+        let documentDir: string | undefined = customBaseDir;
+
+        // Otherwise, get document directory from document or registry
+        if (!documentDir) {
+            if (this._document) {
+                documentDir = path.dirname(this._document.uri.fsPath);
+            } else {
+                // Fall back to registry path when document is closed
+                const registryPath = this._getMainFilePath?.();
+                if (registryPath) {
+                    documentDir = path.dirname(registryPath);
+                }
             }
         }
 
@@ -229,15 +235,17 @@ export class FileManager {
 
     /**
      * Generate a file path based on user configuration (relative or absolute)
+     * @param filePath - The absolute path to convert
+     * @param customBaseDir - Optional custom base directory (e.g., include file's directory)
      */
-    public generateConfiguredPath(filePath: string): string {
+    public generateConfiguredPath(filePath: string, customBaseDir?: string): string {
         const pathMode = configService.getPathGenerationMode();
 
         if (pathMode === 'absolute') {
             return filePath;
         } else {
-            // Use existing relative path logic
-            return this.getRelativePath(filePath);
+            // Use custom base directory if provided, otherwise use document/registry path
+            return this.getRelativePath(filePath, customBaseDir);
         }
     }
 

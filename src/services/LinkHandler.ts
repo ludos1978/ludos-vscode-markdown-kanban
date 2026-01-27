@@ -87,7 +87,7 @@ export class LinkHandler {
                     sourceFile
                 });
                 if (result) {
-                    await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex);
+                    await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex, includeContext);
                     return;
                 }
 
@@ -300,10 +300,13 @@ export class LinkHandler {
      * Note: No document check needed here - LinkReplacementHandler uses the
      * unified MarkdownFileRegistry which is the single source of truth for files.
      */
-    private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number) {
+    private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
         // Generate path based on user configuration (relative or absolute)
-        // Note: generateConfiguredPath gracefully handles missing document by returning absolute path
-        const configuredPath = this._fileManager.generateConfiguredPath(replacementUri.fsPath);
+        // Use include file's directory if from include, otherwise main file's directory
+        const configuredPath = this._fileManager.generateConfiguredPath(
+            replacementUri.fsPath,
+            includeContext?.includeDir
+        );
 
         // Check if the path is an image file using centralized extensions
         const isImage = hasExtension(originalPath, DOTTED_EXTENSIONS.image);
