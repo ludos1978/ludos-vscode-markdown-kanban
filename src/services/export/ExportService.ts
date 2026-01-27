@@ -1476,10 +1476,9 @@ export class ExportService {
             const resolveIncludes = mergeIncludes;
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
 
-            // Exclude filtering is handled by PresentationGenerator via excludeTags option
+            // NOTE: excludeTags NOT passed here - already applied at text level above (line 1455)
             filteredContent = PresentationGenerator.fromBoard(board, {
                 includeMarpDirectives: true,
-                excludeTags: options.excludeTags,
                 marp: {
                     theme: options.marpTheme || marpConfig.defaultTheme || 'default',
                     globalClasses: options.marpGlobalClasses || marpConfig.globalClasses || [],
@@ -1492,12 +1491,9 @@ export class ExportService {
             const resolveIncludes = mergeIncludes;
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
 
-            // Exclude filtering is handled by PresentationGenerator via excludeTags option
-            // NOTE: tagVisibility NOT passed here - already applied at text level above (line 1460)
+            // NOTE: excludeTags and tagVisibility NOT passed here - already applied at text level above
             const pageBreaks = options.documentPageBreaks || 'continuous';
-            filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {
-                excludeTags: options.excludeTags
-            });
+            filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {});
         }
         // format === 'kanban' or 'keep' → keep as-is
 
