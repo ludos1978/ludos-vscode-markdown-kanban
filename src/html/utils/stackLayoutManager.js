@@ -266,38 +266,10 @@ function applyStackedColumnStyles(columnId = null) {
     const container = document.getElementById('kanban-container');
     const board = document.getElementById('kanban-board');
     const scrollPositions = [];
-    const dimensionLocks = [];
 
-    // Capture and fix dimensions to prevent layout shift during reflow
-    const lockDimensions = (element) => {
-        if (!element) return null;
-        const rect = element.getBoundingClientRect();
-        const originalStyles = {
-            element,
-            width: element.style.width,
-            height: element.style.height,
-            minWidth: element.style.minWidth,
-            minHeight: element.style.minHeight
-        };
-        // Fix dimensions to current values
-        element.style.width = rect.width + 'px';
-        element.style.height = rect.height + 'px';
-        element.style.minWidth = rect.width + 'px';
-        element.style.minHeight = rect.height + 'px';
-        return originalStyles;
-    };
-
-    const unlockDimensions = (lock) => {
-        if (!lock || !lock.element) return;
-        lock.element.style.width = lock.width;
-        lock.element.style.height = lock.height;
-        lock.element.style.minWidth = lock.minWidth;
-        lock.element.style.minHeight = lock.minHeight;
-    };
-
-    // Lock dimensions before capturing scroll positions
+    // Use centralized lock system - self-cleans stale locks
     if (container) {
-        dimensionLocks.push(lockDimensions(container));
+        lockElementDimensions(container);
         scrollPositions.push({
             element: container,
             left: container.scrollLeft,
@@ -305,7 +277,7 @@ function applyStackedColumnStyles(columnId = null) {
         });
     }
     if (board) {
-        dimensionLocks.push(lockDimensions(board));
+        lockElementDimensions(board);
         scrollPositions.push({
             element: board,
             left: board.scrollLeft,
@@ -339,8 +311,9 @@ function applyStackedColumnStyles(columnId = null) {
             element.scrollLeft = left;
             element.scrollTop = top;
         });
-        // Then unlock dimensions so layout can flow naturally
-        dimensionLocks.forEach(unlockDimensions);
+        // Unlock dimensions using centralized system
+        if (container) unlockElementDimensions(container);
+        if (board) unlockElementDimensions(board);
     };
 
     // Restore after the layout pass settles to avoid scroll jumps.
@@ -536,35 +509,14 @@ function updateStackLayoutDebounced(stackElement = null) {
             // Updating all stacks - use the high-level orchestrator
             applyStackedColumnStyles(null);
         } else {
-            // Single stack update - still preserve scroll/dimensions
+            // Single stack update - use centralized lock system
             const container = document.getElementById('kanban-container');
             const board = document.getElementById('kanban-board');
             const scrollPositions = [];
-            const dimensionLocks = [];
 
-            const lockDimensions = (element) => {
-                if (!element) return null;
-                const rect = element.getBoundingClientRect();
-                return {
-                    element,
-                    width: element.style.width,
-                    height: element.style.height,
-                    minWidth: element.style.minWidth,
-                    minHeight: element.style.minHeight,
-                    setWidth: rect.width + 'px',
-                    setHeight: rect.height + 'px'
-                };
-            };
-
+            // Use centralized lock system - self-cleans stale locks
             if (container) {
-                const lock = lockDimensions(container);
-                if (lock) {
-                    container.style.width = lock.setWidth;
-                    container.style.height = lock.setHeight;
-                    container.style.minWidth = lock.setWidth;
-                    container.style.minHeight = lock.setHeight;
-                    dimensionLocks.push(lock);
-                }
+                lockElementDimensions(container);
                 scrollPositions.push({
                     element: container,
                     left: container.scrollLeft,
@@ -572,14 +524,7 @@ function updateStackLayoutDebounced(stackElement = null) {
                 });
             }
             if (board) {
-                const lock = lockDimensions(board);
-                if (lock) {
-                    board.style.width = lock.setWidth;
-                    board.style.height = lock.setHeight;
-                    board.style.minWidth = lock.setWidth;
-                    board.style.minHeight = lock.setHeight;
-                    dimensionLocks.push(lock);
-                }
+                lockElementDimensions(board);
                 scrollPositions.push({
                     element: board,
                     left: board.scrollLeft,
@@ -595,13 +540,9 @@ function updateStackLayoutDebounced(stackElement = null) {
                     element.scrollLeft = left;
                     element.scrollTop = top;
                 });
-                dimensionLocks.forEach(lock => {
-                    if (!lock || !lock.element) return;
-                    lock.element.style.width = lock.width;
-                    lock.element.style.height = lock.height;
-                    lock.element.style.minWidth = lock.minWidth;
-                    lock.element.style.minHeight = lock.minHeight;
-                });
+                // Unlock using centralized system
+                if (container) unlockElementDimensions(container);
+                if (board) unlockElementDimensions(board);
             }));
         }
         updateStackLayoutTimer = null;
@@ -1095,37 +1036,10 @@ function updateStackLayoutWithPreservation(stackElement = null) {
     const container = document.getElementById('kanban-container');
     const board = document.getElementById('kanban-board');
     const scrollPositions = [];
-    const dimensionLocks = [];
 
-    const lockDimensions = (element) => {
-        if (!element) return null;
-        const rect = element.getBoundingClientRect();
-        const lock = {
-            element,
-            width: element.style.width,
-            height: element.style.height,
-            minWidth: element.style.minWidth,
-            minHeight: element.style.minHeight
-        };
-        // Fix dimensions to current values
-        element.style.width = rect.width + 'px';
-        element.style.height = rect.height + 'px';
-        element.style.minWidth = rect.width + 'px';
-        element.style.minHeight = rect.height + 'px';
-        return lock;
-    };
-
-    const unlockDimensions = (lock) => {
-        if (!lock || !lock.element) return;
-        lock.element.style.width = lock.width;
-        lock.element.style.height = lock.height;
-        lock.element.style.minWidth = lock.minWidth;
-        lock.element.style.minHeight = lock.minHeight;
-    };
-
-    // Lock dimensions and capture scroll positions
+    // Use centralized lock system - self-cleans stale locks
     if (container) {
-        dimensionLocks.push(lockDimensions(container));
+        lockElementDimensions(container);
         scrollPositions.push({
             element: container,
             left: container.scrollLeft,
@@ -1133,7 +1047,7 @@ function updateStackLayoutWithPreservation(stackElement = null) {
         });
     }
     if (board) {
-        dimensionLocks.push(lockDimensions(board));
+        lockElementDimensions(board);
         scrollPositions.push({
             element: board,
             left: board.scrollLeft,
@@ -1150,7 +1064,9 @@ function updateStackLayoutWithPreservation(stackElement = null) {
             element.scrollLeft = left;
             element.scrollTop = top;
         });
-        dimensionLocks.forEach(unlockDimensions);
+        // Unlock using centralized system
+        if (container) unlockElementDimensions(container);
+        if (board) unlockElementDimensions(board);
     }));
 }
 

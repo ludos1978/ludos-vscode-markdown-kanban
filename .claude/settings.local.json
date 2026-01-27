@@ -159,7 +159,8 @@
       "Skill(refactor)",
       "Bash(unzip:*)",
       "Bash(npm list:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
