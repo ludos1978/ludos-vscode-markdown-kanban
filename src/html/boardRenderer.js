@@ -2398,7 +2398,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         event.stopPropagation();
         const href = link.getAttribute('data-original-href') || link.getAttribute('href');
         if (href && href !== '#') {
-            if (href.startsWith('http://') || href.startsWith('https://')) {
+            if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
                 vscode.postMessage({
                     type: 'openExternalLink',
                     href: href
