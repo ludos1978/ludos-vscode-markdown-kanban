@@ -31,6 +31,7 @@ const TILDE_DEAD_CODES = new Set([
     'KeyN',           // macOS Option+N
     'BracketRight',   // Spanish, Portuguese
     'Digit4',         // French AZERTY (AltGr+4)
+    'Equal',          // Some Nordic layouts
 ]);
 
 // Dead key codes that produce circumflex (^) across various keyboard layouts
