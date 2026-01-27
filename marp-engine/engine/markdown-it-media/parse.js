@@ -562,16 +562,21 @@ function parseMediaArgs(state, start) {
     );
 
     if (linkDestinationRes.ok) {
-      const src = state.md.normalizeLink(linkDestinationRes.str);
-      if (!state.md.validateLink(src)) {
+      const rawSrc = state.md.normalizeLink(linkDestinationRes.str);
+      if (!state.md.validateLink(rawSrc)) {
         return null;
       }
+
+      // Extract time params from URL query string (e.g., ?start=600&end=700)
+      const { normalizedSrc, startTime, endTime } = extractTimeParams(rawSrc);
 
       mediaSource = {
         pos: linkDestinationRes.pos,
         res: {
-          src,
+          src: normalizedSrc,
           type: null,
+          start: startTime,
+          end: endTime,
         },
       };
     }
