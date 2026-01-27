@@ -1636,11 +1636,11 @@ function updateAutoExportButton() {
         if (autoExportActive) {
             marpStatus.textContent = 'Active';
             marpStatus.className = 'processes-status-value scanning';
-            if (marpActions) marpActions.style.display = '';
+            if (marpActions) marpActions.classList.remove('hidden');
         } else {
             marpStatus.textContent = 'Inactive';
             marpStatus.className = 'processes-status-value';
-            if (marpActions) marpActions.style.display = 'none';
+            if (marpActions) marpActions.classList.add('hidden');
         }
     }
 
