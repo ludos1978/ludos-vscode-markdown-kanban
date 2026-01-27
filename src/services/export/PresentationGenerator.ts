@@ -14,6 +14,8 @@ export interface PresentationOptions {
     filterIncludes?: boolean;
     /** Tag visibility settings */
     tagVisibility?: TagVisibility;
+    /** Tags that exclude content from export (e.g., ['#export-exclude', '#private']) */
+    excludeTags?: string[];
     /** Marp-specific options (theme, directives) */
     marp?: MarpOptions;
     /** Custom YAML to merge (will be merged with Marp directives if both present) */
@@ -71,6 +73,10 @@ export class PresentationGenerator {
         if (options.filterIncludes) {
             filteredTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
         }
+        // Filter tasks with exclude tags
+        if (options.excludeTags && options.excludeTags.length > 0) {
+            filteredTasks = filteredTasks.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
+        }
 
         // Convert tasks to slide content strings
         const slideContents = filteredTasks.map(task => this.taskToSlideContent(task, options));
@@ -92,6 +98,12 @@ export class PresentationGenerator {
             // Column title slide
             // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
             let columnTitle = column.originalTitle ?? column.title;
+
+            // Skip column if title contains exclude tag
+            if (this.hasExcludeTag(columnTitle, options.excludeTags)) {
+                continue;
+            }
+
             if (options.stripIncludes) {
                 columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
@@ -101,6 +113,10 @@ export class PresentationGenerator {
             let tasks = column.tasks;
             if (options.filterIncludes) {
                 tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+            }
+            // Filter tasks with exclude tags
+            if (options.excludeTags && options.excludeTags.length > 0) {
+                tasks = tasks.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
             }
             for (const task of tasks) {
                 slideContents.push(this.taskToSlideContent(task, options));
@@ -145,6 +161,12 @@ export class PresentationGenerator {
             // Column title as H1
             // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
             let columnTitle = column.originalTitle ?? column.title;
+
+            // Skip column if title contains exclude tag
+            if (this.hasExcludeTag(columnTitle, options.excludeTags)) {
+                continue;
+            }
+
             if (options.stripIncludes) {
                 columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
@@ -154,6 +176,10 @@ export class PresentationGenerator {
             let tasks = column.tasks;
             if (options.filterIncludes) {
                 tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+            }
+            // Filter tasks with exclude tags
+            if (options.excludeTags && options.excludeTags.length > 0) {
+                tasks = tasks.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
             }
 
             for (const task of tasks) {
@@ -174,6 +200,11 @@ export class PresentationGenerator {
                 // Apply tag filtering if specified
                 if (options.tagVisibility && options.tagVisibility !== 'all') {
                     description = TagUtils.processMarkdownContent(description, options.tagVisibility);
+                }
+
+                // Filter excluded lines from description
+                if (options.excludeTags && options.excludeTags.length > 0) {
+                    description = this.filterExcludedLines(description, options.excludeTags);
                 }
 
                 if (description) {
@@ -201,10 +232,15 @@ export class PresentationGenerator {
     private static taskToSlideContent(task: KanbanTask, options: PresentationOptions): string {
         // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
         let title = task.originalTitle ?? task.title ?? '';
-        const description = task.description ?? '';
+        let description = task.description ?? '';
 
         if (options.stripIncludes) {
             title = title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+        }
+
+        // Filter excluded lines from description
+        if (options.excludeTags && options.excludeTags.length > 0) {
+            description = this.filterExcludedLines(description, options.excludeTags);
         }
 
         // Slide format: title\n\ndescription
@@ -302,5 +338,35 @@ export class PresentationGenerator {
         result += '---\n\n';
 
         return result;
+    }
+
+    /**
+     * Check if text contains any of the exclude tags
+     * Uses word boundary matching to avoid partial matches
+     */
+    private static hasExcludeTag(text: string, excludeTags?: string[]): boolean {
+        if (!text || !excludeTags || excludeTags.length === 0) {
+            return false;
+        }
+        for (const tag of excludeTags) {
+            const tagPattern = new RegExp(`${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            if (tagPattern.test(text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Filter lines in content that contain exclude tags
+     */
+    private static filterExcludedLines(content: string, excludeTags?: string[]): string {
+        if (!content || !excludeTags || excludeTags.length === 0) {
+            return content;
+        }
+        return content
+            .split('\n')
+            .filter(line => !this.hasExcludeTag(line, excludeTags))
+            .join('\n');
     }
 }

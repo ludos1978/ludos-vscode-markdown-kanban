@@ -95,6 +95,8 @@
 
 ## Project Specific
 
+- Export content filtering (like excludeTags, tagVisibility) must be done in PresentationGenerator during content generation, not at raw text level in ExportService.
+
 The order of the columns is fixed using translateZ:
 - column-offset and column-margin is furtherst back but above kanban-full-height-column
 - column-content comes next

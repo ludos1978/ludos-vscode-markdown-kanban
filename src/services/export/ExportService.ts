@@ -6,7 +6,7 @@ import * as crypto from 'crypto';
 import { showWarning } from '../NotificationService';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 import { PresentationParser } from './PresentationParser';
-import { PresentationGenerator } from './PresentationGenerator';
+import { PresentationGenerator, PresentationOptions } from './PresentationGenerator';
 import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
 import { PandocExportService, PandocOutputFormat } from './PandocExportService';
@@ -222,6 +222,7 @@ export class ExportService {
             return board;
         }
 
+        logger.info(`[ExportService.filterExcludedFromBoard] Filtering board with tags: ${JSON.stringify(excludeTags)}, columns: ${board.columns.length}`);
         const filteredColumns: KanbanColumn[] = [];
 
         for (const column of board.columns) {
@@ -275,11 +276,78 @@ export class ExportService {
             return content;
         }
 
+        // Detect if content is in presentation format (has slide separators)
+        const isPresentationFormat = content.includes('\n---\n') || content.startsWith('---\n');
+
+        if (isPresentationFormat) {
+            return this.filterExcludedFromPresentation(content, excludeTags);
+        } else {
+            return this.filterExcludedFromKanban(content, excludeTags);
+        }
+    }
+
+    /**
+     * Filter excluded content from presentation format (slides separated by ---)
+     * - Removes entire slides if the slide title/first line contains an exclude tag
+     * - Removes individual lines within slides if they contain exclude tags
+     */
+    private static filterExcludedFromPresentation(content: string, excludeTags: string[]): string {
+        // Split content into slides (separated by ---)
+        const slides = content.split(/\n---\n/);
+        logger.info(`[ExportService.filterExcludedFromPresentation] Filtering ${slides.length} slides with tags: ${JSON.stringify(excludeTags)}`);
+
+        const filteredSlides: string[] = [];
+        let excludedSlides = 0;
+        let excludedLines = 0;
+
+        for (const slide of slides) {
+            const lines = slide.split('\n');
+            // Check if the slide title (first non-empty, non-directive line) has an exclude tag
+            const titleLine = lines.find(line => {
+                const trimmed = line.trim();
+                return trimmed && !trimmed.startsWith('<!--') && !trimmed.startsWith('---');
+            });
+
+            if (titleLine && this.hasExcludeTag(titleLine, excludeTags)) {
+                // Exclude entire slide
+                logger.info(`[ExportService.filterExcludedFromPresentation] EXCLUDING slide: ${titleLine.substring(0, 80)}`);
+                excludedSlides++;
+                continue;
+            }
+
+            // Filter individual lines within the slide
+            const filteredLines = lines.filter(line => {
+                if (this.hasExcludeTag(line, excludeTags)) {
+                    logger.info(`[ExportService.filterExcludedFromPresentation] EXCLUDING line: ${line.substring(0, 80)}`);
+                    excludedLines++;
+                    return false;
+                }
+                return true;
+            });
+
+            filteredSlides.push(filteredLines.join('\n'));
+        }
+
+        logger.info(`[ExportService.filterExcludedFromPresentation] Result: ${slides.length} slides -> ${filteredSlides.length} slides (excluded ${excludedSlides} slides, ${excludedLines} lines)`);
+        return filteredSlides.join('\n---\n');
+    }
+
+    /**
+     * Filter excluded content from kanban format (## headers and - [ ] tasks)
+     * - Removes ## column header lines if they contain exclude tags
+     * - Removes task blocks (- [ ] task and its content) if title contains exclude tags
+     * - Removes individual lines within task content if they contain exclude tags
+     */
+    private static filterExcludedFromKanban(content: string, excludeTags: string[]): string {
         const lines = content.split('\n');
+        logger.info(`[ExportService.filterExcludedFromKanban] Filtering ${lines.length} lines with tags: ${JSON.stringify(excludeTags)}`);
+        logger.info(`[ExportService.filterExcludedFromKanban] First 3 lines: ${JSON.stringify(lines.slice(0, 3))}`);
+
         const result: string[] = [];
         let skipUntilNextSection = false;
         let inExcludedTask = false;
         let taskIndentLevel = 0;
+        let excludedCount = 0;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -289,7 +357,10 @@ export class ExportService {
             if (trimmedLine.startsWith('## ')) {
                 skipUntilNextSection = this.hasExcludeTag(line, excludeTags);
                 inExcludedTask = false;
-                if (!skipUntilNextSection) {
+                if (skipUntilNextSection) {
+                    logger.info(`[ExportService.filterExcludedFromKanban] EXCLUDING column: ${line.substring(0, 80)}`);
+                    excludedCount++;
+                } else {
                     result.push(line);
                 }
                 continue;
@@ -297,6 +368,7 @@ export class ExportService {
 
             // Skip all content in excluded column
             if (skipUntilNextSection) {
+                excludedCount++;
                 continue;
             }
 
@@ -305,7 +377,10 @@ export class ExportService {
             if (taskMatch) {
                 taskIndentLevel = taskMatch[1].length;
                 inExcludedTask = this.hasExcludeTag(line, excludeTags);
-                if (!inExcludedTask) {
+                if (inExcludedTask) {
+                    logger.info(`[ExportService.filterExcludedFromKanban] EXCLUDING task: ${line.substring(0, 80)}`);
+                    excludedCount++;
+                } else {
                     result.push(line);
                 }
                 continue;
@@ -315,6 +390,7 @@ export class ExportService {
             const lineIndent = line.match(/^(\s*)/)?.[1].length || 0;
             if (inExcludedTask && lineIndent > taskIndentLevel && trimmedLine !== '') {
                 // Skip indented content of excluded task
+                excludedCount++;
                 continue;
             }
 
@@ -325,12 +401,15 @@ export class ExportService {
 
             // For regular lines, check if they contain exclude tags
             if (this.hasExcludeTag(line, excludeTags)) {
+                logger.info(`[ExportService.filterExcludedFromKanban] EXCLUDING line: ${line.substring(0, 80)}`);
+                excludedCount++;
                 continue;
             }
 
             result.push(line);
         }
 
+        logger.info(`[ExportService.filterExcludedFromKanban] Result: ${lines.length} lines -> ${result.length} lines (excluded ${excludedCount})`);
         return result.join('\n');
     }
 
@@ -1365,9 +1444,20 @@ export class ExportService {
             includeFiles: includeStats
         };
 
-        // Apply tag filtering to the content if specified
+        // TAG PROCESSING ORDER IS CRITICAL:
+        // 1. Exclude filtering (removes content WITH tags) - must run while tags are still present
+        // 2. Tag visibility filtering (removes/modifies tags themselves) - runs after exclusion
+        // If reversed, tags would be stripped before exclude filter can match them!
+
+        // Step 1: Apply exclude tag filtering FIRST (before tags are stripped by visibility filter)
+        let filteredContent = modifiedContent;
+        if (options.excludeTags && options.excludeTags.length > 0) {
+            filteredContent = this.filterExcludedFromMarkdown(filteredContent, options.excludeTags);
+        }
+
+        // Step 2: Apply tag visibility filtering (may remove tags from display)
         // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
+        filteredContent = this.applyTagFiltering(filteredContent, options.tagVisibility);
 
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
@@ -1385,8 +1475,11 @@ export class ExportService {
             // This prevents duplicate content (includes will be processed by Marp engine)
             const resolveIncludes = mergeIncludes;
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
+
+            // Exclude filtering is handled by PresentationGenerator via excludeTags option
             filteredContent = PresentationGenerator.fromBoard(board, {
                 includeMarpDirectives: true,
+                excludeTags: options.excludeTags,
                 marp: {
                     theme: options.marpTheme || marpConfig.defaultTheme || 'default',
                     globalClasses: options.marpGlobalClasses || marpConfig.globalClasses || [],
@@ -1398,9 +1491,12 @@ export class ExportService {
             // When mergeIncludes=false, don't resolve includes during parsing
             const resolveIncludes = mergeIncludes;
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
+
+            // Exclude filtering is handled by PresentationGenerator via excludeTags option
             const pageBreaks = options.documentPageBreaks || 'continuous';
             filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {
-                tagVisibility: options.tagVisibility
+                tagVisibility: options.tagVisibility,
+                excludeTags: options.excludeTags
             });
         }
         // format === 'kanban' or 'keep' → keep as-is
@@ -1768,15 +1864,16 @@ export class ExportService {
                                         !options.packAssets &&
                                         mergeIncludes;
 
+        logger.info(`[ExportService.transformContent] Path selection: useBoardBasedConversion=${useBoardBasedConversion}, format=${options.format}, mergeIncludes=${mergeIncludes}, packAssets=${options.packAssets}, excludeTags=${JSON.stringify(options.excludeTags)}`);
+
         if (useBoardBasedConversion) {
             // BOARD-BASED PATH: Use in-memory board (includes already resolved)
+            logger.info('[ExportService.transformContent] Using BOARD-BASED path');
             // Filter board based on scope and selection
-            let filteredBoard = this.filterBoard(board, options);
+            const filteredBoard = this.filterBoard(board, options);
 
-            // Apply exclude tag filtering to board
-            if (options.excludeTags && options.excludeTags.length > 0) {
-                filteredBoard = this.filterExcludedFromBoard(filteredBoard, options.excludeTags);
-            }
+            // NOTE: Exclude tag filtering is handled by PresentationGenerator
+            // This keeps it consistent with how tagVisibility filtering works
 
             // Use unified presentation generator
             const config = ConfigurationService.getInstance();
@@ -1790,9 +1887,11 @@ export class ExportService {
 
             // For copy mode: no YAML header, no column title slides - just raw content
             const isCopyMode = options.mode === 'copy';
-            const generatorOptions = {
+            const generatorOptions: PresentationOptions = {
                 includeMarpDirectives: !isCopyMode,  // Only include Marp directives for export, not copy
                 stripIncludes: true,  // Strip include syntax (content already inlined in board)
+                tagVisibility: options.tagVisibility,
+                excludeTags: options.excludeTags,
                 marp: {
                     theme: options.marpTheme || marpConfig.defaultTheme || 'default',
                     globalClasses: marpClasses.global.length > 0 ? marpClasses.global : (marpConfig.globalClasses || []),
@@ -1808,7 +1907,8 @@ export class ExportService {
                 const pageBreaks = options.documentPageBreaks || 'continuous';
                 result = PresentationGenerator.toDocument(filteredBoard, pageBreaks, {
                     stripIncludes: true,
-                    tagVisibility: options.tagVisibility
+                    tagVisibility: options.tagVisibility,
+                    excludeTags: options.excludeTags
                 });
             } else if (isCopyMode && options.scope === 'task') {
                 const allTasks = filteredBoard.columns.flatMap(col => col.tasks);
@@ -1839,6 +1939,7 @@ export class ExportService {
         // - Need to process includes (mergeIncludes is false)
         else if (options.packAssets || options.format !== 'kanban' || needsIncludeProcessing) {
             // FILE-BASED PATH: Process raw markdown to handle includes correctly
+            logger.info('[ExportService.transformContent] Using FILE-BASED path');
 
             // Use existing processMarkdownContent (it does everything)
             const processed = await this.processMarkdownContent(
@@ -1854,20 +1955,23 @@ export class ExportService {
 
             result = processed.exportedContent;
             notIncludedAssets = processed.notIncludedAssets;
-
-            // Apply exclude tag filtering to markdown content
-            if (options.excludeTags && options.excludeTags.length > 0) {
-                result = this.filterExcludedFromMarkdown(result, options.excludeTags);
-            }
+            // NOTE: Exclude tag filtering is already applied inside processMarkdownContent
+            // Tag processing order: 1) exclude filtering, 2) tag visibility filtering
 
         } else {
             // Simple path: tag filtering and link rewriting (no asset packing)
-            result = this.applyTagFiltering(result, options.tagVisibility);
+            logger.info('[ExportService.transformContent] Using SIMPLE path');
+            // TAG PROCESSING ORDER IS CRITICAL:
+            // 1. Exclude filtering (removes content WITH tags) - must run while tags are still present
+            // 2. Tag visibility filtering (removes/modifies tags themselves) - runs after exclusion
 
-            // Apply exclude tag filtering to markdown content
+            // Step 1: Apply exclude tag filtering FIRST (before tags are stripped)
             if (options.excludeTags && options.excludeTags.length > 0) {
                 result = this.filterExcludedFromMarkdown(result, options.excludeTags);
             }
+
+            // Step 2: Apply tag visibility filtering (may remove tags from display)
+            result = this.applyTagFiltering(result, options.tagVisibility);
 
             // Apply content transformations (speaker notes, HTML comments, HTML content)
             result = this.applyContentTransformations(result, options);
