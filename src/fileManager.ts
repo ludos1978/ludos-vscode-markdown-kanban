@@ -156,11 +156,22 @@ export class FileManager {
      * Enhanced relative path generation that uses workspace folder names when appropriate
      */
     private getRelativePath(filePath: string): string {
-        if (!this._document) {
+        // Get document directory from document or registry
+        let documentDir: string | undefined;
+        if (this._document) {
+            documentDir = path.dirname(this._document.uri.fsPath);
+        } else {
+            // Fall back to registry path when document is closed
+            const registryPath = this._getMainFilePath?.();
+            if (registryPath) {
+                documentDir = path.dirname(registryPath);
+            }
+        }
+
+        if (!documentDir) {
+            // No document or registry path available - return absolute
             return filePath;
         }
-        
-        const documentDir = path.dirname(this._document.uri.fsPath);
         const workspaceFolders = vscode.workspace.workspaceFolders;
         
         // First, try to find if file is in a workspace folder

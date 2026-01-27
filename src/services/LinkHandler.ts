@@ -296,23 +296,13 @@ export class LinkHandler {
      *
      * Previously: called _onRequestLinkReplacement callback
      * Now: emits 'link:replace-requested' event via EventBus
+     *
+     * Note: No document check needed here - LinkReplacementHandler uses the
+     * unified MarkdownFileRegistry which is the single source of truth for files.
      */
     private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number) {
-        const document = this._fileManager.getDocument();
-        if (!document) {
-            console.error(`[LinkHandler] No document loaded. FileManager state:`, {
-                hasDocument: !!this._fileManager.getDocument(),
-                originalPath,
-                replacementUri: replacementUri.fsPath,
-                taskId,
-                columnId,
-                linkIndex
-            });
-            showError(`No document loaded to update links. originalPath: ${originalPath}, taskId: ${taskId}, columnId: ${columnId}`);
-            return;
-        }
-
         // Generate path based on user configuration (relative or absolute)
+        // Note: generateConfiguredPath gracefully handles missing document by returning absolute path
         const configuredPath = this._fileManager.generateConfiguredPath(replacementUri.fsPath);
 
         // Check if the path is an image file using centralized extensions

@@ -92,6 +92,7 @@
 - Do not assume, rather ask if something is required to implement a feature or change
 - If we worked on a problem which was not successfully solved, analyze what might have gone wrong and dont repeat the error.
 - dont write reports of the tasks you finish, except if the user specifically requests it, othervise the chat is enough to track the progress.
+- try to minimize duplicate checks. if something is save to be not null, dont check it for null every time!
 
 ## Project Specific
 

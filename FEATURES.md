@@ -199,3 +199,20 @@ These types of diagrams can be directly added to the board, they will render to 
 - Broken links/images show a visible state.
 - Burger menu actions can search or browse for a replacement file.
 - Search can be done by filename and updates the path inline.
+
+
+### Replacement File Search
+the replacement file / link search helps finding files if the link to it is broken.
+- it searches in all workspaces for the filename (which can be edited)
+- specific searches such as regex, match case and full word can be toggled
+- it lists the results below, a toggle allows previewing the files
+- preview are closed when the view is closed or the preview toggled off
+- a "replace all" allows fixing all paths that share the complete same path. 
+  - it displays the count of occurances of the path and how many files can be successfully found at the new location. 
+  - only files that can be found in the new location will be fixed.
+- the user can select wether it generates a relative or absolute path, or the default setting.
+  - it displays a preview of the new filepath
+- the paths are generated relative to the file.
+  - in the main file it's relative to the main file
+  - in an included file it's relative to the included filepath
+- it only re-renders the parts of the kanban that has been modified.
