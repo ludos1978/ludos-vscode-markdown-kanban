@@ -1517,39 +1517,54 @@ export interface ColumnsUnfoldedMessage extends ResponseMessage {
     type: 'columnsUnfolded';
 }
 
+// ============= UNIFIED LINK HANDLING =============
+
 /**
- * Open file link request
+ * Link types for unified link handling
  */
-export interface OpenFileLinkMessage extends BaseMessage {
-    type: 'openFileLink';
-    href: string;
-    linkIndex?: number;
-    taskId?: string;
-    columnId?: string;
-    includeContext?: {
-        columnId?: string;
-        taskId?: string;
-        filePath?: string;
-    };
+export enum LinkType {
+    FILE = 'file',
+    WIKI = 'wiki',
+    EXTERNAL = 'external',
+    IMAGE = 'image'
 }
 
 /**
- * Open wiki link request
+ * Include context for link resolution
  */
-export interface OpenWikiLinkMessage extends BaseMessage {
-    type: 'openWikiLink';
-    documentName: string;
-    linkIndex?: number;
-    taskId?: string;
+export interface LinkIncludeContext {
+    includeFilePath?: string;
+    includeDir?: string;
+    mainFilePath?: string;
+    mainDir?: string;
     columnId?: string;
+    taskId?: string;
+    filePath?: string;
 }
 
 /**
- * Open external link request
+ * Unified open link request - replaces openFileLink, openWikiLink, openExternalLink
+ *
+ * All link types use a single message with LinkType discriminator.
+ * Parameters are unified - each link type uses what it needs:
+ * - FILE: target (href), taskId, columnId, linkIndex, includeContext
+ * - WIKI: target (documentName), taskId, columnId, linkIndex
+ * - EXTERNAL: target (href)
+ * - IMAGE: target (src), taskId, columnId, linkIndex, includeContext
  */
-export interface OpenExternalLinkMessage extends BaseMessage {
-    type: 'openExternalLink';
-    href: string;
+export interface OpenLinkMessage extends BaseMessage {
+    type: 'openLink';
+    linkType: LinkType;
+    /** The link target: href for file/external, documentName for wiki, src for image */
+    target: string;
+    /** Task ID where the link is located (for targeted updates) */
+    taskId?: string;
+    /** Column ID where the link is located (for targeted updates) */
+    columnId?: string;
+    /** Link index within the task/column content */
+    linkIndex?: number;
+    /** Include context for resolving paths in include files */
+    includeContext?: LinkIncludeContext;
 }
 
 /**
@@ -2039,9 +2054,7 @@ export type IncomingMessage =
     | EditModeEndMessage
     | EditingStoppedMessage
     | ColumnsUnfoldedMessage
-    | OpenFileLinkMessage
-    | OpenWikiLinkMessage
-    | OpenExternalLinkMessage
+    | OpenLinkMessage
     | OpenFileMessage
     | OpenIncludeFileMessage
     | HandleFileDropMessage

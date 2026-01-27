@@ -14,6 +14,14 @@
  * - window.cachedBoard (board data)
  */
 
+// Link types for unified message handling (matches LinkType enum in MessageTypes.ts)
+const LinkType = {
+    FILE: 'file',
+    WIKI: 'wiki',
+    EXTERNAL: 'external',
+    IMAGE: 'image'
+};
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -143,15 +151,14 @@ function openPath(pathOrElement, taskId, columnId, isColumnTitle) {
         return;
     }
 
-    const message = {
-        type: 'openFileLink',
-        href: filePath
-    };
-    if (taskId) message.taskId = taskId;
-    if (columnId) message.columnId = columnId;
-    if (includeContext) message.includeContext = includeContext;
-
-    vscode.postMessage(message);
+    vscode.postMessage({
+        type: 'openLink',
+        linkType: LinkType.FILE,
+        target: filePath,
+        taskId: taskId || undefined,
+        columnId: columnId || undefined,
+        includeContext: includeContext || undefined
+    });
 }
 
 /**

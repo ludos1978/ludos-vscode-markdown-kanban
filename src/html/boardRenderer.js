@@ -2308,8 +2308,43 @@ window.setupColumnResizeObserver = setupColumnResizeObserver;
 
 // toggleTaskCollapseById, toggleTaskCollapse moved to utils/columnFoldingManager.js
 
+// Link types for unified message handling (matches LinkType enum in MessageTypes.ts)
+const LinkType = {
+    FILE: 'file',
+    WIKI: 'wiki',
+    EXTERNAL: 'external',
+    IMAGE: 'image'
+};
+
+/**
+ * Send unified openLink message to backend
+ * @param {string} linkType - One of LinkType values (file, wiki, external, image)
+ * @param {string} target - The link target (href, documentName, or src)
+ * @param {object} options - Optional: taskId, columnId, linkIndex, includeContext
+ */
+function sendOpenLinkMessage(linkType, target, options = {}) {
+    const { taskId, columnId, linkIndex, includeContext } = options;
+    console.log('[boardRenderer.sendOpenLinkMessage]', JSON.stringify({
+        linkType,
+        target: target?.slice?.(-30) || target,
+        taskId,
+        columnId,
+        linkIndex,
+        hasIncludeContext: !!includeContext
+    }));
+    vscode.postMessage({
+        type: 'openLink',
+        linkType,
+        target,
+        taskId: taskId || undefined,
+        columnId: columnId || undefined,
+        linkIndex: linkIndex ?? undefined,
+        includeContext: includeContext || undefined
+    });
+}
+
 // Single function to handle opening links/images/wiki links
-function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
+function handleMediaOpen(event, target, taskId = null, columnId = null) {
     // Convert string 'undefined'/'null' to actual null (from HTML template literals)
     if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
         taskId = null;
@@ -2388,14 +2423,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         if (documentName) {
             // Calculate index for wiki links
             linkIndex = findElementIndex(wikiLink, containerElement, 'data-document');
-
-            vscode.postMessage({
-                type: 'openWikiLink',
-                documentName: documentName,
-                linkIndex: linkIndex,
-                taskId: taskId,
-                columnId: columnId
-            });
+            sendOpenLinkMessage(LinkType.WIKI, documentName, { taskId, columnId, linkIndex });
         }
         return true;
     }
@@ -2407,24 +2435,12 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         const href = link.getAttribute('data-original-href') || link.getAttribute('href');
         if (href && href !== '#') {
             if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
-                vscode.postMessage({
-                    type: 'openExternalLink',
-                    href: href
-                });
+                sendOpenLinkMessage(LinkType.EXTERNAL, href);
             } else {
                 // Calculate index for file links using the href attribute
                 const hrefAttr = link.getAttribute('data-original-href') ? 'data-original-href' : 'href';
                 linkIndex = findElementIndex(link, containerElement, hrefAttr);
-
-                console.log('[boardRenderer.openFileLink] Sending message:', JSON.stringify({ taskId, columnId, linkIndex, href: href?.slice(-30) }));
-                vscode.postMessage({
-                    type: 'openFileLink',
-                    href: href,
-                    linkIndex: linkIndex,
-                    taskId: taskId,
-                    columnId: columnId,
-                    includeContext: includeContext
-                });
+                sendOpenLinkMessage(LinkType.FILE, href, { taskId, columnId, linkIndex, includeContext });
             }
         }
         return true;
@@ -2440,15 +2456,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
             // Calculate index for images using the src attribute
             const srcAttr = img.getAttribute('data-original-src') ? 'data-original-src' : 'src';
             linkIndex = findElementIndex(img, containerElement, srcAttr);
-
-            vscode.postMessage({
-                type: 'openFileLink',
-                href: originalSrc,
-                linkIndex: linkIndex,
-                taskId: taskId,
-                columnId: columnId,
-                includeContext: includeContext
-            });
+            sendOpenLinkMessage(LinkType.IMAGE, originalSrc, { taskId, columnId, linkIndex, includeContext });
         }
         return true;
     }
@@ -2462,15 +2470,7 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         if (originalSrc) {
             // Calculate index for image-not-found placeholders
             linkIndex = findElementIndex(imageNotFound, containerElement, 'data-original-src');
-
-            vscode.postMessage({
-                type: 'openFileLink',
-                href: originalSrc,
-                linkIndex: linkIndex,
-                taskId: taskId,
-                columnId: columnId,
-                includeContext: includeContext
-            });
+            sendOpenLinkMessage(LinkType.IMAGE, originalSrc, { taskId, columnId, linkIndex, includeContext });
         }
         return true;
     }
@@ -2488,7 +2488,7 @@ function handleColumnTitleClick(event, columnId) {
 
     if (event.altKey) {
         // Alt+click: open link/image (no taskId for column titles)
-        if (handleLinkOrImageOpen(event, event.target, null, columnId)) {return;}
+        if (handleMediaOpen(event, event.target, null, columnId)) {return;}
         return; // Don't edit if Alt is pressed
     }
 
@@ -2532,7 +2532,7 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
 
     if (event.altKey) {
         // Alt+click: open link/image
-        if (handleLinkOrImageOpen(event, event.target, taskId, columnId)) {return;}
+        if (handleMediaOpen(event, event.target, taskId, columnId)) {return;}
         return; // Don't edit if Alt is pressed
     }
 
@@ -2598,7 +2598,7 @@ function handleDescriptionClick(event, element, taskId, columnId) {
 
     if (event.altKey) {
         // Alt+click: open link/image
-        if (handleLinkOrImageOpen(event, event.target, taskId, columnId)) {return;}
+        if (handleMediaOpen(event, event.target, taskId, columnId)) {return;}
         return; // Don't edit if Alt is pressed
     }
 
@@ -3070,7 +3070,7 @@ window.getUserAddedTags = getUserAddedTags;
 // Expose section wrapping function for taskEditor
 window.wrapTaskSections = wrapTaskSections;
 
-window.handleLinkOrImageOpen = handleLinkOrImageOpen;
+window.handleMediaOpen = handleMediaOpen;
 
 /**
  * Incrementally adds a single task to a column without redrawing everything

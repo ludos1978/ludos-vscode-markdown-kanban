@@ -22,6 +22,14 @@ let baseBuildVersion = '';
 // Track recent targeted updates to skip redundant full renders
 let lastTargetedUpdateTime = 0;
 const TARGETED_UPDATE_SKIP_WINDOW = 500; // ms to skip full render after targeted update
+
+// Link types for unified message handling (matches LinkType enum in MessageTypes.ts)
+const LinkType = {
+    FILE: 'file',
+    WIKI: 'wiki',
+    EXTERNAL: 'external',
+    IMAGE: 'image'
+};
 window.kanbanDebug = window.kanbanDebug || {
     enabled: false,
     log: (...args) => {
@@ -5283,8 +5291,9 @@ function updateFileInfoBar() {
         fileNameElement.onclick = () => {
             if (currentFileInfo.filePath) {
                 vscode.postMessage({
-                    type: 'openFileLink',
-                    href: currentFileInfo.filePath
+                    type: 'openLink',
+                    linkType: LinkType.FILE,
+                    target: currentFileInfo.filePath
                 });
             }
         };
@@ -5614,8 +5623,9 @@ function setFontFamily(family) {
 function openIncludeFile(filePath) {
     if (typeof vscode !== 'undefined') {
         vscode.postMessage({
-            type: 'openFileLink',
-            href: filePath
+            type: 'openLink',
+            linkType: LinkType.FILE,
+            target: filePath
         });
     }
 }

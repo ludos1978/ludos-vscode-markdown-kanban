@@ -2,7 +2,8 @@
  * File Commands
  *
  * Handles file-related message operations:
- * - openFileLink, openWikiLink, openExternalLink, openFile, openIncludeFile
+ * - openLink (unified: file, wiki, external, image links)
+ * - openFile, openIncludeFile
  * - handleFileDrop, handleUriDrop
  * - toggleFileLock, selectFile
  * - requestFileInfo, initializeFile
@@ -17,9 +18,8 @@ import { showInfo, showWarning } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import {
-    OpenFileLinkMessage,
-    OpenWikiLinkMessage,
-    OpenExternalLinkMessage,
+    OpenLinkMessage,
+    LinkType,
     OpenFileMessage,
     OpenIncludeFileMessage,
     HandleFileDropMessage,
@@ -38,9 +38,7 @@ export class FileCommands extends SwitchBasedCommand {
         name: 'File Commands',
         description: 'Handles file opening, links, and file management',
         messageTypes: [
-            'openFileLink',
-            'openWikiLink',
-            'openExternalLink',
+            'openLink',
             'openFile',
             'openIncludeFile',
             'handleFileDrop',
@@ -55,9 +53,7 @@ export class FileCommands extends SwitchBasedCommand {
     };
 
     protected handlers: Record<string, MessageHandler> = {
-        'openFileLink': (msg, ctx) => this.handleOpenFileLink(msg as OpenFileLinkMessage, ctx),
-        'openWikiLink': (msg, ctx) => this.handleOpenWikiLink(msg as OpenWikiLinkMessage, ctx),
-        'openExternalLink': (msg, ctx) => this.handleOpenExternalLink(msg as OpenExternalLinkMessage, ctx),
+        'openLink': (msg, ctx) => this.handleOpenLink(msg as OpenLinkMessage, ctx),
         'openFile': (msg, ctx) => this.handleOpenFile(msg as OpenFileMessage, ctx),
         'openIncludeFile': (msg, ctx) => this.handleOpenIncludeFile(msg as OpenIncludeFileMessage, ctx),
         'handleFileDrop': (msg, ctx) => this.handleFileDrop(msg as HandleFileDropMessage, ctx),
@@ -69,92 +65,97 @@ export class FileCommands extends SwitchBasedCommand {
         'resolveAndCopyPath': (msg, ctx) => this.handleResolveAndCopyPath(msg as ResolveAndCopyPathMessage, ctx)
     };
 
-    // ============= FILE LINK HANDLERS =============
+    // ============= UNIFIED LINK HANDLER =============
 
     /**
-     * Handle openFileLink command
+     * Handle unified openLink command
+     *
+     * Routes to appropriate handler based on LinkType:
+     * - FILE/IMAGE: Opens file or shows search dialog if not found
+     * - WIKI: Searches for wiki document
+     * - EXTERNAL: Opens in external browser
      *
      * Triggered when user Alt+clicks a link or image in the board (from boardRenderer.js).
-     * Flow: Alt+click → openFileLink message → LinkHandler.handleFileLink → opens file or shows search dialog if not found.
-     *
-     * Different from PathCommands.handleSearchForFile which is triggered from path menus.
+     * Flow: Alt+click → openLink message → LinkHandler method → opens or searches.
      */
-    private async handleOpenFileLink(message: OpenFileLinkMessage, context: CommandContext): Promise<CommandResult> {
-        // Set up tracked files for file search (main + includes) before handling link
-        const fileRegistry = context.getFileRegistry();
-        let mainFilePath: string | undefined;
-        console.log('[FileCommands.handleOpenFileLink] START', JSON.stringify({
-            href: message.href?.slice(-30),
-            taskId: message.taskId,
-            columnId: message.columnId,
-            linkIndex: message.linkIndex,
-            hasRegistry: !!fileRegistry,
-            hasIncludeContext: !!message.includeContext
-        }));
-        if (fileRegistry) {
-            const allFiles = fileRegistry.getAll();
-            const trackedFiles = allFiles.map(file => ({
-                path: file.getPath(),
-                relativePath: file.getRelativePath(),
-                content: file.getContent()
-            }));
-            context.linkHandler.setTrackedFiles(trackedFiles);
-            // Get main file path from registry
-            const mainFile = fileRegistry.getMainFile();
-            mainFilePath = mainFile?.getPath();
-            console.log('[FileCommands.handleOpenFileLink] Registry info', {
-                fileCount: allFiles.length,
-                mainFilePath,
-                hasMainFile: !!mainFile
-            });
-        }
+    private async handleOpenLink(message: OpenLinkMessage, context: CommandContext): Promise<CommandResult> {
+        const { linkType, target, taskId, columnId, linkIndex, includeContext } = message;
 
-        await context.linkHandler.handleFileLink(
-            message.href,
-            message.taskId,
-            message.columnId,
-            message.linkIndex,
-            message.includeContext,
-            mainFilePath
-        );
-        if (fileRegistry && message.href) {
-            const includeFile = fileRegistry.getByRelativePath(message.href);
-            if (includeFile && includeFile.getFileType() !== 'main') {
-                const includePath = includeFile.getPath();
-                const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
-                if (openDoc && !openDoc.isDirty) {
-                    const cachedContent = includeFile.getContent();
-                    if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
-                        const edit = new vscode.WorkspaceEdit();
-                        const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
-                        edit.replace(openDoc.uri, fullRange, cachedContent);
-                        await vscode.workspace.applyEdit(edit);
+        console.log('[FileCommands.handleOpenLink] START', JSON.stringify({
+            linkType,
+            target: target?.slice(-30),
+            taskId,
+            columnId,
+            linkIndex,
+            hasIncludeContext: !!includeContext
+        }));
+
+        switch (linkType) {
+            case LinkType.FILE:
+            case LinkType.IMAGE: {
+                // Set up tracked files for file search (main + includes) before handling link
+                const fileRegistry = context.getFileRegistry();
+                let mainFilePath: string | undefined;
+
+                if (fileRegistry) {
+                    const allFiles = fileRegistry.getAll();
+                    const trackedFiles = allFiles.map(file => ({
+                        path: file.getPath(),
+                        relativePath: file.getRelativePath(),
+                        content: file.getContent()
+                    }));
+                    context.linkHandler.setTrackedFiles(trackedFiles);
+                    const mainFile = fileRegistry.getMainFile();
+                    mainFilePath = mainFile?.getPath();
+                    console.log('[FileCommands.handleOpenLink] Registry info', {
+                        fileCount: allFiles.length,
+                        mainFilePath,
+                        hasMainFile: !!mainFile
+                    });
+                }
+
+                await context.linkHandler.handleFileLink(
+                    target,
+                    taskId,
+                    columnId,
+                    linkIndex,
+                    includeContext,
+                    mainFilePath
+                );
+
+                // Sync include file content if needed
+                if (fileRegistry && target) {
+                    const includeFile = fileRegistry.getByRelativePath(target);
+                    if (includeFile && includeFile.getFileType() !== 'main') {
+                        const includePath = includeFile.getPath();
+                        const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
+                        if (openDoc && !openDoc.isDirty) {
+                            const cachedContent = includeFile.getContent();
+                            if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
+                                const edit = new vscode.WorkspaceEdit();
+                                const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
+                                edit.replace(openDoc.uri, fullRange, cachedContent);
+                                await vscode.workspace.applyEdit(edit);
+                            }
+                        }
                     }
                 }
+                break;
             }
+
+            case LinkType.WIKI:
+                await context.linkHandler.handleWikiLink(target, taskId, columnId, linkIndex);
+                break;
+
+            case LinkType.EXTERNAL:
+                await context.linkHandler.handleExternalLink(target);
+                break;
+
+            default:
+                console.warn(`[FileCommands.handleOpenLink] Unknown link type: ${linkType}`);
+                return this.failure(`Unknown link type: ${linkType}`);
         }
 
-        return this.success();
-    }
-
-    /**
-     * Handle openWikiLink command
-     */
-    private async handleOpenWikiLink(message: OpenWikiLinkMessage, context: CommandContext): Promise<CommandResult> {
-        await context.linkHandler.handleWikiLink(
-            message.documentName,
-            message.taskId,
-            message.columnId,
-            message.linkIndex
-        );
-        return this.success();
-    }
-
-    /**
-     * Handle openExternalLink command
-     */
-    private async handleOpenExternalLink(message: OpenExternalLinkMessage, context: CommandContext): Promise<CommandResult> {
-        await context.linkHandler.handleExternalLink(message.href);
         return this.success();
     }
 
