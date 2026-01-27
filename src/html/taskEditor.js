@@ -1342,6 +1342,7 @@ class TaskEditor {
                 if (recalcTimeout) { clearTimeout(recalcTimeout); recalcTimeout = null; }
                 lastRecalcTime = now;
                 this._requestStackLayoutRecalc(colId);
+                this._flushStackLayoutRecalc();
                 if (typeof window.logViewMovement === 'function') {
                     window.logViewMovement('taskEditor.queueStackLayout.immediate', {
                         columnId: colId,
@@ -1355,6 +1356,7 @@ class TaskEditor {
                 recalcTimeout = setTimeout(() => {
                     lastRecalcTime = Date.now();
                     this._requestStackLayoutRecalc(colId);
+                    this._flushStackLayoutRecalc();
                     if (typeof window.logViewMovement === 'function') {
                         window.logViewMovement('taskEditor.queueStackLayout.delayed', {
                             columnId: colId,
