@@ -2,10 +2,22 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2026-01-07
+**Last Updated:** 2026-01-27
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Updates (2026-01-27)
+- `src/services/export/ExportService.ts` adds `excludeTags?: string[]` to `NewExportOptions` interface for excluding content from export.
+- `src/services/export/ExportService.ts` adds `hasExcludeTag()` - helper to check if text contains any exclude tag using word boundary matching.
+- `src/services/export/ExportService.ts` adds `filterExcludedFromBoard()` - filters board object by removing columns, tasks, and task content lines containing exclude tags.
+- `src/services/export/ExportService.ts` adds `filterExcludedFromMarkdown()` - filters raw markdown by removing columns, task blocks, and lines containing exclude tags.
+- `src/services/export/ExportService.ts` `transformContent()` now integrates exclude tag filtering in all three paths (board-based, file-based, simple).
+- `src/html/exportMarpUI.js` adds `parseExcludeTags()` - parses comma-separated tags input into normalized array.
+- `src/html/exportMarpUI.js` adds localStorage persistence for export exclude settings (enabled toggle + tag list).
+- `src/html/webview.html` adds export exclude UI: toggle checkbox and comma-separated tag input field.
 
 ---
 

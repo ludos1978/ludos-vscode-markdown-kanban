@@ -59,6 +59,7 @@ export interface NewExportOptions {
     // TRANSFORMATIONS
     mergeIncludes?: boolean;
     tagVisibility: TagVisibility;
+    excludeTags?: string[];  // Tags that exclude content from export (e.g., ['#export-exclude', '#private'])
 
     // PACKING & LINK HANDLING
     linkHandlingMode?: 'rewrite-only' | 'pack-linked' | 'pack-all' | 'no-modify';
@@ -190,6 +191,147 @@ export class ExportService {
             return TagUtils.processMarkdownContent(content, tagVisibility);
         }
         return content;
+    }
+
+    /**
+     * Check if text contains any of the exclude tags
+     * Uses word boundary matching to avoid partial matches (e.g., #export won't match #export-exclude)
+     */
+    private static hasExcludeTag(text: string, excludeTags: string[]): boolean {
+        if (!text || !excludeTags || excludeTags.length === 0) {
+            return false;
+        }
+        for (const tag of excludeTags) {
+            // Use word boundary to match exact tag (e.g., #export-exclude won't match #export)
+            const tagPattern = new RegExp(`${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            if (tagPattern.test(text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Filter excluded content from a board object based on exclude tags
+     * - Removes columns where column.title contains any exclude tag
+     * - Removes tasks where task.title contains any exclude tag
+     * - Filters lines in task.content that contain exclude tags
+     */
+    private static filterExcludedFromBoard(board: KanbanBoard, excludeTags: string[]): KanbanBoard {
+        if (!excludeTags || excludeTags.length === 0) {
+            return board;
+        }
+
+        const filteredColumns: KanbanColumn[] = [];
+
+        for (const column of board.columns) {
+            // Skip column if its title contains an exclude tag
+            if (this.hasExcludeTag(column.title, excludeTags)) {
+                continue;
+            }
+
+            // Filter tasks in this column
+            const filteredTasks: KanbanTask[] = [];
+            for (const task of column.tasks || []) {
+                // Skip task if its title contains an exclude tag
+                if (this.hasExcludeTag(task.title, excludeTags)) {
+                    continue;
+                }
+
+                // Filter lines in task description
+                if (task.description) {
+                    const filteredLines = task.description
+                        .split('\n')
+                        .filter((line: string) => !this.hasExcludeTag(line, excludeTags));
+                    filteredTasks.push({
+                        ...task,
+                        description: filteredLines.join('\n')
+                    });
+                } else {
+                    filteredTasks.push(task);
+                }
+            }
+
+            filteredColumns.push({
+                ...column,
+                tasks: filteredTasks
+            });
+        }
+
+        return {
+            ...board,
+            columns: filteredColumns
+        };
+    }
+
+    /**
+     * Filter excluded content from raw markdown based on exclude tags
+     * - Removes ## column header lines if they contain exclude tags
+     * - Removes task blocks (- [ ] task and its content) if title contains exclude tags
+     * - Removes individual lines within task content if they contain exclude tags
+     */
+    private static filterExcludedFromMarkdown(content: string, excludeTags: string[]): string {
+        if (!excludeTags || excludeTags.length === 0) {
+            return content;
+        }
+
+        const lines = content.split('\n');
+        const result: string[] = [];
+        let skipUntilNextSection = false;
+        let inExcludedTask = false;
+        let taskIndentLevel = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmedLine = line.trim();
+
+            // Check for column header (## Title)
+            if (trimmedLine.startsWith('## ')) {
+                skipUntilNextSection = this.hasExcludeTag(line, excludeTags);
+                inExcludedTask = false;
+                if (!skipUntilNextSection) {
+                    result.push(line);
+                }
+                continue;
+            }
+
+            // Skip all content in excluded column
+            if (skipUntilNextSection) {
+                continue;
+            }
+
+            // Check for task line (- [ ] or - [x])
+            const taskMatch = line.match(/^(\s*)-\s*\[[x\s]\]/i);
+            if (taskMatch) {
+                taskIndentLevel = taskMatch[1].length;
+                inExcludedTask = this.hasExcludeTag(line, excludeTags);
+                if (!inExcludedTask) {
+                    result.push(line);
+                }
+                continue;
+            }
+
+            // Check if we're in indented task content (continuation of task)
+            const lineIndent = line.match(/^(\s*)/)?.[1].length || 0;
+            if (inExcludedTask && lineIndent > taskIndentLevel && trimmedLine !== '') {
+                // Skip indented content of excluded task
+                continue;
+            }
+
+            // Reset excluded task flag when we reach a non-indented line
+            if (lineIndent <= taskIndentLevel && trimmedLine !== '') {
+                inExcludedTask = false;
+            }
+
+            // For regular lines, check if they contain exclude tags
+            if (this.hasExcludeTag(line, excludeTags)) {
+                continue;
+            }
+
+            result.push(line);
+        }
+
+        return result.join('\n');
     }
 
     /**
@@ -1629,7 +1771,12 @@ export class ExportService {
         if (useBoardBasedConversion) {
             // BOARD-BASED PATH: Use in-memory board (includes already resolved)
             // Filter board based on scope and selection
-            const filteredBoard = this.filterBoard(board, options);
+            let filteredBoard = this.filterBoard(board, options);
+
+            // Apply exclude tag filtering to board
+            if (options.excludeTags && options.excludeTags.length > 0) {
+                filteredBoard = this.filterExcludedFromBoard(filteredBoard, options.excludeTags);
+            }
 
             // Use unified presentation generator
             const config = ConfigurationService.getInstance();
@@ -1708,9 +1855,19 @@ export class ExportService {
             result = processed.exportedContent;
             notIncludedAssets = processed.notIncludedAssets;
 
+            // Apply exclude tag filtering to markdown content
+            if (options.excludeTags && options.excludeTags.length > 0) {
+                result = this.filterExcludedFromMarkdown(result, options.excludeTags);
+            }
+
         } else {
             // Simple path: tag filtering and link rewriting (no asset packing)
             result = this.applyTagFiltering(result, options.tagVisibility);
+
+            // Apply exclude tag filtering to markdown content
+            if (options.excludeTags && options.excludeTags.length > 0) {
+                result = this.filterExcludedFromMarkdown(result, options.excludeTags);
+            }
 
             // Apply content transformations (speaker notes, HTML comments, HTML content)
             result = this.applyContentTransformations(result, options);

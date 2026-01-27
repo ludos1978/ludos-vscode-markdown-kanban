@@ -142,6 +142,23 @@ function filterTagsForExport(text, tagVisibility = 'allexcludinglayout') {
     }
 }
 
+/**
+ * Parse comma-separated exclude tags input into an array of normalized tags
+ * Ensures each tag starts with # and trims whitespace
+ * @param {string} input - Comma-separated tags (e.g., "#export-exclude, private, #draft")
+ * @returns {string[]} Array of normalized tags (e.g., ["#export-exclude", "#private", "#draft"])
+ */
+function parseExcludeTags(input) {
+    if (!input || !input.trim()) {
+        return [];
+    }
+    return input
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0)
+        .map(tag => tag.startsWith('#') ? tag : '#' + tag);
+}
+
 // =============================================================================
 // EXPORT DIALOG FUNCTIONS
 // =============================================================================
@@ -288,6 +305,20 @@ function initializeExportTree(preSelectNodeId = null) {
         setupStorageLinkedSelect('html-content-mode', 'kanban-html-content-mode');
         setupStorageLinkedSelect('embed-handling', 'kanban-embed-handling');
 
+        // Set up export exclude tags persistence
+        const excludeEnabledCheckbox = document.getElementById('export-exclude-enabled');
+        const excludeTagsInput = document.getElementById('export-exclude-tags');
+        if (excludeEnabledCheckbox) {
+            excludeEnabledCheckbox.addEventListener('change', () => {
+                localStorage.setItem('kanban-export-exclude-enabled', excludeEnabledCheckbox.checked);
+            });
+        }
+        if (excludeTagsInput) {
+            excludeTagsInput.addEventListener('input', () => {
+                localStorage.setItem('kanban-export-exclude-tags', excludeTagsInput.value);
+            });
+        }
+
         // Set up link handling mode dropdown
         const linkModeDropdown = document.getElementById('link-handling-mode');
         const linkHandlingOptions = document.getElementById('link-handling-options');
@@ -303,6 +334,20 @@ function initializeExportTree(preSelectNodeId = null) {
 
     // Always update visibility state when modal opens
     updateLinkHandlingOptionsVisibility();
+
+    // Restore export exclude settings from localStorage
+    const excludeEnabledCheckbox = document.getElementById('export-exclude-enabled');
+    const excludeTagsInput = document.getElementById('export-exclude-tags');
+    if (excludeEnabledCheckbox) {
+        const savedEnabled = localStorage.getItem('kanban-export-exclude-enabled');
+        excludeEnabledCheckbox.checked = savedEnabled === 'true';
+    }
+    if (excludeTagsInput) {
+        const savedTags = localStorage.getItem('kanban-export-exclude-tags');
+        if (savedTags) {
+            excludeTagsInput.value = savedTags;
+        }
+    }
 
     // Set up selection change callback to update folder name
     exportTreeUI.setSelectionChangeCallback(() => {
@@ -403,6 +448,11 @@ function executeUnifiedExport() {
     const tagVisibility = document.getElementById('export-tag-visibility')?.value || 'allexcludinglayout';
     const linkHandlingMode = document.getElementById('link-handling-mode')?.value || 'rewrite-only';
 
+    // Export exclude tags
+    const excludeEnabled = document.getElementById('export-exclude-enabled')?.checked || false;
+    const excludeTagsRaw = document.getElementById('export-exclude-tags')?.value || '';
+    const excludeTags = excludeEnabled ? parseExcludeTags(excludeTagsRaw) : [];
+
     let packAssets = false;
     let packOptions = undefined;
 
@@ -473,6 +523,7 @@ function executeUnifiedExport() {
         runMarp: useMarp,  // Use Marp checkbox
         marpFormat: useMarp ? marpOutputFormat : undefined,
         tagVisibility: tagVisibility,
+        excludeTags: excludeTags.length > 0 ? excludeTags : undefined,
         mergeIncludes: mergeIncludes,
         speakerNoteMode: speakerNoteMode,
         htmlCommentMode: htmlCommentMode,
