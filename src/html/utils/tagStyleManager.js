@@ -48,6 +48,80 @@ function isDarkTheme() {
 // ============================================================================
 
 /**
+ * Checks if an object is a direct tag configuration (not a group)
+ * @param {object} value - The object to check
+ * @returns {boolean} True if this is a direct tag config
+ */
+function isTagConfig(value) {
+    if (!value || typeof value !== 'object') return false;
+    // A tag config has theme colors or style properties at its level
+    return value.light || value.dark ||
+        value.headerBar || value.footerBar || value.border || value.cornerBadge ||
+        value.opacity !== undefined || value.filter || value.pattern;
+}
+
+/**
+ * Generates CSS for background patterns
+ * @param {string} pattern - Pattern type: 'stripes', 'stripes-h', 'stripes-v', 'dots'
+ * @param {boolean} isDark - Whether dark theme is active
+ * @returns {string} CSS background-image value or empty string
+ */
+function generatePatternCSS(pattern, isDark) {
+    if (!pattern || pattern === 'none') return '';
+
+    // Use semi-transparent overlay that works with any background color
+    const stripeColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const dotColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+    switch (pattern) {
+        case 'stripes':
+            // 45 degree diagonal stripes
+            return `repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 8px,
+                ${stripeColor} 8px,
+                ${stripeColor} 16px
+            )`;
+        case 'stripes-h':
+            // Horizontal stripes
+            return `repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 8px,
+                ${stripeColor} 8px,
+                ${stripeColor} 16px
+            )`;
+        case 'stripes-v':
+            // Vertical stripes
+            return `repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 8px,
+                ${stripeColor} 8px,
+                ${stripeColor} 16px
+            )`;
+        case 'dots':
+            // Dot pattern using radial gradients
+            return `radial-gradient(${dotColor} 2px, transparent 2px)`;
+        default:
+            return '';
+    }
+}
+
+/**
+ * Gets additional CSS properties for pattern backgrounds
+ * @param {string} pattern - Pattern type
+ * @returns {string} Additional CSS properties (like background-size for dots)
+ */
+function getPatternExtraCSS(pattern) {
+    if (pattern === 'dots') {
+        return 'background-size: 12px 12px;';
+    }
+    return '';
+}
+
+/**
  * Helper function to get tag configuration from grouped or flat structure
  * @param {string} tagName - The tag name to look up
  * @returns {object|null} The tag configuration, or null if not found
@@ -64,9 +138,8 @@ function getTagConfig(tagName) {
     // Check all keys in tagColors dynamically (supports any group name)
     for (const key of Object.keys(window.tagColors)) {
         const value = window.tagColors[key];
-        // Check if this is a group (object containing tag configs)
-        if (value && typeof value === 'object' && !value.light && !value.dark &&
-            !value.headerBar && !value.footerBar && !value.border && !value.cornerBadge) {
+        // Check if this is a group (object containing tag configs) - NOT a direct tag config
+        if (value && typeof value === 'object' && !isTagConfig(value)) {
             // This looks like a group - check if it contains the tag (case-insensitive)
             for (const tagKey of Object.keys(value)) {
                 if (tagKey.toLowerCase() === normalizedTagName) {
@@ -558,6 +631,48 @@ function generateTagStyles() {
                             ` : ''}
                         }\n`;
                     }
+
+                    // Visual effects: opacity, filter, pattern
+                    // These apply to the whole column/task element
+                    const hasOpacity = config.opacity !== undefined && config.opacity !== 1;
+                    const hasFilter = config.filter && config.filter !== 'none';
+                    const hasPattern = config.pattern && config.pattern !== 'none';
+
+                    if (hasOpacity || hasFilter || hasPattern) {
+                        let effectStyles = '';
+
+                        if (hasOpacity) {
+                            effectStyles += `opacity: ${config.opacity} !important;\n`;
+                        }
+
+                        if (hasFilter) {
+                            effectStyles += `filter: ${config.filter} !important;\n`;
+                        }
+
+                        if (hasPattern) {
+                            const patternCSS = generatePatternCSS(config.pattern, isDark);
+                            const patternExtra = getPatternExtraCSS(config.pattern);
+                            if (patternCSS) {
+                                // Pattern is applied as an overlay on existing background
+                                effectStyles += `background-image: ${patternCSS} !important;\n`;
+                                if (patternExtra) {
+                                    effectStyles += patternExtra + '\n';
+                                }
+                            }
+                        }
+
+                        if (effectStyles) {
+                            // Apply to columns
+                            styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] {
+                                ${effectStyles}
+                            }\n`;
+
+                            // Apply to tasks
+                            styles += `.task-item[data-task-bg-tag="${attrTagName}"] {
+                                ${effectStyles}
+                            }\n`;
+                        }
+                    }
             }
         }
     };
@@ -568,11 +683,7 @@ function generateTagStyles() {
         const value = window.tagColors[key];
         if (!value || typeof value !== 'object') return;
 
-        // Check if this is a direct tag config (has theme colors or style properties)
-        const isDirectTagConfig = value.light || value.dark ||
-            value.headerBar || value.footerBar || value.border || value.cornerBadge;
-
-        if (isDirectTagConfig) {
+        if (isTagConfig(value)) {
             // This is a direct tag config at root level - process as single tag
             const singleTagObj = {};
             singleTagObj[key] = value;

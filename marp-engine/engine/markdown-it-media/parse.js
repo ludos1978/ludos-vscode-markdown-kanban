@@ -60,6 +60,55 @@ function normalizeTimeValue(value) {
 }
 
 /**
+ * Parse a time string that can be in various formats:
+ * - Pure seconds: "600", "600s"
+ * - Minutes:seconds: "10:00", "1:30"
+ * - Hours:minutes:seconds: "1:30:00"
+ * @param {string} value
+ * @returns {string | null} Time in seconds as a string, or null if invalid
+ */
+function parseTimeString(value) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim().replace(/s$/i, "");
+  if (trimmed === "") {
+    return null;
+  }
+
+  // Check for colon-separated format (mm:ss or hh:mm:ss)
+  if (trimmed.includes(":")) {
+    const parts = trimmed.split(":");
+    if (parts.length === 2) {
+      // mm:ss format
+      const minutes = parseInt(parts[0], 10);
+      const seconds = parseInt(parts[1], 10);
+      if (!Number.isNaN(minutes) && !Number.isNaN(seconds)) {
+        return String(minutes * 60 + seconds);
+      }
+    } else if (parts.length === 3) {
+      // hh:mm:ss format
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      const seconds = parseInt(parts[2], 10);
+      if (!Number.isNaN(hours) && !Number.isNaN(minutes) && !Number.isNaN(seconds)) {
+        return String(hours * 3600 + minutes * 60 + seconds);
+      }
+    }
+    return null;
+  }
+
+  // Plain numeric seconds
+  const numeric = Number(trimmed);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  return String(numeric);
+}
+
+/**
  * @param {string} href
  * @returns {{ normalizedSrc: string, startTime: string | null, endTime: string | null }}
  */
@@ -648,11 +697,52 @@ function parseMedia(state) {
 
     pos += 1;
 
+    // Check for attribute block {start=600 end=700} after the closing )
+    let attrStart = null;
+    let attrEnd = null;
+
+    if (pos < state.posMax && state.src.charAt(pos) === "{") {
+      const attrBlockStart = pos + 1;
+      let attrBlockEnd = -1;
+
+      // Find closing }
+      for (let i = attrBlockStart; i < state.posMax; i++) {
+        if (state.src.charAt(i) === "}") {
+          attrBlockEnd = i;
+          break;
+        }
+      }
+
+      if (attrBlockEnd > attrBlockStart) {
+        const attrContent = state.src.slice(attrBlockStart, attrBlockEnd);
+
+        // Parse start=VALUE (supports 600, 600s, 10:00, 1:30:00)
+        const startMatch = attrContent.match(/\bstart=["']?([^"'\s}]+)["']?/);
+        if (startMatch) {
+          attrStart = parseTimeString(startMatch[1]);
+        }
+
+        // Parse end=VALUE
+        const endMatch = attrContent.match(/\bend=["']?([^"'\s}]+)["']?/);
+        if (endMatch) {
+          attrEnd = parseTimeString(endMatch[1]);
+        }
+
+        pos = attrBlockEnd + 1;
+      }
+    }
+
+    // Merge: URL params take precedence, fallback to attr block
+    const finalStart = argsRes.res.start || attrStart;
+    const finalEnd = argsRes.res.end || attrEnd;
+
     return {
       pos,
       res: {
         label,
         ...argsRes.res,
+        start: finalStart,
+        end: finalEnd,
       },
     };
   }
