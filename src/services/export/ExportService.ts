@@ -1493,9 +1493,9 @@ export class ExportService {
             const { board } = MarkdownKanbanParser.parseMarkdown(filteredContent, sourceDir, undefined, undefined, resolveIncludes);
 
             // Exclude filtering is handled by PresentationGenerator via excludeTags option
+            // NOTE: tagVisibility NOT passed here - already applied at text level above (line 1460)
             const pageBreaks = options.documentPageBreaks || 'continuous';
             filteredContent = PresentationGenerator.toDocument(board, pageBreaks, {
-                tagVisibility: options.tagVisibility,
                 excludeTags: options.excludeTags
             });
         }
