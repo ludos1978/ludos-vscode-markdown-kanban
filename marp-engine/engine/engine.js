@@ -748,7 +748,7 @@ const _customImageCaption = (md) => {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
-      return `<figure class="image-figure">${imgHtml}<figcaption>${escapedTitle}</figcaption></figure>`;
+      return `<figure class="media-figure">${imgHtml}<figcaption>${escapedTitle}</figcaption></figure>`;
     }
 
     return imgHtml;

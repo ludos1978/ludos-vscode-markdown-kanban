@@ -501,7 +501,15 @@ section h3:has(.footnote-ref) sup {
 }
 
 /* caption to an image or video */
-figcaption,
+figcaption {
+	display: block;
+	font-size: 0.85em;
+	font-style: italic;
+	text-align: center;
+	margin-top: 4px;
+	color: #666;
+}
+
 .footnote-ref {
 	display: inline-block;
 }
