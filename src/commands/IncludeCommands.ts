@@ -116,6 +116,19 @@ export class IncludeCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Build default URI for file picker, optionally using current file location.
+     */
+    private buildDefaultUri(currentDir: string, currentFile: string | undefined, label: string): vscode.Uri {
+        if (currentFile) {
+            const currentAbsolutePath = path.resolve(currentDir, currentFile);
+            if (fs.existsSync(currentAbsolutePath)) {
+                return safeFileUri(currentAbsolutePath, `${label}-file`);
+            }
+        }
+        return safeFileUri(currentDir, `${label}-dir`);
+    }
+
+    /**
      * Get current file directory or return error result.
      * @returns Object with currentDir if successful, or null if no active file
      */
@@ -303,16 +316,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const currentDir = this.getCurrentDir(context);
         if (!currentDir) { return this.success(); }
 
-        let defaultUri = safeFileUri(currentDir, 'includeCommands-changeColumnInclude-dir');
-        if (currentFile) {
-            const currentAbsolutePath = path.resolve(currentDir, currentFile);
-            if (fs.existsSync(currentAbsolutePath)) {
-                defaultUri = safeFileUri(currentAbsolutePath, 'includeCommands-changeColumnInclude-file');
-            }
-        }
-
         const fileUris = await selectMarkdownFile({
-            defaultUri: defaultUri,
+            defaultUri: this.buildDefaultUri(currentDir, currentFile, 'includeCommands-changeColumnInclude'),
             title: 'Select new include file for column'
         });
 
@@ -344,16 +349,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const currentDir = this.getCurrentDir(context);
         if (!currentDir) { return this.success(); }
 
-        let defaultUri = safeFileUri(currentDir, 'includeCommands-changeTaskInclude-dir');
-        if (currentFile) {
-            const currentAbsolutePath = path.resolve(currentDir, currentFile);
-            if (fs.existsSync(currentAbsolutePath)) {
-                defaultUri = safeFileUri(currentAbsolutePath, 'includeCommands-changeTaskInclude-file');
-            }
-        }
-
         const fileUris = await selectMarkdownFile({
-            defaultUri: defaultUri,
+            defaultUri: this.buildDefaultUri(currentDir, currentFile, 'includeCommands-changeTaskInclude'),
             title: 'Select new include file for task'
         });
 
