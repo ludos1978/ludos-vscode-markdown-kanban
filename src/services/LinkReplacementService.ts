@@ -102,8 +102,9 @@ export class LinkReplacementService {
         options: ReplacementOptions
     ): Promise<ReplacementResult> {
         logger.debug('[LinkReplacementService.replacePath] START', {
-            brokenPath: brokenPath.substring(0, 100),
-            newPath: newPath.substring(0, 100),
+            brokenPath,
+            newPath,
+            basePath,
             mode: options.mode,
             taskId: options.taskId,
             columnId: options.columnId
@@ -309,9 +310,9 @@ export class LinkReplacementService {
         }
         logger.debug('[LinkReplacementService._computeReplacementPath]', {
             pathFormat,
-            newAbsolutePath: newAbsolutePath.slice(-50),
-            fileBasePath: fileBasePath.slice(-50),
-            result: result.slice(-50)
+            newAbsolutePath,
+            fileBasePath,
+            result
         });
         return result;
     }
