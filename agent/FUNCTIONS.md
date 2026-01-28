@@ -2,10 +2,64 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2026-01-27
+**Last Updated:** 2026-01-28
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Updates (2026-01-28) - Excel Spreadsheet Embedding Feature
+
+### New File: `src/services/export/XlsxService.ts`
+Service for converting Excel spreadsheets (.xlsx, .xls, .ods) to PNG images using LibreOffice CLI.
+
+**Methods:**
+- `XlsxService.getConfigKey()` - Returns 'libreOfficePath' config key
+- `XlsxService.getDefaultCliName()` - Returns 'soffice' CLI name
+- `XlsxService.getServiceName()` - Returns 'XlsxService' for logging
+- `XlsxService.getVersionCheckArgs()` - Returns ['--version'] for CLI check
+- `XlsxService.getCliNotFoundWarning()` - Returns LibreOffice installation warning
+- `XlsxService.getInstallationUrl()` - Returns LibreOffice download URL
+- `XlsxService.getCommonPaths()` - Returns platform-specific LibreOffice paths
+- `XlsxService.showCliWarning()` - Shows platform-specific installation instructions
+- `XlsxService.renderPNG(filePath, sheetNumber)` - Converts xlsx to PNG using LibreOffice
+- `XlsxService.findSheetOutputFile(tempDir, baseName, sheetNumber)` - Finds output file for specific sheet
+- `XlsxService.cleanupGeneratedFiles(tempDir, baseName)` - Cleans up temp PNG files
+- `XlsxService.getSupportedExtensions()` - Returns ['.xlsx', '.xls', '.ods']
+
+### Updates to `src/shared/regexPatterns.ts`
+- Added `DiagramPatterns.xlsx()` - Regex pattern for Excel file references with optional attributes: `![alt](path.xlsx "title"){page=1}`
+
+### Updates to `src/services/export/DiagramPreprocessor.ts`
+- Added `XlsxService` import and instance
+- Extended `DiagramBlock` interface with `'xlsx'` type and `attributes` property
+- Added xlsx extraction in `extractAllDiagrams()` with attribute parsing
+- Added `renderXlsxBatch()` method for parallel xlsx rendering to PNG
+- Added xlsx case to `getUnconvertedDiagramNote()` for error messages
+
+### Updates to `src/commands/DiagramCommands.ts`
+- Added `RequestXlsxRenderMessage` import
+- Added `'requestXlsxRender'` to metadata messageTypes
+- Added `handleRenderXlsx()` handler for webview xlsx render requests
+
+### Updates to `src/core/bridge/MessageTypes.ts`
+- Added `RequestXlsxRenderMessage` interface for xlsx render requests
+- Added `RequestXlsxRenderMessage` to `IncomingMessage` union type
+
+### Updates to `src/html/markdownRenderer.js`
+- Added `renderXlsxSheet(filePath, sheetNumber, includeDir)` - Requests xlsx render from backend
+- Added `queueXlsxRender(id, filePath, sheetNumber, includeDir)` - Queues xlsx for async rendering
+- Added xlsx file detection in image rendering (`.xlsx`, `.xls`, `.ods` extensions)
+- Added xlsx case to `processDiagramQueue()` render logic
+- Added xlsx message handlers for `xlsxRenderSuccess` and `xlsxRenderError`
+- Added xlsx to error type labels
+
+**Usage Syntax:** `![optional alt](path/to/spreadsheet.xlsx){page=2 width=400px}`
+- `page=N` selects sheet number (1-indexed, default: 1)
+- Standard image attributes (width, height, etc.) are supported
+
+**Dependencies:** LibreOffice CLI (user-installed)
 
 ---
 

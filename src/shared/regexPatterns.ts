@@ -80,6 +80,12 @@ export const DiagramPatterns = {
      * Captures: [1] = file path, [2] = optional title
      */
     excalidraw: () => /!\[[^\]]*\]\(([^\s"]+\.excalidraw(?:\.json|\.svg)?)(?:\s+"([^"]+)")?\)/g,
+
+    /**
+     * Excel spreadsheet file reference: ![alt](path.xlsx "title"){page=1} or ![alt](path.xls/.ods)
+     * Captures: [1] = file path, [2] = optional title, [3] = optional attributes block
+     */
+    xlsx: () => /!\[[^\]]*\]\(([^\s"]+\.(?:xlsx|xls|ods))(?:\s+"([^"]+)")?\)(\{[^}]+\})?/g,
 };
 
 /**

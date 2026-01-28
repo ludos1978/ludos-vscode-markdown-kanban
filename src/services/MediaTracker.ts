@@ -413,6 +413,35 @@ export class MediaTracker {
     }
 
     /**
+     * Ensure a file is tracked and watched for changes.
+     * Called when a diagram is rendered to fix first-change detection issue.
+     * @param relativePath - Relative path from markdown reference
+     * @param absolutePath - Absolute path to the file
+     * @param mediaType - Type of media ('diagram', 'image', etc.)
+     * @param mtime - Current modification time
+     */
+    public ensureFileWatched(relativePath: string, absolutePath: string, mediaType: MediaFileEntry['type'], mtime: number): void {
+        // Check if already tracked
+        if (this._cache.files[relativePath]) {
+            // Already tracked, just ensure watcher is set up
+            if (mediaType === 'diagram' && !this._fileWatchers.has(relativePath)) {
+                this._watchFile(relativePath, this._cache.files[relativePath]);
+            }
+            return;
+        }
+
+        // Add to cache
+        const entry: MediaFileEntry = { mtime, type: mediaType };
+        this._cache.files[relativePath] = entry;
+        this._saveCache();
+
+        // Set up watcher for diagram files
+        if (mediaType === 'diagram') {
+            this._watchFile(relativePath, entry);
+        }
+    }
+
+    /**
      * Watch a single file for changes
      */
     private _watchFile(relativePath: string, entry: MediaFileEntry): void {

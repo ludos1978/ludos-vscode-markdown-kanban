@@ -2,7 +2,8 @@ import { PlantUMLService } from './PlantUMLService';
 import { MermaidExportService } from './MermaidExportService';
 import { DrawIOService } from './DrawIOService';
 import { ExcalidrawService } from './ExcalidrawService';
-import { DiagramPatterns } from '../../shared/regexPatterns';
+import { XlsxService } from './XlsxService';
+import { DiagramPatterns, parseAttributeBlock } from '../../shared/regexPatterns';
 import { showError } from '../NotificationService';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -14,12 +15,13 @@ const DEBUG = false;
 const log = DEBUG ? logger.debug.bind(logger, '[DiagramPreprocessor]') : () => {};
 
 interface DiagramBlock {
-    type: 'plantuml' | 'mermaid' | 'drawio' | 'excalidraw';
+    type: 'plantuml' | 'mermaid' | 'drawio' | 'excalidraw' | 'xlsx';
     code: string;
     fullMatch: string;
     id: string;
-    filePath?: string;  // For file-based diagrams (draw.io, excalidraw)
+    filePath?: string;  // For file-based diagrams (draw.io, excalidraw, xlsx)
     title?: string;     // Optional title/caption from markdown syntax
+    attributes?: { [key: string]: string };  // Optional attributes like {page=1 width=300px}
 }
 
 interface RenderedDiagram {
@@ -43,6 +45,7 @@ export class DiagramPreprocessor {
     private mermaidService: MermaidExportService;
     private drawioService: DrawIOService;
     private excalidrawService: ExcalidrawService;
+    private xlsxService: XlsxService;
 
     constructor(mermaidService?: MermaidExportService, webviewPanel?: vscode.WebviewPanel) {
         this.plantUMLService = new PlantUMLService();
@@ -50,6 +53,7 @@ export class DiagramPreprocessor {
         this.mermaidService = mermaidService || new MermaidExportService();
         this.drawioService = new DrawIOService();
         this.excalidrawService = new ExcalidrawService();
+        this.xlsxService = new XlsxService();
 
         if (webviewPanel && mermaidService) {
             this.mermaidService.setWebviewPanel(webviewPanel);
@@ -169,6 +173,25 @@ export class DiagramPreprocessor {
             });
         }
 
+        // Extract Excel spreadsheet file references
+        // Pattern: ![alt](path/to/file.xlsx "title"){page=1} or ![alt](file.xls) or ![alt](file.ods)
+        let xlsxCounter = 0;
+        const xlsxRegex = DiagramPatterns.xlsx();
+
+        while ((match = xlsxRegex.exec(markdown)) !== null) {
+            xlsxCounter++;
+            const attributes = match[3] ? parseAttributeBlock(match[3]) : undefined;
+            diagrams.push({
+                type: 'xlsx',
+                code: '',  // File-based, no inline code
+                fullMatch: match[0],
+                id: `xlsx-${xlsxCounter}`,
+                filePath: match[1],
+                title: match[2],  // Optional title from "..." in markdown
+                attributes
+            });
+        }
+
         return diagrams;
     }
 
@@ -233,6 +256,18 @@ export class DiagramPreprocessor {
                 sourceDir
             );
             rendered.push(...excalidrawResults);
+        }
+
+        // Render xlsx spreadsheets in parallel (LibreOffice CLI-based)
+        const xlsxDiagrams = diagrams.filter(d => d.type === 'xlsx');
+        if (xlsxDiagrams.length > 0) {
+            const xlsxResults = await this.renderXlsxBatch(
+                xlsxDiagrams,
+                outputFolder,
+                baseFileName,
+                sourceDir
+            );
+            rendered.push(...xlsxResults);
         }
 
         return rendered;
@@ -459,6 +494,81 @@ export class DiagramPreprocessor {
     }
 
     /**
+     * Render xlsx spreadsheets in parallel (outputs PNG, not SVG)
+     */
+    private async renderXlsxBatch(
+        diagrams: DiagramBlock[],
+        outputFolder: string,
+        baseFileName: string,
+        sourceDir: string
+    ): Promise<RenderedDiagram[]> {
+
+        const renderPromises = diagrams.map(async (diagram) => {
+            try {
+                if (!diagram.filePath) {
+                    console.error(`[DiagramPreprocessor] ❌ No file path for ${diagram.id}`);
+                    return null;
+                }
+
+                // Resolve path relative to the SOURCE markdown file's directory
+                const absolutePath = path.isAbsolute(diagram.filePath)
+                    ? diagram.filePath
+                    : path.resolve(sourceDir, diagram.filePath);
+
+                // Check if file exists
+                if (!fs.existsSync(absolutePath)) {
+                    console.error(`[DiagramPreprocessor] ❌ File not found: ${absolutePath}`);
+                    return null;
+                }
+
+                // PNG output for xlsx (not SVG like other diagram types)
+                const fileName = `${baseFileName}-${diagram.id}.png`;
+                const outputPath = path.join(outputFolder, fileName);
+
+                // Check if output is up-to-date (skip re-rendering unchanged files)
+                if (await this.isOutputUpToDate(absolutePath, outputPath)) {
+                    log(`✓ Skipping ${diagram.id} (unchanged)`);
+                    const result: RenderedDiagram = {
+                        id: diagram.id,
+                        fileName,
+                        originalBlock: diagram.fullMatch
+                    };
+                    if (diagram.title) result.title = diagram.title;
+                    return result;
+                }
+
+                // Get page/sheet number from attributes (default: 1)
+                const pageNumber = diagram.attributes?.page
+                    ? parseInt(diagram.attributes.page, 10)
+                    : 1;
+
+                // Render using LibreOffice
+                log(`Rendering ${diagram.id} (sheet ${pageNumber})...`);
+                const pngBuffer = await this.xlsxService.renderPNG(absolutePath, pageNumber);
+
+                // Save PNG file
+                await fs.promises.writeFile(outputPath, pngBuffer);
+
+                const result: RenderedDiagram = {
+                    id: diagram.id,
+                    fileName,
+                    originalBlock: diagram.fullMatch
+                };
+                if (diagram.title) result.title = diagram.title;
+                return result;
+            } catch (error) {
+                console.error(`[DiagramPreprocessor] Failed to render ${diagram.id}:`, error);
+                return null;
+            }
+        });
+
+        const results = await Promise.all(renderPromises);
+
+        // Filter out failures
+        return results.filter((r): r is RenderedDiagram => r !== null);
+    }
+
+    /**
      * Replace all diagram blocks with image references
      */
     private replaceAllDiagrams(
@@ -515,6 +625,9 @@ export class DiagramPreprocessor {
 
             case 'excalidraw':
                 return `${header}\n> Check if the file exists and is a valid Excalidraw format: ${diagram.filePath || 'unknown'}`;
+
+            case 'xlsx':
+                return `${header}\n> Ensure LibreOffice is installed, or check if the file exists: ${diagram.filePath || 'unknown'}`;
 
             default:
                 return `${header}\n> Check the output console for error details`;

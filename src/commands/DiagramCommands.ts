@@ -21,7 +21,8 @@ import {
     RequestPDFPageRenderMessage,
     RequestPDFInfoMessage,
     RequestEPUBPageRenderMessage,
-    RequestEPUBInfoMessage
+    RequestEPUBInfoMessage,
+    RequestXlsxRenderMessage
 } from '../core/bridge/MessageTypes';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
@@ -38,7 +39,7 @@ export class DiagramCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'diagram-commands',
         name: 'Diagram Commands',
-        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, PDF, and EPUB rendering',
+        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, PDF, EPUB, and Excel rendering',
         messageTypes: [
             'renderPlantUML',
             'convertPlantUMLToSVG',
@@ -50,7 +51,8 @@ export class DiagramCommands extends SwitchBasedCommand {
             'requestPDFPageRender',
             'requestPDFInfo',
             'requestEPUBPageRender',
-            'requestEPUBInfo'
+            'requestEPUBInfo',
+            'requestXlsxRender'
         ],
         priority: 100
     };
@@ -103,6 +105,10 @@ export class DiagramCommands extends SwitchBasedCommand {
         },
         'requestEPUBInfo': async (msg, ctx) => {
             await this.handleGetEPUBInfo(msg as RequestEPUBInfoMessage, ctx);
+            return this.success();
+        },
+        'requestXlsxRender': async (msg, ctx) => {
+            await this.handleRenderXlsx(msg as RequestXlsxRenderMessage, ctx);
             return this.success();
         }
     };
@@ -275,6 +281,12 @@ export class DiagramCommands extends SwitchBasedCommand {
             // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
+
+            // Ensure this file is being watched for changes (fixes first-change detection)
+            const mediaTracker = context.getMediaTracker?.();
+            if (mediaTracker) {
+                mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
+            }
 
             // Check if the DrawIO file is empty (only has default root cells)
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
@@ -525,6 +537,12 @@ export class DiagramCommands extends SwitchBasedCommand {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
+            // Ensure this file is being watched for changes (fixes first-change detection)
+            const mediaTracker = context.getMediaTracker?.();
+            if (mediaTracker) {
+                mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
+            }
+
             // Check if the Excalidraw file is empty
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
             const isEmptyDiagram = this.isEmptyExcalidrawFile(fileContent, absolutePath);
@@ -758,6 +776,57 @@ export class DiagramCommands extends SwitchBasedCommand {
             // Send error response
             this.postMessage({
                 type: 'epubInfoError',
+                requestId,
+                error: getErrorMessage(error)
+            });
+        }
+    }
+
+    // ============= XLSX HANDLERS =============
+
+    /**
+     * Handle Excel spreadsheet rendering request from webview
+     * Renders a specific sheet to PNG using LibreOffice
+     */
+    private async handleRenderXlsx(message: RequestXlsxRenderMessage, context: CommandContext): Promise<void> {
+        const { requestId, filePath, sheetNumber, includeDir } = message;
+        const panel = context.getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[DiagramCommands.handleRenderXlsx] No panel or webview available');
+            return;
+        }
+
+        try {
+            const { XlsxService } = await import('../services/export/XlsxService');
+            const service = new XlsxService();
+            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'Excel');
+
+            // Check if LibreOffice CLI is available
+            if (!await service.isAvailable()) {
+                throw new Error('LibreOffice CLI not installed');
+            }
+
+            // Render Excel sheet to PNG
+            const pngBuffer = await service.renderPNG(absolutePath, sheetNumber);
+
+            // Convert PNG to data URL
+            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+
+            // Send success response to webview with mtime for cache invalidation
+            this.postMessage({
+                type: 'xlsxRenderSuccess',
+                requestId,
+                pngDataUrl,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[XLSX Backend] Render error:', error);
+
+            // Send error response to webview
+            this.postMessage({
+                type: 'xlsxRenderError',
                 requestId,
                 error: getErrorMessage(error)
             });

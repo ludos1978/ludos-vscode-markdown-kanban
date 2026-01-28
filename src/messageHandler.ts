@@ -84,6 +84,7 @@ export class MessageHandler {
             linkHandler: this._linkHandler,
             plantUMLService: this._plantUMLService,
             getMermaidExportService: () => this._panelContext.mermaidExportService,
+            getMediaTracker: () => this._deps.getWebviewPanel()?.getMediaTracker?.(),
             fileSaveService: this._fileSaveService,
             getFileRegistry: () => this._deps.getWebviewPanel()?.fileRegistry,
             onBoardUpdate: this._deps.onBoardUpdate,

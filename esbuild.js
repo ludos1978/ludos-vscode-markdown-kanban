@@ -53,17 +53,13 @@ console.log('Marp watch script placeholder');
 			}
 
 			// Copy Excalidraw worker script (runs in child process with real node_modules)
-			// Must be in same directory as compiled ExcalidrawService.js (uses __dirname)
+			// Uses Puppeteer for full Excalidraw rendering support including modern features
+			// Must be in dist/ directory (same as bundled extension.js, where __dirname resolves)
 			const excalidrawWorkerSrc = 'src/services/export/excalidraw-worker.js';
-			const excalidrawWorkerDist = 'dist/src/services/export/excalidraw-worker.js';
+			const excalidrawWorkerDist = 'dist/excalidraw-worker.js';
 			if (fs.existsSync(excalidrawWorkerSrc)) {
-				// Ensure target directory exists
-				const targetDir = 'dist/src/services/export';
-				if (!fs.existsSync(targetDir)) {
-					fs.mkdirSync(targetDir, { recursive: true });
-				}
 				fs.copyFileSync(excalidrawWorkerSrc, excalidrawWorkerDist);
-				console.log('Copied excalidraw-worker.js to dist/src/services/export/');
+				console.log('Copied excalidraw-worker.js to dist/');
 			}
 
 			// Copy sql.js WASM file for SQLite support

@@ -1,3 +1,52 @@
+- [ ] what puppeteer features could we now implement that we have added that addon?
+
+- [ ] could we add more formats similar to notion?
+
+- [ ] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in pupeteer that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the puppeteer?
+
+- [x] this is an xlsx embed feature we could add!
+  using libreoffice:
+  /Applications/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf:calc_pdf_Export --outdir . "$@"%
+  maybe directly convert to png
+  or use the pdf to image conversion after that
+  i want to use something like ![](/path/to/file.xlsx){page=1 width=300px} and it directly converts to png and embeds it into the file.
+
+- [ ] we have so many addons and features. would it make sense to refactor the features so they function as plugins that can be added.
+
+i am thinking about the features:
+- "marp export"
+- "pandoc export"
+- "excalidraw rendering & export"
+- "drawio rendering & export"
+- "mermaid rendering & export"
+- "plantuml rendering and export"
+- "website embedding & export"
+- "alternative image search (using web)"
+- puppeteer
+- export to specific formats 
+- integration of other markdown-it plugins
+
+where would the base sytem require modular systems that this could be integrated? my first guesses would be:
+- kanban
+  - rendering and display of the kanban board/columns/tasks/elements
+  - board/column/task burger options menu
+  - element burger options (images, videos, other elements)
+  - different tags
+  - card and column source (template) system
+  - sorting features
+  - yaml header editing
+  - modification of elements, tasks, columns
+  - processing after content changed (definition of order)
+  - in the active processes menu
+  - data loading & saving
+- kanban dashboard integration
+- kanban search intergation
+- export
+  - options
+  - filters 
+  - postprocessors
+
+
 - [ ] the filterTagsForExport in the frontend might be obsolete. is it used?
 
 - [ ] where is the css class hidden used, is this applied in a consistent way?
@@ -5,23 +54,6 @@
 - [ ] apparently exporting is using the source data format while processing things such as tags etc. i want to use an internal format, while storing the source format (so we can export into that again)
 
 - [ ] Add some internal navigation functionality. it could use user defined tags such as #2.1 and somethink like <#2.1> or what would you suggest?
-
-- [ ] i would like a way to embed iframes in the pages. currently it possible to use html, but when exporting it as pdf it's a bad look.
-for example i have this html:
-"""
-<div style='position: relative; padding: 0px; height: 650px; overflow: hidden;'>
-    <iframe width="100%" height="100%" src="https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
-</div>
-"""
-but i'd rather have something like this:
-![](https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947 )
-
-and when rendering as pdf it should:
-- display a screenshot of the page 
-- just display the url
-- show a manually given image in the alt text
-
-what would you suggest how to implement it? 
 
 - [ ] add Excourse to the Teaching-Content 
 
@@ -82,6 +114,28 @@ A column can have multiple query tags:
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
+
+---
+
+# DONE
+
+- [x] i would like a way to embed iframes in the pages. currently it possible to use html, but when exporting it as pdf it's a bad look.
+for example i have this html:
+"""
+<div style='position: relative; padding: 0px; height: 650px; overflow: hidden;'>
+    <iframe width="100%" height="100%" src="https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
+</div>
+"""
+but i'd rather have something like this:
+![](https://miro.com/app/live-embed/uXjVLewdNZE=/?moveToViewport=-956,-2765,1912,1595&embedId=344522680947 )
+
+and when rendering as pdf it should:
+- display a screenshot of the page 
+- just display the url
+- show a manually given image in the alt text
+
+what would you suggest how to implement it? 
+
 
 - [x] Dashboard fixes:
   - [x] the "right-click a .md file in explorer ..." can be hidden after one has been added.

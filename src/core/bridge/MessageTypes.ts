@@ -878,6 +878,17 @@ export interface RequestEPUBInfoMessage extends RequestMessage {
     includeDir?: string;
 }
 
+/**
+ * Request Excel spreadsheet render (LibreOffice-based)
+ */
+export interface RequestXlsxRenderMessage extends RequestMessage {
+    type: 'requestXlsxRender';
+    filePath: string;
+    sheetNumber: number;
+    /** Directory of include file if spreadsheet is inside an include (for relative path resolution) */
+    includeDir?: string;
+}
+
 // ============= UI MESSAGES =============
 
 /**
@@ -2050,6 +2061,7 @@ export type IncomingMessage =
     | RequestPDFInfoMessage
     | RequestEPUBPageRenderMessage
     | RequestEPUBInfoMessage
+    | RequestXlsxRenderMessage
     | EditModeStartMessage
     | EditModeEndMessage
     | EditingStoppedMessage

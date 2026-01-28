@@ -111,6 +111,8 @@ export interface ServiceContext {
     plantUMLService: PlantUMLService;
     /** Get the panel's MermaidExportService for panel-isolated Mermaid rendering */
     getMermaidExportService: () => MermaidExportService;
+    /** Get the MediaTracker for file watching (diagram change detection) */
+    getMediaTracker: () => import('../../services/MediaTracker').MediaTracker | null | undefined;
 }
 
 // =============================================================================

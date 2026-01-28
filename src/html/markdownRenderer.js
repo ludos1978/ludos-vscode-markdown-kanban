@@ -1412,6 +1412,46 @@ function queuePDFPageRender(id, filePath, pageNumber, includeDir) {
 }
 
 /**
+ * Render an Excel spreadsheet sheet to PNG using LibreOffice backend
+ * @param {string} filePath - Path to xlsx/xls/ods file
+ * @param {number} sheetNumber - Sheet number to render (1-indexed)
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
+ * @returns {Promise<{pngDataUrl: string, fileMtime: number}>} PNG data URL and file mtime
+ */
+async function renderXlsxSheet(filePath, sheetNumber, includeDir) {
+    return new Promise((resolve, reject) => {
+        const requestId = `xlsx-${++diagramRequestId}`;
+
+        // Store promise callbacks
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath, sheetNumber });
+
+        // Send request to extension backend
+        const message = {
+            type: 'requestXlsxRender',
+            requestId: requestId,
+            filePath: filePath,
+            sheetNumber: sheetNumber
+        };
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
+
+        // Timeout after 60 seconds (LibreOffice can be slow on cold start)
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`Excel sheet ${sheetNumber} rendering timeout`));
+            }
+        }, 60000);
+    });
+}
+
+function queueXlsxRender(id, filePath, sheetNumber, includeDir) {
+    pendingDiagramQueue.push({ id, filePath, sheetNumber, diagramType: 'xlsx', includeDir, timestamp: Date.now() });
+}
+
+/**
  * Request PDF info (page count) from backend
  * @param {string} filePath - Path to PDF file
  * @param {string} [includeDir] - Directory of include file for relative path resolution
@@ -1909,6 +1949,12 @@ async function processDiagramQueue() {
                 imageDataUrl = result.pngDataUrl;
                 fileMtime = result.fileMtime;
                 displayLabel = `PDF page ${item.pageNumber}`;
+            } else if (item.diagramType === 'xlsx') {
+                // Render Excel spreadsheet sheet
+                const result = await renderXlsxSheet(item.filePath, item.sheetNumber || 1, item.includeDir);
+                imageDataUrl = result.pngDataUrl;
+                fileMtime = result.fileMtime;
+                displayLabel = `Excel sheet ${item.sheetNumber || 1}`;
             } else {
                 // Render diagram (draw.io or excalidraw) with cache reuse when unchanged
                 const cachedDiagram = getRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir);
@@ -1925,15 +1971,20 @@ async function processDiagramQueue() {
             }
 
             // Cache with mtime for invalidation on file changes
-            const cacheKey = item.diagramType === 'pdf'
-                ? `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`
-                : `${item.diagramType}:${item.filePath}:${item.includeDir || ''}:${fileMtime}`;
+            let cacheKey;
+            if (item.diagramType === 'pdf') {
+                cacheKey = `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`;
+            } else if (item.diagramType === 'xlsx') {
+                cacheKey = `xlsx:${item.filePath}:${item.sheetNumber || 1}:${fileMtime}`;
+            } else {
+                cacheKey = `${item.diagramType}:${item.filePath}:${item.includeDir || ''}:${fileMtime}`;
+            }
 
             // Invalidate old cache entries for this file first
             invalidateDiagramCache(item.filePath, item.diagramType);
             // Add current version (with size limit)
             setCacheWithLimit(diagramRenderCache, cacheKey, imageDataUrl);
-            if (item.diagramType !== 'pdf' && item.diagramType !== 'pdf-slideshow' && item.diagramType !== 'epub-slideshow') {
+            if (item.diagramType !== 'pdf' && item.diagramType !== 'pdf-slideshow' && item.diagramType !== 'epub-slideshow' && item.diagramType !== 'xlsx') {
                 setRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir, fileMtime, imageDataUrl);
             }
 
@@ -2012,7 +2063,8 @@ async function processDiagramQueue() {
                 'pdf-slideshow': { label: 'PDF', emoji: '📄' },
                 'epub-slideshow': { label: 'EPUB', emoji: '📚' },
                 'drawio': { label: 'DrawIO diagram', emoji: '📊' },
-                'excalidraw': { label: 'Excalidraw diagram', emoji: '🎨' }
+                'excalidraw': { label: 'Excalidraw diagram', emoji: '🎨' },
+                'xlsx': { label: `Excel sheet ${item.sheetNumber || 1}`, emoji: '📊' }
             }[item.diagramType] || { label: `${item.diagramType} diagram`, emoji: '📷' };
             // Wrap error in overlay container with burger menu for path operations
             let decodedPath = item.filePath;
@@ -2096,6 +2148,24 @@ window.addEventListener('message', event => {
 
         if (request) {
             console.error(`[PDF] Page rendering failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'xlsxRenderSuccess') {
+        const { requestId, pngDataUrl, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            // Resolve with both pngDataUrl and fileMtime for cache invalidation
+            request.resolve({ pngDataUrl, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'xlsxRenderError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[XLSX] Rendering failed:`, error);
             request.reject(new Error(error));
             diagramRenderRequests.delete(requestId);
         }
@@ -3262,6 +3332,29 @@ function renderMarkdown(text, includeContext) {
 
                 // Return placeholder immediately (synchronous)
                 return createLoadingPlaceholder(diagramId, 'diagram-placeholder', `Loading ${diagramType} diagram...`);
+            }
+
+            // Check if this is an Excel spreadsheet file that needs LibreOffice rendering
+            const isXlsxFile = originalSrc && /\.(?:xlsx|xls|ods)$/i.test(originalSrc);
+            if (isXlsxFile) {
+                // Create unique ID for this spreadsheet
+                const xlsxId = createUniqueId('xlsx');
+
+                // Parse sheet number from token attributes if available (e.g., {page=2})
+                // The markdown-it-image-attrs plugin may have parsed these
+                let sheetNumber = 1;
+                if (token.attrGet) {
+                    const pageAttr = token.attrGet('data-page') || token.attrGet('page');
+                    if (pageAttr) {
+                        sheetNumber = parseInt(pageAttr, 10) || 1;
+                    }
+                }
+
+                // Queue for async rendering (pass includeDir for relative path resolution)
+                queueXlsxRender(xlsxId, originalSrc, sheetNumber, includeDir);
+
+                // Return placeholder immediately (synchronous)
+                return createLoadingPlaceholder(xlsxId, 'diagram-placeholder', `Loading Excel sheet ${sheetNumber}...`);
             }
 
             // Check if this is an embed URL (external iframe content)

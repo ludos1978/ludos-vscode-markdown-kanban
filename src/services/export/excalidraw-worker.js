@@ -1,106 +1,86 @@
 /**
  * Excalidraw to SVG worker script
- * Runs in a child process with real node_modules (not bundled)
- * to avoid jsdom bundling issues
+ * Uses Puppeteer (headless browser) for full Excalidraw rendering support
+ * including modern features like custom fonts (fontFamily 5+)
  */
 
-const { JSDOM } = require('jsdom');
-const fs = require('fs');
-const path = require('path');
+const puppeteer = require('puppeteer');
 
 // Read input from stdin
 let inputData = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => inputData += chunk);
 process.stdin.on('end', async () => {
+    let browser;
     try {
         const { elements, appState, files } = JSON.parse(inputData);
 
-        // Load the polyfill and excalidraw utils
-        // When copied to dist/, node_modules is at ../node_modules
-        const nodeModulesDir = path.join(__dirname, '../node_modules');
-        const canvasPolyfillPath = path.join(nodeModulesDir, 'canvas-5-polyfill/canvas.js');
-        const excalidrawUtilsPath = path.join(nodeModulesDir, '@excalidraw/utils/dist/excalidraw-utils.min.js');
+        // Launch headless browser
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
 
-        const canvasPolyfillCode = fs.readFileSync(canvasPolyfillPath, 'utf8');
-        const excalidrawUtilsCode = fs.readFileSync(excalidrawUtilsPath, 'utf8');
+        const page = await browser.newPage();
 
-        // Create the export script
-        const exportScript = `
+        // Create HTML page with Excalidraw loaded via ES modules from esm.sh
+        const htmlContent = `
             <!DOCTYPE html>
             <html>
-            <head>
-                <script>
-                    class CanvasRenderingContext2D {}
-                    window.devicePixelRatio = 1;
-                </script>
-                <script>${canvasPolyfillCode}</script>
-                <script>${excalidrawUtilsCode}</script>
-                <script>
-                    (async function() {
+            <body>
+                <script type="module">
+                    import Excalidraw from "https://esm.sh/@excalidraw/excalidraw@0.17.0";
+
+                    window.renderExcalidraw = async function(elements, appState, files) {
                         try {
-                            const elements = ${JSON.stringify(elements)};
                             const hasContent = elements.length > 0;
-                            const appState = ${JSON.stringify({
+                            const exportAppState = {
                                 ...appState,
                                 exportWithDarkMode: false,
                                 exportBackground: false,
-                            })};
-                            appState.exportPadding = hasContent ? 0 : 20;
-                            const files = ${JSON.stringify(files)};
+                                exportPadding: hasContent ? 0 : 20
+                            };
 
-                            const svg = await ExcalidrawUtils.exportToSvg({
+                            const svg = await Excalidraw.exportToSvg({
                                 elements,
-                                appState,
-                                files,
+                                appState: exportAppState,
+                                files: files || {}
                             });
 
-                            document.body.appendChild(svg);
+                            return svg.outerHTML;
                         } catch (error) {
-                            const errorDiv = document.createElement('div');
-                            errorDiv.id = 'excalidraw-error';
-                            errorDiv.textContent = error.message || 'Unknown error';
-                            document.body.appendChild(errorDiv);
+                            throw new Error(error.message || 'Export failed');
                         }
-                    })();
+                    };
+
+                    // Signal that we're ready
+                    window.excalidrawReady = true;
                 </script>
-            </head>
-            <body></body>
+            </body>
             </html>
         `;
 
-        const dom = new JSDOM(exportScript, {
-            runScripts: 'dangerously',
-            resources: 'usable',
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+        // Wait for Excalidraw module to load and be ready
+        await page.waitForFunction(() => window.excalidrawReady === true, { timeout: 60000 });
+
+        // Call the render function with our data
+        const svgString = await page.evaluate(async (elements, appState, files) => {
+            return await window.renderExcalidraw(elements, appState, files);
+        }, elements, appState || {}, files || {});
+
+        await browser.close();
+
+        // Output SVG to stdout
+        process.stdout.write(svgString, () => {
+            process.exit(0);
         });
 
-        // Wait for SVG to be created
-        let checks = 100;
-        while (checks > 0) {
-            checks--;
-
-            const errorDiv = dom.window.document.body.querySelector('#excalidraw-error');
-            if (errorDiv) {
-                throw new Error(errorDiv.textContent);
-            }
-
-            const svg = dom.window.document.body.querySelector('svg');
-            if (svg) {
-                dom.window.close();
-                // Use stdout.write to avoid console.log buffer truncation
-                process.stdout.write(svg.outerHTML, () => {
-                    process.exit(0);
-                });
-                return;
-            }
-
-            await new Promise(r => setTimeout(r, 20));
-        }
-
-        dom.window.close();
-        throw new Error('SVG was not created after timeout');
-
     } catch (error) {
+        if (browser) {
+            await browser.close();
+        }
         console.error(JSON.stringify({ error: error.message }));
         process.exit(1);
     }

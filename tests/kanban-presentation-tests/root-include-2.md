@@ -19,3 +19,9 @@ Modify this line a
 
 
 ![](root-include-2-MEDIA/included-excalidraw.excalidraw "included-excalidraw")
+
+---
+
+Book2
+
+![Book2.xlsx](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/Book2.xlsx)

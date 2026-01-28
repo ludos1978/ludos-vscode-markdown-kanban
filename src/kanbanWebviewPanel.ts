@@ -757,6 +757,11 @@ export class KanbanWebviewPanel {
         this._includeCoordinator.registerBoardIncludeFiles(board);
     }
 
+    /** Get the MediaTracker for file watching */
+    public getMediaTracker(): MediaTracker | null {
+        return this._mediaTracker;
+    }
+
     /** Get board - returns cached or generates fresh from registry */
     public getBoard(): KanbanBoard | undefined {
         if (this._boardStore.isCacheValid()) {
