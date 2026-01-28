@@ -105,6 +105,19 @@ export class IncludeCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Get current file directory or return error result.
+     * @returns Object with currentDir if successful, or null if no active file
+     */
+    private getCurrentDir(context: CommandContext): string | null {
+        const currentFilePath = context.fileManager.getFilePath();
+        if (!currentFilePath) {
+            showError('No active kanban file');
+            return null;
+        }
+        return path.dirname(currentFilePath);
+    }
+
+    /**
      * Trigger marpWatch export if active.
      * Used after saving files to trigger automatic export.
      */
@@ -247,13 +260,9 @@ export class IncludeCommands extends SwitchBasedCommand {
     // ============= FILE PICKER HANDLERS =============
 
     private async handleRequestIncludeFileName(message: RequestIncludeFileNameMessage, context: CommandContext): Promise<CommandResult> {
-        const currentFilePath = context.fileManager.getFilePath();
-        if (!currentFilePath) {
-            showError('No active kanban file');
-            return this.success();
-        }
+        const currentDir = this.getCurrentDir(context);
+        if (!currentDir) { return this.success(); }
 
-        const currentDir = path.dirname(currentFilePath);
         const fileUris = await selectMarkdownFile({
             defaultUri: safeFileUri(currentDir, 'includeCommands-selectColumnInclude'),
             title: 'Select include file for column'
@@ -282,13 +291,9 @@ export class IncludeCommands extends SwitchBasedCommand {
             return this.success();
         }
 
-        const currentFilePath = context.fileManager.getFilePath();
-        if (!currentFilePath) {
-            showError('No active kanban file');
-            return this.success();
-        }
+        const currentDir = this.getCurrentDir(context);
+        if (!currentDir) { return this.success(); }
 
-        const currentDir = path.dirname(currentFilePath);
         let defaultUri = safeFileUri(currentDir, 'includeCommands-changeColumnInclude-dir');
         if (currentFile) {
             const currentAbsolutePath = path.resolve(currentDir, currentFile);
@@ -329,13 +334,9 @@ export class IncludeCommands extends SwitchBasedCommand {
             return this.success();
         }
 
-        const currentFilePath = context.fileManager.getFilePath();
-        if (!currentFilePath) {
-            showError('No active kanban file');
-            return this.success();
-        }
+        const currentDir = this.getCurrentDir(context);
+        if (!currentDir) { return this.success(); }
 
-        const currentDir = path.dirname(currentFilePath);
         let defaultUri = safeFileUri(currentDir, 'includeCommands-changeTaskInclude-dir');
         if (currentFile) {
             const currentAbsolutePath = path.resolve(currentDir, currentFile);
@@ -365,13 +366,9 @@ export class IncludeCommands extends SwitchBasedCommand {
     }
 
     private async handleRequestTaskIncludeFileName(taskId: string, columnId: string, context: CommandContext): Promise<CommandResult> {
-        const currentFilePath = context.fileManager.getFilePath();
-        if (!currentFilePath) {
-            showError('No active kanban file');
-            return this.success();
-        }
+        const currentDir = this.getCurrentDir(context);
+        if (!currentDir) { return this.success(); }
 
-        const currentDir = path.dirname(currentFilePath);
         const fileUris = await selectMarkdownFile({
             defaultUri: safeFileUri(currentDir, 'includeCommands-selectTaskInclude'),
             title: 'Select include file for task'
