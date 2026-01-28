@@ -245,9 +245,12 @@ export class ConfigurationService {
         this.cache.clear();
     }
 
-    public getEnabledTagCategoriesColumn(): { [key: string]: boolean } {
+    /**
+     * Helper to get enabled tag categories as a boolean map.
+     */
+    private getEnabledCategories(configKey: string): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
-        const enabledArray = config.get<string[]>('enabledTagCategoriesColumn', []);
+        const enabledArray = config.get<string[]>(configKey, []);
 
         const result: { [key: string]: boolean } = {};
         enabledArray.forEach(category => {
@@ -257,16 +260,12 @@ export class ConfigurationService {
         return result;
     }
 
-    public getEnabledTagCategoriesTask(): { [key: string]: boolean } {
-        const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
-        const enabledArray = config.get<string[]>('enabledTagCategoriesTask', []);
+    public getEnabledTagCategoriesColumn(): { [key: string]: boolean } {
+        return this.getEnabledCategories('enabledTagCategoriesColumn');
+    }
 
-        const result: { [key: string]: boolean } = {};
-        enabledArray.forEach(category => {
-            const camelCase = category.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-            result[camelCase] = true;
-        });
-        return result;
+    public getEnabledTagCategoriesTask(): { [key: string]: boolean } {
+        return this.getEnabledCategories('enabledTagCategoriesTask');
     }
 
     public getCustomTagCategories(): { [key: string]: any } {
