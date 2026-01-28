@@ -245,15 +245,30 @@ export class PathConversionService {
     }
 
     /**
-     * Convert all absolute paths in content to relative paths
+     * Internal helper to convert paths in content
+     * @param content - The content to process
+     * @param basePath - Base path for resolution
+     * @param direction - 'relative' or 'absolute'
      */
-    public convertToRelative(content: string, basePath: string): ConversionResult {
+    private _convertPaths(
+        content: string,
+        basePath: string,
+        direction: 'relative' | 'absolute'
+    ): ConversionResult {
         const paths = this.extractPaths(content);
         let result = content;
         let offset = 0;
         let converted = 0;
         let skipped = 0;
         const warnings: string[] = [];
+
+        const shouldSkip = direction === 'relative'
+            ? (info: PathInfo) => !info.isAbsolute  // Skip already relative
+            : (info: PathInfo) => info.isAbsolute;  // Skip already absolute
+
+        const convert = direction === 'relative'
+            ? (p: string) => this.toRelativePath(p, basePath)
+            : (p: string) => this.toAbsolutePath(p, basePath);
 
         for (const pathInfo of paths) {
             // Skip URLs
@@ -262,8 +277,8 @@ export class PathConversionService {
                 continue;
             }
 
-            // Skip already relative paths
-            if (!pathInfo.isAbsolute) {
+            // Skip paths already in target format
+            if (shouldSkip(pathInfo)) {
                 skipped++;
                 continue;
             }
@@ -275,20 +290,20 @@ export class PathConversionService {
             }
 
             try {
-                const relativePath = this.toRelativePath(pathInfo.original, basePath);
+                const newPath = convert(pathInfo.original);
 
                 // Perform replacement
                 const adjustedStart = pathInfo.pathStart + offset;
                 const adjustedEnd = pathInfo.pathEnd + offset;
-                result = result.slice(0, adjustedStart) + relativePath + result.slice(adjustedEnd);
+                result = result.slice(0, adjustedStart) + newPath + result.slice(adjustedEnd);
 
                 // Update offset for subsequent replacements
-                offset += relativePath.length - pathInfo.original.length;
+                offset += newPath.length - pathInfo.original.length;
                 converted++;
 
-                // Warn if the path contains parent traversal that might break
-                if (relativePath.includes('../../../')) {
-                    warnings.push(`Deep path traversal: ${relativePath}`);
+                // Warn if relative path has deep traversal
+                if (direction === 'relative' && newPath.includes('../../../')) {
+                    warnings.push(`Deep path traversal: ${newPath}`);
                 }
             } catch (error) {
                 warnings.push(`Failed to convert: ${pathInfo.original}`);
@@ -300,53 +315,17 @@ export class PathConversionService {
     }
 
     /**
+     * Convert all absolute paths in content to relative paths
+     */
+    public convertToRelative(content: string, basePath: string): ConversionResult {
+        return this._convertPaths(content, basePath, 'relative');
+    }
+
+    /**
      * Convert all relative paths in content to absolute paths
      */
     public convertToAbsolute(content: string, basePath: string): ConversionResult {
-        const paths = this.extractPaths(content);
-        let result = content;
-        let offset = 0;
-        let converted = 0;
-        let skipped = 0;
-        const warnings: string[] = [];
-
-        for (const pathInfo of paths) {
-            // Skip URLs
-            if (pathInfo.isUrl) {
-                skipped++;
-                continue;
-            }
-
-            // Skip already absolute paths
-            if (pathInfo.isAbsolute) {
-                skipped++;
-                continue;
-            }
-
-            // Skip empty paths
-            if (!pathInfo.original.trim()) {
-                skipped++;
-                continue;
-            }
-
-            try {
-                const absolutePath = this.toAbsolutePath(pathInfo.original, basePath);
-
-                // Perform replacement
-                const adjustedStart = pathInfo.pathStart + offset;
-                const adjustedEnd = pathInfo.pathEnd + offset;
-                result = result.slice(0, adjustedStart) + absolutePath + result.slice(adjustedEnd);
-
-                // Update offset for subsequent replacements
-                offset += absolutePath.length - pathInfo.original.length;
-                converted++;
-            } catch (error) {
-                warnings.push(`Failed to convert: ${pathInfo.original}`);
-                skipped++;
-            }
-        }
-
-        return { content: result, converted, skipped, warnings };
+        return this._convertPaths(content, basePath, 'absolute');
     }
 
     /**
