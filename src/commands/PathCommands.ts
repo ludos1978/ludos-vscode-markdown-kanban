@@ -143,6 +143,28 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Helper to convert paths in a single file
+     */
+    private _convertFilePaths(
+        file: MarkdownFile,
+        direction: 'relative' | 'absolute',
+        conversionService: PathConversionService
+    ): ConversionResult {
+        const basePath = path.dirname(file.getPath());
+        const content = file.getContent();
+
+        const result = direction === 'relative'
+            ? conversionService.convertToRelative(content, basePath)
+            : conversionService.convertToAbsolute(content, basePath);
+
+        if (result.converted > 0) {
+            file.setContent(result.content, false);
+        }
+
+        return result;
+    }
+
+    /**
      * Convert paths in main file and all include files
      */
     private async handleConvertAllPaths(
@@ -160,44 +182,12 @@ export class PathCommands extends SwitchBasedCommand {
         const allWarnings: string[] = [];
         const convertedFiles: string[] = [];
 
-        // Convert main file
-        const mainFile = fileRegistry.getMainFile();
-        if (mainFile) {
-            const basePath = path.dirname(mainFile.getPath());
-            const content = mainFile.getContent();
-
-            let result: ConversionResult;
-            if (message.direction === 'relative') {
-                result = conversionService.convertToRelative(content, basePath);
-            } else {
-                result = conversionService.convertToAbsolute(content, basePath);
-            }
+        // Convert all files (main + includes)
+        const allFiles = fileRegistry.getAll();
+        for (const file of allFiles) {
+            const result = this._convertFilePaths(file, message.direction, conversionService);
 
             if (result.converted > 0) {
-                mainFile.setContent(result.content, false);
-                convertedFiles.push(mainFile.getRelativePath());
-            }
-
-            totalConverted += result.converted;
-            totalSkipped += result.skipped;
-            allWarnings.push(...result.warnings.map(w => `[${mainFile.getRelativePath()}] ${w}`));
-        }
-
-        // Convert all include files
-        const includeFiles = fileRegistry.getIncludeFiles();
-        for (const file of includeFiles) {
-            const basePath = path.dirname(file.getPath());
-            const content = file.getContent();
-
-            let result: ConversionResult;
-            if (message.direction === 'relative') {
-                result = conversionService.convertToRelative(content, basePath);
-            } else {
-                result = conversionService.convertToAbsolute(content, basePath);
-            }
-
-            if (result.converted > 0) {
-                file.setContent(result.content, false);
                 convertedFiles.push(file.getRelativePath());
             }
 
@@ -331,25 +321,34 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Resolve a path to absolute, using main file's directory as base for relative paths.
+     * Returns null if resolution fails.
+     */
+    private _resolveToAbsolutePath(filePath: string): string | null {
+        if (path.isAbsolute(filePath)) {
+            return filePath;
+        }
+
+        const fileRegistry = this.getFileRegistry();
+        const mainFile = fileRegistry?.getMainFile();
+        if (!mainFile) {
+            return null;
+        }
+
+        const basePath = path.dirname(mainFile.getPath());
+        return path.resolve(basePath, filePath);
+    }
+
+    /**
      * Open a file path directly (in VS Code or default app)
      */
     private async handleOpenPath(
         message: OpenPathMessage,
         _context: CommandContext
     ): Promise<CommandResult> {
-        const filePath = message.filePath;
-
-        // If the path is relative, resolve it against the main file's directory
-        let resolvedPath = filePath;
-        if (!path.isAbsolute(filePath)) {
-            const fileRegistry = this.getFileRegistry();
-            const mainFile = fileRegistry?.getMainFile();
-            if (mainFile) {
-                const basePath = path.dirname(mainFile.getPath());
-                resolvedPath = path.resolve(basePath, filePath);
-            } else {
-                return this.failure('Cannot resolve relative path: main file not found');
-            }
+        const resolvedPath = this._resolveToAbsolutePath(message.filePath);
+        if (!resolvedPath) {
+            return this.failure('Cannot resolve relative path: main file not found');
         }
 
         try {
@@ -474,19 +473,9 @@ export class PathCommands extends SwitchBasedCommand {
         message: RevealPathInExplorerMessage,
         _context: CommandContext
     ): Promise<CommandResult> {
-        const filePath = message.filePath;
-
-        // If the path is relative, resolve it against the main file's directory
-        let resolvedPath = filePath;
-        if (!path.isAbsolute(filePath)) {
-            const fileRegistry = this.getFileRegistry();
-            const mainFile = fileRegistry?.getMainFile();
-            if (mainFile) {
-                const basePath = path.dirname(mainFile.getPath());
-                resolvedPath = path.resolve(basePath, filePath);
-            } else {
-                return this.failure('Cannot resolve relative path: main file not found');
-            }
+        const resolvedPath = this._resolveToAbsolutePath(message.filePath);
+        if (!resolvedPath) {
+            return this.failure('Cannot resolve relative path: main file not found');
         }
 
         // Check if the path exists
