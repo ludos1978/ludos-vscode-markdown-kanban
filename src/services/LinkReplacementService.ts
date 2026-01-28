@@ -411,7 +411,8 @@ export class LinkReplacementService {
             : path.resolve(contextBasePath, decodedBrokenPath);
         const brokenDir = this._normalizeDirForComparison(path.dirname(absoluteBrokenPath));
 
-        const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|!!!include\(([^)]+)\)!!!/g;
+        // Pattern matches: images, regular links, wiki links (with optional |label), and includes
+        const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|\[\[([^\]|]+)(?:\|[^\]]+)?\]\]|!!!include\(([^)]+)\)!!!/g;
 
         for (const file of files) {
             const content = file.getContent();
@@ -420,7 +421,8 @@ export class LinkReplacementService {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                const matchedPath = match[1] || match[2] || match[3];
+                // Groups: 1=image, 2=link, 3=wiki link, 4=include
+                const matchedPath = match[1] || match[2] || match[3] || match[4];
                 if (!matchedPath || replacements.has(matchedPath)) continue;
 
                 const decodedPath = safeDecodeURIComponent(matchedPath);

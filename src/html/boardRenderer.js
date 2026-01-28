@@ -2417,7 +2417,7 @@ function handleMediaOpen(event, target, taskId = null, columnId = null) {
         if (documentName) {
             // Calculate index for wiki links
             linkIndex = findElementIndex(wikiLink, containerElement, 'data-document');
-            sendOpenLinkMessage(LinkType.WIKI, documentName, { taskId, columnId, linkIndex });
+            sendOpenLinkMessage(LinkType.WIKI, documentName, { taskId, columnId, linkIndex, includeContext });
         }
         return true;
     }

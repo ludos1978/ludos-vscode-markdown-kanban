@@ -54,6 +54,34 @@ export class LinkHandler {
     }
 
     /**
+     * Resolve base directory for path operations.
+     * Priority: include context directory > main file directory
+     */
+    private resolveBaseDir(includeContext?: IncludeContextForResolution): string | undefined {
+        if (includeContext?.includeDir) {
+            return includeContext.includeDir;
+        }
+        if (includeContext?.filePath) {
+            return path.dirname(includeContext.filePath);
+        }
+        const mainFile = this._replacementDeps?.fileRegistry.getMainFile();
+        if (mainFile) {
+            return path.dirname(mainFile.getPath());
+        }
+        return undefined;
+    }
+
+    /**
+     * Resolve source file path for display purposes.
+     * Priority: include file path > main file path
+     */
+    private resolveSourceFile(includeContext?: IncludeContextForResolution): string | undefined {
+        return includeContext?.includeFilePath
+            || includeContext?.filePath
+            || this._replacementDeps?.fileRegistry.getMainFile()?.getPath();
+    }
+
+    /**
      * Enhanced file link handler with workspace-relative path support
      */
     public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
@@ -77,21 +105,9 @@ export class LinkHandler {
             const { resolvedPath, exists, isAbsolute, attemptedPaths } = resolution;
 
             if (!exists) {
-                // Unified behavior: Open an incremental QuickPick and stream results.
-                // Resolve baseDir: include context takes priority, then main file
-                let baseDir: string | undefined;
-                if (includeContext?.includeDir) {
-                    baseDir = includeContext.includeDir;
-                } else if (includeContext?.filePath) {
-                    baseDir = path.dirname(includeContext.filePath);
-                } else {
-                    const mainFile = this._replacementDeps?.fileRegistry.getMainFile();
-                    if (mainFile) {
-                        baseDir = path.dirname(mainFile.getPath());
-                    }
-                }
-                // Show source file: include file path if from include, otherwise main file path
-                const sourceFile = includeContext?.includeFilePath || includeContext?.filePath || (this._replacementDeps?.fileRegistry.getMainFile()?.getPath());
+                // Unified behavior: Open an incremental QuickPick and stream results
+                const baseDir = this.resolveBaseDir(includeContext);
+                const sourceFile = this.resolveSourceFile(includeContext);
                 console.log('[LinkHandler.handleFileLink] File not found - showing search', {
                     href,
                     hasIncludeContext: !!includeContext,
@@ -466,18 +482,7 @@ export class LinkHandler {
 
         // Offer replacement picker before warning
         try {
-            // Resolve baseDir: include context takes priority, then main file
-            let baseDir: string | undefined;
-            if (includeContext?.includeDir) {
-                baseDir = includeContext.includeDir;
-            } else if (includeContext?.filePath) {
-                baseDir = path.dirname(includeContext.filePath);
-            } else {
-                const mainFile = this._replacementDeps?.fileRegistry.getMainFile();
-                if (mainFile) {
-                    baseDir = path.dirname(mainFile.getPath());
-                }
-            }
+            const baseDir = this.resolveBaseDir(includeContext);
 
             if (!baseDir) {
                 console.warn('[LinkHandler.handleWikiLink] No base directory available, cannot offer replacement');
