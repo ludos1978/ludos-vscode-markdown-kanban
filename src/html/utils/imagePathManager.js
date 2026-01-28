@@ -405,7 +405,8 @@ function togglePathMenu(container, filePath, mediaType) {
     // Determine button class based on media type
     const buttonClass = mediaType === 'include' ? '.include-menu-btn' :
                         mediaType === 'video' ? '.video-menu-btn' :
-                        mediaType === 'link' ? '.link-menu-btn' : '.image-menu-btn';
+                        mediaType === 'link' ? '.link-menu-btn' :
+                        mediaType === 'wiki' ? '.wiki-menu-btn' : '.image-menu-btn';
     const button = container.querySelector(buttonClass);
     if (!button) return;
 
@@ -713,6 +714,19 @@ const MEDIA_TYPE_CONFIG = {
         menuItemClass: 'link-path-menu-item',
         pathDataAttr: 'filePath',  // Unified: all types use data-file-path
         mediaLabel: 'link'
+    },
+    wiki: {
+        emoji: '📝',
+        containerClass: 'wiki-link-container',
+        notFoundClass: 'wiki-not-found',
+        notFoundContainerClass: 'wiki-not-found-container',
+        notFoundTextClass: 'wiki-not-found-text',
+        notFoundMenuClass: 'wiki-not-found-menu',
+        brokenClass: 'wiki-broken',
+        menuBtnClass: 'wiki-menu-btn',
+        menuItemClass: 'wiki-path-menu-item',
+        pathDataAttr: 'document',  // Uses data-document for wiki links
+        mediaLabel: 'wiki link'
     },
     include: {
         emoji: '📎',
@@ -1370,6 +1384,7 @@ function setupMediaPathEventDelegation() {
             case 'image-menu':
             case 'video-menu':
             case 'link-menu':
+            case 'wiki-menu':
             case 'include-menu':
                 // Handle working media menu toggle (not broken/not-found)
                 togglePathMenu(container, filePath, mediaType);

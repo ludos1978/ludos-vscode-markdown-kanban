@@ -509,8 +509,9 @@ function wikiLinksPlugin(md, options = {}) {
     // Add render rules
     md.renderer.rules.wiki_link_open = function(tokens, idx) {
         const token = tokens[idx];
+        const document = token.attrGet('data-document') || '';
         let attrs = '';
-        
+
         if (token.attrIndex('href') >= 0) {
             attrs += ` href="${token.attrGet('href')}"`;
         }
@@ -520,15 +521,17 @@ function wikiLinksPlugin(md, options = {}) {
         if (token.attrIndex('title') >= 0) {
             attrs += ` title="${token.attrGet('title')}"`;
         }
-        if (token.attrIndex('data-document') >= 0) {
-            attrs += ` data-document="${escapeHtml(token.attrGet('data-document'))}"`;
+        if (document) {
+            attrs += ` data-document="${escapeHtml(document)}"`;
         }
-        
-        return `<a${attrs}>`;
+
+        // Wrap wiki link in a container for the menu button
+        return `<span class="wiki-link-container" data-document="${escapeHtml(document)}"><a${attrs}>`;
     };
-    
+
     md.renderer.rules.wiki_link_close = function() {
-        return '</a>';
+        // Add menu button after the link
+        return `</a><button class="wiki-menu-btn" data-action="wiki-menu" title="Wiki link options">☰</button></span>`;
     };
 }
 

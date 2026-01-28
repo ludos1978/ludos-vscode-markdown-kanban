@@ -4821,6 +4821,54 @@ blockquote {
 }
 
 /* ============================================================================
+   WIKI LINK CONTAINER - Wiki link burger menus
+   ============================================================================ */
+
+.wiki-link-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wiki-link-container .wiki-menu-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border-radius: 2px;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.wiki-link-container:hover .wiki-menu-btn {
+  opacity: 1;
+}
+
+.wiki-link-container .wiki-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Wiki link broken state */
+.wiki-link-container.wiki-broken .wiki-link {
+  text-decoration: line-through;
+}
+
+.wiki-link-container.wiki-broken .wiki-menu-btn {
+  opacity: 1;
+  background: rgba(255, 100, 100, 0.8);
+}
+
+/* ============================================================================
    DIAGRAM OVERLAY CONTAINER - Mermaid, PlantUML burger menus
    ============================================================================ */
 
