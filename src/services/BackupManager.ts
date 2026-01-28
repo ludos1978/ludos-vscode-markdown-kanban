@@ -37,6 +37,15 @@ export class BackupManager {
     }
 
     /**
+     * Check if backups are disabled for the given options.
+     * Returns true if backup should be skipped.
+     */
+    private isBackupDisabled(options: BackupOptions): boolean {
+        const enableBackups = configService.getConfig('enableBackups');
+        return !enableBackups && !options.forceCreate;
+    }
+
+    /**
      * Create a backup of the given document
      * @returns The backup file path if successful, null if failed or skipped
      */
@@ -48,12 +57,11 @@ export class BackupManager {
                 return null;
             }
 
-            const enableBackups = configService.getConfig('enableBackups');
-            const defaultIntervalMinutes = configService.getConfig('backupInterval');
-
-            if (!enableBackups && !options.forceCreate) {
+            if (this.isBackupDisabled(options)) {
                 return null;
             }
+
+            const defaultIntervalMinutes = configService.getConfig('backupInterval');
 
             const now = new Date();
             const intervalMinutes = options.minIntervalMinutes ?? defaultIntervalMinutes;
@@ -101,9 +109,7 @@ export class BackupManager {
      */
     public async createBackupFromContent(filePath: string, content: string, options: BackupOptions = {}): Promise<string | null> {
         try {
-            const enableBackups = configService.getConfig('enableBackups');
-
-            if (!enableBackups && !options.forceCreate) {
+            if (this.isBackupDisabled(options)) {
                 return null;
             }
 
@@ -163,9 +169,7 @@ export class BackupManager {
      */
     public async createFileBackup(filePath: string, content: string, options: BackupOptions = {}): Promise<string | null> {
         try {
-            const enableBackups = configService.getConfig('enableBackups');
-
-            if (!enableBackups && !options.forceCreate) {
+            if (this.isBackupDisabled(options)) {
                 return null;
             }
 

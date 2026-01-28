@@ -329,43 +329,16 @@ export class MarpExportService {
         }
 
         // Theme set - add configured theme directories
-        const configService = ConfigurationService.getInstance();
-        const configuredThemeFolders = configService.getNestedConfig('marp.themeFolders', []) as string[];
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        
-        // Add configured theme folders first
-        if (configuredThemeFolders.length > 0 && workspaceFolders && workspaceFolders.length > 0) {
-            const workspaceRoot = workspaceFolders[0].uri.fsPath;
-            
-            for (const themeFolder of configuredThemeFolders) {
-                let resolvedPath: string;
-                
-                // Resolve relative paths against workspace root, keep absolute paths as-is
-                if (path.isAbsolute(themeFolder)) {
-                    resolvedPath = themeFolder;
-                } else {
-                    resolvedPath = path.resolve(workspaceRoot, themeFolder);
-                }
-                
-                if (fs.existsSync(resolvedPath)) {
-                    args.push('--theme-set', resolvedPath);
-                } else {
-                    console.warn(`[kanban.MarpExportService] Configured theme directory not found: ${resolvedPath}`);
-                }
-            }
+        const resolvedFolders = this.getResolvedConfiguredThemeFolders();
+        for (const resolvedPath of resolvedFolders) {
+            args.push('--theme-set', resolvedPath);
         }
-        
+
         // Fallback to common theme directories if no configured folders were found/added
+        const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
             const workspaceRoot = workspaceFolders[0].uri.fsPath;
-            
-            // Check for custom theme directories in common locations
-            const themePaths = [
-                path.join(workspaceRoot, '.marp/themes'),
-                path.join(workspaceRoot, 'themes'),
-                path.join(workspaceRoot, '_themes'),
-                path.join(workspaceRoot, 'assets/themes')
-            ];
+            const themePaths = this.getCommonThemePaths(workspaceRoot);
 
             for (const themePath of themePaths) {
                 if (fs.existsSync(themePath)) {
@@ -564,6 +537,77 @@ export class MarpExportService {
     }
 
     /**
+     * Resolve a theme folder path against workspace root.
+     * @param themeFolder - The configured theme folder (relative or absolute)
+     * @param workspaceRoot - The workspace root path
+     * @returns Resolved absolute path
+     */
+    private static resolveThemeFolderPath(themeFolder: string, workspaceRoot: string): string {
+        if (path.isAbsolute(themeFolder)) {
+            return themeFolder;
+        }
+        return path.resolve(workspaceRoot, themeFolder);
+    }
+
+    /**
+     * Get resolved, existing configured theme folder paths.
+     * @returns Array of resolved theme folder paths that exist on disk
+     */
+    private static getResolvedConfiguredThemeFolders(): string[] {
+        const configService = ConfigurationService.getInstance();
+        const configuredThemeFolders = configService.getNestedConfig('marp.themeFolders', []) as string[];
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+
+        if (configuredThemeFolders.length === 0 || !workspaceFolders || workspaceFolders.length === 0) {
+            return [];
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const resolvedPaths: string[] = [];
+
+        for (const themeFolder of configuredThemeFolders) {
+            const resolvedPath = this.resolveThemeFolderPath(themeFolder, workspaceRoot);
+            if (fs.existsSync(resolvedPath)) {
+                resolvedPaths.push(resolvedPath);
+            } else {
+                console.warn(`[kanban.MarpExportService] Configured theme directory not found: ${resolvedPath}`);
+            }
+        }
+
+        return resolvedPaths;
+    }
+
+    /**
+     * Get common theme directory paths for a workspace.
+     * @param workspaceRoot - The workspace root path
+     * @returns Array of common theme directory paths
+     */
+    private static getCommonThemePaths(workspaceRoot: string): string[] {
+        return [
+            path.join(workspaceRoot, '.marp/themes'),
+            path.join(workspaceRoot, 'themes'),
+            path.join(workspaceRoot, '_themes'),
+            path.join(workspaceRoot, 'assets/themes')
+        ];
+    }
+
+    /**
+     * Collect theme names from CSS files in a directory.
+     * @param dirPath - Directory path to scan
+     * @param themes - Array to add theme names to
+     */
+    private static collectThemesFromDirectory(dirPath: string, themes: string[]): void {
+        const files = fs.readdirSync(dirPath);
+        const cssFiles = files.filter((file: string) => file.endsWith('.css') || file.endsWith('.marp.css'));
+        cssFiles.forEach((file: string) => {
+            const themeName = file.replace(/\.(css|marp\.css)$/, '');
+            if (!themes.includes(themeName)) {
+                themes.push(themeName);
+            }
+        });
+    }
+
+    /**
      * Get available Marp themes
      * @returns Promise that resolves to an array of available theme names
      */
@@ -578,66 +622,25 @@ export class MarpExportService {
             // Start with built-in themes
             const themes = [
                 'default',
-                'gaia', 
+                'gaia',
                 'uncover',
             ];
 
-            // Get configured theme folders
-            const configService = ConfigurationService.getInstance();
-            const configuredThemeFolders = configService.getNestedConfig('marp.themeFolders', []) as string[];
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            
             // Check configured theme folders first
-            if (configuredThemeFolders.length > 0 && workspaceFolders && workspaceFolders.length > 0) {
-                const workspaceRoot = workspaceFolders[0].uri.fsPath;
-                
-                for (const themeFolder of configuredThemeFolders) {
-                    let resolvedPath: string;
-                    
-                    // Resolve relative paths against workspace root, keep absolute paths as-is
-                    if (path.isAbsolute(themeFolder)) {
-                        resolvedPath = themeFolder;
-                    } else {
-                        resolvedPath = path.resolve(workspaceRoot, themeFolder);
-                    }
-                    
-                    if (fs.existsSync(resolvedPath)) {
-                        const files = fs.readdirSync(resolvedPath);
-                        const cssFiles = files.filter((file: string) => file.endsWith('.css') || file.endsWith('.marp.css'));
-                        cssFiles.forEach((file: string) => {
-                            const themeName = file.replace(/\.(css|marp\.css)$/, '');
-                            if (!themes.includes(themeName)) {
-                                themes.push(themeName);
-                            }
-                        });
-                    } else {
-                        console.warn('[kanban.MarpExportService.getAvailableThemes] Configured theme directory not found:', resolvedPath);
-                    }
-                }
+            const resolvedFolders = this.getResolvedConfiguredThemeFolders();
+            for (const resolvedPath of resolvedFolders) {
+                this.collectThemesFromDirectory(resolvedPath, themes);
             }
-            
+
             // Fallback to common theme directories
+            const workspaceFolders = vscode.workspace.workspaceFolders;
             if (workspaceFolders && workspaceFolders.length > 0) {
                 const workspaceRoot = workspaceFolders[0].uri.fsPath;
-                
-                // Check for custom theme files in common locations
-                const themePaths = [
-                    path.join(workspaceRoot, '.marp/themes'),
-                    path.join(workspaceRoot, 'themes'),
-                    path.join(workspaceRoot, '_themes'),
-                    path.join(workspaceRoot, 'assets/themes')
-                ];
+                const themePaths = this.getCommonThemePaths(workspaceRoot);
 
                 for (const themePath of themePaths) {
                     if (fs.existsSync(themePath)) {
-                        const files = fs.readdirSync(themePath);
-                        const cssFiles = files.filter((file: string) => file.endsWith('.css') || file.endsWith('.marp.css'));
-                        cssFiles.forEach((file: string) => {
-                            const themeName = file.replace(/\.(css|marp\.css)$/, '');
-                            if (!themes.includes(themeName)) {
-                                themes.push(themeName);
-                            }
-                        });
+                        this.collectThemesFromDirectory(themePath, themes);
                     }
                 }
             }
