@@ -4,13 +4,6 @@
 
 - [ ] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in pupeteer that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the puppeteer?
 
-- [x] this is an xlsx embed feature we could add!
-  using libreoffice:
-  /Applications/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf:calc_pdf_Export --outdir . "$@"%
-  maybe directly convert to png
-  or use the pdf to image conversion after that
-  i want to use something like ![](/path/to/file.xlsx){page=1 width=300px} and it directly converts to png and embeds it into the file.
-
 - [ ] we have so many addons and features. would it make sense to refactor the features so they function as plugins that can be added.
 
 i am thinking about the features:
@@ -118,6 +111,32 @@ Collects all cards that didn't match any gather rule:
 ---
 
 # DONE
+
+- [x] /refactor the burger menu is for the embeds, links, etc:
+- types that show the menu
+  - embeds ![]()
+  - links []()
+    - embeds and links also can have the {} after
+  - includes !!!include()!!!
+  - links <>
+  - wiki-links [[]]
+  - ```plantuml or mermaid
+```
+- all media and links allways have the burger menu, when it's a broken link we show it in errors style and show the burger menu allways visible, if it's valid it only shows on hover. All links are relative to the file the link is in. If it's an included file, its relative to it's path. the menu options typically are:
+  - open (open the media in the builtin or external editor associated with the mediatype)
+  - reveal in file explorer
+  - search for file (search for alternative file with the same filename)
+  - browse for file (file-dialogue to select the fiels)
+  - convert to relative / absolute (filepath)
+  - delete
+
+- [x] this is an xlsx embed feature we could add!
+  using libreoffice:
+  /Applications/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf:calc_pdf_Export --outdir . "$@"%
+  maybe directly convert to png
+  or use the pdf to image conversion after that
+  i want to use something like ![](/path/to/file.xlsx){page=1 width=300px} and it directly converts to png and embeds it into the file.
+
 
 - [x] i would like a way to embed iframes in the pages. currently it possible to use html, but when exporting it as pdf it's a bad look.
 for example i have this html:

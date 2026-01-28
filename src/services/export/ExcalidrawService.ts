@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
+import { BrowserService } from '../BrowserService';
 
 /**
  * Excalidraw element structure (subset of properties used)
@@ -124,6 +125,9 @@ export class ExcalidrawService {
         const appState = excalidrawData.appState || {};
         const files = excalidrawData.files || {};
 
+        // Resolve browser executable path via BrowserService
+        const browserPath = await BrowserService.ensureBrowser();
+
         // Find the worker script - it's in the same directory as the compiled output
         const workerPath = path.join(__dirname, 'excalidraw-worker.js');
 
@@ -165,8 +169,8 @@ export class ExcalidrawService {
                 reject(err);
             });
 
-            // Send the data to the child process
-            child.stdin.write(JSON.stringify({ elements, appState, files }));
+            // Send the data to the child process (including browser path for Playwright)
+            child.stdin.write(JSON.stringify({ elements, appState, files, browserPath }));
             child.stdin.end();
         });
     }

@@ -460,6 +460,9 @@ interface KanbanConfiguration {
     htmlCommentRenderMode: string;
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
+    browser: {
+        executablePath: string;  // '' = auto-detect
+    };
     marp: {
         enginePath: string;
         defaultTheme: string;
@@ -474,6 +477,9 @@ interface KanbanConfiguration {
 ```
 
 **Purpose**: Type-safe access to all configuration values.
+
+**Browser Config (2026-01-28):**
+- `browser.executablePath`: Custom path to Chrome/Chromium executable for Playwright-based features (Excalidraw rendering, Handout PDF). Empty string means auto-detect (system Chrome → Playwright-managed browser).
 
 **Marp Style Classes (2025-11-13):**
 - `availableClasses`: List of available CSS class names that can be used in Marp presentations (e.g., 'font24', 'invert', 'center')
@@ -508,6 +514,9 @@ interface ConfigurationDefaults {
     htmlCommentRenderMode: string;
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
+    browser: {
+        executablePath: string;
+    };
     marp: {
         enginePath: string;
         defaultTheme: string;

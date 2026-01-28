@@ -658,4 +658,33 @@ let forceWriteConfirmationDialog = null;
 
 ---
 
+## 7. STATIC UTILITY SERVICES (2026-01-28)
+
+### 7.1 BrowserService
+**File:** `/src/services/BrowserService.ts`
+
+**Instance Name:** Static class (no singleton instance)
+**Type:** Static utility class
+**Scope:** Module-level (all methods are static)
+
+**Purpose:**
+- Centralized browser detection and management for Playwright-based features
+- Resolves browser executable path with priority: user config → system Chrome/Chromium → Playwright-managed browser
+- Auto-installs Playwright chromium browser if needed
+
+**Data Held:**
+```typescript
+// No instance data – purely static methods
+// Uses platform-specific KNOWN_BROWSER_PATHS constant for detection
+```
+
+**Key Constants:**
+- `KNOWN_BROWSER_PATHS`: Platform-specific (darwin/linux/win32) Chrome/Chromium executable paths
+
+**Used By:**
+- ExcalidrawService.ts (resolves browser path for excalidraw-worker.js)
+- handout-postprocess.js (via BROWSER_PATH env var, set by callers)
+
+---
+
 **End of Documentation**

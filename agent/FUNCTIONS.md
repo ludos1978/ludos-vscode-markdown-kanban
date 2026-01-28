@@ -9,6 +9,36 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
+## Recent Updates (2026-01-28) - Puppeteer → Playwright Migration
+
+### New File: `src/services/BrowserService.ts`
+Centralized browser detection & management for Playwright-based features (Excalidraw, Handout PDF).
+
+**Static Methods:**
+- `BrowserService.findBrowserExecutable()` - Resolves browser path: user config → system Chrome/Chromium → Playwright-managed browser
+- `BrowserService.ensureBrowser()` - Calls findBrowserExecutable(); if not found, runs `npx playwright install chromium` then retries
+- `BrowserService.launchHeadless(options?)` - Convenience: resolves path and launches headless Playwright browser
+
+### Updates to `src/services/export/ExcalidrawService.ts`
+- `ExcalidrawService.convertToSVG()` now resolves browser path via `BrowserService.ensureBrowser()` and passes `browserPath` in stdin JSON to the worker
+
+### Updates to `src/services/export/excalidraw-worker.js`
+- Migrated from Puppeteer to Playwright (`chromium.launch`)
+- Accepts `browserPath` in stdin JSON for explicit executable path
+- Changed `waitUntil: 'networkidle0'` → `waitUntil: 'networkidle'` (Playwright API)
+
+### Updates to `marp-engine/engine/handout-postprocess.js`
+- Migrated from Puppeteer to Playwright (`chromium.launch`)
+- Reads `BROWSER_PATH` environment variable for executable path
+- Changed `headless: 'new'` → `headless: true` (Playwright API)
+- Changed `waitUntil: 'networkidle0'` → `waitUntil: 'networkidle'` (Playwright API)
+
+### Updates to `src/services/ConfigurationService.ts`
+- Added `browser: { executablePath: string }` to `KanbanConfiguration` interface
+- Added default `browser: { executablePath: '' }` (auto-detect)
+
+---
+
 ## Recent Updates (2026-01-28) - Excel Spreadsheet Embedding Feature
 
 ### New File: `src/services/export/XlsxService.ts`

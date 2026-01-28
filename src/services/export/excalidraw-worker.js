@@ -1,10 +1,10 @@
 /**
  * Excalidraw to SVG worker script
- * Uses Puppeteer (headless browser) for full Excalidraw rendering support
+ * Uses Playwright (headless browser) for full Excalidraw rendering support
  * including modern features like custom fonts (fontFamily 5+)
  */
 
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
 
 // Read input from stdin
 let inputData = '';
@@ -13,13 +13,17 @@ process.stdin.on('data', chunk => inputData += chunk);
 process.stdin.on('end', async () => {
     let browser;
     try {
-        const { elements, appState, files } = JSON.parse(inputData);
+        const { elements, appState, files, browserPath } = JSON.parse(inputData);
 
         // Launch headless browser
-        browser = await puppeteer.launch({
+        const launchOptions = {
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        };
+        if (browserPath) {
+            launchOptions.executablePath = browserPath;
+        }
+        browser = await chromium.launch(launchOptions);
 
         const page = await browser.newPage();
 
@@ -60,15 +64,16 @@ process.stdin.on('end', async () => {
             </html>
         `;
 
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        await page.setContent(htmlContent, { waitUntil: 'networkidle' });
 
         // Wait for Excalidraw module to load and be ready
         await page.waitForFunction(() => window.excalidrawReady === true, { timeout: 60000 });
 
         // Call the render function with our data
-        const svgString = await page.evaluate(async (elements, appState, files) => {
+        // Playwright evaluate() accepts only a single argument — wrap in an object
+        const svgString = await page.evaluate(async ({ elements, appState, files }) => {
             return await window.renderExcalidraw(elements, appState, files);
-        }, elements, appState || {}, files || {});
+        }, { elements, appState: appState || {}, files: files || {} });
 
         await browser.close();
 

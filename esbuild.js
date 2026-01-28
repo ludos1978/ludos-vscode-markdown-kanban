@@ -53,7 +53,7 @@ console.log('Marp watch script placeholder');
 			}
 
 			// Copy Excalidraw worker script (runs in child process with real node_modules)
-			// Uses Puppeteer for full Excalidraw rendering support including modern features
+			// Uses Playwright for full Excalidraw rendering support including modern features
 			// Must be in dist/ directory (same as bundled extension.js, where __dirname resolves)
 			const excalidrawWorkerSrc = 'src/services/export/excalidraw-worker.js';
 			const excalidrawWorkerDist = 'dist/excalidraw-worker.js';

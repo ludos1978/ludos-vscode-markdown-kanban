@@ -50,6 +50,9 @@ export interface KanbanConfiguration {
         globalClasses: string[];
         localClasses: string[];
     };
+    browser: {
+        executablePath: string;
+    };
     pandoc: {
         path: string;
     };
@@ -121,6 +124,9 @@ export class ConfigurationService {
             ],
             globalClasses: [],
             localClasses: []
+        },
+        browser: {
+            executablePath: ''
         },
         pandoc: {
             path: ''

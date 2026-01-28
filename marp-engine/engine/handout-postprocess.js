@@ -19,12 +19,12 @@
 const fs = require('fs');
 const path = require('path');
 
-// Try to load puppeteer (optional for PDF generation)
-let puppeteer = null;
+// Try to load playwright (optional for PDF generation)
+let chromium = null;
 try {
-  puppeteer = require('puppeteer');
+  chromium = require('playwright').chromium;
 } catch (e) {
-  // Puppeteer not available - PDF generation won't work
+  // Playwright not available - PDF generation won't work
 }
 
 // Default options
@@ -543,11 +543,11 @@ ${pages.join('\n')}
 }
 
 /**
- * Generate PDF from HTML using Puppeteer
+ * Generate PDF from HTML using Playwright
  */
 async function generatePdf(htmlContent, outputPath, options) {
-  if (!puppeteer) {
-    throw new Error('Puppeteer is required for PDF generation. Install with: npm install puppeteer');
+  if (!chromium) {
+    throw new Error('Playwright is required for PDF generation. Install with: npm install playwright');
   }
 
   const isPortrait = options.layout === 'portrait';
@@ -555,14 +555,19 @@ async function generatePdf(htmlContent, outputPath, options) {
 
   console.log(`[Handout] Generating PDF: ${outputPath}`);
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
+  const launchOptions = {
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+  };
+  const browserPath = process.env.BROWSER_PATH;
+  if (browserPath) {
+    launchOptions.executablePath = browserPath;
+  }
+  const browser = await chromium.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: 'networkidle' });
 
     // Wait a bit for any SVG rendering
     await new Promise(resolve => setTimeout(resolve, 500));
