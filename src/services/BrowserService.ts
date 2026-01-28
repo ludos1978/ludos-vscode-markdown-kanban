@@ -111,4 +111,20 @@ export class BrowserService {
             ...options,
         });
     }
+
+    /**
+     * Convenience: resolve path and launch a headed (visible) Playwright browser.
+     * Used for interactive features like web image search where the user needs to interact with the browser.
+     * Returns the Playwright Browser instance.
+     */
+    static async launchHeaded(options?: Record<string, unknown>): Promise<any> {
+        const execPath = await BrowserService.ensureBrowser();
+        const { chromium } = require('playwright');
+        return chromium.launch({
+            headless: false,
+            executablePath: execPath,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...options,
+        });
+    }
 }

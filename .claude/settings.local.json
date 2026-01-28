@@ -163,7 +163,8 @@
       "Bash(git stash:*)",
       "Bash(npm show:*)",
       "WebFetch(domain:help.libreoffice.org)",
-      "WebFetch(domain:ask.libreoffice.org)"
+      "WebFetch(domain:ask.libreoffice.org)",
+      "Bash(git status:*)"
     ],
     "deny": [],
     "ask": []

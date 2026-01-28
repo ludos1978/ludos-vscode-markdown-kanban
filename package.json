@@ -3,7 +3,7 @@
   "displayName": "Ludos Kanban",
   "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
-  "version": "0.118.1",
+  "version": "0.119.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -4782,6 +4782,30 @@
           "type": "string",
           "default": "",
           "description": "Custom path to a Chrome/Chromium executable for Playwright-based features (Excalidraw rendering, Handout PDF). Leave empty for auto-detection."
+        },
+        "markdown-kanban.imageSearch.engine": {
+          "type": "string",
+          "enum": [
+            "google",
+            "kagi",
+            "bing",
+            "duckduckgo",
+            "custom"
+          ],
+          "default": "google",
+          "description": "Search engine to use for web image search",
+          "enumDescriptions": [
+            "Google Images",
+            "Kagi Images",
+            "Bing Images",
+            "DuckDuckGo Images",
+            "Custom URL (set markdown-kanban.imageSearch.customUrl)"
+          ]
+        },
+        "markdown-kanban.imageSearch.customUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Custom search URL template. Use ${query} as placeholder for the search query. Example: https://example.com/search?q=${query}&type=images"
         },
         "markdown-kanban.pandoc.path": {
           "type": "string",

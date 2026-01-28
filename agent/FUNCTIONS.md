@@ -2,10 +2,75 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2026-01-28
+**Last Updated:** 2026-01-29
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Updates (2026-01-29) - Web Image Search Feature
+
+### New File: `src/services/WebImageSearchService.ts`
+Service for interactive web image search using a headed Playwright browser.
+
+**Static Methods:**
+- `WebImageSearchService._buildSearchUrl(query)` - Builds search URL from configured engine (google/kagi/bing/duckduckgo/custom) and query string
+- `WebImageSearchService._sanitizeFilename(text)` - Converts text to a filename-safe string (lowercase, hyphens, no special chars)
+- `WebImageSearchService._getExtensionFromContentType(contentType)` - Maps content-type header to file extension
+- `WebImageSearchService._getExtensionFromUrl(url)` - Extracts file extension from URL path
+- `WebImageSearchService._uniqueFilePath(basePath, baseName, ext)` - Finds unique filename by appending -1, -2, etc.
+- `WebImageSearchService.searchAndSelect(altText, basePath)` - Opens headed browser to image search, injects selection overlay, downloads selected image, returns {filePath, sourceUrl} or null
+
+### Updates to `src/services/BrowserService.ts`
+- `BrowserService.launchHeaded(options?)` - Convenience: resolves path and launches headed (visible) Playwright browser for interactive features
+
+### Updates to `src/commands/PathCommands.ts`
+- `PathCommands.handleWebSearchForImage(message, context)` - Handler for webSearchForImage messages. Calls WebImageSearchService.searchAndSelect, replaces path, adds source URL as title
+- `PathCommands._addSourceUrlTitle(imagePath, sourceUrl, basePath)` - Adds source URL as markdown image title: ![alt](path "sourceUrl")
+
+### Updates to `src/core/bridge/MessageTypes.ts`
+- `WebSearchForImageMessage` - New message type for web image search (altText, oldPath, taskId, columnId, isColumnTitle, includeContext)
+
+### Updates to `src/services/ConfigurationService.ts`
+- Added `imageSearch: { engine, customUrl }` to KanbanConfiguration interface and defaults
+
+### New function in `src/html/utils/imagePathManager.js`
+- `src/html/utils/imagePathManager-webSearchForImage` - Sends webSearchForImage message to backend with alt text, old path, and include context
+
+### Modified functions in `src/html/utils/imagePathManager.js`
+- `src/html/utils/imagePathManager-generateBrokenMediaMenuHtml` - Added mediaType parameter, adds "Web Search" button for image type
+- `src/html/utils/imagePathManager-handleMediaNotFound` - Stores element.alt as container.dataset.altText for image type
+- `src/html/utils/imagePathManager-upgradeSimpleImageNotFoundPlaceholder` - Stores alt text from sibling img, adds "Web Search" button in menu
+- `src/html/utils/imagePathManager-upgradeImageOverlayToBroken` - Stores alt text from hidden img, dynamically adds "Web Search" button to existing menu
+- `src/html/utils/imagePathManager-setupMediaPathEventDelegation` - Added 'web-search' case in switch block
+
+---
+
+## Recent Updates (2026-01-28) - Burger Menu System Consolidation
+
+### New functions in `src/html/markdownRenderer.js`
+- `src/html/markdownRenderer-createBrokenMediaPlaceholder` - Create broken media placeholder DOM element (span.image-path-overlay-container.image-broken) with burger menu button. Accepts path, emoji, titleText, optional displayText, optional existingContainer, optional mediaType. Used by EPUB/PDF/diagram error handlers and _handleMediaError fallback.
+- `src/html/markdownRenderer-window._handleMediaError` - Unified onerror handler for media load failures. Tries handleMediaNotFound first, falls back to createBrokenMediaPlaceholder. Called from inline onerror on img/video/audio/source elements.
+- `src/html/markdownRenderer-createDiagramWrapper` - Create diagram wrapper with burger menu button for PlantUML/Mermaid. Accepts diagramType, code, svgContent. Returns wrapper div with diagram content and menu button.
+
+### Removed functions from `src/html/markdownRenderer.js`
+- `src/html/markdownRenderer-attachBrokenMenuButtonHandler` - Removed. Logic folded into createBrokenMediaPlaceholder (onclick attached during creation).
+- `src/html/markdownRenderer-window._brokenMediaFallback` - Removed. Replaced by window._handleMediaError which uses createBrokenMediaPlaceholder.
+
+### Removed functions from `src/html/utils/imagePathManager.js`
+- `src/html/utils/imagePathManager-toggleImagePathMenu` - Removed thin wrapper. Callers use togglePathMenu(container, path, 'image') directly.
+- `src/html/utils/imagePathManager-toggleVideoPathMenu` - Removed thin wrapper. Callers use togglePathMenu(container, path, 'video') directly.
+- `src/html/utils/imagePathManager-toggleIncludePathMenu` - Removed thin wrapper. Callers use togglePathMenu(container, path, 'include') directly.
+- `src/html/utils/imagePathManager-toggleLinkPathMenu` - Removed thin wrapper. Callers use togglePathMenu(container, path, 'link') directly.
+- `src/html/utils/imagePathManager-setupImagePathEventDelegation` - Removed alias. Caller uses setupMediaPathEventDelegation() directly.
+
+### Modified callers
+- `src/html/markdownRenderer.js` - EPUB/PDF burger menu onclick: toggleImagePathMenu → togglePathMenu(wrapper, filePath, 'image')
+- `src/html/markdownRenderer.js` - Diagram queue success handler: toggleImagePathMenu → togglePathMenu(element, decodedPath, 'image')
+- `src/html/markdownRenderer.js` - 5 onerror handlers simplified from try/catch/_brokenMediaFallback to window._handleMediaError()
+- `src/html/markdown-it-include-browser.js` - 2 onerror handlers simplified to window._handleMediaError()
+- `src/html/wysiwygEditor.ts` - Image/video menu button handlers: toggleImagePathMenu/toggleVideoPathMenu → togglePathMenu with media type arg
 
 ---
 

@@ -1810,6 +1810,25 @@ export interface BrowseForImageMessage extends BaseMessage {
 }
 
 /**
+ * Web search for an image to replace a broken/empty image path
+ * Opens a headed browser with an image search engine for interactive selection
+ */
+export interface WebSearchForImageMessage extends BaseMessage {
+    type: 'webSearchForImage';
+    altText: string;
+    oldPath: string;
+    taskId?: string;
+    columnId?: string;
+    isColumnTitle?: boolean;
+    includeContext?: {
+        includeDir?: string;
+        includeFilePath?: string;
+        mainDir?: string;
+        mainFilePath?: string;
+    };
+}
+
+/**
  * Delete an element (image, link, include) from the markdown source
  */
 export interface DeleteFromMarkdownMessage extends BaseMessage {
@@ -2155,6 +2174,7 @@ export type IncomingMessage =
     | SearchForFileMessage
     | RevealPathInExplorerMessage
     | BrowseForImageMessage
+    | WebSearchForImageMessage
     | DeleteFromMarkdownMessage
     // Processes messages
     | GetProcessesStatusMessage

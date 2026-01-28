@@ -374,6 +374,69 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle, includeDirFrom
 }
 
 /**
+ * Web search for an image - opens a headed browser with image search for interactive selection
+ * @param {string} altText - The image alt text to use as search query
+ * @param {string} oldPath - The old file path to replace
+ * @param {string} [taskId] - Optional task ID for targeted update
+ * @param {string} [columnId] - Optional column ID for targeted update
+ * @param {string} [isColumnTitle] - 'true' if image is in column title
+ * @param {string} [includeDirFromContainer] - Include directory from container
+ */
+function webSearchForImage(altText, oldPath, taskId, columnId, isColumnTitle, includeDirFromContainer) {
+    closeAllPathMenus();
+
+    if (taskId === 'undefined' || taskId === 'null' || taskId === '') {
+        taskId = undefined;
+    }
+    if (columnId === 'undefined' || columnId === 'null' || columnId === '') {
+        columnId = undefined;
+    }
+    if (!taskId || !columnId) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (!taskId && overlayRef?.taskId) {
+            taskId = overlayRef.taskId;
+        }
+        if (!columnId && overlayRef?.columnId) {
+            columnId = overlayRef.columnId;
+        }
+    }
+
+    // Extract includeContext (same logic as browseForImage)
+    let includeContext = null;
+
+    if (includeDirFromContainer && includeDirFromContainer !== '' && includeDirFromContainer !== 'undefined') {
+        includeContext = { includeDir: includeDirFromContainer };
+    }
+
+    if (!includeContext && taskId && columnId && window.cachedBoard?.columns) {
+        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === taskId);
+        if (task?.includeContext) {
+            includeContext = task.includeContext;
+        }
+    }
+
+    if (!includeContext) {
+        const overlayRef = window.taskOverlayEditor?.getTaskRef?.();
+        if (overlayRef?.includeContext) {
+            includeContext = overlayRef.includeContext;
+        }
+    }
+
+    const message = {
+        type: 'webSearchForImage',
+        altText: altText || '',
+        oldPath: oldPath
+    };
+    if (taskId) message.taskId = taskId;
+    if (columnId) message.columnId = columnId;
+    if (isColumnTitle === 'true') message.isColumnTitle = true;
+    if (includeContext) message.includeContext = includeContext;
+
+    vscode.postMessage(message);
+}
+
+/**
  * Delete an element from the markdown source
  * This will remove the entire markdown element (image, link, include, etc.) from the document
  */
@@ -865,13 +928,17 @@ function createBrokenPathMatcher(brokenPaths) {
  * @param {object} config - Media type config
  * @returns {string} Menu HTML
  */
-function generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config) {
+function generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config, mediaType) {
+    const webSearchBtn = mediaType === 'image'
+        ? `<button class="${config.menuItemClass}" data-action="web-search">🌐 Web Search</button>`
+        : '';
     return `
         <div class="${config.notFoundMenuClass}" data-is-absolute="${isAbsolutePath}">
             <button class="${config.menuItemClass} disabled" disabled>📄 Open</button>
             <button class="${config.menuItemClass}" data-action="reveal">🔍 Reveal in File Explorer</button>
             <button class="${config.menuItemClass}" data-action="search">🔎 Search for File</button>
             <button class="${config.menuItemClass}" data-action="browse">📂 Browse for File</button>
+            ${webSearchBtn}
             <div class="${config.menuItemClass.replace('-item', '-divider')}"></div>
             <button class="${config.menuItemClass}${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
             <button class="${config.menuItemClass}${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
@@ -963,13 +1030,16 @@ function handleMediaNotFound(element, originalSrc, mediaType) {
     const container = document.createElement('div');
     container.className = `${config.notFoundContainerClass}${mediaType === 'video' ? ' ' + config.brokenClass : ''}`;
     container.dataset[config.pathDataAttr] = originalSrc;
+    if (mediaType === 'image' && element.alt) {
+        container.dataset.altText = element.alt;
+    }
 
     container.innerHTML = `
         <span class="${config.notFoundClass}" data-original-src="${htmlEscapedPath}" title="${config.mediaLabel.charAt(0).toUpperCase() + config.mediaLabel.slice(1)} not found: ${htmlEscapedPath}">
             <span class="${config.notFoundTextClass}">${config.emoji} ${htmlEscapedShortPath}</span>
             <button class="${config.menuBtnClass}" data-action="toggle-menu" title="Path options">☰</button>
         </span>
-        ${generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config)}
+        ${generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config, mediaType)}
     `;
 
     element.parentElement.insertBefore(container, element);
@@ -1084,6 +1154,12 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
     container.className = 'image-not-found-container';
     container.dataset.filePath = originalSrc;
 
+    // Try to get alt text from a sibling hidden img element
+    const siblingImg = simpleSpan.parentElement?.querySelector('img[style*="display: none"], img[style*="display:none"]');
+    if (siblingImg && siblingImg.alt) {
+        container.dataset.altText = siblingImg.alt;
+    }
+
     container.innerHTML = `
         <span class="image-not-found" data-original-src="${htmlEscapedPath}" title="Image not found: ${htmlEscapedPath}">
             <span class="image-not-found-text">📷 ${htmlEscapedShortPath}</span>
@@ -1094,6 +1170,7 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
             <button class="image-path-menu-item" data-action="reveal">🔍 Reveal in File Explorer</button>
             <button class="image-path-menu-item" data-action="search">🔎 Search for File</button>
             <button class="image-path-menu-item" data-action="browse">📂 Browse for File</button>
+            <button class="image-path-menu-item" data-action="web-search">🌐 Web Search</button>
             <div class="image-path-menu-divider"></div>
             <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
             <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
@@ -1126,6 +1203,12 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
     // Store the path on the overlay container for event delegation
     overlayContainer.dataset.filePath = originalSrc;
     overlayContainer.classList.add('image-broken');
+
+    // Store alt text from the hidden image for web search
+    const hiddenImg = overlayContainer.querySelector('img[style*="display: none"], img[style*="display:none"]');
+    if (hiddenImg && hiddenImg.alt) {
+        overlayContainer.dataset.altText = hiddenImg.alt;
+    }
 
     // Find task/column context for targeted updates
     const taskElement = overlayContainer.closest('.task-item');
@@ -1175,6 +1258,23 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
                 e.stopPropagation();
                 browseForImage(originalSrc, taskId, columnId, '', includeDir);
             };
+        }
+
+        // Add "Web Search" button after Browse button
+        const webSearchBtn = document.createElement('button');
+        webSearchBtn.className = 'image-path-menu-item';
+        webSearchBtn.dataset.action = 'web-search';
+        webSearchBtn.textContent = '🌐 Web Search';
+        webSearchBtn.onclick = function(e) {
+            e.stopPropagation();
+            const altText = overlayContainer.dataset.altText || '';
+            webSearchForImage(altText, originalSrc, taskId, columnId, '', includeDir);
+        };
+        // Insert after the browse button
+        if (browseBtn && browseBtn.nextSibling) {
+            existingMenu.insertBefore(webSearchBtn, browseBtn.nextSibling);
+        } else if (browseBtn) {
+            existingMenu.appendChild(webSearchBtn);
         }
     }
 
@@ -1393,6 +1493,11 @@ function setupMediaPathEventDelegation() {
                 if (browseMenu) browseMenu.classList.remove('visible');
                 browseForImage(filePath, taskId, columnId, '', includeDir);
                 break;
+            case 'web-search':
+                const wsMenu = container.querySelector(menuSelector);
+                if (wsMenu) wsMenu.classList.remove('visible');
+                webSearchForImage(container.dataset.altText || '', filePath, taskId, columnId, '', includeDir);
+                break;
             case 'to-relative':
                 if (!target.disabled) {
                     convertSinglePath(filePath, 'relative', true);
@@ -1500,6 +1605,7 @@ window.getShortDisplayPath = getShortDisplayPath;
 window.searchForFile = searchForFile;
 window.searchForIncludeFile = searchForIncludeFile;
 window.browseForImage = browseForImage;
+window.webSearchForImage = webSearchForImage;
 window.deleteFromMarkdown = deleteFromMarkdown;
 
 // Path menus

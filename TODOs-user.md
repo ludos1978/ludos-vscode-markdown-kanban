@@ -2,7 +2,7 @@
 
 - [ ] could we add more formats similar to notion?
 
-- [ ] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in pupeteer that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the puppeteer?
+- [x] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in playwright that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the playwright?
 
 - [ ] we have so many addons and features. would it make sense to refactor the features so they function as plugins that can be added.
 

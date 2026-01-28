@@ -64,6 +64,10 @@ export interface KanbanConfiguration {
         defaultIframeAttributes: { [key: string]: string | boolean | number };
         exportHandling: 'url' | 'fallback' | 'remove';
     };
+    imageSearch: {
+        engine: 'google' | 'kagi' | 'bing' | 'duckduckgo' | 'custom';
+        customUrl: string;
+    };
 }
 
 /**
@@ -133,6 +137,10 @@ export class ConfigurationService {
         },
         sidebar: {
             autoScan: true
+        },
+        imageSearch: {
+            engine: 'google' as 'google' | 'kagi' | 'bing' | 'duckduckgo' | 'custom',
+            customUrl: ''
         },
         embed: {
             knownDomains: [

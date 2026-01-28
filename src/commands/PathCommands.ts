@@ -14,9 +14,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { PathConversionService, ConversionResult } from '../services/PathConversionService';
-import { getErrorMessage } from '../utils/stringUtils';
+import { getErrorMessage, encodeFilePath } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
-import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
+import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, WebSearchForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
 import { safeFileUri } from '../utils/uriUtils';
 import { FileSearchService, TrackedFileData } from '../fileSearchService';
 import { PathFormat } from '../services/FileSearchWebview';
@@ -24,6 +24,7 @@ import { showInfo, showWarning } from '../services/NotificationService';
 import { findColumn, findColumnContainingTask } from '../actions/helpers';
 import { logger } from '../utils/logger';
 import { linkReplacementService, ReplacementDependencies } from '../services/LinkReplacementService';
+import { WebImageSearchService } from '../services/WebImageSearchService';
 
 /**
  * Options for path replacement operations
@@ -47,7 +48,7 @@ export class PathCommands extends SwitchBasedCommand {
         id: 'path-commands',
         name: 'Path Commands',
         description: 'Handles path conversion between absolute and relative formats',
-        messageTypes: ['convertPaths', 'convertAllPaths', 'convertSinglePath', 'openPath', 'searchForFile', 'revealPathInExplorer', 'browseForImage', 'deleteFromMarkdown'],
+        messageTypes: ['convertPaths', 'convertAllPaths', 'convertSinglePath', 'openPath', 'searchForFile', 'revealPathInExplorer', 'browseForImage', 'webSearchForImage', 'deleteFromMarkdown'],
         priority: 100
     };
 
@@ -59,6 +60,7 @@ export class PathCommands extends SwitchBasedCommand {
         'searchForFile': (msg, ctx) => this.handleSearchForFile(msg as SearchForFileMessage, ctx),
         'revealPathInExplorer': (msg, ctx) => this.handleRevealPathInExplorer(msg as RevealPathInExplorerMessage, ctx),
         'browseForImage': (msg, ctx) => this.handleBrowseForImage(msg as BrowseForImageMessage, ctx),
+        'webSearchForImage': (msg, ctx) => this.handleWebSearchForImage(msg as WebSearchForImageMessage, ctx),
         'deleteFromMarkdown': (msg, ctx) => this.handleDeleteFromMarkdown(msg as DeleteFromMarkdownMessage, ctx)
     };
 
@@ -571,6 +573,123 @@ export class PathCommands extends SwitchBasedCommand {
             isColumnTitle: message.isColumnTitle,
             successMessage: 'Image path updated successfully'
         });
+    }
+
+    /**
+     * Web search for an image - opens headed browser for interactive image selection
+     * Downloads the selected image and replaces the old path, adding the source URL as title
+     */
+    private async handleWebSearchForImage(
+        message: WebSearchForImageMessage,
+        context: CommandContext
+    ): Promise<CommandResult> {
+        const oldPath = message.oldPath;
+        // Use alt text as search query, fall back to filename from the old path
+        const altText = message.altText || path.basename(oldPath, path.extname(oldPath)) || 'image';
+
+        // Get the main file's directory as the base path
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) {
+            return this.failure('File registry not available');
+        }
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            return this.failure('No main file found');
+        }
+
+        // Use includeContext to determine the correct base path
+        let basePath: string;
+        if (message.includeContext?.includeDir) {
+            basePath = message.includeContext.includeDir;
+        } else {
+            basePath = path.dirname(mainFile.getPath());
+        }
+
+        try {
+            const result = await WebImageSearchService.searchAndSelect(altText, basePath);
+
+            if (!result) {
+                return this.success({ cancelled: true });
+            }
+
+            // Replace the old path with the downloaded file
+            const replaceResult = await this._replacePaths(oldPath, result.filePath, basePath, context, {
+                mode: 'single',
+                pathFormat: 'auto',
+                taskId: message.taskId,
+                columnId: message.columnId,
+                isColumnTitle: message.isColumnTitle,
+                successMessage: 'Image downloaded and path updated'
+            });
+
+            // After path replacement, add the source URL as the image title
+            // The markdown syntax: ![alt](path "title") - we add the source URL as title
+            if (replaceResult.success && (replaceResult.data as any)?.replaced) {
+                this._addSourceUrlTitle(result.filePath, result.sourceUrl, basePath);
+            }
+
+            return replaceResult;
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            logger.error('[PathCommands.handleWebSearchForImage] Error:', error);
+            return this.failure(`Web image search failed: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Add source URL as title to a markdown image after path replacement.
+     * Transforms ![alt](path) into ![alt](path "sourceUrl")
+     */
+    private _addSourceUrlTitle(imagePath: string, sourceUrl: string, basePath: string): void {
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) return;
+
+        const allFiles = fileRegistry.getAll();
+        const relativePath = path.relative(basePath, imagePath);
+        const encodedRelativePath = encodeFilePath(relativePath);
+
+        // Search for the image path in all files
+        for (const file of allFiles) {
+            let content = file.getContent();
+
+            // Match ![any alt](our-path) or ![any alt](our-path "existing-title")
+            // We need to find the exact path variant used in the file
+            const pathVariants = [relativePath, encodedRelativePath, imagePath];
+            // Also try with ./ prefix
+            if (!relativePath.startsWith('./') && !relativePath.startsWith('/')) {
+                pathVariants.push('./' + relativePath);
+            }
+            // Also try encoded variants with ./ prefix
+            if (!encodedRelativePath.startsWith('./') && !encodedRelativePath.startsWith('/')) {
+                pathVariants.push('./' + encodedRelativePath);
+            }
+            // Try just the basename as last resort
+            pathVariants.push(path.basename(imagePath));
+
+            let modified = false;
+            for (const pathVariant of pathVariants) {
+                const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Match image syntax with this path, with or without existing title
+                const regex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedPath}(\\s+"[^"]*")?\\)`, 'g');
+
+                const escapedSourceUrl = sourceUrl.replace(/"/g, '%22');
+                const newContent = content.replace(regex, (match, prefix, existingTitle) => {
+                    // Replace or add the title with the source URL
+                    return `${prefix}${pathVariant} "${escapedSourceUrl}")`;
+                });
+
+                if (newContent !== content) {
+                    content = newContent;
+                    modified = true;
+                    break;
+                }
+            }
+
+            if (modified) {
+                file.setContent(content, false);
+                break;
+            }
+        }
     }
 
     /**
