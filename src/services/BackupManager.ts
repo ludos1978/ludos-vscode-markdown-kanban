@@ -25,6 +25,18 @@ export class BackupManager {
     constructor() {}
 
     /**
+     * Write content to a backup file, creating directory if needed.
+     */
+    private async writeBackupFile(backupPath: string, content: string): Promise<void> {
+        const backupDir = path.dirname(backupPath);
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+        fs.writeFileSync(backupPath, content, 'utf8');
+        await this.setFileHidden(backupPath);
+    }
+
+    /**
      * Create a backup of the given document
      * @returns The backup file path if successful, null if failed or skipped
      */
@@ -65,18 +77,7 @@ export class BackupManager {
             }
 
             const backupPath = this.generateBackupPath(document, options.label || 'backup');
-
-            // Ensure backup directory exists
-            const backupDir = path.dirname(backupPath);
-            if (!fs.existsSync(backupDir)) {
-                fs.mkdirSync(backupDir, { recursive: true });
-            }
-
-            // Write backup file
-            fs.writeFileSync(backupPath, content, 'utf8');
-
-            // Set hidden attribute on Windows
-            await this.setFileHidden(backupPath);
+            await this.writeBackupFile(backupPath, content);
 
             this._lastBackupTime = new Date();
             this._lastContentHash = contentHash;
@@ -107,19 +108,7 @@ export class BackupManager {
             }
 
             const backupPath = this.generateBackupPathFromFilePath(filePath, options.label || 'backup');
-
-            // Ensure backup directory exists
-            const backupDir = path.dirname(backupPath);
-            if (!fs.existsSync(backupDir)) {
-                fs.mkdirSync(backupDir, { recursive: true });
-            }
-
-            // Write backup file
-            fs.writeFileSync(backupPath, content, 'utf8');
-
-            // Set hidden attribute on Windows
-            await this.setFileHidden(backupPath);
-
+            await this.writeBackupFile(backupPath, content);
             return backupPath;
         } catch (error) {
             console.error('[BackupManager] Failed to create backup from content:', error);

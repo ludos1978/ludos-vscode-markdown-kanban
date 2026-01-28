@@ -14,6 +14,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { getUnsavedChangesPath } from '../constants/FileNaming';
+import { confirmSaveOnClose } from './NotificationService';
 
 /**
  * Result of showing the unsaved changes dialog
@@ -80,25 +81,7 @@ export class UnsavedChangesService {
             message = `You have unsaved changes in column include files:\n${info.changedIncludeFiles.join('\n')}\n\nDo you want to save before closing?`;
         }
 
-        const saveAndClose = 'Save and close';
-        const closeWithoutSaving = 'Close without saving';
-        const cancel = 'Cancel (Esc)';
-
-        const choice = await vscode.window.showWarningMessage(
-            message,
-            { modal: true },
-            saveAndClose,
-            closeWithoutSaving,
-            cancel
-        );
-
-        if (!choice || choice === cancel) {
-            return 'cancel';
-        } else if (choice === saveAndClose) {
-            return 'save';
-        } else {
-            return 'discard';
-        }
+        return confirmSaveOnClose(message);
     }
 
     /**

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { confirmSaveOnClose } from './NotificationService';
 
 export type ConflictType = 'panel_close' | 'external_main' | 'external_include' | 'presave_check' | 'watcher_failure' | 'permission_denied' | 'file_missing' | 'circular_dependency' | 'batch_conflict' | 'network_timeout' | 'crash_recovery';
 /**
@@ -140,31 +141,19 @@ export class ConflictResolver {
             };
         }
 
-        const saveAndClose = 'Save and close';
-        const closeWithoutSaving = 'Close without saving';
-        const cancel = 'Cancel (Esc)';
-
-        const choice = await vscode.window.showWarningMessage(
-            message,
-            { modal: true },
-            saveAndClose,
-            closeWithoutSaving,
-            cancel
-        );
-
-        if (!choice || choice === cancel) {
-            return {
-                action: 'cancel',
-                shouldProceed: false,
-                shouldCreateBackup: false,
-                shouldSave: false,
-                shouldReload: false,
-                shouldIgnore: false
-            };
-        }
+        const choice = await confirmSaveOnClose(message);
 
         switch (choice) {
-            case saveAndClose:
+            case 'cancel':
+                return {
+                    action: 'cancel',
+                    shouldProceed: false,
+                    shouldCreateBackup: false,
+                    shouldSave: false,
+                    shouldReload: false,
+                    shouldIgnore: false
+                };
+            case 'save':
                 return {
                     action: 'save',
                     shouldProceed: true,
@@ -173,7 +162,7 @@ export class ConflictResolver {
                     shouldReload: false,
                     shouldIgnore: false
                 };
-            case closeWithoutSaving:
+            case 'discard':
                 return {
                     action: 'discard_local',
                     shouldProceed: true,

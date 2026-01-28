@@ -120,6 +120,34 @@ export class NotificationService {
     }
 
     /**
+     * Show save/close confirmation dialog for panel closing.
+     * Common pattern used by ConflictResolver and UnsavedChangesService.
+     * @param message - The warning message to display
+     * @returns Promise resolving to 'save', 'discard', or 'cancel'
+     */
+    async confirmSaveOnClose(message: string): Promise<SaveDiscardResult> {
+        const saveAndClose = 'Save and close';
+        const closeWithoutSaving = 'Close without saving';
+        const cancel = 'Cancel (Esc)';
+
+        const choice = await vscode.window.showWarningMessage(
+            message,
+            { modal: true },
+            saveAndClose,
+            closeWithoutSaving,
+            cancel
+        );
+
+        if (!choice || choice === cancel) {
+            return 'cancel';
+        } else if (choice === saveAndClose) {
+            return 'save';
+        } else {
+            return 'discard';
+        }
+    }
+
+    /**
      * Show delete confirmation dialog
      * @param itemType - Type of item being deleted (e.g., 'column', 'task')
      * @param itemName - Name/title of the item
@@ -187,3 +215,6 @@ export const confirm = (message: string, confirmLabel?: string) =>
 
 export const confirmUnsavedChanges = (fileName: string) =>
     notificationService.confirmUnsavedChanges(fileName);
+
+export const confirmSaveOnClose = (message: string) =>
+    notificationService.confirmSaveOnClose(message);
