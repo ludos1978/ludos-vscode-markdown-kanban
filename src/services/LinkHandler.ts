@@ -56,7 +56,7 @@ export class LinkHandler {
     /**
      * Enhanced file link handler with workspace-relative path support
      */
-    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution, mainFilePath?: string) {
+    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
         console.log('[LinkHandler.handleFileLink] Received context:', JSON.stringify({ taskId, columnId, linkIndex, hasIncludeContext: !!includeContext }));
         try {
             if (href.startsWith('file://')) {
@@ -78,17 +78,23 @@ export class LinkHandler {
 
             if (!exists) {
                 // Unified behavior: Open an incremental QuickPick and stream results.
-                const resolvedMainFilePath = mainFilePath || this._fileManager.getFilePath();
-                const baseDir = resolvedMainFilePath ? path.dirname(resolvedMainFilePath) : undefined;
+                // Resolve baseDir: include context takes priority, then main file
+                let baseDir: string | undefined;
+                if (includeContext?.includeDir) {
+                    baseDir = includeContext.includeDir;
+                } else if (includeContext?.filePath) {
+                    baseDir = path.dirname(includeContext.filePath);
+                } else {
+                    const mainFile = this._replacementDeps?.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        baseDir = path.dirname(mainFile.getPath());
+                    }
+                }
                 // Show source file: include file path if from include, otherwise main file path
-                // Note: task.includeContext uses 'includeFilePath', MessageTypes uses 'filePath'
-                const sourceFile = includeContext?.includeFilePath || includeContext?.filePath || resolvedMainFilePath;
+                const sourceFile = includeContext?.includeFilePath || includeContext?.filePath || (this._replacementDeps?.fileRegistry.getMainFile()?.getPath());
                 console.log('[LinkHandler.handleFileLink] File not found - showing search', {
                     href,
-                    mainFilePath,
-                    resolvedMainFilePath,
-                    includeContextIncludeFilePath: includeContext?.includeFilePath,
-                    includeContextFilePath: includeContext?.filePath,
+                    hasIncludeContext: !!includeContext,
                     sourceFile,
                     baseDir
                 });
@@ -361,8 +367,9 @@ export class LinkHandler {
      * @param taskId - Optional task ID for targeted updates
      * @param columnId - Optional column ID for targeted updates
      * @param linkIndex - Optional link index for specific link replacement
+     * @param includeContext - Optional include file context for proper path resolution
      */
-    public async handleWikiLink(documentName: string, taskId?: string, columnId?: string, linkIndex?: number) {
+    public async handleWikiLink(documentName: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
         const allAttemptedPaths: string[] = [];
         let triedFilenames: string[] = [];
 
@@ -459,15 +466,29 @@ export class LinkHandler {
 
         // Offer replacement picker before warning
         try {
-            const baseDir = this._fileManager.getDocument()
-                ? path.dirname(this._fileManager.getDocument()!.uri.fsPath)
-                : undefined;
-            const result = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
-            if (result) {
-                // Pass taskId, columnId, linkIndex for targeted updates
-                // Also pass baseDir since document may not be available
-                await this.applyLinkReplacement(documentName, result.uri, taskId, columnId, linkIndex, undefined, result.pathFormat, baseDir);
-                return;
+            // Resolve baseDir: include context takes priority, then main file
+            let baseDir: string | undefined;
+            if (includeContext?.includeDir) {
+                baseDir = includeContext.includeDir;
+            } else if (includeContext?.filePath) {
+                baseDir = path.dirname(includeContext.filePath);
+            } else {
+                const mainFile = this._replacementDeps?.fileRegistry.getMainFile();
+                if (mainFile) {
+                    baseDir = path.dirname(mainFile.getPath());
+                }
+            }
+
+            if (!baseDir) {
+                console.warn('[LinkHandler.handleWikiLink] No base directory available, cannot offer replacement');
+                // Continue to show warning message below
+            } else {
+                const result = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
+                if (result) {
+                    // Pass taskId, columnId, linkIndex for targeted updates
+                    await this.applyLinkReplacement(documentName, result.uri, taskId, columnId, linkIndex, includeContext, result.pathFormat);
+                    return;
+                }
             }
         } catch (e) {
             console.warn('[LinkHandler] Wiki replacement picker failed:', e);

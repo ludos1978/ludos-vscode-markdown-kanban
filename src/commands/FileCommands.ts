@@ -95,7 +95,6 @@ export class FileCommands extends SwitchBasedCommand {
             case LinkType.IMAGE: {
                 // Set up tracked files for file search (main + includes) before handling link
                 const fileRegistry = context.getFileRegistry();
-                let mainFilePath: string | undefined;
 
                 if (fileRegistry) {
                     const allFiles = fileRegistry.getAll();
@@ -105,12 +104,9 @@ export class FileCommands extends SwitchBasedCommand {
                         content: file.getContent()
                     }));
                     context.linkHandler.setTrackedFiles(trackedFiles);
-                    const mainFile = fileRegistry.getMainFile();
-                    mainFilePath = mainFile?.getPath();
                     console.log('[FileCommands.handleOpenLink] Registry info', {
                         fileCount: allFiles.length,
-                        mainFilePath,
-                        hasMainFile: !!mainFile
+                        hasMainFile: !!fileRegistry.getMainFile()
                     });
                 }
 
@@ -119,8 +115,7 @@ export class FileCommands extends SwitchBasedCommand {
                     taskId,
                     columnId,
                     linkIndex,
-                    includeContext,
-                    mainFilePath
+                    includeContext
                 );
 
                 // Sync include file content if needed
@@ -144,7 +139,7 @@ export class FileCommands extends SwitchBasedCommand {
             }
 
             case LinkType.WIKI:
-                await context.linkHandler.handleWikiLink(target, taskId, columnId, linkIndex);
+                await context.linkHandler.handleWikiLink(target, taskId, columnId, linkIndex, includeContext);
                 break;
 
             case LinkType.EXTERNAL:
