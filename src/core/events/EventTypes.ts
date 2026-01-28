@@ -20,8 +20,7 @@ export type EventType =
     | 'media:changed'           // Media file (image/diagram) changed
     | 'focus:gained'            // Panel gained focus
     | 'focus:lost'              // Panel lost focus
-    // === NEW: Event-driven architecture events ===
-    | 'link:replace-requested'  // Link replacement needed in board content
+    // === Event-driven architecture events ===
     | 'webview:update-requested' // Webview needs board update sent
     | 'webview:html-requested'  // Webview HTML generation needed
     | 'panel:closing'           // Panel is about to close (check unsaved)
@@ -134,22 +133,7 @@ export interface FocusLostEvent extends BaseEvent {
     type: 'focus:lost';
 }
 
-// === NEW: Event-driven architecture event interfaces ===
-
-/**
- * Link replace requested event - emitted when a link needs to be replaced in board content
- */
-export interface LinkReplaceRequestedEvent extends BaseEvent {
-    type: 'link:replace-requested';
-    data: {
-        originalPath: string;
-        newPath: string;
-        isImage: boolean;
-        taskId?: string;
-        columnId?: string;
-        linkIndex?: number;
-    };
-}
+// === Event-driven architecture event interfaces ===
 
 /**
  * Webview update requested event - emitted when webview needs a board update
@@ -196,8 +180,7 @@ export type AppEvent =
     | MediaChangedEvent
     | FocusGainedEvent
     | FocusLostEvent
-    // NEW: Event-driven architecture events
-    | LinkReplaceRequestedEvent
+    // Event-driven architecture events
     | WebviewUpdateRequestedEvent
     | WebviewHtmlRequestedEvent
     | PanelClosingEvent

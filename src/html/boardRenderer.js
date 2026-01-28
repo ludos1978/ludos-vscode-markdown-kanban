@@ -2308,13 +2308,7 @@ window.setupColumnResizeObserver = setupColumnResizeObserver;
 
 // toggleTaskCollapseById, toggleTaskCollapse moved to utils/columnFoldingManager.js
 
-// Link types for unified message handling (matches LinkType enum in MessageTypes.ts)
-const LinkType = {
-    FILE: 'file',
-    WIKI: 'wiki',
-    EXTERNAL: 'external',
-    IMAGE: 'image'
-};
+// LinkType is defined in utils/imagePathManager.js (loaded first)
 
 /**
  * Send unified openLink message to backend

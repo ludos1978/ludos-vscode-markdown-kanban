@@ -5,7 +5,6 @@ import { FileManager, IncludeContextForResolution } from '../fileManager';
 import { FileSearchService } from '../fileSearchService';
 import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
-import { eventBus, createEvent, LinkReplaceRequestedEvent } from '../core/events';
 import { PanelContext } from '../panel/PanelContext';
 import {
     DRAWIO_EXTENSIONS,
@@ -17,17 +16,18 @@ import {
     DOTTED_EXTENSIONS
 } from '../constants/FileExtensions';
 import { showError, showWarning, showInfo } from './NotificationService';
+import { linkReplacementService, ReplacementDependencies } from './LinkReplacementService';
 
 export class LinkHandler {
     private _fileManager: FileManager;
     private _fileSearchService: FileSearchService;
     private _panelContext: PanelContext;
+    private _replacementDeps?: ReplacementDependencies;
 
     /**
-     * Constructor - now uses event-driven approach instead of callbacks
+     * Constructor
      *
-     * Previously: received onRequestLinkReplacement callback
-     * Now: emits 'link:replace-requested' events via scoped EventBus
+     * Uses LinkReplacementService for path replacement operations.
      */
     constructor(fileManager: FileManager, panelContext: PanelContext) {
         this._fileManager = fileManager;
@@ -35,6 +35,14 @@ export class LinkHandler {
         // Create FileSearchService and set the webview for modal display
         this._fileSearchService = new FileSearchService();
         this._fileSearchService.setWebview(this._fileManager.getWebview());
+    }
+
+    /**
+     * Set dependencies for link replacement operations.
+     * Must be called after panel initialization.
+     */
+    public setReplacementDependencies(deps: ReplacementDependencies): void {
+        this._replacementDeps = deps;
     }
 
     /**
@@ -88,7 +96,7 @@ export class LinkHandler {
                     sourceFile
                 });
                 if (result) {
-                    await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex, includeContext);
+                    await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex, includeContext, result.pathFormat);
                     return;
                 }
 
@@ -293,38 +301,58 @@ export class LinkHandler {
     }
 
     /**
-     * Apply link replacement by emitting an event
+     * Apply link replacement using LinkReplacementService
      *
-     * Previously: called _onRequestLinkReplacement callback
-     * Now: emits 'link:replace-requested' event via EventBus
+     * Directly calls the replacement service instead of emitting events.
+     * This provides better include file support and path variant handling.
      *
-     * Note: No document check needed here - LinkReplacementHandler uses the
-     * unified MarkdownFileRegistry which is the single source of truth for files.
+     * @param userPathFormat - Path format selected by user in search dialog (overrides config if provided and not 'auto')
+     * @param fallbackBaseDir - Fallback base directory when document is not available (e.g., wiki links)
      */
-    private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
-        console.log('[LinkHandler.applyLinkReplacement] Context:', JSON.stringify({ taskId, columnId, linkIndex, hasIncludeContext: !!includeContext }));
+    private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution, userPathFormat?: 'auto' | 'relative' | 'absolute', fallbackBaseDir?: string) {
+        console.log('[LinkHandler.applyLinkReplacement] Context:', JSON.stringify({ taskId, columnId, linkIndex, hasIncludeContext: !!includeContext, userPathFormat, hasFallbackBaseDir: !!fallbackBaseDir }));
 
-        // Generate path based on user configuration (relative or absolute)
-        // Use include file's directory if from include, otherwise main file's directory
-        const configuredPath = this._fileManager.generateConfiguredPath(
-            replacementUri.fsPath,
-            includeContext?.includeDir
-        );
+        if (!this._replacementDeps) {
+            console.warn('[LinkHandler.applyLinkReplacement] No replacement dependencies set, cannot replace');
+            showWarning('Cannot replace link: replacement service not initialized');
+            return;
+        }
 
-        // Check if the path is an image file using centralized extensions
-        const isImage = hasExtension(originalPath, DOTTED_EXTENSIONS.image);
+        // Get base directory for path resolution
+        // Priority: includeContext > document > fallbackBaseDir > main file from registry
+        const document = this._fileManager.getDocument();
+        const mainFile = this._replacementDeps.fileRegistry.getMainFile();
+        const baseDir = includeContext?.includeDir
+            || (document ? path.dirname(document.uri.fsPath) : undefined)
+            || fallbackBaseDir
+            || (mainFile ? path.dirname(mainFile.getPath()) : undefined);
 
-        // Emit event for link replacement on scoped bus (handled by LinkReplacementHandler)
-        this._panelContext.scopedEventBus.emit('link:replace-requested', {
+        if (!baseDir) {
+            console.warn('[LinkHandler.applyLinkReplacement] No base directory available (no document, no fallback, no main file)');
+            showWarning('Cannot replace link: no document context');
+            return;
+        }
+
+        // Determine path format: user selection overrides config (unless 'auto')
+        const configPathFormat = configService.getPathGenerationMode();
+        const pathFormat = (userPathFormat && userPathFormat !== 'auto') ? userPathFormat : configPathFormat;
+        console.log('[LinkHandler.applyLinkReplacement] pathFormat:', pathFormat, '(user:', userPathFormat, ', config:', configPathFormat, '), baseDir:', baseDir);
+
+        // Use the unified replacement service
+        await linkReplacementService.replacePath(
             originalPath,
-            newPath: configuredPath,
-            isImage,
-            taskId,
-            columnId,
-            linkIndex
-        });
-
-        showInfo(`Link updated: ${originalPath} → ${configuredPath}`);
+            replacementUri.fsPath,
+            baseDir,
+            this._replacementDeps,
+            {
+                mode: 'single',
+                pathFormat,
+                taskId,
+                columnId,
+                linkIndex,
+                isColumnTitle: false
+            }
+        );
     }
 
     /**
@@ -437,7 +465,8 @@ export class LinkHandler {
             const result = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
             if (result) {
                 // Pass taskId, columnId, linkIndex for targeted updates
-                await this.applyLinkReplacement(documentName, result.uri, taskId, columnId, linkIndex);
+                // Also pass baseDir since document may not be available
+                await this.applyLinkReplacement(documentName, result.uri, taskId, columnId, linkIndex, undefined, result.pathFormat, baseDir);
                 return;
             }
         } catch (e) {

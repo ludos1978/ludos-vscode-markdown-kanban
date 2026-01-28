@@ -23,13 +23,8 @@ let baseBuildVersion = '';
 let lastTargetedUpdateTime = 0;
 const TARGETED_UPDATE_SKIP_WINDOW = 500; // ms to skip full render after targeted update
 
-// Link types for unified message handling (matches LinkType enum in MessageTypes.ts)
-const LinkType = {
-    FILE: 'file',
-    WIKI: 'wiki',
-    EXTERNAL: 'external',
-    IMAGE: 'image'
-};
+// LinkType is defined in utils/imagePathManager.js (loaded first)
+
 window.kanbanDebug = window.kanbanDebug || {
     enabled: false,
     log: (...args) => {

@@ -20,7 +20,7 @@ import { logger } from './utils/logger';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
+import { BoardSyncHandler, FileSyncHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
 import { InsertSnippetContentMessage, PerformEditorRedoMessage, PerformEditorUndoMessage, TriggerSnippetMessage, ScrollToElementMessage, ScrollToElementByIndexMessage } from './core/bridge/MessageTypes';
@@ -76,7 +76,6 @@ export class KanbanWebviewPanel {
     // Handlers (inlined from HandlerRegistry for simplicity)
     private _boardSyncHandler: BoardSyncHandler | null = null;
     private _fileSyncHandler: FileSyncHandler | null = null;
-    private _linkReplacementHandler: LinkReplacementHandler | null = null;
     private _boardInitHandler: BoardInitializationHandler | null = null;
     private _fileRegistryChangeHandler: FileRegistryChangeHandler | null = null;
     private _unsavedChangesService: UnsavedChangesService | null = null;
@@ -420,8 +419,13 @@ export class KanbanWebviewPanel {
             sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         });
-        this._linkReplacementHandler = new LinkReplacementHandler({
-            boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context
+        // Set replacement dependencies on LinkHandler (replaces LinkReplacementHandler)
+        this._linkHandler.setReplacementDependencies({
+            fileRegistry: this._fileRegistry,
+            boardStore: this._boardStore,
+            webviewBridge: this._webviewBridge,
+            getBoard: () => this.getBoard(),
+            invalidateCache: () => this._boardStore.invalidateCache()
         });
         this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
         this._webviewUpdateService = new WebviewUpdateService({
@@ -873,7 +877,6 @@ export class KanbanWebviewPanel {
         // Dispose handlers in reverse registration order
         this._webviewUpdateService?.dispose();
         this._fileRegistryChangeHandler?.dispose();
-        this._linkReplacementHandler?.dispose();
         this._fileSyncHandler?.dispose();
         this._boardSyncHandler?.dispose();
         // Note: unsavedChangesService and boardInitHandler don't need disposal
