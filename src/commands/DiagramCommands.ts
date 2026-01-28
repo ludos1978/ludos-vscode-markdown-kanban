@@ -567,6 +567,29 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
     }
 
+    // ============= DOCUMENT FILE HELPERS =============
+
+    /**
+     * Resolve a document file path and get its modification time.
+     * Common helper for PDF and EPUB handlers.
+     * @throws Error if file not found
+     */
+    private async resolveDocumentFile(
+        filePath: string,
+        includeDir: string | undefined,
+        context: CommandContext,
+        fileType: string
+    ): Promise<{ absolutePath: string; fileMtime: number }> {
+        const includeContext = includeDir ? { includeDir } : undefined;
+        const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
+        if (!resolution || !resolution.exists) {
+            throw new Error(`${fileType} file not found: ${filePath}`);
+        }
+        const absolutePath = resolution.resolvedPath;
+        const stats = await fs.promises.stat(absolutePath);
+        return { absolutePath, fileMtime: stats.mtimeMs };
+    }
+
     // ============= PDF HANDLERS =============
 
     /**
@@ -584,24 +607,9 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Import PDFService dynamically
             const { PDFService } = await import('../services/export/PDFService');
             const service = new PDFService();
-
-            // Build include context if provided (for PDFs inside include files)
-            const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both workspace-relative and document-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-            if (!resolution || !resolution.exists) {
-                throw new Error(`PDF file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
+            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
 
             // Render PDF page to PNG
             const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
@@ -642,24 +650,9 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Import PDFService dynamically
             const { PDFService } = await import('../services/export/PDFService');
             const service = new PDFService();
-
-            // Build include context if provided (for PDFs inside include files)
-            const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both workspace-relative and document-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-            if (!resolution || !resolution.exists) {
-                throw new Error(`PDF file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
+            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
 
             // Get page count
             const pageCount = await service.getPageCount(absolutePath);
@@ -701,24 +694,9 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Import EPUBService dynamically
             const { EPUBService } = await import('../services/export/EPUBService');
             const service = new EPUBService();
-
-            // Build include context if provided (for EPUBs inside include files)
-            const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both workspace-relative and document-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-            if (!resolution || !resolution.exists) {
-                throw new Error(`EPUB file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
+            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
 
             // Render EPUB page to PNG
             const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
@@ -759,24 +737,9 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Import EPUBService dynamically
             const { EPUBService } = await import('../services/export/EPUBService');
             const service = new EPUBService();
-
-            // Build include context if provided (for EPUBs inside include files)
-            const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both workspace-relative and document-relative paths)
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-            if (!resolution || !resolution.exists) {
-                throw new Error(`EPUB file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
+            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
 
             // Get page count
             const pageCount = await service.getPageCount(absolutePath);

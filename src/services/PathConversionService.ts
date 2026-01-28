@@ -125,6 +125,37 @@ export class PathConversionService {
     }
 
     /**
+     * Extract paths from content using a pattern and add them via callback.
+     * Common helper for path extraction loops.
+     */
+    private extractPathsWithPattern(
+        content: string,
+        pattern: RegExp,
+        type: PathInfo['type'],
+        addPath: (info: Omit<PathInfo, 'isAbsolute' | 'isUrl'> & { isAbsolute: boolean; isUrl: boolean }) => void
+    ): void {
+        let match: RegExpExecArray | null;
+        while ((match = pattern.exec(content)) !== null) {
+            const pathStr = match[1];
+            const matchStart = match.index;
+            const matchEnd = match.index + match[0].length;
+            const pathStart = match.index + match[0].indexOf(pathStr);
+            const pathEnd = pathStart + pathStr.length;
+
+            addPath({
+                original: pathStr,
+                type,
+                matchStart,
+                matchEnd,
+                pathStart,
+                pathEnd,
+                isAbsolute: this.isAbsolutePath(pathStr),
+                isUrl: this.isUrl(pathStr)
+            });
+        }
+    }
+
+    /**
      * Convert an absolute path to relative
      */
     public toRelativePath(absolutePath: string, basePath: string): string {
@@ -196,89 +227,16 @@ export class PathConversionService {
         };
 
         // Process images first (they take precedence over links due to ! prefix)
-        let match: RegExpExecArray | null;
-        const imagePattern = new RegExp(PathConversionService.PATTERNS.IMAGE.source, 'g');
-        while ((match = imagePattern.exec(content)) !== null) {
-            const pathStr = match[1];
-            const matchStart = match.index;
-            const matchEnd = match.index + match[0].length;
-            const pathStart = match.index + match[0].indexOf(pathStr);
-            const pathEnd = pathStart + pathStr.length;
-
-            addPath({
-                original: pathStr,
-                type: 'image',
-                matchStart,
-                matchEnd,
-                pathStart,
-                pathEnd,
-                isAbsolute: this.isAbsolutePath(pathStr),
-                isUrl: this.isUrl(pathStr)
-            });
-        }
+        this.extractPathsWithPattern(content, new RegExp(PathConversionService.PATTERNS.IMAGE.source, 'g'), 'image', addPath);
 
         // Process HTML images
-        const htmlImgPattern = new RegExp(PathConversionService.PATTERNS.HTML_IMG.source, 'gi');
-        while ((match = htmlImgPattern.exec(content)) !== null) {
-            const pathStr = match[1];
-            const matchStart = match.index;
-            const matchEnd = match.index + match[0].length;
-            const pathStart = match.index + match[0].indexOf(pathStr);
-            const pathEnd = pathStart + pathStr.length;
-
-            addPath({
-                original: pathStr,
-                type: 'html-img',
-                matchStart,
-                matchEnd,
-                pathStart,
-                pathEnd,
-                isAbsolute: this.isAbsolutePath(pathStr),
-                isUrl: this.isUrl(pathStr)
-            });
-        }
+        this.extractPathsWithPattern(content, new RegExp(PathConversionService.PATTERNS.HTML_IMG.source, 'gi'), 'html-img', addPath);
 
         // Process includes
-        const includePattern = new RegExp(PathConversionService.PATTERNS.INCLUDE.source, 'g');
-        while ((match = includePattern.exec(content)) !== null) {
-            const pathStr = match[1];
-            const matchStart = match.index;
-            const matchEnd = match.index + match[0].length;
-            const pathStart = match.index + match[0].indexOf(pathStr);
-            const pathEnd = pathStart + pathStr.length;
-
-            addPath({
-                original: pathStr,
-                type: 'include',
-                matchStart,
-                matchEnd,
-                pathStart,
-                pathEnd,
-                isAbsolute: this.isAbsolutePath(pathStr),
-                isUrl: this.isUrl(pathStr)
-            });
-        }
+        this.extractPathsWithPattern(content, new RegExp(PathConversionService.PATTERNS.INCLUDE.source, 'g'), 'include', addPath);
 
         // Process regular links (after images to avoid duplicates)
-        const linkPattern = new RegExp(PathConversionService.PATTERNS.LINK.source, 'g');
-        while ((match = linkPattern.exec(content)) !== null) {
-            const pathStr = match[1];
-            const matchStart = match.index;
-            const matchEnd = match.index + match[0].length;
-            const pathStart = match.index + match[0].indexOf(pathStr);
-            const pathEnd = pathStart + pathStr.length;
-
-            addPath({
-                original: pathStr,
-                type: 'link',
-                matchStart,
-                matchEnd,
-                pathStart,
-                pathEnd,
-                isAbsolute: this.isAbsolutePath(pathStr),
-                isUrl: this.isUrl(pathStr)
-            });
-        }
+        this.extractPathsWithPattern(content, new RegExp(PathConversionService.PATTERNS.LINK.source, 'g'), 'link', addPath);
 
         // Sort by position for consistent processing
         paths.sort((a, b) => a.pathStart - b.pathStart);
