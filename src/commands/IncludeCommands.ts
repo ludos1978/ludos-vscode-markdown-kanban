@@ -105,6 +105,17 @@ export class IncludeCommands extends SwitchBasedCommand {
     }
 
     /**
+     * Get relative path from file selection result.
+     * @returns Relative path if file was selected, null otherwise
+     */
+    private getSelectedRelativePath(fileUris: vscode.Uri[] | undefined, currentDir: string): string | null {
+        if (!fileUris || fileUris.length === 0) {
+            return null;
+        }
+        return path.relative(currentDir, fileUris[0].fsPath);
+    }
+
+    /**
      * Get current file directory or return error result.
      * @returns Object with currentDir if successful, or null if no active file
      */
@@ -268,10 +279,8 @@ export class IncludeCommands extends SwitchBasedCommand {
             title: 'Select include file for column'
         });
 
-        if (fileUris && fileUris.length > 0) {
-            const absolutePath = fileUris[0].fsPath;
-            const relativePath = path.relative(currentDir, absolutePath);
-
+        const relativePath = this.getSelectedRelativePath(fileUris, currentDir);
+        if (relativePath) {
             this.postMessage({
                 type: 'proceedEnableIncludeMode',
                 columnId: message.columnId,
@@ -307,10 +316,8 @@ export class IncludeCommands extends SwitchBasedCommand {
             title: 'Select new include file for column'
         });
 
-        if (fileUris && fileUris.length > 0) {
-            const absolutePath = fileUris[0].fsPath;
-            const relativePath = path.relative(currentDir, absolutePath);
-
+        const relativePath = this.getSelectedRelativePath(fileUris, currentDir);
+        if (relativePath) {
             this.postMessage({
                 type: 'proceedUpdateIncludeFile',
                 columnId: message.columnId,
@@ -350,10 +357,8 @@ export class IncludeCommands extends SwitchBasedCommand {
             title: 'Select new include file for task'
         });
 
-        if (fileUris && fileUris.length > 0) {
-            const absolutePath = fileUris[0].fsPath;
-            const relativePath = path.relative(currentDir, absolutePath);
-
+        const relativePath = this.getSelectedRelativePath(fileUris, currentDir);
+        if (relativePath) {
             this.postMessage({
                 type: 'proceedUpdateTaskIncludeFile',
                 taskId: taskId,
@@ -374,10 +379,8 @@ export class IncludeCommands extends SwitchBasedCommand {
             title: 'Select include file for task'
         });
 
-        if (fileUris && fileUris.length > 0) {
-            const absolutePath = fileUris[0].fsPath;
-            const relativePath = path.relative(currentDir, absolutePath);
-
+        const relativePath = this.getSelectedRelativePath(fileUris, currentDir);
+        if (relativePath) {
             this.postMessage({
                 type: 'enableTaskIncludeMode',
                 taskId: taskId,
