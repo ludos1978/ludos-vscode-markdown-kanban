@@ -82,6 +82,32 @@ export class LinkHandler {
     }
 
     /**
+     * Try to open a file externally, with error handling.
+     * @returns true if opened successfully, false otherwise
+     */
+    private async tryOpenExternal(resolvedPath: string, fileType: string): Promise<boolean> {
+        try {
+            await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
+            showInfo(`Opened externally: ${path.basename(resolvedPath)}`);
+            return true;
+        } catch (error) {
+            showError(`Failed to open ${fileType}: ${resolvedPath}`);
+            return false;
+        }
+    }
+
+    /**
+     * Find an existing document by path (already open in VS Code).
+     */
+    private findExistingDocument(resolvedPath: string): vscode.TextDocument | undefined {
+        const normalizedPath = path.resolve(resolvedPath);
+        return vscode.workspace.textDocuments.find(doc => {
+            const docPath = path.resolve(doc.uri.fsPath);
+            return docPath === normalizedPath;
+        });
+    }
+
+    /**
      * Enhanced file link handler with workspace-relative path support
      */
     public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
@@ -191,17 +217,8 @@ export class LinkHandler {
                     return;
                 } catch (error) {
                     console.warn(`Could not open diagram in VS Code, trying external: ${resolvedPath}`, error);
-                    // If VS Code can't open it, try opening externally
-                    try {
-                        await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
-                        showInfo(
-                            `Opened externally: ${path.basename(resolvedPath)}`
-                        );
-                        return;
-                    } catch (externalError) {
-                        showError(`Failed to open diagram file: ${resolvedPath}`);
-                        return;
-                    }
+                    await this.tryOpenExternal(resolvedPath, 'diagram file');
+                    return;
                 }
             }
 
@@ -217,16 +234,8 @@ export class LinkHandler {
                     return;
                 } catch (error) {
                     console.warn(`Could not open image in VS Code, trying external: ${resolvedPath}`, error);
-                    try {
-                        await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
-                        showInfo(
-                            `Opened externally: ${path.basename(resolvedPath)}`
-                        );
-                        return;
-                    } catch (externalError) {
-                        showError(`Failed to open image file: ${resolvedPath}`);
-                        return;
-                    }
+                    await this.tryOpenExternal(resolvedPath, 'image file');
+                    return;
                 }
             }
 
@@ -240,19 +249,9 @@ export class LinkHandler {
                 const openInNewTab = configService.getConfig('openLinksInNewTab');
 
                 try {
-                    // Normalize the path for comparison (resolve symlinks, normalize separators)
-                    const normalizedPath = path.resolve(resolvedPath);
-
-
-                    // Check if file is already open as a document (even if not visible)
-                    const existingDocument = vscode.workspace.textDocuments.find(doc => {
-                        const docPath = path.resolve(doc.uri.fsPath);
-                        const matches = docPath === normalizedPath;
-                        return matches;
-                    });
+                    const existingDocument = this.findExistingDocument(resolvedPath);
 
                     if (existingDocument) {
-
                         // ALWAYS focus existing documents, ignore openInNewTab setting
                         await vscode.window.showTextDocument(existingDocument, {
                             preserveFocus: false,
@@ -417,16 +416,7 @@ export class LinkHandler {
                         const ext = path.extname(filename).toLowerCase();
 
                         if (!ext || hasExtension(filename, TEXT_FILE_EXTENSIONS)) {
-                            // Normalize the path for comparison (resolve symlinks, normalize separators)
-                            const normalizedPath = path.resolve(resolution.resolvedPath);
-
-
-                            // Check if file is already open as a document (even if not visible)
-                            const existingDocument = vscode.workspace.textDocuments.find(doc => {
-                                const docPath = path.resolve(doc.uri.fsPath);
-                                const matches = docPath === normalizedPath;
-                                return matches;
-                            });
+                            const existingDocument = this.findExistingDocument(resolution.resolvedPath);
 
                             if (existingDocument) {
                                 // File is already open, always focus it
