@@ -23,7 +23,7 @@ import { BoardStore, UndoCapture } from '../core/stores';
 import { WebviewBridge } from '../core/bridge/WebviewBridge';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 import { LinkOperations, MARKDOWN_PATH_PATTERN, extractPathFromMatch } from '../utils/linkOperations';
-import { encodeFilePath, safeDecodeURIComponent } from '../utils/stringUtils';
+import { encodeFilePath, safeDecodeURIComponent, normalizeDirForComparison } from '../utils/stringUtils';
 import { showInfo, showWarning } from './NotificationService';
 import { logger } from '../utils/logger';
 import { PathFormat } from './FileSearchWebview';
@@ -205,20 +205,6 @@ export class LinkReplacementService {
     }
 
     // ============= PRIVATE HELPER METHODS =============
-
-    /**
-     * Normalize a directory path for comparison
-     */
-    private _normalizeDirForComparison(dir: string): string {
-        let normalized = dir.replace(/\\/g, '/');
-        if (normalized.startsWith('./')) {
-            normalized = normalized.substring(2);
-        }
-        if (normalized.endsWith('/')) {
-            normalized = normalized.slice(0, -1);
-        }
-        return normalized;
-    }
 
     /**
      * Resolve the context-aware base path for path resolution
@@ -409,7 +395,7 @@ export class LinkReplacementService {
         const absoluteBrokenPath = path.isAbsolute(decodedBrokenPath)
             ? decodedBrokenPath
             : path.resolve(contextBasePath, decodedBrokenPath);
-        const brokenDir = this._normalizeDirForComparison(path.dirname(absoluteBrokenPath));
+        const brokenDir = normalizeDirForComparison(path.dirname(absoluteBrokenPath));
 
         // Use shared pattern for matching all path types
         const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN.source, 'g');
@@ -428,7 +414,7 @@ export class LinkReplacementService {
                 const absolutePath = path.isAbsolute(decodedPath)
                     ? decodedPath
                     : path.resolve(fileDir, decodedPath);
-                const pathDir = this._normalizeDirForComparison(path.dirname(absolutePath));
+                const pathDir = normalizeDirForComparison(path.dirname(absolutePath));
 
                 const matchedRelativeDir = path.dirname(decodedPath);
                 const brokenRelativeDir = path.dirname(decodedBrokenPath);

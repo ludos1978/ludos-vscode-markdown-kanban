@@ -96,28 +96,14 @@ export class PresentationGenerator {
 
         for (const column of columns) {
             // Column title slide
-            // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
-            let columnTitle = column.originalTitle ?? column.title;
-
-            // Skip column if title contains exclude tag
-            if (this.hasExcludeTag(columnTitle, options.excludeTags)) {
+            const columnTitle = this.getProcessedColumnTitle(column, options);
+            if (columnTitle === null) {
                 continue;
-            }
-
-            if (options.stripIncludes) {
-                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
             slideContents.push(columnTitle + '\n\n');
 
             // Task slides
-            let tasks = column.tasks;
-            if (options.filterIncludes) {
-                tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
-            }
-            // Filter tasks with exclude tags
-            if (options.excludeTags && options.excludeTags.length > 0) {
-                tasks = tasks.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
-            }
+            const tasks = this.filterTasks(column.tasks, options);
             for (const task of tasks) {
                 slideContents.push(this.taskToSlideContent(task, options));
             }
@@ -159,28 +145,14 @@ export class PresentationGenerator {
 
         for (const column of board.columns) {
             // Column title as H1
-            // Use originalTitle to preserve !!!include(...)!!! syntax (displayTitle has badge placeholders)
-            let columnTitle = column.originalTitle ?? column.title;
-
-            // Skip column if title contains exclude tag
-            if (this.hasExcludeTag(columnTitle, options.excludeTags)) {
+            const columnTitle = this.getProcessedColumnTitle(column, options);
+            if (columnTitle === null) {
                 continue;
-            }
-
-            if (options.stripIncludes) {
-                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
             lines.push(`# ${columnTitle}`, '');
 
-            // Filter tasks if requested
-            let tasks = column.tasks;
-            if (options.filterIncludes) {
-                tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
-            }
-            // Filter tasks with exclude tags
-            if (options.excludeTags && options.excludeTags.length > 0) {
-                tasks = tasks.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
-            }
+            // Filter tasks
+            const tasks = this.filterTasks(column.tasks, options);
 
             for (const task of tasks) {
                 // Task title (plain text, like presentation format)
@@ -338,6 +310,35 @@ export class PresentationGenerator {
         result += '---\n\n';
 
         return result;
+    }
+
+    /**
+     * Get processed column title, or null if column should be excluded.
+     * Handles exclude tag checking and include syntax stripping.
+     */
+    private static getProcessedColumnTitle(column: KanbanColumn, options: PresentationOptions): string | null {
+        let columnTitle = column.originalTitle ?? column.title;
+        if (this.hasExcludeTag(columnTitle, options.excludeTags)) {
+            return null;
+        }
+        if (options.stripIncludes) {
+            columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+        }
+        return columnTitle;
+    }
+
+    /**
+     * Filter tasks based on options (include mode, exclude tags).
+     */
+    private static filterTasks(tasks: KanbanTask[], options: PresentationOptions): KanbanTask[] {
+        let filtered = tasks;
+        if (options.filterIncludes) {
+            filtered = filtered.filter(task => !task.includeMode && !task.includeFiles);
+        }
+        if (options.excludeTags && options.excludeTags.length > 0) {
+            filtered = filtered.filter(task => !this.hasExcludeTag(task.title, options.excludeTags));
+        }
+        return filtered;
     }
 
     /**

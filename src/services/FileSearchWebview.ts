@@ -14,7 +14,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { escapeRegExp, safeDecodeURIComponent } from '../utils/stringUtils';
+import { escapeRegExp, safeDecodeURIComponent, normalizeDirForComparison } from '../utils/stringUtils';
 import { MARKDOWN_PATH_PATTERN_WITH_TITLE, extractPathFromMatch } from '../utils/linkOperations';
 import {
     SEARCH_DEBOUNCE_DELAY_MS,
@@ -72,21 +72,6 @@ export class FileSearchWebview {
         // No extensionUri needed - we use the existing kanban webview
     }
 
-    /**
-     * Normalize a directory path for comparison
-     * Strips leading ./ and normalizes separators
-     * This ensures directories match regardless of ./ prefix differences
-     */
-    private _normalizeDirForComparison(dir: string): string {
-        let normalized = dir.replace(/\\/g, '/');
-        if (normalized.startsWith('./')) {
-            normalized = normalized.substring(2);
-        }
-        if (normalized.endsWith('/')) {
-            normalized = normalized.slice(0, -1);
-        }
-        return normalized;
-    }
 
     /**
      * Set the tracked files to search within (from MarkdownFileRegistry)
@@ -558,7 +543,7 @@ export class FileSearchWebview {
         const absoluteBrokenDir = this._baseDir && !path.isAbsolute(brokenDir)
             ? path.resolve(this._baseDir, brokenDir)
             : brokenDir;
-        const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
+        const normalizedBrokenDir = normalizeDirForComparison(absoluteBrokenDir);
 
         logger.debug('[FileSearchWebview._handleScanBrokenPath] Setup', {
             originalPath: this._originalPath,
@@ -619,7 +604,7 @@ export class FileSearchWebview {
                 const absoluteFoundDir = path.isAbsolute(foundDir)
                     ? foundDir
                     : path.resolve(fileDir, foundDir);
-                const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
+                const normalizedFoundDir = normalizeDirForComparison(absoluteFoundDir);
 
                 // Also check relative directory match (for paths from different files)
                 const decodedOriginalPath = safeDecodeURIComponent(this._originalPath);
@@ -691,7 +676,7 @@ export class FileSearchWebview {
         const absoluteBrokenDir = this._baseDir && !path.isAbsolute(brokenDir)
             ? path.resolve(this._baseDir, brokenDir)
             : brokenDir;
-        const normalizedBrokenDir = this._normalizeDirForComparison(absoluteBrokenDir);
+        const normalizedBrokenDir = normalizeDirForComparison(absoluteBrokenDir);
 
         logger.debug('[FileSearchWebview._handleAnalyzeBatch] Setup', {
             brokenDir,
@@ -750,7 +735,7 @@ export class FileSearchWebview {
                 const absoluteFoundDir = path.isAbsolute(foundDir)
                     ? foundDir
                     : path.resolve(fileDir, foundDir);
-                const normalizedFoundDir = this._normalizeDirForComparison(absoluteFoundDir);
+                const normalizedFoundDir = normalizeDirForComparison(absoluteFoundDir);
 
                 // Check for directory match (absolute or relative)
                 const relativeDirMatch = foundDir === brokenRelativeDir;
