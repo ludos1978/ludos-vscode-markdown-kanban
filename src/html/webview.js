@@ -5371,7 +5371,7 @@ function selectFile() {
 
 
 // Image path management functions moved to utils/imagePathManager.js:
-// - toggleImagePathMenu, toggleIncludePathMenu
+// - togglePathMenu
 // - convertSinglePath, openPath, revealPathInExplorer, getShortDisplayPath
 // - handleImageNotFound, toggleImageNotFoundMenu, searchForFile, browseForImage
 // - deleteFromMarkdown, upgradeSimpleImageNotFoundPlaceholder, upgradeImageOverlayToBroken

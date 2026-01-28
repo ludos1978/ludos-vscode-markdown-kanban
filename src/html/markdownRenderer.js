@@ -20,6 +20,108 @@ function createLoadingPlaceholder(id, className, message) {
     </div>`;
 }
 
+/**
+ * Create a broken media placeholder with overlay container and burger menu button.
+ * Returns a span.image-path-overlay-container.image-broken DOM element.
+ * When existingContainer is provided, the inner content is appended to it instead
+ * of creating a new overlay (used by _handleMediaError for media inside existing wrappers).
+ * @param {string} path - The file path
+ * @param {string} emoji - The emoji to display
+ * @param {string} titleText - The hover title text
+ * @param {string} [displayText] - Optional display text (defaults to short path)
+ * @param {HTMLElement} [existingContainer] - Optional existing overlay to reuse
+ * @param {string} [mediaType] - Media type for menu toggle (default: 'image')
+ * @returns {HTMLElement} The overlay container element with onclick handler attached
+ */
+function createBrokenMediaPlaceholder(path, emoji, titleText, displayText, existingContainer, mediaType) {
+    const shortPath = displayText || (typeof getShortDisplayPath === 'function'
+        ? getShortDisplayPath(path)
+        : (path ? path.split('/').pop() || 'unknown' : 'unknown'));
+    const type = mediaType || 'image';
+
+    const container = existingContainer || document.createElement('span');
+    container.classList.add('image-path-overlay-container', 'image-broken');
+    container.dataset.filePath = path || '';
+
+    const notFound = document.createElement('span');
+    notFound.className = 'image-not-found';
+    notFound.setAttribute('data-original-src', path || '');
+    notFound.title = titleText || ('Failed to load: ' + path);
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'image-not-found-text';
+    textSpan.textContent = emoji + ' ' + shortPath;
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'image-menu-btn';
+    menuBtn.setAttribute('data-action', 'toggle-menu');
+    menuBtn.title = 'Path options';
+    menuBtn.textContent = '☰';
+    menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof window.toggleMediaNotFoundMenu === 'function') {
+            window.toggleMediaNotFoundMenu(container, type);
+        }
+    };
+
+    notFound.appendChild(textSpan);
+    notFound.appendChild(menuBtn);
+    container.appendChild(notFound);
+    return container;
+}
+
+/**
+ * Unified error handler for media load failures.
+ * Called from inline onerror handlers on <img>/<video>/<audio>/<source> elements.
+ * Tries handleMediaNotFound first, falls back to createBrokenMediaPlaceholder.
+ */
+window._handleMediaError = function(mediaEl, path, mediaType) {
+    if (typeof handleMediaNotFound === 'function') {
+        try {
+            handleMediaNotFound(mediaEl, path, mediaType);
+            return;
+        } catch(e) {
+            console.warn('[_handleMediaError] handleMediaNotFound threw, using fallback:', e);
+        }
+    }
+    // Fallback when handleMediaNotFound is unavailable or threw
+    const existingContainer = mediaEl.parentElement;
+    if (!existingContainer) return;
+    createBrokenMediaPlaceholder(path, '📷', 'Failed to load: ' + path, null, existingContainer, mediaType);
+    mediaEl.style.display = 'none';
+};
+
+/**
+ * Create a diagram wrapper with burger menu button for PlantUML/Mermaid diagrams.
+ * @param {string} diagramType - 'plantuml' or 'mermaid'
+ * @param {string} code - The diagram source code
+ * @param {string} svgContent - The rendered SVG HTML
+ * @returns {HTMLElement} The wrapper element with diagram content and menu button
+ */
+function createDiagramWrapper(diagramType, code, svgContent) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `diagram-overlay-container ${diagramType}-wrapper`;
+    wrapper.dataset.diagramType = diagramType;
+    wrapper.dataset.diagramCode = code;
+
+    const container = document.createElement('div');
+    container.className = `${diagramType}-diagram`;
+    container.innerHTML = svgContent;
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'diagram-menu-btn';
+    menuBtn.title = 'Diagram options';
+    menuBtn.textContent = '☰';
+    menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleDiagramMenu(wrapper, diagramType);
+    };
+
+    wrapper.appendChild(container);
+    wrapper.appendChild(menuBtn);
+    return wrapper;
+}
+
 function safeDecodePath(value) {
     if (!value) {
         return value;
@@ -1608,8 +1710,8 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
     menuBtn.textContent = '☰';
     menuBtn.onclick = (e) => {
         e.stopPropagation();
-        if (typeof toggleImagePathMenu === 'function') {
-            toggleImagePathMenu(wrapper, filePath);
+        if (typeof togglePathMenu === 'function') {
+            togglePathMenu(wrapper, filePath, 'image');
         }
     };
 
@@ -1690,16 +1792,13 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
 
         } catch (error) {
             console.error('[EPUB Slideshow] Failed to load page:', error);
-            // Use unified .image-not-found structure for consistent error styling
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
-            const escapedPath = filePath.replace(/"/g, '&quot;');
-            const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${escapedPath}">
-                <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load EPUB page ${pageNumber}: ${filePath}">
-                    <span class="image-not-found-text">📚 ${escapedShortPath} (page ${pageNumber})</span>
-                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
-                </span>
-            </span>`;
+            imageContainer.innerHTML = '';
+            imageContainer.appendChild(createBrokenMediaPlaceholder(
+                filePath, '📚',
+                `Failed to load EPUB page ${pageNumber}: ${filePath}`,
+                `${shortPath} (page ${pageNumber})`
+            ));
         }
     };
 
@@ -1759,15 +1858,14 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
     container.setAttribute('data-initial-page', startPage);
 
     // Burger menu button for path operations
-    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const menuBtn = document.createElement('button');
     menuBtn.className = 'image-menu-btn';
     menuBtn.title = 'Path options';
     menuBtn.textContent = '☰';
     menuBtn.onclick = (e) => {
         e.stopPropagation();
-        if (typeof toggleImagePathMenu === 'function') {
-            toggleImagePathMenu(wrapper, filePath);
+        if (typeof togglePathMenu === 'function') {
+            togglePathMenu(wrapper, filePath, 'image');
         }
     };
 
@@ -1856,16 +1954,13 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
 
         } catch (error) {
             console.error(`[PDF Slideshow] Failed to load page ${pageNumber}:`, error);
-            // Use unified .image-not-found structure for consistent error styling
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
-            const escapedPath = filePath.replace(/"/g, '&quot;');
-            const escapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            imageContainer.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${escapedPath}">
-                <span class="image-not-found" data-original-src="${escapedPath}" title="Failed to load PDF page ${pageNumber}: ${filePath}">
-                    <span class="image-not-found-text">📄 ${escapedShortPath} (page ${pageNumber})</span>
-                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
-                </span>
-            </span>`;
+            imageContainer.innerHTML = '';
+            imageContainer.appendChild(createBrokenMediaPlaceholder(
+                filePath, '📄',
+                `Failed to load PDF page ${pageNumber}: ${filePath}`,
+                `${shortPath} (page ${pageNumber})`
+            ));
         }
     };
 
@@ -2021,7 +2116,7 @@ async function processDiagramQueue() {
                 menuBtn.setAttribute('contenteditable', 'false');
                 menuBtn.onclick = (e) => {
                     e.stopPropagation();
-                    toggleImagePathMenu(element, decodedPath);
+                    togglePathMenu(element, decodedPath, 'image');
                 };
 
                 element.innerHTML = '';
@@ -2073,15 +2168,11 @@ async function processDiagramQueue() {
             } catch (e) {
                 // If decoding fails, use original path
             }
-            const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-            // Use unified .image-not-found structure for consistent error styling
-            const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(decodedPath) : decodedPath.split('/').pop() || decodedPath;
-            element.innerHTML = `<span class="image-path-overlay-container image-broken" data-file-path="${decodedPath.replace(/"/g, '&quot;')}">
-                <span class="image-not-found" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" title="Failed to load ${typeInfo.label}: ${decodedPath}">
-                    <span class="image-not-found-text">${typeInfo.emoji} ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
-                    <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
-                </span>
-            </span>`;
+            element.innerHTML = '';
+            element.appendChild(createBrokenMediaPlaceholder(
+                decodedPath, typeInfo.emoji,
+                `Failed to load ${typeInfo.label}: ${decodedPath}`
+            ));
         }
     }
 
@@ -2267,33 +2358,7 @@ async function processPlantUMLQueue() {
 
         try {
             const svg = await renderPlantUML(item.code);
-            const escapedCode = escapeHtml(item.code).replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-            // Create wrapper with burger menu
-            const wrapper = document.createElement('div');
-            wrapper.className = 'diagram-overlay-container plantuml-wrapper';
-            wrapper.dataset.diagramType = 'plantuml';
-            wrapper.dataset.diagramCode = item.code;
-
-            // Replace placeholder with diagram container
-            const container = document.createElement('div');
-            container.className = 'plantuml-diagram';
-            container.innerHTML = svg;
-
-            // Add burger menu button
-            const menuBtn = document.createElement('button');
-            menuBtn.className = 'diagram-menu-btn';
-            menuBtn.title = 'Diagram options';
-            menuBtn.textContent = '☰';
-            menuBtn.onclick = (e) => {
-                e.stopPropagation();
-                toggleDiagramMenu(wrapper, 'plantuml');
-            };
-
-            wrapper.appendChild(container);
-            wrapper.appendChild(menuBtn);
-
-            element.replaceWith(wrapper);
+            element.replaceWith(createDiagramWrapper('plantuml', item.code, svg));
         } catch (error) {
             console.error('[PlantUML] Rendering error:', error);
 
@@ -2505,33 +2570,7 @@ async function processMermaidQueue() {
 
         try {
             const svg = await renderMermaid(item.code);
-            const escapedCode = escapeHtml(item.code).replace(/'/g, "\\'").replace(/"/g, '\\"');
-
-            // Create wrapper with burger menu
-            const wrapper = document.createElement('div');
-            wrapper.className = 'diagram-overlay-container mermaid-wrapper';
-            wrapper.dataset.diagramType = 'mermaid';
-            wrapper.dataset.diagramCode = item.code;
-
-            // Replace placeholder with diagram container
-            const container = document.createElement('div');
-            container.className = 'mermaid-diagram';
-            container.innerHTML = svg;
-
-            // Add burger menu button
-            const menuBtn = document.createElement('button');
-            menuBtn.className = 'diagram-menu-btn';
-            menuBtn.title = 'Diagram options';
-            menuBtn.textContent = '☰';
-            menuBtn.onclick = (e) => {
-                e.stopPropagation();
-                toggleDiagramMenu(wrapper, 'mermaid');
-            };
-
-            wrapper.appendChild(container);
-            wrapper.appendChild(menuBtn);
-
-            element.replaceWith(wrapper);
+            element.replaceWith(createDiagramWrapper('mermaid', item.code, svg));
         } catch (error) {
             console.error('[Mermaid] Rendering error:', error);
 
@@ -2896,12 +2935,12 @@ function renderMarkdown(text, includeContext) {
             // So we need to add onerror to both the video (for direct src) and source elements
             let videoWithError = videoHtml.replace(
                 /<video([^>]*)>/,
-                `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','video');}">`
+                `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="window._handleMediaError(this,'${escapedOriginalSrc}','video')">`
             );
             // Also add error handler to <source> elements - this is where errors actually fire for <video><source></video>
             videoWithError = videoWithError.replace(
                 /<source([^>]*)>/g,
-                `<source$1 onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this.parentElement,'${escapedOriginalSrc}','video');}">`
+                `<source$1 onerror="window._handleMediaError(this.parentElement,'${escapedOriginalSrc}','video')">`
             );
 
             // Wrap with overlay container for path conversion menu (similar to images)
@@ -3091,12 +3130,12 @@ function renderMarkdown(text, includeContext) {
             // IMPORTANT: For <audio> with <source> children, error events fire on <source>, not <audio>!
             let audioWithError = audioHtml.replace(
                 /<audio([^>]*)>/,
-                `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','video');}">`
+                `<audio$1 data-original-src="${escapeHtml(originalSrc)}" onerror="window._handleMediaError(this,'${escapedOriginalSrc}','video')">`
             );
             // Also add error handler to <source> elements
             audioWithError = audioWithError.replace(
                 /<source([^>]*)>/g,
-                `<source$1 onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this.parentElement,'${escapedOriginalSrc}','video');}">`
+                `<source$1 onerror="window._handleMediaError(this.parentElement,'${escapedOriginalSrc}','video')">`
             );
 
             // Wrap with overlay container for path conversion menu (same as video)
@@ -3405,12 +3444,10 @@ function renderMarkdown(text, includeContext) {
             const isDataUrl = displaySrc && displaySrc.startsWith('data:');
 
             // Add onerror handler to replace broken image with searchable placeholder with burger menu
-            // The placeholder includes data-original-src so Alt+click search still works
             let onerrorHandler = '';
             if (!isDataUrl) {
                 const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
-                // Extract filename for display (inline since getShortDisplayPath may not be available in fallback)
-                onerrorHandler = ` onerror="if(typeof handleMediaNotFound==='function'){handleMediaNotFound(this,'${escapedOriginalSrc}','image');}else{var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';var fn=(typeof getShortDisplayPath==='function')?getShortDisplayPath('${escapedOriginalSrc}'):'${escapedOriginalSrc}'.split('/').pop()||'unknown';p.innerHTML='<span class=image-not-found-text>📷 '+fn+'</span>';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';}"`;
+                onerrorHandler = ` onerror="window._handleMediaError(this,'${escapedOriginalSrc}','image')"`;
             }
 
             // Build the img tag
@@ -3435,7 +3472,7 @@ function renderMarkdown(text, includeContext) {
             const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
 
             // Wrap with overlay container for path conversion menu
-            // Menu is dynamically generated by toggleImagePathMenu to avoid stacking context issues
+            // Menu is dynamically generated by togglePathMenu to avoid stacking context issues
             // Use data-file-path for unified path handling across all media types
             if (title) {
                 return `<figure class="media-figure">

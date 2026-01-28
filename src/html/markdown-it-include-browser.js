@@ -127,7 +127,7 @@
 
     return `<span class="image-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}">
       <img src="${escapeHtml(filePath)}" alt="include: ${escapeHtml(filePath)}"
-           onerror="handleMediaNotFound(this, '${escapedPath}', 'image')"
+           onerror="window._handleMediaError(this,'${escapedPath}','image')"
            style="max-width: 100%; height: auto;">
       <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
     </span>`;
@@ -145,7 +145,7 @@
 
     return `<span class="video-path-overlay-container${brokenClass}" data-file-path="${escapeHtml(filePath)}">
       <video src="${escapeHtml(filePath)}" controls
-             onerror="handleMediaNotFound(this, '${escapedPath}', 'video')"
+             onerror="window._handleMediaError(this,'${escapedPath}','video')"
              style="max-width: 100%; height: auto;">
         Your browser does not support the video tag.
       </video>

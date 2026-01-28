@@ -1640,6 +1640,7 @@ export class WysiwygEditor {
                     event.stopPropagation();
                     return toggleTaskCheckbox(view, nodePos, node);
                 }
+                const menuApi = window as unknown as { togglePathMenu?: (container: HTMLElement, filePath: string, mediaType: string) => void };
                 const imageMenuButton = target.closest?.('.image-menu-btn') as HTMLElement | null;
                 if (imageMenuButton) {
                     const container = imageMenuButton.closest('.image-path-overlay-container') as HTMLElement | null;
@@ -1647,11 +1648,10 @@ export class WysiwygEditor {
                         container?.querySelector('img')?.getAttribute('data-original-src') ||
                         container?.querySelector('img')?.getAttribute('data-file-path') ||
                         container?.querySelector('img')?.getAttribute('src');
-                    const menuApi = window as unknown as { toggleImagePathMenu?: (container: HTMLElement, imagePath: string) => void };
-                    if (container && imagePath && typeof menuApi.toggleImagePathMenu === 'function') {
+                    if (container && imagePath && typeof menuApi.togglePathMenu === 'function') {
                         event.preventDefault();
                         event.stopPropagation();
-                        menuApi.toggleImagePathMenu(container, imagePath);
+                        menuApi.togglePathMenu(container, imagePath, 'image');
                         return true;
                     }
                 }
@@ -1663,11 +1663,10 @@ export class WysiwygEditor {
                         container?.querySelector('audio')?.getAttribute('data-original-src') ||
                         container?.querySelector('video')?.getAttribute('src') ||
                         container?.querySelector('audio')?.getAttribute('src');
-                    const menuApi = window as unknown as { toggleVideoPathMenu?: (container: HTMLElement, videoPath: string) => void };
-                    if (container && videoPath && typeof menuApi.toggleVideoPathMenu === 'function') {
+                    if (container && videoPath && typeof menuApi.togglePathMenu === 'function') {
                         event.preventDefault();
                         event.stopPropagation();
-                        menuApi.toggleVideoPathMenu(container, videoPath);
+                        menuApi.togglePathMenu(container, videoPath, 'video');
                         return true;
                     }
                 }

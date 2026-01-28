@@ -460,6 +460,7 @@ function togglePathMenu(container, filePath, mediaType) {
     menu.style.position = 'fixed';
     menu.style.top = (rect.bottom + 2) + 'px';
     menu.style.left = rect.left + 'px';
+    menu.style.right = 'auto';
     menu.style.zIndex = '999999';
     menu.dataset.filePath = filePath;
 
@@ -503,23 +504,6 @@ function togglePathMenu(container, filePath, mediaType) {
     setTimeout(() => document.addEventListener('click', closeHandler), 0);
 }
 
-// Wrapper functions for backwards compatibility with existing onclick handlers
-function toggleImagePathMenu(container, imagePath) {
-    togglePathMenu(container, imagePath, 'image');
-}
-
-function toggleVideoPathMenu(container, videoPath) {
-    togglePathMenu(container, videoPath, 'video');
-}
-
-function toggleIncludePathMenu(container, includePath) {
-    togglePathMenu(container, includePath, 'include');
-}
-
-function toggleLinkPathMenu(container, linkPath) {
-    togglePathMenu(container, linkPath, 'link');
-}
-
 /**
  * Toggle embed menu for iframe embeds
  * @param {HTMLElement} container - The embed container element
@@ -544,6 +528,7 @@ function toggleEmbedMenu(container) {
     menu.style.position = 'fixed';
     menu.style.top = (rect.bottom + 2) + 'px';
     menu.style.left = rect.left + 'px';
+    menu.style.right = 'auto';
     menu.style.zIndex = '999999';
 
     menu.innerHTML = `
@@ -1427,8 +1412,6 @@ function setupMediaPathEventDelegation() {
     });
 }
 
-// Alias for backwards compatibility
-const setupImagePathEventDelegation = setupMediaPathEventDelegation;
 
 /**
  * Set up MutationObserver to automatically upgrade simple placeholders when they're added to the DOM
@@ -1483,7 +1466,7 @@ function setupImageNotFoundObserver() {
  * Sets up event delegation and mutation observer
  */
 function initImagePathManager() {
-    setupImagePathEventDelegation();
+    setupMediaPathEventDelegation();
     setupImageNotFoundObserver();
 }
 
@@ -1521,10 +1504,6 @@ window.deleteFromMarkdown = deleteFromMarkdown;
 
 // Path menus
 window.togglePathMenu = togglePathMenu;
-window.toggleImagePathMenu = toggleImagePathMenu;
-window.toggleIncludePathMenu = toggleIncludePathMenu;
-window.toggleVideoPathMenu = toggleVideoPathMenu;
-window.toggleLinkPathMenu = toggleLinkPathMenu;
 window.toggleMediaNotFoundMenu = toggleMediaNotFoundMenu;
 
 // Unified broken media handling
@@ -1568,6 +1547,7 @@ function toggleDiagramMenu(container, diagramType) {
     menu.style.position = 'fixed';
     menu.style.top = (rect.bottom + 2) + 'px';
     menu.style.left = rect.left + 'px';
+    menu.style.right = 'auto';
     menu.style.zIndex = '999999';
 
     const typeLabel = diagramType === 'mermaid' ? 'Mermaid' : 'PlantUML';
