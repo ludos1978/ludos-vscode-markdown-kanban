@@ -104,6 +104,44 @@ export class IncludeCommands extends SwitchBasedCommand {
         return 'cancel';
     }
 
+    /**
+     * Trigger marpWatch export if active.
+     * Used after saving files to trigger automatic export.
+     */
+    private async triggerMarpWatchExport(context: CommandContext, panelAccess: PanelCommandAccess): Promise<void> {
+        const autoExportSettings = context.getAutoExportSettings();
+        if (!autoExportSettings?.marpWatch) {
+            return;
+        }
+
+        let document = context.fileManager.getDocument();
+        const filePathForReopen = context.fileManager.getFilePath();
+
+        if (!document && filePathForReopen) {
+            try {
+                document = await vscode.workspace.openTextDocument(filePathForReopen);
+            } catch (error) {
+                console.error(`[IncludeCommands] Failed to reopen document:`, error);
+                return;
+            }
+        }
+
+        if (!document) {
+            return;
+        }
+
+        const fileService = panelAccess._fileService;
+        const board = fileService?.board?.();
+
+        try {
+            const webviewPanel = context.getWebviewPanel();
+            const mermaidService = context.getMermaidExportService();
+            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
+        } catch (error) {
+            console.error('[IncludeCommands] MarpWatch export failed:', error);
+        }
+    }
+
     // ============= INCLUDE MODE HANDLERS =============
 
     private async handleConfirmDisableIncludeMode(message: ConfirmDisableIncludeModeMessage, _context: CommandContext): Promise<CommandResult> {
@@ -415,32 +453,7 @@ export class IncludeCommands extends SwitchBasedCommand {
                     updateUi: false
                 });
 
-                // Trigger marpWatch export if active
-                const autoExportSettings = context.getAutoExportSettings();
-                if (autoExportSettings?.marpWatch) {
-                    let document = context.fileManager.getDocument();
-                    const filePathForReopen = context.fileManager.getFilePath();
-
-                    if (!document && filePathForReopen) {
-                        try {
-                            document = await vscode.workspace.openTextDocument(filePathForReopen);
-                        } catch (error) {
-                            console.error(`[IncludeCommands] Failed to reopen document:`, error);
-                        }
-                    }
-
-                    if (document) {
-                        const fileService = panelAccess._fileService;
-                        const board = fileService?.board?.();
-                        try {
-                            const webviewPanel = context.getWebviewPanel();
-                            const mermaidService = context.getMermaidExportService();
-                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
-                        } catch (error) {
-                            console.error('[IncludeCommands] MarpWatch export failed:', error);
-                        }
-                    }
-                }
+                await this.triggerMarpWatchExport(context, panelAccess);
 
                 this.postMessage({
                     type: 'individualFileSaved',
@@ -463,33 +476,7 @@ export class IncludeCommands extends SwitchBasedCommand {
                     updateUi: false
                 });
 
-                // Trigger marpWatch export if active
-                const autoExportSettings = context.getAutoExportSettings();
-                if (autoExportSettings?.marpWatch) {
-                    let document = context.fileManager.getDocument();
-                    const filePathForReopen = context.fileManager.getFilePath();
-
-                    if (!document && filePathForReopen) {
-                        try {
-                            document = await vscode.workspace.openTextDocument(filePathForReopen);
-                        } catch (error) {
-                            console.error(`[IncludeCommands] Failed to reopen document:`, error);
-                        }
-                    }
-
-                    if (document) {
-                        const fileService = panelAccess._fileService;
-                        const board = fileService?.board?.();
-
-                        try {
-                            const webviewPanel = context.getWebviewPanel();
-                            const mermaidService = context.getMermaidExportService();
-                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
-                        } catch (error) {
-                            console.error('[IncludeCommands] MarpWatch export failed:', error);
-                        }
-                    }
-                }
+                await this.triggerMarpWatchExport(context, panelAccess);
 
                 this.postMessage({
                     type: 'individualFileSaved',

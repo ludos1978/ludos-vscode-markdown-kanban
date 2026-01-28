@@ -81,22 +81,28 @@ export class UICommands extends SwitchBasedCommand {
     // ============= UI HANDLERS =============
 
     /**
-     * Handle undo command
+     * Execute undo/redo operation with common logic.
      */
-    private async handleUndo(context: CommandContext): Promise<CommandResult> {
-        logger.debug(`[UICommands] handleUndo: canUndo=${context.boardStore.canUndo()}, stackSize=${context.boardStore.getUndoStackSize()}`);
+    private async executeUndoRedo(
+        context: CommandContext,
+        operation: 'undo' | 'redo'
+    ): Promise<CommandResult> {
+        const isUndo = operation === 'undo';
+        const canExecute = isUndo ? context.boardStore.canUndo() : context.boardStore.canRedo();
+        const stackSize = isUndo ? context.boardStore.getUndoStackSize() : context.boardStore.getRedoStackSize();
+
+        logger.debug(`[UICommands] handle${isUndo ? 'Undo' : 'Redo'}: can${isUndo ? 'Undo' : 'Redo'}=${canExecute}, stackSize=${stackSize}`);
         context.setUndoRedoOperation(true);
 
-        const result = context.boardStore.undo();
+        const result = isUndo ? context.boardStore.undo() : context.boardStore.redo();
         if (result) {
             context.setBoard(result.board);
-            context.emitBoardChanged(result.board, 'undo');
-            logger.debug('[kanban.UICommands.handleUndo.emitBoardChanged]', {
-                trigger: 'undo',
+            context.emitBoardChanged(result.board, operation);
+            logger.debug(`[UICommands.handle${isUndo ? 'Undo' : 'Redo'}.emitBoardChanged]`, {
+                trigger: operation,
                 targetCount: result.targets?.length ?? 0
             });
 
-            // Use targeted update if single element changed, otherwise full update
             const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);
             if (!didTargetedUpdate) {
                 await context.onBoardUpdate();
@@ -105,7 +111,6 @@ export class UICommands extends SwitchBasedCommand {
 
         context.setUndoRedoOperation(false);
 
-        // Send undo/redo state to frontend
         const panel = context.getWebviewPanel();
         if (panel?.webview) {
             this.postMessage({
@@ -119,42 +124,17 @@ export class UICommands extends SwitchBasedCommand {
     }
 
     /**
+     * Handle undo command
+     */
+    private async handleUndo(context: CommandContext): Promise<CommandResult> {
+        return this.executeUndoRedo(context, 'undo');
+    }
+
+    /**
      * Handle redo command
      */
     private async handleRedo(context: CommandContext): Promise<CommandResult> {
-        logger.debug(`[kanban.UICommands.handleRedo.undo] canRedo=${context.boardStore.canRedo()}, stackSize=${context.boardStore.getRedoStackSize()}`);
-        context.setUndoRedoOperation(true);
-
-        const result = context.boardStore.redo();
-        logger.debug(`[kanban.UICommands.handleRedo.undo] result=${result ? 'restored' : 'none'}`);
-        if (result) {
-            context.setBoard(result.board);
-            context.emitBoardChanged(result.board, 'redo');
-            logger.debug('[kanban.UICommands.handleRedo.emitBoardChanged]', {
-                trigger: 'redo',
-                targetCount: result.targets?.length ?? 0
-            });
-
-            // Use targeted update if single element changed, otherwise full update
-            const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);
-            if (!didTargetedUpdate) {
-                await context.onBoardUpdate();
-            }
-        }
-
-        context.setUndoRedoOperation(false);
-
-        // Send undo/redo state to frontend
-        const panel = context.getWebviewPanel();
-        if (panel?.webview) {
-            this.postMessage({
-                type: 'undoRedoState',
-                canUndo: context.boardStore.canUndo(),
-                canRedo: context.boardStore.canRedo()
-            });
-        }
-
-        return this.success();
+        return this.executeUndoRedo(context, 'redo');
     }
 
     /**
