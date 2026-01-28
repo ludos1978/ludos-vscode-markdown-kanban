@@ -496,8 +496,7 @@ export class KanbanFileService {
             ? filePath
             : path.join(path.dirname(document.uri.fsPath), filePath);
 
-        return this.fileRegistry.get(filePath)
-            || this.fileRegistry.getByRelativePath(filePath)
+        return this.fileRegistry.findByPath(filePath)
             || this.fileRegistry.get(absolutePath);
     }
 
@@ -659,8 +658,7 @@ export class KanbanFileService {
                 return;
             }
 
-            const includeFile = this.fileRegistry.get(document.uri.fsPath)
-                || this.fileRegistry.getByRelativePath(document.uri.fsPath);
+            const includeFile = this.fileRegistry.findByPath(document.uri.fsPath);
             if (!includeFile || includeFile.getFileType() === 'main') {
                 return;
             }

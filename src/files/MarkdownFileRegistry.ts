@@ -239,6 +239,20 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     }
 
     /**
+     * Find file by any path format (absolute or relative)
+     *
+     * Tries multiple lookup strategies:
+     * 1. get() - exact absolute path match
+     * 2. getByRelativePath() - case-insensitive relative path match
+     *
+     * @param filePath The path to look up (absolute or relative)
+     * @returns The file if found, undefined otherwise
+     */
+    public findByPath(filePath: string): MarkdownFile | undefined {
+        return this.get(filePath) || this.getByRelativePath(filePath);
+    }
+
+    /**
      * Get all files
      */
     public getAll(): MarkdownFile[] {

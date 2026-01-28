@@ -172,10 +172,8 @@ export class BoardSyncHandler {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     const decodedPath = safeDecodeURIComponent(relativePath);
-                    const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
-                        || this._deps.fileRegistry.get(decodedPath)
-                        || this._deps.fileRegistry.getByRelativePath(relativePath)
-                        || this._deps.fileRegistry.get(relativePath);
+                    const file = this._deps.fileRegistry.findByPath(decodedPath)
+                        || this._deps.fileRegistry.findByPath(relativePath);
                     if (!file) {
                         if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                             console.warn('[kanban.BoardSyncHandler.undoRedo.includeColumnMissing]', {
@@ -255,10 +253,8 @@ export class BoardSyncHandler {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
                         const decodedPath = safeDecodeURIComponent(relativePath);
-                        const file = this._deps.fileRegistry.getByRelativePath(decodedPath)
-                            || this._deps.fileRegistry.get(decodedPath)
-                            || this._deps.fileRegistry.getByRelativePath(relativePath)
-                            || this._deps.fileRegistry.get(relativePath);
+                        const file = this._deps.fileRegistry.findByPath(decodedPath)
+                            || this._deps.fileRegistry.findByPath(relativePath);
                         if (!file) {
                             if (isDebug && (trigger === 'undo' || trigger === 'redo')) {
                                 console.warn('[kanban.BoardSyncHandler.undoRedo.includeTaskMissing]', {

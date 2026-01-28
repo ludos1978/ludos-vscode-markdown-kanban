@@ -15,6 +15,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { escapeRegExp, safeDecodeURIComponent } from '../utils/stringUtils';
+import { MARKDOWN_PATH_PATTERN_WITH_TITLE, extractPathFromMatch } from '../utils/linkOperations';
 import {
     SEARCH_DEBOUNCE_DELAY_MS,
     MAX_SEARCH_RESULTS,
@@ -569,10 +570,8 @@ export class FileSearchWebview {
             trackedFiles: this._trackedFiles.map(f => f.relativePath)
         });
 
-        // Pattern to find markdown image/link/include paths
-        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
-        // Also matches !!!include(path)!!! directives
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
+        // Use shared pattern for matching all path types (excludes optional title in links)
+        const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN_WITH_TITLE.source, 'g');
         let brokenCount = 0;
         const foundFiles: string[] = [];
         let lastUpdateTime = 0;
@@ -609,8 +608,7 @@ export class FileSearchWebview {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Group 1 = image path, Group 2 = link path, Group 3 = include path
-                const foundPath = match[1] || match[2] || match[3];
+                const foundPath = extractPathFromMatch(match);
                 if (!foundPath) continue;
 
                 pathsInFile++;
@@ -704,10 +702,8 @@ export class FileSearchWebview {
         });
 
         // Find all paths with broken directory and check if they exist in new directory
-        // Captures only the path, excluding optional title: ![alt](path "title") or [text](path "title")
-        // Also captures !!!include(path)!!! directives
-        // Matches PathConversionService.PATTERNS.IMAGE/LINK for consistency
-        const pathPattern = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|!!!include\(([^)]+)\)!!!/g;
+        // Use shared pattern for matching all path types (excludes optional title in links)
+        const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN_WITH_TITLE.source, 'g');
         const filesToReplace: string[] = [];
         const filesMissing: string[] = [];
         let lastUpdateTime = 0;
@@ -743,8 +739,7 @@ export class FileSearchWebview {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Group 1 = image path, Group 2 = link path, Group 3 = include path
-                const foundPath = match[1] || match[2] || match[3];
+                const foundPath = extractPathFromMatch(match);
                 if (!foundPath) continue;
 
                 const decodedPath = safeDecodeURIComponent(foundPath);

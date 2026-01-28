@@ -68,6 +68,50 @@ export class FileCommands extends SwitchBasedCommand {
     // ============= UNIFIED LINK HANDLER =============
 
     /**
+     * Set up tracked files for link handler from file registry.
+     * This enables file search to scan all tracked files (main + includes).
+     */
+    private setupTrackedFiles(context: CommandContext): void {
+        const fileRegistry = context.getFileRegistry();
+        if (fileRegistry) {
+            const allFiles = fileRegistry.getAll();
+            const trackedFiles = allFiles.map(file => ({
+                path: file.getPath(),
+                relativePath: file.getRelativePath(),
+                content: file.getContent()
+            }));
+            context.linkHandler.setTrackedFiles(trackedFiles);
+            console.log('[FileCommands] Tracked files set', {
+                fileCount: allFiles.length,
+                hasMainFile: !!fileRegistry.getMainFile()
+            });
+        }
+    }
+
+    /**
+     * Sync include file content if the target is an include file with unsaved changes.
+     */
+    private async syncIncludeFileContent(context: CommandContext, target: string | undefined): Promise<void> {
+        const fileRegistry = context.getFileRegistry();
+        if (!fileRegistry || !target) { return; }
+
+        const includeFile = fileRegistry.findByPath(target);
+        if (!includeFile || includeFile.getFileType() === 'main') { return; }
+
+        const includePath = includeFile.getPath();
+        const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
+        if (!openDoc || openDoc.isDirty) { return; }
+
+        const cachedContent = includeFile.getContent();
+        if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
+            const edit = new vscode.WorkspaceEdit();
+            const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
+            edit.replace(openDoc.uri, fullRange, cachedContent);
+            await vscode.workspace.applyEdit(edit);
+        }
+    }
+
+    /**
      * Handle unified openLink command
      *
      * Routes to appropriate handler based on LinkType:
@@ -90,53 +134,17 @@ export class FileCommands extends SwitchBasedCommand {
             hasIncludeContext: !!includeContext
         }));
 
+        // Set up tracked files for all local link types (FILE, IMAGE, WIKI)
+        if (linkType !== LinkType.EXTERNAL) {
+            this.setupTrackedFiles(context);
+        }
+
         switch (linkType) {
             case LinkType.FILE:
-            case LinkType.IMAGE: {
-                // Set up tracked files for file search (main + includes) before handling link
-                const fileRegistry = context.getFileRegistry();
-
-                if (fileRegistry) {
-                    const allFiles = fileRegistry.getAll();
-                    const trackedFiles = allFiles.map(file => ({
-                        path: file.getPath(),
-                        relativePath: file.getRelativePath(),
-                        content: file.getContent()
-                    }));
-                    context.linkHandler.setTrackedFiles(trackedFiles);
-                    console.log('[FileCommands.handleOpenLink] Registry info', {
-                        fileCount: allFiles.length,
-                        hasMainFile: !!fileRegistry.getMainFile()
-                    });
-                }
-
-                await context.linkHandler.handleFileLink(
-                    target,
-                    taskId,
-                    columnId,
-                    linkIndex,
-                    includeContext
-                );
-
-                // Sync include file content if needed
-                if (fileRegistry && target) {
-                    const includeFile = fileRegistry.getByRelativePath(target);
-                    if (includeFile && includeFile.getFileType() !== 'main') {
-                        const includePath = includeFile.getPath();
-                        const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
-                        if (openDoc && !openDoc.isDirty) {
-                            const cachedContent = includeFile.getContent();
-                            if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
-                                const edit = new vscode.WorkspaceEdit();
-                                const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
-                                edit.replace(openDoc.uri, fullRange, cachedContent);
-                                await vscode.workspace.applyEdit(edit);
-                            }
-                        }
-                    }
-                }
+            case LinkType.IMAGE:
+                await context.linkHandler.handleFileLink(target, taskId, columnId, linkIndex, includeContext);
+                await this.syncIncludeFileContent(context, target);
                 break;
-            }
 
             case LinkType.WIKI:
                 await context.linkHandler.handleWikiLink(target, taskId, columnId, linkIndex, includeContext);
@@ -223,26 +231,7 @@ export class FileCommands extends SwitchBasedCommand {
      */
     private async handleOpenIncludeFile(message: OpenIncludeFileMessage, context: CommandContext): Promise<CommandResult> {
         await context.linkHandler.handleFileLink(message.filePath);
-
-        const fileRegistry = context.getFileRegistry();
-        if (fileRegistry && message.filePath) {
-            const includeFile = fileRegistry.get(message.filePath)
-                || fileRegistry.getByRelativePath(message.filePath);
-            if (includeFile && includeFile.getFileType() !== 'main') {
-                const includePath = includeFile.getPath();
-                const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === includePath);
-                if (openDoc && !openDoc.isDirty) {
-                    const cachedContent = includeFile.getContent();
-                    if (includeFile.hasUnsavedChanges() && openDoc.getText() !== cachedContent) {
-                        const edit = new vscode.WorkspaceEdit();
-                        const fullRange = new vscode.Range(0, 0, openDoc.lineCount, 0);
-                        edit.replace(openDoc.uri, fullRange, cachedContent);
-                        await vscode.workspace.applyEdit(edit);
-                    }
-                }
-            }
-        }
-
+        await this.syncIncludeFileContent(context, message.filePath);
         return this.success();
     }
 

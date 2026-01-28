@@ -20,7 +20,7 @@ import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, 
 import { safeFileUri } from '../utils/uriUtils';
 import { FileSearchService, TrackedFileData } from '../fileSearchService';
 import { PathFormat } from '../services/FileSearchWebview';
-import { LinkOperations } from '../utils/linkOperations';
+import { LinkOperations, MARKDOWN_PATH_PATTERN, extractPathFromMatch } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 import { showInfo, showWarning } from '../services/NotificationService';
 import { extractIncludeFiles } from '../constants/IncludeConstants';
@@ -261,12 +261,7 @@ export class PathCommands extends SwitchBasedCommand {
         const imagePath = message.imagePath;
 
         // Collect all files to search
-        const allFiles: MarkdownFile[] = [];
-        const mainFile = fileRegistry.getMainFile();
-        if (mainFile) {
-            allFiles.push(mainFile);
-        }
-        allFiles.push(...fileRegistry.getIncludeFiles());
+        const allFiles = fileRegistry.getAll();
 
         // Search for the path in all files
         let foundFile: MarkdownFile | null = null;
@@ -619,12 +614,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Collect all files to search
-        const allFiles: MarkdownFile[] = [];
-        const mainFile = fileRegistry.getMainFile();
-        if (mainFile) {
-            allFiles.push(mainFile);
-        }
-        allFiles.push(...fileRegistry.getIncludeFiles());
+        const allFiles = fileRegistry.getAll();
 
         // Find the file containing the path
         let foundFile: MarkdownFile | null = null;
@@ -991,8 +981,8 @@ export class PathCommands extends SwitchBasedCommand {
             fileList: files.map(f => f.getRelativePath())
         });
 
-        // Pattern to match images, links, and includes
-        const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|!!!include\(([^)]+)\)!!!/g;
+        // Use shared pattern for matching all path types
+        const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN.source, 'g');
 
         for (const file of files) {
             const content = file.getContent();
@@ -1006,7 +996,7 @@ export class PathCommands extends SwitchBasedCommand {
             pathPattern.lastIndex = 0; // Reset regex for each file
 
             while ((match = pathPattern.exec(content)) !== null) {
-                const matchedPath = match[1] || match[2] || match[3];
+                const matchedPath = extractPathFromMatch(match);
                 if (!matchedPath) continue;
 
                 // Skip if we already have this path

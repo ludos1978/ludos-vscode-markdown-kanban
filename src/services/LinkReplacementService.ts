@@ -22,7 +22,7 @@ import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { BoardStore, UndoCapture } from '../core/stores';
 import { WebviewBridge } from '../core/bridge/WebviewBridge';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
-import { LinkOperations } from '../utils/linkOperations';
+import { LinkOperations, MARKDOWN_PATH_PATTERN, extractPathFromMatch } from '../utils/linkOperations';
 import { encodeFilePath, safeDecodeURIComponent } from '../utils/stringUtils';
 import { showInfo, showWarning } from './NotificationService';
 import { logger } from '../utils/logger';
@@ -411,8 +411,8 @@ export class LinkReplacementService {
             : path.resolve(contextBasePath, decodedBrokenPath);
         const brokenDir = this._normalizeDirForComparison(path.dirname(absoluteBrokenPath));
 
-        // Pattern matches: images, regular links, wiki links (with optional |label), and includes
-        const pathPattern = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|\[\[([^\]|]+)(?:\|[^\]]+)?\]\]|!!!include\(([^)]+)\)!!!/g;
+        // Use shared pattern for matching all path types
+        const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN.source, 'g');
 
         for (const file of files) {
             const content = file.getContent();
@@ -421,8 +421,7 @@ export class LinkReplacementService {
             pathPattern.lastIndex = 0;
 
             while ((match = pathPattern.exec(content)) !== null) {
-                // Groups: 1=image, 2=link, 3=wiki link, 4=include
-                const matchedPath = match[1] || match[2] || match[3] || match[4];
+                const matchedPath = extractPathFromMatch(match);
                 if (!matchedPath || replacements.has(matchedPath)) continue;
 
                 const decodedPath = safeDecodeURIComponent(matchedPath);

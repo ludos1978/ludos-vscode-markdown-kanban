@@ -1,6 +1,40 @@
 import { escapeRegExp } from './stringUtils';
 
 /**
+ * Unified pattern to find all markdown path references.
+ * Matches: images, links, wiki links (with optional |label), and includes.
+ *
+ * Capture groups:
+ * - Group 1: Image path from ![alt](path)
+ * - Group 2: Link path from [text](path)
+ * - Group 3: Wiki link path from [[path]] or [[path|label]]
+ * - Group 4: Include path from !!!include(path)!!!
+ *
+ * Use with global flag for iterating: new RegExp(MARKDOWN_PATH_PATTERN.source, 'g')
+ */
+export const MARKDOWN_PATH_PATTERN = /!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]*\]\(([^)]+)\)|\[\[([^\]|]+)(?:\|[^\]]+)?\]\]|!!!include\(([^)]+)\)!!!/;
+
+/**
+ * Same pattern but also handles optional title in links: [text](path "title")
+ * Useful for more precise path extraction that excludes title text.
+ *
+ * Capture groups:
+ * - Group 1: Image path from ![alt](path "title")
+ * - Group 2: Link path from [text](path "title")
+ * - Group 3: Wiki link path from [[path]] or [[path|label]]
+ * - Group 4: Include path from !!!include(path)!!!
+ */
+export const MARKDOWN_PATH_PATTERN_WITH_TITLE = /!\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|(?<!!)\[[^\]]*\]\(([^)\s"]+)(?:\s+"[^"]*")?\)|\[\[([^\]|]+)(?:\|[^\]]+)?\]\]|!!!include\(([^)]+)\)!!!/;
+
+/**
+ * Extract path from a pattern match result.
+ * Returns the first non-null capture group (image, link, wiki, or include path).
+ */
+export function extractPathFromMatch(match: RegExpExecArray): string | null {
+    return match[1] || match[2] || match[3] || match[4] || null;
+}
+
+/**
  * Types of link patterns that can be matched
  */
 type LinkMatchType = 'image' | 'link' | 'wiki' | 'auto' | 'include' | 'html';

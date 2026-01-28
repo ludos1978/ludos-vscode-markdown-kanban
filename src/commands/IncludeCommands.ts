@@ -70,6 +70,40 @@ export class IncludeCommands extends SwitchBasedCommand {
         'reloadIndividualFile': (msg, ctx) => this.handleReloadIndividualFile((msg as any).filePath, (msg as any).isMainFile, ctx)
     };
 
+    // ============= HELPER METHODS =============
+
+    /**
+     * Prompt user about unsaved changes before switching include files.
+     * @returns 'continue' to proceed, 'cancel' to abort the operation
+     */
+    private async promptUnsavedChanges(
+        file: import('../files/MarkdownFile').MarkdownFile,
+        currentFile: string,
+        context: CommandContext,
+        fileType: 'include' | 'task include' = 'include'
+    ): Promise<'continue' | 'cancel'> {
+        if (!file.hasUnsavedChanges() || !file.exists()) {
+            return 'continue';
+        }
+
+        const choice = await vscode.window.showWarningMessage(
+            `The current ${fileType} file "${currentFile}" has unsaved changes. What would you like to do?`,
+            { modal: true },
+            'Save and Switch',
+            'Discard and Switch',
+            'Cancel'
+        );
+
+        if (choice === 'Save and Switch') {
+            await context.fileSaveService.saveFile(file);
+            return 'continue';
+        } else if (choice === 'Discard and Switch') {
+            file.discardChanges();
+            return 'continue';
+        }
+        return 'cancel';
+    }
+
     // ============= INCLUDE MODE HANDLERS =============
 
     private async handleConfirmDisableIncludeMode(message: ConfirmDisableIncludeModeMessage, _context: CommandContext): Promise<CommandResult> {
@@ -206,22 +240,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const file = fileRegistry?.getByRelativePath(currentFile);
 
         // Only prompt if file was ever loaded (exists() is cached). Skip for broken includes.
-        if (file && file.hasUnsavedChanges() && file.exists()) {
-            const choice = await vscode.window.showWarningMessage(
-                `The current include file "${currentFile}" has unsaved changes. What would you like to do?`,
-                { modal: true },
-                'Save and Switch',
-                'Discard and Switch',
-                'Cancel'
-            );
-
-            if (choice === 'Save and Switch') {
-                await context.fileSaveService.saveFile(file);
-            } else if (choice === 'Discard and Switch') {
-                file.discardChanges();
-            } else {
-                return this.success();
-            }
+        if (file && await this.promptUnsavedChanges(file, currentFile, context, 'include') === 'cancel') {
+            return this.success();
         }
 
         const currentFilePath = context.fileManager.getFilePath();
@@ -267,22 +287,8 @@ export class IncludeCommands extends SwitchBasedCommand {
         const file = fileRegistry?.getByRelativePath(currentFile);
 
         // Only prompt if file was ever loaded (exists() is cached). Skip for broken includes.
-        if (file && file.hasUnsavedChanges() && file.exists()) {
-            const choice = await vscode.window.showWarningMessage(
-                `The current task include file "${currentFile}" has unsaved changes. What would you like to do?`,
-                { modal: true },
-                'Save and Switch',
-                'Discard and Switch',
-                'Cancel'
-            );
-
-            if (choice === 'Save and Switch') {
-                await context.fileSaveService.saveFile(file);
-            } else if (choice === 'Discard and Switch') {
-                file.discardChanges();
-            } else {
-                return this.success();
-            }
+        if (file && await this.promptUnsavedChanges(file, currentFile, context, 'task include') === 'cancel') {
+            return this.success();
         }
 
         const currentFilePath = context.fileManager.getFilePath();
