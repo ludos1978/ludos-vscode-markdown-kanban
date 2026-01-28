@@ -27,6 +27,7 @@ import { encodeFilePath, safeDecodeURIComponent, normalizeDirForComparison } fro
 import { showInfo, showWarning } from './NotificationService';
 import { logger } from '../utils/logger';
 import { PathFormat } from './FileSearchWebview';
+import { extractIncludeFiles } from '../constants/IncludeConstants';
 
 /**
  * Options for path replacement operations
@@ -71,6 +72,17 @@ interface PathReplacement {
 }
 
 /**
+ * Parameters for include switch operations
+ */
+export interface IncludeSwitchParams {
+    taskId?: string;
+    columnId?: string;
+    oldFiles: string[];
+    newFiles: string[];
+    newTitle: string;
+}
+
+/**
  * Dependencies required for replacement operations
  */
 export interface ReplacementDependencies {
@@ -79,6 +91,10 @@ export interface ReplacementDependencies {
     webviewBridge: WebviewBridge;
     getBoard: () => KanbanBoard | undefined;
     invalidateCache: () => void;
+    /** Optional callback for handling include file switches */
+    handleIncludeSwitch?: (params: IncludeSwitchParams) => Promise<void>;
+    /** Optional callback to refresh the board after changes */
+    refreshBoard?: () => Promise<void>;
 }
 
 /**
@@ -509,6 +525,66 @@ export class LinkReplacementService {
     }
 
     /**
+     * Check if a path was an include path and handle the include switch if needed.
+     * Returns true if an include switch was handled, false otherwise.
+     */
+    private async _handleIncludeSwitchIfNeeded(
+        deps: ReplacementDependencies,
+        oldTitle: string,
+        newTitle: string,
+        taskId?: string,
+        columnId?: string,
+        isColumnTitle?: boolean
+    ): Promise<boolean> {
+        if (!deps.handleIncludeSwitch) return false;
+
+        const oldIncludePaths = extractIncludeFiles(oldTitle);
+        const newIncludePaths = extractIncludeFiles(newTitle);
+
+        // No include files involved
+        if (oldIncludePaths.length === 0 && newIncludePaths.length === 0) {
+            return false;
+        }
+
+        // Check if include paths actually changed (using normalized comparison)
+        const normalizeForCompare = (p: string) => safeDecodeURIComponent(p).toLowerCase();
+        const oldNormalized = new Set(oldIncludePaths.map(normalizeForCompare));
+        const newNormalized = new Set(newIncludePaths.map(normalizeForCompare));
+
+        const includesChanged = oldNormalized.size !== newNormalized.size ||
+            [...oldNormalized].some(p => !newNormalized.has(p));
+
+        if (!includesChanged) {
+            return false;
+        }
+
+        // Include paths changed - trigger include switch
+        if (isColumnTitle && columnId) {
+            await deps.handleIncludeSwitch({
+                columnId,
+                oldFiles: oldIncludePaths,
+                newFiles: newIncludePaths,
+                newTitle
+            });
+            return true;
+        } else if (taskId) {
+            await deps.handleIncludeSwitch({
+                taskId,
+                oldFiles: oldIncludePaths,
+                newFiles: newIncludePaths,
+                newTitle
+            });
+            return true;
+        }
+
+        // Can't determine context, fall back to full refresh
+        if (deps.refreshBoard) {
+            await deps.refreshBoard();
+        }
+        return true;
+    }
+
+    /**
      * Apply board updates - either targeted or full refresh
      */
     private async _applyBoardUpdates(
@@ -537,13 +613,19 @@ export class LinkReplacementService {
                 if (replacementPaths.some(p => oldColumnTitle.includes(p))) {
                     const newTitle = this._applyAllReplacements(oldColumnTitle, replacements, mainFileDir, options.pathFormat);
                     if (oldColumnTitle !== newTitle) {
-                        column.title = newTitle;
-                        deps.webviewBridge.send({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            column: column,
-                            imageMappings: {}
-                        });
+                        // Check for include switch
+                        const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                            deps, oldColumnTitle, newTitle, undefined, column.id, true
+                        );
+                        if (!hadIncludeSwitch) {
+                            column.title = newTitle;
+                            deps.webviewBridge.send({
+                                type: 'updateColumnContent',
+                                columnId: column.id,
+                                column: column,
+                                imageMappings: {}
+                            });
+                        }
                     }
                 }
 
@@ -597,7 +679,16 @@ export class LinkReplacementService {
             const task = column?.tasks.find((t: KanbanTask) => t.id === options.taskId);
             if (task) {
                 const taskBaseDir = task.includeContext?.includeDir || mainFileDir;
-                task.title = this._applyAllReplacements(task.title || '', replacements, taskBaseDir, options.pathFormat);
+                const oldTitle = task.title || '';
+                const newTitle = this._applyAllReplacements(oldTitle, replacements, taskBaseDir, options.pathFormat);
+
+                // Check for include switch
+                const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                    deps, oldTitle, newTitle, options.taskId, options.columnId, false
+                );
+                if (hadIncludeSwitch) return;
+
+                task.title = newTitle;
                 if (task.description) {
                     task.description = this._applyAllReplacements(task.description, replacements, taskBaseDir, options.pathFormat);
                 }
@@ -615,7 +706,16 @@ export class LinkReplacementService {
         } else if (options.columnId && options.isColumnTitle) {
             const column = board.columns.find((c: KanbanColumn) => c.id === options.columnId);
             if (column) {
-                column.title = this._applyAllReplacements(column.title || '', replacements, mainFileDir, options.pathFormat);
+                const oldTitle = column.title || '';
+                const newTitle = this._applyAllReplacements(oldTitle, replacements, mainFileDir, options.pathFormat);
+
+                // Check for include switch
+                const hadIncludeSwitch = await this._handleIncludeSwitchIfNeeded(
+                    deps, oldTitle, newTitle, undefined, options.columnId, true
+                );
+                if (hadIncludeSwitch) return;
+
+                column.title = newTitle;
                 deps.webviewBridge.send({
                     type: 'updateColumnContent',
                     columnId: options.columnId,

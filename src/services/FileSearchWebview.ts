@@ -535,6 +535,25 @@ export class FileSearchWebview {
         });
     }
 
+    /**
+     * Check if a file exists at the resolved path location.
+     * @param decodedPath - The decoded path from the markdown
+     * @param fileDir - The directory of the file containing the path
+     * @returns true if file exists at current location (path is NOT broken)
+     */
+    private async _fileExistsAtCurrentLocation(decodedPath: string, fileDir: string): Promise<boolean> {
+        const currentPath = path.isAbsolute(decodedPath)
+            ? decodedPath
+            : path.resolve(fileDir, decodedPath);
+
+        try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(currentPath));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     private async _handleScanBrokenPath(): Promise<void> {
         // Scan tracked files (main + includes) for paths matching the broken directory
         const brokenDir = path.dirname(this._originalPath);
@@ -628,20 +647,8 @@ export class FileSearchWebview {
                     const filename = path.basename(decodedPath);
 
                     // Check if the file already exists at the current location (i.e., path is NOT broken)
-                    const currentPath = path.isAbsolute(decodedPath)
-                        ? decodedPath
-                        : path.resolve(fileDir, decodedPath);
-
-                    let fileExistsAtCurrentLocation = false;
-                    try {
-                        await vscode.workspace.fs.stat(vscode.Uri.file(currentPath));
-                        fileExistsAtCurrentLocation = true;
-                    } catch {
-                        // File doesn't exist - this path IS broken
-                    }
-
-                    if (fileExistsAtCurrentLocation) {
-                        logger.debug('[FileSearchWebview] Path is NOT broken (file exists):', { filename, currentPath: currentPath.substring(currentPath.length - 60) });
+                    if (await this._fileExistsAtCurrentLocation(decodedPath, fileDir)) {
+                        logger.debug('[FileSearchWebview] Path is NOT broken (file exists):', { filename, decodedPath: decodedPath.substring(decodedPath.length - 60) });
                         continue; // Skip - this path works fine
                     }
 
@@ -765,22 +772,10 @@ export class FileSearchWebview {
 
                 if (absoluteDirMatch || relativeDirMatch) {
                     // First check if the file already exists at the current location (path is NOT broken)
-                    const currentPath = path.isAbsolute(decodedPath)
-                        ? decodedPath
-                        : path.resolve(fileDir, decodedPath);
-
-                    let fileExistsAtCurrentLocation = false;
-                    try {
-                        await vscode.workspace.fs.stat(vscode.Uri.file(currentPath));
-                        fileExistsAtCurrentLocation = true;
-                    } catch {
-                        // File doesn't exist - this path IS broken
-                    }
-
-                    if (fileExistsAtCurrentLocation) {
+                    if (await this._fileExistsAtCurrentLocation(decodedPath, fileDir)) {
                         logger.debug('[FileSearchWebview._handleAnalyzeBatch] Path NOT broken (file exists)', {
                             foundFilename,
-                            currentPath: currentPath.substring(currentPath.length - 60)
+                            decodedPath: decodedPath.substring(decodedPath.length - 60)
                         });
                         continue; // Skip - this path works fine, no replacement needed
                     }
