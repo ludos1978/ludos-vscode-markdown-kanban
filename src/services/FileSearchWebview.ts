@@ -708,21 +708,24 @@ export class FileSearchWebview {
         // Find all paths with broken directory and check if they exist in new directory
         // Use shared pattern for matching all path types (excludes optional title in links)
         const pathPattern = new RegExp(MARKDOWN_PATH_PATTERN_WITH_TITLE.source, 'g');
-        const filesToReplace: string[] = [];
-        const filesMissing: string[] = [];
+        const filesToReplace: string[] = [];  // Unique filenames
+        const filesMissing: string[] = [];    // Unique filenames missing in new dir
+        let canReplaceCount = 0;              // Total occurrences that can be replaced
+        let missingCount = 0;                 // Total occurrences that are missing
         let lastUpdateTime = 0;
 
         // Always include the original broken path's filename in the count
         // The selected file IS the replacement, so it always "can be replaced"
         const originalFilename = path.basename(decodedOriginalPath);
         filesToReplace.push(originalFilename);
+        canReplaceCount = 1;  // Count the original path as 1 occurrence
         logger.debug('[FileSearchWebview._handleAnalyzeBatch] Including original file', { originalFilename });
 
         const sendUpdate = (scanning: boolean = true) => {
             this._webview?.postMessage({
                 type: 'fileSearchBatchAnalysis',
-                canReplace: filesToReplace.length,
-                missing: filesMissing.length,
+                canReplace: canReplaceCount,
+                missing: missingCount,
                 filesCanReplace: [...filesToReplace],
                 filesMissing: [...filesMissing],
                 brokenDir: brokenDir,
@@ -792,31 +795,48 @@ export class FileSearchWebview {
                         absoluteDirMatch
                     });
 
-                    if (!filesToReplace.includes(foundFilename) && !filesMissing.includes(foundFilename)) {
-                        // Check if file exists in new directory
+                    // Check if we already know whether this filename can be replaced or is missing
+                    const alreadyKnownCanReplace = filesToReplace.includes(foundFilename);
+                    const alreadyKnownMissing = filesMissing.includes(foundFilename);
+
+                    if (alreadyKnownCanReplace) {
+                        // Already confirmed this file exists in new dir - count this occurrence
+                        canReplaceCount++;
+                        logger.debug('[FileSearchWebview._handleAnalyzeBatch] Additional occurrence CAN be replaced', { foundFilename, canReplaceCount });
+                    } else if (alreadyKnownMissing) {
+                        // Already confirmed this file is missing - count this occurrence
+                        missingCount++;
+                        logger.debug('[FileSearchWebview._handleAnalyzeBatch] Additional occurrence MISSING', { foundFilename, missingCount });
+                    } else {
+                        // First time seeing this filename - check if file exists in new directory
                         const newPath = path.join(newDir, foundFilename);
                         try {
                             await vscode.workspace.fs.stat(vscode.Uri.file(newPath));
                             filesToReplace.push(foundFilename);
-                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File CAN be replaced', { foundFilename, newPath });
+                            canReplaceCount++;
+                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File CAN be replaced', { foundFilename, newPath, canReplaceCount });
                         } catch {
                             filesMissing.push(foundFilename);
-                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File MISSING in new dir', { foundFilename, newPath });
+                            missingCount++;
+                            logger.debug('[FileSearchWebview._handleAnalyzeBatch] File MISSING in new dir', { foundFilename, newPath, missingCount });
                         }
-                        // Send incremental update (throttled)
-                        const now = Date.now();
-                        if (now - lastUpdateTime > 100) {
-                            lastUpdateTime = now;
-                            sendUpdate(true);
-                        }
+                    }
+
+                    // Send incremental update (throttled)
+                    const now = Date.now();
+                    if (now - lastUpdateTime > 100) {
+                        lastUpdateTime = now;
+                        sendUpdate(true);
                     }
                 }
             }
         }
 
         logger.debug('[FileSearchWebview._handleAnalyzeBatch] Final result', {
-            canReplace: filesToReplace.length,
-            missing: filesMissing.length,
+            canReplaceCount,
+            missingCount,
+            uniqueFilesToReplace: filesToReplace.length,
+            uniqueFilesMissing: filesMissing.length,
             filesToReplace,
             filesMissing
         });
