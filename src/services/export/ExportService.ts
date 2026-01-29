@@ -11,6 +11,7 @@ import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
 import { PandocExportService, PandocOutputFormat } from './PandocExportService';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
+import { PluginRegistry } from '../../plugins/registry/PluginRegistry';
 // MermaidExportService replaced by MermaidPlugin via PluginRegistry
 import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
@@ -2040,11 +2041,29 @@ export class ExportService {
 
         // Handle Marp conversion (only if runMarp = Use Marp checkbox checked)
         if (options.runMarp) {
+            // Check plugin availability via registry
+            const registry = PluginRegistry.getInstance();
+            const marpPlugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'marp');
+            if (!marpPlugin) {
+                return {
+                    success: false,
+                    message: 'Marp export plugin is not available. Check plugins.disabled setting.'
+                };
+            }
             return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel);
         }
 
         // Handle Pandoc conversion (only if runPandoc = Use Pandoc checkbox checked)
         if (options.runPandoc && options.pandocFormat) {
+            // Check plugin availability via registry
+            const registry = PluginRegistry.getInstance();
+            const pandocPlugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'pandoc');
+            if (!pandocPlugin) {
+                return {
+                    success: false,
+                    message: 'Pandoc export plugin is not available. Check plugins.disabled setting.'
+                };
+            }
             return await this.runPandocConversion(markdownPath, options, webviewPanel);
         }
 
@@ -2057,33 +2076,25 @@ export class ExportService {
     }
 
     /**
-     * Run Marp conversion
-     * Helper for outputContentNew
-     * @param markdownPath - Path to the exported markdown file (in _Export folder)
-     * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
-     * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+     * Preprocess diagrams in markdown files before export conversion.
+     * Converts code block diagrams (Mermaid, PlantUML, etc.) and file diagrams
+     * (Excalidraw, Draw.io) to SVG/PNG files for export compatibility.
+     *
+     * Processes ALL markdown files in the export folder (main + includes).
+     *
+     * @param markdownPath - Path to the main markdown file
+     * @param webviewPanel - Optional webview panel for Mermaid rendering
+     * @returns Processed path and optional cleanup function
      */
-    private static async runMarpConversion(
+    private static async preprocessDiagrams(
         markdownPath: string,
-        _sourceFilePath: string,  // Reserved for future path normalization
-        options: NewExportOptions,
         webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
-    ): Promise<ExportResult> {
-        const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
-        logger.debug(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
-
-        // Build output path
+    ): Promise<{ processedPath: string; cleanup?: () => Promise<void> }> {
         const dir = path.dirname(markdownPath);
         const baseName = path.basename(markdownPath, '.md');
 
-        // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Marp processing
-        // This ensures diagrams work in PDF exports
-        // IMPORTANT: Must preprocess ALL markdown files in export folder (main + includes)
-        let processedMarkdownPath = markdownPath;
-        let preprocessCleanup: (() => Promise<void>) | undefined;
-
         try {
-            // Use injected webview panel for Mermaid rendering (avoids circular dependency)
+            // Resolve webview panel for Mermaid rendering
             const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
 
             // Create diagram preprocessor (uses PluginRegistry; panel enables Mermaid rendering)
@@ -2129,28 +2140,55 @@ export class ExportService {
 
             // If diagrams were processed, write to temp file
             if (preprocessResult.diagramFiles.length > 0) {
-                // Write processed markdown to temp file
                 const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
                 await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
 
-                processedMarkdownPath = tempFile;
-
-                // Setup cleanup function
-                preprocessCleanup = async () => {
-                    try {
-                        await fs.promises.unlink(tempFile);
-                    } catch (error) {
-                        // Ignore cleanup errors
+                return {
+                    processedPath: tempFile,
+                    cleanup: async () => {
+                        try {
+                            await fs.promises.unlink(tempFile);
+                        } catch {
+                            // Ignore cleanup errors
+                        }
                     }
                 };
             }
         } catch (error) {
             console.error('[ExportService] Diagram preprocessing failed:', error);
-            // Continue with original file if preprocessing fails
             showWarning(
                 'Diagram preprocessing failed. Exporting without diagram conversion.'
             );
         }
+
+        // No preprocessing needed or preprocessing failed — use original path
+        return { processedPath: markdownPath };
+    }
+
+    /**
+     * Run Marp conversion
+     * Helper for outputContentNew
+     * @param markdownPath - Path to the exported markdown file (in _Export folder)
+     * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
+     * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+     */
+    private static async runMarpConversion(
+        markdownPath: string,
+        _sourceFilePath: string,  // Reserved for future path normalization
+        options: NewExportOptions,
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
+    ): Promise<ExportResult> {
+        const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
+        logger.debug(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
+
+        // Build output path
+        const dir = path.dirname(markdownPath);
+        const baseName = path.basename(markdownPath, '.md');
+
+        // Preprocess diagrams (converts code block / file diagrams to SVG/PNG)
+        const { processedPath: processedMarkdownPath, cleanup: preprocessCleanup } =
+            await this.preprocessDiagrams(markdownPath, webviewPanel);
+
         let ext = '.html';
         switch (marpFormat) {
             case 'pdf': ext = '.pdf'; break;
@@ -2280,80 +2318,9 @@ export class ExportService {
         const ext = PandocExportService.getExtensionForFormat(pandocFormat);
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
-        // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Pandoc processing
-        // This ensures Mermaid, PlantUML, Excalidraw, Draw.io diagrams work in document exports
-        // IMPORTANT: Must preprocess ALL markdown files in export folder (main + includes)
-        let processedMarkdownPath = markdownPath;
-        let preprocessCleanup: (() => Promise<void>) | undefined;
-
-        try {
-            // Use injected webview panel for Mermaid rendering
-            const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
-
-            // Create diagram preprocessor (uses PluginRegistry; panel enables Mermaid rendering)
-            const preprocessor = new DiagramPreprocessor(panel);
-
-            // STEP 1: Preprocess ALL include files in the export folder
-            // This ensures diagrams inside included files are also converted to SVG
-            const allFiles = fs.readdirSync(dir);
-            const includeFiles = allFiles.filter(f =>
-                f.endsWith('.md') &&
-                f !== `${baseName}.md` &&
-                !f.endsWith('.preprocessed.md')
-            );
-
-            for (const includeFile of includeFiles) {
-                const includeFilePath = path.join(dir, includeFile);
-                const includeBaseName = path.basename(includeFile, '.md');
-
-                try {
-                    const includeResult = await preprocessor.preprocess(
-                        includeFilePath,
-                        dir,
-                        includeBaseName
-                    );
-
-                    // If diagrams were processed, overwrite the include file
-                    if (includeResult.diagramFiles.length > 0) {
-                        await fs.promises.writeFile(includeFilePath, includeResult.processedMarkdown, 'utf8');
-                        logger.debug(`[ExportService] Preprocessed diagrams in include file: ${includeFile}`);
-                    }
-                } catch (includeError) {
-                    console.error(`[ExportService] Failed to preprocess include file ${includeFile}:`, includeError);
-                    // Continue with other files
-                }
-            }
-
-            // STEP 2: Preprocess the main file
-            const preprocessResult = await preprocessor.preprocess(
-                markdownPath,
-                dir,
-                baseName
-            );
-
-            // If diagrams were processed, write to temp file
-            if (preprocessResult.diagramFiles.length > 0) {
-                const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
-                await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
-
-                processedMarkdownPath = tempFile;
-
-                // Setup cleanup function
-                preprocessCleanup = async () => {
-                    try {
-                        await fs.promises.unlink(tempFile);
-                    } catch {
-                        // Ignore cleanup errors
-                    }
-                };
-            }
-        } catch (error) {
-            console.error('[ExportService] Diagram preprocessing failed:', error);
-            // Continue with original file if preprocessing fails
-            showWarning(
-                'Diagram preprocessing failed. Exporting without diagram conversion.'
-            );
-        }
+        // Preprocess diagrams (converts code block / file diagrams to SVG/PNG)
+        const { processedPath: processedMarkdownPath, cleanup: preprocessCleanup } =
+            await this.preprocessDiagrams(markdownPath, webviewPanel);
 
         try {
             await PandocExportService.export({

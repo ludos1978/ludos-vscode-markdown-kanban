@@ -167,6 +167,34 @@ export class MarpExportPlugin implements ExportPlugin {
         return MarpExportService.getAvailableThemes();
     }
 
+    /**
+     * Stop all Marp watch processes
+     */
+    stopAllWatches(): void {
+        MarpExportService.stopAllMarpWatches();
+    }
+
+    /**
+     * Stop all Marp watch processes except for a specific file
+     */
+    stopAllWatchesExcept(excludeFilePath?: string): void {
+        MarpExportService.stopAllMarpWatchesExcept(excludeFilePath);
+    }
+
+    /**
+     * Check if the Marp engine file exists
+     */
+    engineFileExists(): boolean {
+        return MarpExportService.engineFileExists();
+    }
+
+    /**
+     * Get the Marp engine path
+     */
+    getEnginePath(): string {
+        return MarpExportService.getEnginePath();
+    }
+
     // ============= PRIVATE HELPERS =============
 
     /**

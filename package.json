@@ -4753,6 +4753,26 @@
           "maximum": 50,
           "description": "Maximum number of backups to keep per file (older backups will be deleted)"
         },
+        "markdown-kanban.plugins.disabled": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "plantuml",
+              "mermaid",
+              "drawio",
+              "excalidraw",
+              "pdf",
+              "epub",
+              "xlsx",
+              "marp",
+              "pandoc"
+            ]
+          },
+          "default": [],
+          "description": "List of built-in plugin IDs to disable. Disabled plugins will not be loaded at startup.",
+          "markdownDescription": "List of built-in plugin IDs to disable. Available plugins:\n- `plantuml` — PlantUML diagram rendering\n- `mermaid` — Mermaid diagram rendering\n- `drawio` — Draw.io file rendering\n- `excalidraw` — Excalidraw file rendering\n- `pdf` — PDF page rendering\n- `epub` — EPUB page rendering\n- `xlsx` — Excel/spreadsheet rendering\n- `marp` — Marp presentation export\n- `pandoc` — Pandoc document export"
+        },
         "markdown-kanban.popplerPath": {
           "type": "string",
           "default": "",

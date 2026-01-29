@@ -19,6 +19,7 @@ import { ColumnIncludePlugin } from './import/ColumnIncludePlugin';
 import { TaskIncludePlugin } from './import/TaskIncludePlugin';
 import { RegularIncludePlugin } from './import/RegularIncludePlugin';
 import { MarpExportPlugin } from './export/MarpExportPlugin';
+import { PandocExportPlugin } from './export/PandocExportPlugin';
 
 // Diagram plugins
 import { PlantUMLPlugin } from './diagram/PlantUMLPlugin';
@@ -96,6 +97,16 @@ export class PluginLoader {
                 registry.registerExportPlugin(new MarpExportPlugin());
             } catch (error) {
                 console.error('[PluginLoader] Failed to register MarpExportPlugin:', error);
+            }
+        }
+
+        // Pandoc Export Plugin
+        // Handles DOCX, ODT, EPUB exports via Pandoc
+        if (!isPluginDisabled('pandoc')) {
+            try {
+                registry.registerExportPlugin(new PandocExportPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register PandocExportPlugin:', error);
             }
         }
 

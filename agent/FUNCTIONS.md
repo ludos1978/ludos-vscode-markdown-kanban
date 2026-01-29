@@ -9,6 +9,43 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
+## Recent Updates (2026-01-29) - Phase 3: Export Plugin Migration
+
+### New File: `src/plugins/export/PandocExportPlugin.ts`
+Thin wrapper around PandocExportService providing plugin interface for DOCX/ODT/EPUB exports.
+- `PandocExportPlugin.getSupportedFormats()` - Returns pandoc-docx, pandoc-odt, pandoc-epub formats
+- `PandocExportPlugin.canExport(board, formatId)` - Check format supported and board has columns
+- `PandocExportPlugin.isAvailable()` - Delegates to PandocExportService.isPandocAvailable()
+- `PandocExportPlugin.getVersion()` - Delegates to PandocExportService.getPandocVersion()
+- `PandocExportPlugin.export(board, options)` - Delegates to PandocExportService.export()
+
+### Modified: `src/plugins/export/MarpExportPlugin.ts`
+Added methods for ExportCommands plugin routing:
+- `MarpExportPlugin.stopAllWatches()` - Delegates to MarpExportService.stopAllMarpWatches()
+- `MarpExportPlugin.stopAllWatchesExcept(path)` - Delegates to MarpExportService.stopAllMarpWatchesExcept()
+- `MarpExportPlugin.engineFileExists()` - Delegates to MarpExportService.engineFileExists()
+- `MarpExportPlugin.getEnginePath()` - Delegates to MarpExportService.getEnginePath()
+
+### Modified: `src/plugins/PluginLoader.ts`
+- Registers PandocExportPlugin (gated by `isPluginDisabled('pandoc')`)
+
+### Modified: `src/services/export/ExportService.ts`
+- `ExportService.preprocessDiagrams(markdownPath, webviewPanel)` - (NEW) Extracted shared diagram preprocessing logic used by both runMarpConversion and runPandocConversion. Converts code block/file diagrams to SVG/PNG for export.
+- `ExportService.outputContent()` - (MODIFIED) Now checks plugin availability via PluginRegistry before routing to runMarpConversion/runPandocConversion.
+- `ExportService.runMarpConversion()` - (MODIFIED) Uses preprocessDiagrams() instead of inline preprocessing.
+- `ExportService.runPandocConversion()` - (MODIFIED) Uses preprocessDiagrams() instead of inline preprocessing.
+
+### Modified: `src/commands/ExportCommands.ts`
+Replaced direct MarpExportService/PandocExportService calls with plugin lookups:
+- `ExportCommands._getMarpPlugin()` - (NEW) Get MarpExportPlugin from PluginRegistry
+- `ExportCommands._getPandocPlugin()` - (NEW) Get PandocExportPlugin from PluginRegistry
+- handleStopAutoExport, handleStopAutoExportForOtherKanbanFiles, handleGetMarpThemes, handlePollMarpThemes, handleCheckMarpStatus, handleCheckPandocStatus — all now route through plugins
+
+### Modified: `package.json`
+- Added 'pandoc' to `markdown-kanban.plugins.disabled` enum
+
+---
+
 ## Recent Updates (2026-01-29) - Web Image Search Feature
 
 ### New File: `src/services/WebImageSearchService.ts`
@@ -1534,12 +1571,28 @@ Plugin-based architecture for import/export operations. Provides unified interfa
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_getSupportedFormats - Get PDF, PPTX, HTML formats
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_canExport - Check format supported and board has columns
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_isAvailable - Check Marp CLI availability
-- src/plugins/export/MarpExportPlugin-MarpExportPlugin_getToolVersion - Get Marp CLI version
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_export - Export board (delegates to MarpExportService)
-- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopWatch - Stop Marp watch process
-- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopAllWatches - Stop all Marp watch processes
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_isWatching - Check if file is being watched
 - src/plugins/export/MarpExportPlugin-MarpExportPlugin_getAvailableThemes - Get available Marp themes
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopAllWatches - Stop all Marp watch processes
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopAllWatchesExcept - Stop all watches except specific file
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_engineFileExists - Check if Marp engine file exists
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_getEnginePath - Get Marp engine file path
+
+## src/plugins/export/PandocExportPlugin.ts - PandocExportPlugin
+
+### Properties:
+- metadata.id: 'pandoc'
+- metadata.formats: ['pandoc-docx', 'pandoc-odt', 'pandoc-epub']
+- metadata.requiresExternalTool: true
+- metadata.externalToolName: 'Pandoc (pandoc.org)'
+
+### Methods:
+- src/plugins/export/PandocExportPlugin-PandocExportPlugin_getSupportedFormats - Get DOCX, ODT, EPUB formats
+- src/plugins/export/PandocExportPlugin-PandocExportPlugin_canExport - Check format supported and board has columns
+- src/plugins/export/PandocExportPlugin-PandocExportPlugin_isAvailable - Check Pandoc availability
+- src/plugins/export/PandocExportPlugin-PandocExportPlugin_getVersion - Get Pandoc version string
+- src/plugins/export/PandocExportPlugin-PandocExportPlugin_export - Export board (delegates to PandocExportService)
 
 ## Modified Files for Plugin Integration
 

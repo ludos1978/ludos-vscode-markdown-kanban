@@ -13,10 +13,11 @@
 
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler, IncomingMessage } from './interfaces';
 import { ExportService, NewExportOptions } from '../services/export/ExportService';
-import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
-import { PandocExportService } from '../services/export/PandocExportService';
 import { ConfigurationService } from '../services/ConfigurationService';
+import { PluginRegistry } from '../plugins/registry/PluginRegistry';
+import { MarpExportPlugin } from '../plugins/export/MarpExportPlugin';
+import { PandocExportPlugin } from '../plugins/export/PandocExportPlugin';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage } from '../utils/stringUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';
@@ -345,8 +346,11 @@ export class ExportCommands extends SwitchBasedCommand {
                 }
             }
 
-            // Stop all Marp watch processes
-            MarpExportService.stopAllMarpWatches();
+            // Stop all Marp watch processes via plugin
+            const marpPlugin = this._getMarpPlugin();
+            if (marpPlugin) {
+                marpPlugin.stopAllWatches();
+            }
 
             context.setAutoExportSettings(null);
 
@@ -370,11 +374,14 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handleStopAutoExportForOtherKanbanFiles(_currentKanbanFilePath: string, _context: CommandContext, protectExportedPath?: string): Promise<void> {
         try {
-            // Stop Marp watch processes for OTHER files (not the current export)
-            if (protectExportedPath) {
-                MarpExportService.stopAllMarpWatchesExcept(protectExportedPath);
-            } else {
-                MarpExportService.stopAllMarpWatches();
+            // Stop Marp watch processes for OTHER files (not the current export) via plugin
+            const marpPlugin = this._getMarpPlugin();
+            if (marpPlugin) {
+                if (protectExportedPath) {
+                    marpPlugin.stopAllWatchesExcept(protectExportedPath);
+                } else {
+                    marpPlugin.stopAllWatches();
+                }
             }
         } catch (error) {
             console.error('[ExportCommands.handleStopAutoExportForOtherKanbanFiles] Error:', error);
@@ -479,7 +486,8 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handleGetMarpThemes(_context: CommandContext): Promise<void> {
         try {
-            const themes = await MarpExportService.getAvailableThemes();
+            const marpPlugin = this._getMarpPlugin();
+            const themes = marpPlugin ? await marpPlugin.getAvailableThemes() : ['default'];
 
             if (!this.postMessage({ type: 'marpThemesAvailable', themes: themes })) {
                 console.error('[ExportCommands.handleGetMarpThemes] No webview panel available');
@@ -500,7 +508,8 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handlePollMarpThemes(_context: CommandContext): Promise<void> {
         try {
-            const themes = await MarpExportService.getAvailableThemes();
+            const marpPlugin = this._getMarpPlugin();
+            const themes = marpPlugin ? await marpPlugin.getAvailableThemes() : ['default'];
 
             if (!this.postMessage({ type: 'marpThemesAvailable', themes: themes })) {
                 console.error('[ExportCommands.handlePollMarpThemes] Still no webview panel available');
@@ -529,9 +538,10 @@ export class ExportCommands extends SwitchBasedCommand {
     private async handleCheckMarpStatus(_context: CommandContext): Promise<void> {
         try {
             const marpExtensionStatus = MarpExtensionService.getMarpStatus();
-            const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
-            const engineFileExists = MarpExportService.engineFileExists();
-            const enginePath = MarpExportService.getEnginePath();
+            const marpPlugin = this._getMarpPlugin();
+            const marpCliAvailable = marpPlugin ? await marpPlugin.isAvailable() : false;
+            const engineFileExists = marpPlugin ? marpPlugin.engineFileExists() : false;
+            const enginePath = marpPlugin ? marpPlugin.getEnginePath() : '';
 
             if (!this.postMessage({
                 type: 'marpStatus',
@@ -553,8 +563,9 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handleCheckPandocStatus(_context: CommandContext): Promise<void> {
         try {
-            const isAvailable = await PandocExportService.isPandocAvailable();
-            const version = isAvailable ? await PandocExportService.getPandocVersion() : null;
+            const pandocPlugin = this._getPandocPlugin();
+            const isAvailable = pandocPlugin ? await pandocPlugin.isAvailable() : false;
+            const version = (isAvailable && pandocPlugin) ? await pandocPlugin.getVersion() : null;
 
             if (!this.postMessage({
                 type: 'pandocStatus',
@@ -584,5 +595,25 @@ export class ExportCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[ExportCommands.handleGetMarpAvailableClasses] Error:', error);
         }
+    }
+
+    // ============= PLUGIN HELPERS =============
+
+    /**
+     * Get the registered MarpExportPlugin from PluginRegistry
+     */
+    private _getMarpPlugin(): MarpExportPlugin | null {
+        const registry = PluginRegistry.getInstance();
+        const plugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'marp');
+        return (plugin as MarpExportPlugin) ?? null;
+    }
+
+    /**
+     * Get the registered PandocExportPlugin from PluginRegistry
+     */
+    private _getPandocPlugin(): PandocExportPlugin | null {
+        const registry = PluginRegistry.getInstance();
+        const plugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'pandoc');
+        return (plugin as PandocExportPlugin) ?? null;
     }
 }
