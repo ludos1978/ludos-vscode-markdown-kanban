@@ -325,44 +325,29 @@ Migrates from: `src/services/export/PandocExportService.ts` (381 LOC)
 After migration, delete:
 - `src/services/export/PandocExportService.ts` (381 LOC)
 
-### 3.4 Extract built-in Markdown Export Plugin
+### ~~3.4 Extract built-in Markdown Export Plugin~~ — REJECTED
 
-File: `src/plugins/export/MarkdownExportPlugin.ts` (new)
+Markdown export is core pipeline logic, not a plugin. The export orchestration
+(extract -> transform -> output) stays in ExportService. Plugins may influence
+the markdown export via hooks (e.g., format-specific media post-processing for
+PDF vs HTML), but the export itself is not a plugin.
 
-Migrates from: embedded logic in `src/services/export/ExportService.ts`
+### 3.5 Refactor ExportService to use export plugins — DONE (partial)
 
-What moves into the plugin (~500 LOC):
-- Format conversion: kanban -> presentation format (slide separators)
-- Format conversion: kanban -> document format (H1 headers, content blocks)
-- Content transformations: speaker notes, HTML comments, HTML content, media captions, embeds
-- `applyContentTransformations()` and `extractMarpClassesFromMarkdown()`
+File: `src/services/export/ExportService.ts`
 
-What stays in ExportService (core):
-- Export orchestration (extract -> transform -> output pipeline)
-- Include file handling, asset packing, link rewriting
-- Tag filtering, scope handling, file I/O
+- ~~Remove direct imports of MarpExportService, PandocExportService~~ — DONE
+- `runMarpConversion()` and `runPandocConversion()` now use plugins via PluginRegistry — DONE
+- `outputContent()` already checks plugin availability via PluginRegistry — DONE (Phase 3a)
 
-### 3.5 Refactor ExportService to use export plugins
+### 3.6 Refactor ExportCommands to use plugin discovery — DONE (Phase 3a)
 
-File: `src/services/export/ExportService.ts` (modify)
+All Marp/Pandoc calls route through plugin lookups.
 
-- `outputContent()` delegates to `PluginRegistry.getInstance().findExportPlugin(formatId)`
-- Remove direct imports of MarpExportService, PandocExportService
-- Remove `runMarpConversion()` and `runPandocConversion()` private methods
+### 3.7 DiagramPreprocessor — no changes needed
 
-### 3.6 Refactor ExportCommands to use plugin discovery
-
-File: `src/commands/ExportCommands.ts` (modify)
-
-- Replace hardcoded Marp/Pandoc references with plugin lookups
-- Use `PluginRegistry.getSupportedExportFormats()` to discover available formats
-- Watch mode start/stop goes through plugin interface
-
-### 3.7 Move DiagramPreprocessor into export plugin infrastructure
-
-DiagramPreprocessor already uses diagram plugins (done in Phase 1). In Phase 3:
-- Export plugins that need diagram preprocessing call it during their `preprocess()` step
-- DiagramPreprocessor stays in `src/services/export/` as shared infrastructure
+DiagramPreprocessor already uses diagram plugins via PluginRegistry (done in Phase 1).
+It stays in `src/services/export/` as shared infrastructure.
 
 ---
 
@@ -469,7 +454,6 @@ src/plugins/
   export/                 -- export format plugins
     MarpExportPlugin.ts   -- DONE (full implementation, absorbed MarpExportService)
     PandocExportPlugin.ts -- DONE (full implementation, absorbed PandocExportService)
-    MarkdownExportPlugin.ts -- TODO (Phase 3b)
 
   diagram/                -- DONE -- diagram rendering plugins
     PlantUMLPlugin.ts
