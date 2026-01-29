@@ -10,7 +10,8 @@ Goal: simpler core, features as plugins that expand rendering, embedding and exp
 |-------|--------|-------------|
 | Phase 1 | DONE | Plugin Infrastructure (Core Changes) |
 | Phase 2 | DONE | Diagram Plugins (7 plugins migrated, 7 service files deleted) |
-| Phase 3 | TODO | Export Plugins (Marp, Pandoc, Markdown) |
+| Phase 3a | DONE | Export Plugins — pragmatic routing (Marp, Pandoc through PluginRegistry) |
+| Phase 3b | TODO | Export Plugins — full migration (move service code into plugins, optional) |
 | Phase 4 | TODO | Embed Plugins (optional, lower priority) |
 | Phase 5 | TODO | Markdown-it Processor Plugins (optional, lower priority) |
 
@@ -212,7 +213,28 @@ Migrated from: `src/services/export/XlsxService.ts` (deleted)
 
 ---
 
-## Phase 3: Export Plugins -- TODO
+## Phase 3a: Export Plugins — Pragmatic Routing -- DONE
+
+Completed: Routing ExportService and ExportCommands through PluginRegistry.
+
+What was done:
+- Created `PandocExportPlugin.ts` — thin wrapper around PandocExportService
+- Added `stopAllWatches`, `stopAllWatchesExcept`, `engineFileExists`, `getEnginePath` to MarpExportPlugin
+- Registered PandocExportPlugin in PluginLoader (gated by `isPluginDisabled('pandoc')`)
+- Added `'pandoc'` to `plugins.disabled` enum in package.json
+- Extracted `preprocessDiagrams()` helper in ExportService (eliminated ~70 LOC duplication)
+- ExportService.outputContent() checks plugin availability via PluginRegistry before conversion
+- ExportCommands routes all Marp/Pandoc calls through plugin lookups (removed direct service imports)
+
+What was NOT done (deferred to Phase 3b):
+- Moving MarpExportService/PandocExportService code INTO the plugins
+- Moving PresentationGenerator/PresentationParser into MarpExportPlugin
+- Creating MarkdownExportPlugin
+- Deleting the service files
+
+---
+
+## Phase 3b: Export Plugins — Full Migration (optional) -- TODO
 
 ### 3.1 Enhance ExportPlugin interface
 
@@ -445,9 +467,9 @@ src/plugins/
     RegularIncludePlugin.ts
 
   export/                 -- export format plugins
-    MarpExportPlugin.ts   -- existing thin wrapper, TODO: full migration
-    PandocExportPlugin.ts -- TODO
-    MarkdownExportPlugin.ts -- TODO
+    MarpExportPlugin.ts   -- DONE (thin wrapper, routes through PluginRegistry)
+    PandocExportPlugin.ts -- DONE (thin wrapper, routes through PluginRegistry)
+    MarkdownExportPlugin.ts -- TODO (Phase 3b)
 
   diagram/                -- DONE -- diagram rendering plugins
     PlantUMLPlugin.ts
@@ -473,9 +495,9 @@ Phase 2 deletions (7 files, ~1431 LOC):
 - ~~`src/services/export/EPUBService.ts`~~ (deleted)
 - ~~`src/services/export/XlsxService.ts`~~ (deleted)
 
-## Files To Delete (future phases)
+## Files To Delete (Phase 3b, optional)
 
-Phase 3 deletions (5 files, ~1898 LOC):
+Only if full migration is done (moving service code into plugins):
 - `src/services/export/MarpExportService.ts` (655 LOC)
 - `src/services/export/MarpExtensionService.ts` (208 LOC)
 - `src/services/export/PresentationGenerator.ts` (373 LOC)
