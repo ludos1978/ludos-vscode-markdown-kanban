@@ -6420,6 +6420,8 @@ figure {
 
 figcaption {
   font-size: 0.85em;
+  max-width: 100%; 
+  overflow-wrap: break-word;
   color: var(--vscode-descriptionForeground);
   margin-top: 4px;
   text-align: center;
