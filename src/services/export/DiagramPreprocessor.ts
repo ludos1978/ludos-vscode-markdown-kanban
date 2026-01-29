@@ -1,8 +1,5 @@
-import { PlantUMLService } from './PlantUMLService';
-import { MermaidExportService } from './MermaidExportService';
-import { DrawIOService } from './DrawIOService';
-import { ExcalidrawService } from './ExcalidrawService';
-import { XlsxService } from './XlsxService';
+import { PluginRegistry } from '../../plugins/registry/PluginRegistry';
+import { MermaidPlugin } from '../../plugins/diagram/MermaidPlugin';
 import { DiagramPatterns, parseAttributeBlock } from '../../shared/regexPatterns';
 import { showError } from '../NotificationService';
 import * as path from 'path';
@@ -41,23 +38,23 @@ export interface PreprocessResult {
  * for export compatibility (especially Marp PDF export)
  */
 export class DiagramPreprocessor {
-    private plantUMLService: PlantUMLService;
-    private mermaidService: MermaidExportService;
-    private drawioService: DrawIOService;
-    private excalidrawService: ExcalidrawService;
-    private xlsxService: XlsxService;
+    private _registry: PluginRegistry;
 
-    constructor(mermaidService?: MermaidExportService, webviewPanel?: vscode.WebviewPanel) {
-        this.plantUMLService = new PlantUMLService();
-        // Create a dummy service if not provided (Mermaid diagrams won't render but won't crash)
-        this.mermaidService = mermaidService || new MermaidExportService();
-        this.drawioService = new DrawIOService();
-        this.excalidrawService = new ExcalidrawService();
-        this.xlsxService = new XlsxService();
+    constructor(webviewPanel?: vscode.WebviewPanel) {
+        this._registry = PluginRegistry.getInstance();
 
-        if (webviewPanel && mermaidService) {
-            this.mermaidService.setWebviewPanel(webviewPanel);
+        // Set up Mermaid rendering via plugin if panel is available
+        if (webviewPanel) {
+            const mermaidPlugin = this._getMermaidPlugin();
+            if (mermaidPlugin) {
+                mermaidPlugin.setWebviewPanel(webviewPanel);
+            }
         }
+    }
+
+    private _getMermaidPlugin(): MermaidPlugin | null {
+        const plugin = this._registry.findDiagramPluginById('mermaid');
+        return plugin as MermaidPlugin | null;
     }
 
     /**
@@ -281,21 +278,27 @@ export class DiagramPreprocessor {
         outputFolder: string,
         baseFileName: string
     ): Promise<RenderedDiagram[]> {
+        const plugin = this._registry.findDiagramPluginForCodeBlock('plantuml');
+        if (!plugin || !plugin.renderCodeBlock) {
+            console.error('[DiagramPreprocessor] PlantUML plugin not available');
+            return [];
+        }
 
         const renderPromises = diagrams.map(async (diagram) => {
             try {
-
                 // Wrap code with PlantUML delimiters
                 const wrappedCode = `@startuml\n${diagram.code.trim()}\n@enduml`;
 
-                // Render using backend service
-                const svg = await this.plantUMLService.renderSVG(wrappedCode);
+                // Render using plugin
+                const result = await plugin.renderCodeBlock!(wrappedCode);
+                if (!result.success) {
+                    throw new Error(result.error || 'PlantUML rendering failed');
+                }
 
                 // Save SVG file
                 const fileName = `${baseFileName}-${diagram.id}.svg`;
                 const filePath = path.join(outputFolder, fileName);
-                await fs.promises.writeFile(filePath, svg, 'utf8');
-
+                await fs.promises.writeFile(filePath, result.data as string, 'utf8');
 
                 return {
                     id: diagram.id,
@@ -309,23 +312,22 @@ export class DiagramPreprocessor {
         });
 
         const results = await Promise.all(renderPromises);
-
-        // Filter out failures
         return results.filter((r): r is RenderedDiagram => r !== null);
     }
 
     /**
-     * Render Mermaid diagrams via MermaidExportService
+     * Render Mermaid diagrams via MermaidPlugin
      */
     private async renderMermaidBatch(
         diagrams: DiagramBlock[],
         outputFolder: string,
         baseFileName: string
     ): Promise<RenderedDiagram[]> {
+        const mermaidPlugin = this._getMermaidPlugin();
 
-        // Check if service is ready
-        if (!this.mermaidService.isReady()) {
-            console.error('[DiagramPreprocessor] ❌ MermaidExportService not ready (no webview)');
+        // Check if plugin is ready
+        if (!mermaidPlugin || !mermaidPlugin.isReady()) {
+            console.error('[DiagramPreprocessor] ❌ Mermaid plugin not ready (no webview)');
             showError(
                 'Cannot export Mermaid diagrams: Please open the Kanban board view first, then try exporting again.'
             );
@@ -335,8 +337,8 @@ export class DiagramPreprocessor {
         // Extract codes
         const codes = diagrams.map(d => d.code);
 
-        // Render via service (handles queuing and responses)
-        const svgs = await this.mermaidService.renderBatch(codes);
+        // Render via plugin (handles queuing and responses)
+        const svgs = await mermaidPlugin.renderBatch(codes);
 
         // Save results
         const rendered: RenderedDiagram[] = [];
@@ -466,12 +468,24 @@ export class DiagramPreprocessor {
         baseFileName: string,
         sourceDir: string
     ): Promise<RenderedDiagram[]> {
+        const plugin = this._registry.findDiagramPluginById('drawio');
+        if (!plugin || !plugin.renderFile) {
+            console.error('[DiagramPreprocessor] Draw.io plugin not available');
+            return [];
+        }
+
         return this.renderFileBasedDiagramBatch(
             diagrams,
             outputFolder,
             baseFileName,
             sourceDir,
-            (absolutePath) => this.drawioService.renderSVG(absolutePath)
+            async (absolutePath) => {
+                const result = await plugin.renderFile!(absolutePath, { outputFormat: 'svg' });
+                if (!result.success) {
+                    throw new Error(result.error || 'Draw.io rendering failed');
+                }
+                return result.data as string;
+            }
         );
     }
 
@@ -484,12 +498,24 @@ export class DiagramPreprocessor {
         baseFileName: string,
         sourceDir: string
     ): Promise<RenderedDiagram[]> {
+        const plugin = this._registry.findDiagramPluginById('excalidraw');
+        if (!plugin || !plugin.renderFile) {
+            console.error('[DiagramPreprocessor] Excalidraw plugin not available');
+            return [];
+        }
+
         return this.renderFileBasedDiagramBatch(
             diagrams,
             outputFolder,
             baseFileName,
             sourceDir,
-            (absolutePath) => this.excalidrawService.renderSVG(absolutePath)
+            async (absolutePath) => {
+                const result = await plugin.renderFile!(absolutePath);
+                if (!result.success) {
+                    throw new Error(result.error || 'Excalidraw rendering failed');
+                }
+                return result.data as string;
+            }
         );
     }
 
@@ -542,9 +568,18 @@ export class DiagramPreprocessor {
                     ? parseInt(diagram.attributes.page, 10)
                     : 1;
 
-                // Render using LibreOffice
+                // Render using plugin (LibreOffice)
+                const plugin = this._registry.findDiagramPluginById('xlsx');
+                if (!plugin || !plugin.renderFile) {
+                    throw new Error('XLSX plugin not available');
+                }
+
                 log(`Rendering ${diagram.id} (sheet ${pageNumber})...`);
-                const pngBuffer = await this.xlsxService.renderPNG(absolutePath, pageNumber);
+                const renderResult = await plugin.renderFile(absolutePath, { sheetNumber: pageNumber });
+                if (!renderResult.success) {
+                    throw new Error(renderResult.error || 'XLSX rendering failed');
+                }
+                const pngBuffer = renderResult.data as Buffer;
 
                 // Save PNG file
                 await fs.promises.writeFile(outputPath, pngBuffer);

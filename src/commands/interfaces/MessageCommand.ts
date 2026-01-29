@@ -12,8 +12,7 @@ import { BoardStore, UndoCapture } from '../../core/stores';
 import { BoardOperations } from '../../board';
 import { LinkHandler } from '../../services/LinkHandler';
 import { KanbanBoard } from '../../markdownParser';
-import { PlantUMLService } from '../../services/export/PlantUMLService';
-import { MermaidExportService } from '../../services/export/MermaidExportService';
+// PlantUMLService and MermaidExportService replaced by diagram plugins via PluginRegistry
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { FileSaveService } from '../../core/FileSaveService';
 import { IncomingMessage } from '../../core/bridge/MessageTypes';
@@ -108,9 +107,6 @@ export interface ExportContext {
  */
 export interface ServiceContext {
     linkHandler: LinkHandler;
-    plantUMLService: PlantUMLService;
-    /** Get the panel's MermaidExportService for panel-isolated Mermaid rendering */
-    getMermaidExportService: () => MermaidExportService;
     /** Get the MediaTracker for file watching (diagram change detection) */
     getMediaTracker: () => import('../../services/MediaTracker').MediaTracker | null | undefined;
 }

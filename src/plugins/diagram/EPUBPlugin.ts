@@ -1,15 +1,26 @@
+/**
+ * EPUB Document Plugin
+ *
+ * Renders EPUB pages to PNG using mutool (MuPDF) CLI.
+ * Migrated from src/services/export/EPUBService.ts
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { AbstractCLIService } from './AbstractCLIService';
+import { AbstractCLIService } from '../../services/export/AbstractCLIService';
+import {
+    DiagramPlugin,
+    DiagramPluginMetadata,
+    DiagramRenderOptions,
+    DiagramRenderResult,
+    DiagramFileInfo
+} from '../interfaces/DiagramPlugin';
 
 /**
- * Service for rendering individual EPUB pages to images
- * Uses mutool (MuPDF) CLI tool for conversion
- *
- * Supports:
- * - Rendering specific pages from EPUB files
- * - PNG output with configurable DPI
+ * Internal CLI service for EPUB operations
  */
-export class EPUBService extends AbstractCLIService {
+class EPUBCLI extends AbstractCLIService {
     protected getConfigKey(): string {
         return 'mutoolPath';
     }
@@ -19,7 +30,7 @@ export class EPUBService extends AbstractCLIService {
     }
 
     protected getServiceName(): string {
-        return 'EPUBService';
+        return 'EPUBPlugin';
     }
 
     protected getCliNotFoundWarning(): string {
@@ -30,9 +41,6 @@ export class EPUBService extends AbstractCLIService {
         return 'https://mupdf.com/docs/manual-mutool-draw.html';
     }
 
-    /**
-     * Override to add MuPDF-specific paths
-     */
     protected getCommonPaths(): string[] {
         const cliName = this.getDefaultCliName();
         const platform = process.platform;
@@ -57,17 +65,9 @@ export class EPUBService extends AbstractCLIService {
         }
     }
 
-    /**
-     * Render a specific page from an EPUB file to PNG
-     * @param filePath Absolute path to .epub file
-     * @param pageNumber Page number to render (1-indexed)
-     * @param dpi Resolution in DPI (default: 150)
-     * @returns PNG data as Buffer
-     */
     async renderPage(filePath: string, pageNumber: number = 1, dpi: number = 150): Promise<Buffer> {
         const tempOutput = this.getTempFilePath(`epub-${pageNumber}`, 'png');
 
-        // mutool draw -r DPI -o output.png input.epub PAGE
         const args = [
             'draw',
             '-r', dpi.toString(),
@@ -79,19 +79,62 @@ export class EPUBService extends AbstractCLIService {
         const result = await this.executeAndReadOutput(args, tempOutput, { binary: true });
         return result as Buffer;
     }
+}
 
-    /**
-     * Get the total page count from an EPUB file
-     * Parses the EPUB structure directly (EPUB is a ZIP with XML metadata)
-     * @param filePath Absolute path to .epub file
-     * @returns Total number of pages (spine items)
-     */
-    async getPageCount(filePath: string): Promise<number> {
+export class EPUBPlugin implements DiagramPlugin {
+    readonly metadata: DiagramPluginMetadata = {
+        id: 'epub',
+        name: 'EPUB Page Renderer',
+        version: '1.0.0',
+        supportedCodeBlocks: [],
+        supportedFileExtensions: ['.epub'],
+        renderOutput: 'png',
+        requiresExternalTool: true,
+        externalToolName: 'mutool (MuPDF)',
+        configKeys: ['mutoolPath']
+    };
+
+    private _cli = new EPUBCLI();
+
+    canRenderCodeBlock(_language: string): boolean {
+        return false;
+    }
+
+    canRenderFile(filePath: string): boolean {
+        const ext = path.extname(filePath).toLowerCase();
+        return this.metadata.supportedFileExtensions.includes(ext);
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this._cli.isAvailable();
+    }
+
+    async renderFile(filePath: string, options?: DiagramRenderOptions): Promise<DiagramRenderResult> {
         try {
-            // EPUB files are ZIP archives
+            const pageNumber = options?.pageNumber ?? 1;
+            const dpi = options?.dpi ?? 150;
+            const png = await this._cli.renderPage(filePath, pageNumber, dpi);
+            return { success: true, data: png, format: 'png' };
+        } catch (error) {
+            return {
+                success: false,
+                data: Buffer.alloc(0),
+                format: 'png',
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
+    }
+
+    async getFileInfo(filePath: string): Promise<DiagramFileInfo> {
+        const pageCount = await this._getPageCount(filePath);
+        const stats = await fs.promises.stat(filePath);
+        return { pageCount, fileMtime: stats.mtimeMs };
+    }
+
+    private async _getPageCount(filePath: string): Promise<number> {
+        try {
             const zip = new AdmZip(filePath);
 
-            // Step 1: Read META-INF/container.xml to find the OPF file
             const containerEntry = zip.getEntry('META-INF/container.xml');
             if (!containerEntry) {
                 throw new Error('Invalid EPUB: Missing META-INF/container.xml');
@@ -99,16 +142,12 @@ export class EPUBService extends AbstractCLIService {
 
             const containerXml = containerEntry.getData().toString('utf8');
 
-            // Parse container.xml to find OPF path
             const rootfileMatch = containerXml.match(/rootfile[^>]+full-path=["']([^"']+)["']/i);
             if (!rootfileMatch) {
                 throw new Error('Invalid EPUB: Cannot find rootfile in container.xml');
             }
 
             const opfPath = rootfileMatch[1];
-            console.log('[EPUBService] Found OPF at:', opfPath);
-
-            // Step 2: Read the OPF file
             const opfEntry = zip.getEntry(opfPath);
             if (!opfEntry) {
                 throw new Error(`Invalid EPUB: Cannot find OPF file at ${opfPath}`);
@@ -116,7 +155,6 @@ export class EPUBService extends AbstractCLIService {
 
             const opfContent = opfEntry.getData().toString('utf8');
 
-            // Step 3: Count spine items
             const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
             if (!spineMatch) {
                 throw new Error('Invalid EPUB: Cannot find spine in OPF');
@@ -130,18 +168,10 @@ export class EPUBService extends AbstractCLIService {
                 throw new Error('Invalid EPUB: No spine items found');
             }
 
-            console.log('[EPUBService] EPUB page count:', pageCount);
             return pageCount;
         } catch (error) {
-            console.error('[EPUBService] Failed to get page count:', error);
+            console.error('[EPUBPlugin] Failed to get page count:', error);
             throw error;
         }
-    }
-
-    /**
-     * Get supported file extensions
-     */
-    getSupportedExtensions(): string[] {
-        return ['.epub'];
     }
 }

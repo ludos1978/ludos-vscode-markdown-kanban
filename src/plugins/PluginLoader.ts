@@ -4,17 +4,39 @@
  * Responsible for loading and initializing all built-in plugins.
  * Called during extension activation to set up the plugin system.
  *
+ * Supports enable/disable via VS Code settings:
+ *   markdown-kanban.plugins.disabled: string[]
+ *
  * @module plugins/PluginLoader
  */
 
+import * as vscode from 'vscode';
 import { PluginRegistry } from './registry/PluginRegistry';
-import { PluginContext } from './interfaces';
+import { PluginContext, DiagramPluginContext } from './interfaces';
 
 // Import plugins
 import { ColumnIncludePlugin } from './import/ColumnIncludePlugin';
 import { TaskIncludePlugin } from './import/TaskIncludePlugin';
 import { RegularIncludePlugin } from './import/RegularIncludePlugin';
 import { MarpExportPlugin } from './export/MarpExportPlugin';
+
+// Diagram plugins
+import { PlantUMLPlugin } from './diagram/PlantUMLPlugin';
+import { MermaidPlugin } from './diagram/MermaidPlugin';
+import { DrawIOPlugin } from './diagram/DrawIOPlugin';
+import { ExcalidrawPlugin } from './diagram/ExcalidrawPlugin';
+import { PDFPlugin } from './diagram/PDFPlugin';
+import { EPUBPlugin } from './diagram/EPUBPlugin';
+import { XlsxPlugin } from './diagram/XlsxPlugin';
+
+/**
+ * Check if a plugin is disabled via VS Code settings
+ */
+function isPluginDisabled(pluginId: string): boolean {
+    const config = vscode.workspace.getConfiguration('markdown-kanban');
+    const disabledPlugins = config.get<string[]>('plugins.disabled', []);
+    return disabledPlugins.includes(pluginId);
+}
 
 /**
  * Plugin Loader
@@ -69,10 +91,77 @@ export class PluginLoader {
 
         // Marp Export Plugin
         // Handles PDF, PPTX, HTML exports via Marp CLI
-        try {
-            registry.registerExportPlugin(new MarpExportPlugin());
-        } catch (error) {
-            console.error('[PluginLoader] Failed to register MarpExportPlugin:', error);
+        if (!isPluginDisabled('marp')) {
+            try {
+                registry.registerExportPlugin(new MarpExportPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register MarpExportPlugin:', error);
+            }
+        }
+
+        // ============= DIAGRAM PLUGINS =============
+
+        // PlantUML Plugin — renders ```plantuml code blocks to SVG
+        if (!isPluginDisabled('plantuml')) {
+            try {
+                registry.registerDiagramPlugin(new PlantUMLPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register PlantUMLPlugin:', error);
+            }
+        }
+
+        // Mermaid Plugin — renders ```mermaid code blocks to SVG via webview
+        if (!isPluginDisabled('mermaid')) {
+            try {
+                registry.registerDiagramPlugin(new MermaidPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register MermaidPlugin:', error);
+            }
+        }
+
+        // Draw.io Plugin — renders .drawio/.dio files to PNG
+        if (!isPluginDisabled('drawio')) {
+            try {
+                registry.registerDiagramPlugin(new DrawIOPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register DrawIOPlugin:', error);
+            }
+        }
+
+        // Excalidraw Plugin — renders .excalidraw files to SVG
+        if (!isPluginDisabled('excalidraw')) {
+            try {
+                registry.registerDiagramPlugin(new ExcalidrawPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register ExcalidrawPlugin:', error);
+            }
+        }
+
+        // PDF Plugin — renders PDF pages to PNG
+        if (!isPluginDisabled('pdf')) {
+            try {
+                registry.registerDiagramPlugin(new PDFPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register PDFPlugin:', error);
+            }
+        }
+
+        // EPUB Plugin — renders EPUB pages to PNG
+        if (!isPluginDisabled('epub')) {
+            try {
+                registry.registerDiagramPlugin(new EPUBPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register EPUBPlugin:', error);
+            }
+        }
+
+        // XLSX Plugin — renders spreadsheet sheets to PNG
+        if (!isPluginDisabled('xlsx')) {
+            try {
+                registry.registerDiagramPlugin(new XlsxPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register XlsxPlugin:', error);
+            }
         }
 
         this._loaded = true;
@@ -92,5 +181,16 @@ export class PluginLoader {
         }
 
         await registry.initialize(context);
+    }
+
+    /**
+     * Initialize diagram plugins with webview context
+     *
+     * Called when a webview panel is created/available,
+     * so diagram plugins that need the webview (Mermaid) can activate.
+     */
+    static async initializeDiagramPlugins(context: DiagramPluginContext): Promise<void> {
+        const registry = PluginRegistry.getInstance();
+        await registry.activateDiagramPlugins(context);
     }
 }

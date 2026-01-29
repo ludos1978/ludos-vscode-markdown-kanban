@@ -7,6 +7,9 @@
  * - requestDrawIORender, requestExcalidrawRender
  * - requestPDFPageRender, requestPDFInfo
  * - requestEPUBPageRender, requestEPUBInfo
+ * - requestXlsxRender
+ *
+ * Uses PluginRegistry to discover and invoke diagram plugins.
  *
  * @module commands/DiagramCommands
  */
@@ -26,6 +29,8 @@ import {
 } from '../core/bridge/MessageTypes';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
+import { PluginRegistry } from '../plugins/registry/PluginRegistry';
+import { MermaidPlugin } from '../plugins/diagram/MermaidPlugin';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -33,7 +38,7 @@ import * as fs from 'fs';
  * Diagram Commands Handler
  *
  * Processes diagram rendering messages from the webview.
- * Uses SwitchBasedCommand for automatic dispatch and error handling.
+ * Delegates rendering to diagram plugins via PluginRegistry.
  */
 export class DiagramCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
@@ -73,14 +78,20 @@ export class DiagramCommands extends SwitchBasedCommand {
             await this.handleConvertMermaidToSVG(msg as ConvertMermaidToSVGMessage, ctx);
             return this.success();
         },
-        'mermaidExportSuccess': (msg, ctx) => {
+        'mermaidExportSuccess': (msg) => {
             const m = msg as { requestId: string; svg: string };
-            ctx.getMermaidExportService().handleRenderSuccess(m.requestId, m.svg);
+            const mermaidPlugin = this._getMermaidPlugin();
+            if (mermaidPlugin) {
+                mermaidPlugin.handleRenderSuccess(m.requestId, m.svg);
+            }
             return Promise.resolve(this.success());
         },
-        'mermaidExportError': (msg, ctx) => {
+        'mermaidExportError': (msg) => {
             const m = msg as { requestId: string; error: string };
-            ctx.getMermaidExportService().handleRenderError(m.requestId, m.error);
+            const mermaidPlugin = this._getMermaidPlugin();
+            if (mermaidPlugin) {
+                mermaidPlugin.handleRenderError(m.requestId, m.error);
+            }
             return Promise.resolve(this.success());
         },
         'requestDrawIORender': async (msg, ctx) => {
@@ -113,6 +124,17 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
     };
 
+    // ============= PLUGIN ACCESS =============
+
+    private _getRegistry(): PluginRegistry {
+        return PluginRegistry.getInstance();
+    }
+
+    private _getMermaidPlugin(): MermaidPlugin | null {
+        const plugin = this._getRegistry().findDiagramPluginById('mermaid');
+        return plugin as MermaidPlugin | null;
+    }
+
     // ============= PLANTUML HANDLERS =============
 
     /**
@@ -128,20 +150,25 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Render using backend service (Java + PlantUML JAR)
-            const svg = await context.plantUMLService.renderSVG(code);
+            const plugin = this._getRegistry().findDiagramPluginForCodeBlock('plantuml');
+            if (!plugin || !plugin.renderCodeBlock) {
+                throw new Error('PlantUML plugin not available');
+            }
 
-            // Send success response to webview
+            const result = await plugin.renderCodeBlock(code);
+            if (!result.success) {
+                throw new Error(result.error || 'PlantUML rendering failed');
+            }
+
             this.postMessage({
                 type: 'plantUMLRenderSuccess',
                 requestId,
-                svg
+                svg: result.data
             });
 
         } catch (error) {
             console.error('[PlantUML Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'plantUMLRenderError',
                 requestId,
@@ -195,29 +222,22 @@ export class DiagramCommands extends SwitchBasedCommand {
         const capitalizedType = diagramType === 'plantuml' ? 'PlantUML' : 'Mermaid';
 
         try {
-            // Get file info
             const fileDir = path.dirname(filePath);
             const fileName = path.basename(filePath, path.extname(filePath));
 
-            // Create Media folder
             const mediaFolder = path.join(fileDir, `Media-${fileName}`);
             await fs.promises.mkdir(mediaFolder, { recursive: true });
 
-            // Generate unique SVG filename
             const timestamp = Date.now();
             const svgFileName = `${diagramType}-${timestamp}.svg`;
             const svgFilePath = path.join(mediaFolder, svgFileName);
 
-            // Save SVG file
             await fs.promises.writeFile(svgFilePath, svgContent, 'utf8');
 
-            // Calculate relative path for markdown
             const relativePath = path.join(`Media-${fileName}`, svgFileName);
 
-            // Read current file content
             const currentContent = await fs.promises.readFile(filePath, 'utf8');
 
-            // Find and replace code block with disabled version + image
             const updatedContent = replaceCodeBlockWithSVG(
                 currentContent,
                 diagramCode,
@@ -225,10 +245,8 @@ export class DiagramCommands extends SwitchBasedCommand {
                 { blockType: diagramType, altText }
             );
 
-            // Write updated content
             await fs.promises.writeFile(filePath, updatedContent, 'utf8');
 
-            // Notify success
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
                 this.postMessage({
@@ -253,7 +271,7 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Handle draw.io diagram rendering request from webview
-     * Uses backend DrawIOService with CLI for conversion
+     * Uses DrawIO diagram plugin via PluginRegistry
      * Implements file-based caching to avoid re-rendering unchanged diagrams
      */
     private async handleRenderDrawIO(message: RequestDrawIORenderMessage, context: CommandContext): Promise<void> {
@@ -266,10 +284,7 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Build include context if provided (for diagrams inside include files)
             const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both document-relative and workspace-relative paths)
             const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
 
             if (!resolution || !resolution.exists) {
@@ -277,23 +292,18 @@ export class DiagramCommands extends SwitchBasedCommand {
             }
 
             const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Ensure this file is being watched for changes (fixes first-change detection)
             const mediaTracker = context.getMediaTracker?.();
             if (mediaTracker) {
                 mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
             }
 
-            // Check if the DrawIO file is empty (only has default root cells)
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
             const isEmptyDiagram = this.isEmptyDrawIOFile(fileContent);
 
             if (isEmptyDiagram) {
-                // Return a placeholder SVG for empty diagrams
                 const placeholderSvg = this.createEmptyDrawIOPlaceholder();
                 const pngDataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
 
@@ -306,55 +316,49 @@ export class DiagramCommands extends SwitchBasedCommand {
                 return;
             }
 
-            // Determine cache location based on file context
             const cacheDir = this.getDrawIOCacheDir(absolutePath, context);
             const cacheFileName = this.getDrawIOCacheFileName(absolutePath, fileMtime);
             const cachePath = path.join(cacheDir, cacheFileName);
 
             let pngDataUrl: string;
 
-            // Check if cached version exists and is valid
             if (fs.existsSync(cachePath)) {
                 const cachedPng = await fs.promises.readFile(cachePath);
                 pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
             } else {
-                // Import draw.io service
-                const { DrawIOService } = await import('../services/export/DrawIOService');
-                const service = new DrawIOService();
+                const plugin = this._getRegistry().findDiagramPluginById('drawio');
+                if (!plugin || !plugin.renderFile) {
+                    throw new Error('Draw.io plugin not available');
+                }
 
-                // Check if CLI is available
-                if (!await service.isAvailable()) {
+                if (!await plugin.isAvailable()) {
                     throw new Error('draw.io CLI not installed');
                 }
 
-                // Render to PNG (better rendering than SVG in webview)
-                const pngBuffer = await service.renderPNG(absolutePath);
+                const result = await plugin.renderFile(absolutePath, { outputFormat: 'png' });
+                if (!result.success) {
+                    throw new Error(result.error || 'Draw.io rendering failed');
+                }
 
-                // Ensure cache directory exists
+                const pngBuffer = result.data as Buffer;
+
                 await fs.promises.mkdir(cacheDir, { recursive: true });
-
-                // Save to cache
                 await fs.promises.writeFile(cachePath, pngBuffer);
-
-                // Clean up old cache files for this diagram (different mtimes)
                 await this.cleanOldDrawIOCache(cacheDir, absolutePath, cacheFileName);
 
-                // Convert PNG to data URL
                 pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
             }
 
-            // Send success response to webview with mtime for cache invalidation
             this.postMessage({
                 type: 'drawioRenderSuccess',
                 requestId,
-                svgDataUrl: pngDataUrl,  // Keep property name for compatibility
+                svgDataUrl: pngDataUrl,
                 fileMtime
             });
 
         } catch (error) {
             console.error('[DrawIO Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'drawioRenderError',
                 requestId,
@@ -365,45 +369,35 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Get cache directory for draw.io rendered images
-     * Uses {filename}-Media/drawio-cache/ structure
      */
     private getDrawIOCacheDir(diagramPath: string, context: CommandContext): string {
-        // Determine which file the diagram belongs to (main kanban or include file)
         const diagramDir = path.dirname(diagramPath);
-        // Get kanban path from fileManager
         const kanbanPath = context.fileManager.getFilePath() || context.fileManager.getDocument()?.uri.fsPath;
         if (!kanbanPath) {
-            // Fallback: use diagram directory if no kanban path available
             return path.join(diagramDir, 'drawio-cache');
         }
         const kanbanDir = path.dirname(kanbanPath);
         const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
 
-        // Check if diagram is in a different directory (likely from an include file)
         if (diagramDir !== kanbanDir) {
-            // Find the include file this diagram likely belongs to
-            // Use the diagram's directory to create a local cache
             const diagramBaseName = path.basename(diagramDir);
             return path.join(diagramDir, `${diagramBaseName}-Media`, 'drawio-cache');
         }
 
-        // Default: use main kanban's media folder
         return path.join(kanbanDir, `${kanbanBaseName}-Media`, 'drawio-cache');
     }
 
     /**
      * Generate cache file name based on source file path and mtime
-     * Format: {basename}-{hash}-{mtime}.png
      */
     private getDrawIOCacheFileName(sourcePath: string, mtime: number): string {
         const basename = path.basename(sourcePath, path.extname(sourcePath));
-        // Create a simple hash from the full path to handle files with same name in different dirs
         const pathHash = Buffer.from(sourcePath).toString('base64').replace(/[/+=]/g, '').substring(0, 8);
         return `${basename}-${pathHash}-${Math.floor(mtime)}.png`;
     }
 
     /**
-     * Clean up old cache files for a diagram (different mtimes = outdated)
+     * Clean up old cache files for a diagram
      */
     private async cleanOldDrawIOCache(cacheDir: string, sourcePath: string, currentCacheFile: string): Promise<void> {
         try {
@@ -419,27 +413,22 @@ export class DiagramCommands extends SwitchBasedCommand {
                 }
             }
         } catch (error) {
-            // Ignore cleanup errors
             console.warn('[DrawIO Backend] Cache cleanup warning:', error);
         }
     }
 
     /**
-     * Check if a DrawIO file is empty (only contains default root cells)
-     * Empty DrawIO files have mxCell elements with id="0" and id="1" only
+     * Check if a DrawIO file is empty
      */
     private isEmptyDrawIOFile(content: string): boolean {
         try {
-            // Count mxCell elements - empty diagrams only have 2 (id=0 and id=1)
             const mxCellMatches = content.match(/<mxCell\s+id="[^"]*"/g);
             if (!mxCellMatches) {
-                return true; // No cells at all = empty
+                return true;
             }
-            // Default cells are id="0" (root) and id="1" (default layer)
-            // Any additional cells mean the diagram has content
             return mxCellMatches.length <= 2;
         } catch {
-            return false; // If we can't parse, assume not empty
+            return false;
         }
     }
 
@@ -458,14 +447,11 @@ export class DiagramCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Check if an Excalidraw file is empty (no elements or only deleted elements)
+     * Check if an Excalidraw file is empty
      */
     private isEmptyExcalidrawFile(content: string, filePath: string): boolean {
         try {
-            // For .excalidraw.svg files, check if the SVG has meaningful content
             if (filePath.endsWith('.excalidraw.svg')) {
-                // Check for actual drawing elements in the SVG
-                // Empty excalidraw SVGs typically only have basic structure
                 const hasDrawingContent = content.includes('<path') ||
                     content.includes('<rect') ||
                     content.includes('<circle') ||
@@ -474,16 +460,14 @@ export class DiagramCommands extends SwitchBasedCommand {
                 return !hasDrawingContent;
             }
 
-            // For JSON files (.excalidraw, .excalidraw.json)
             const data = JSON.parse(content);
             if (!data.elements || !Array.isArray(data.elements)) {
                 return true;
             }
-            // Filter out deleted elements
             const activeElements = data.elements.filter((el: { isDeleted?: boolean }) => !el.isDeleted);
             return activeElements.length === 0;
         } catch {
-            return false; // If we can't parse, assume not empty
+            return false;
         }
     }
 
@@ -505,7 +489,6 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Handle excalidraw diagram rendering request from webview
-     * Uses backend ExcalidrawService with library for conversion
      */
     private async handleRenderExcalidraw(message: RequestExcalidrawRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, includeDir } = message;
@@ -517,14 +500,7 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            // Import excalidraw service
-            const { ExcalidrawService } = await import('../services/export/ExcalidrawService');
-            const service = new ExcalidrawService();
-
-            // Build include context if provided (for diagrams inside include files)
             const includeContext = includeDir ? { includeDir } : undefined;
-
-            // Resolve file path (handles both document-relative and workspace-relative paths)
             const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
 
             if (!resolution || !resolution.exists) {
@@ -532,23 +508,18 @@ export class DiagramCommands extends SwitchBasedCommand {
             }
 
             const absolutePath = resolution.resolvedPath;
-
-            // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Ensure this file is being watched for changes (fixes first-change detection)
             const mediaTracker = context.getMediaTracker?.();
             if (mediaTracker) {
                 mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
             }
 
-            // Check if the Excalidraw file is empty
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
             const isEmptyDiagram = this.isEmptyExcalidrawFile(fileContent, absolutePath);
 
             if (isEmptyDiagram) {
-                // Return a placeholder SVG for empty diagrams
                 const placeholderSvg = this.createEmptyExcalidrawPlaceholder();
                 const dataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
 
@@ -561,22 +532,29 @@ export class DiagramCommands extends SwitchBasedCommand {
                 return;
             }
 
-            // Render as SVG
-            const svg = await service.renderSVG(absolutePath);
+            const plugin = this._getRegistry().findDiagramPluginById('excalidraw');
+            if (!plugin || !plugin.renderFile) {
+                throw new Error('Excalidraw plugin not available');
+            }
+
+            const result = await plugin.renderFile(absolutePath);
+            if (!result.success) {
+                throw new Error(result.error || 'Excalidraw rendering failed');
+            }
+
+            const svg = result.data as string;
             const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
-            // Send success response to webview with mtime for cache invalidation
             this.postMessage({
                 type: 'excalidrawRenderSuccess',
                 requestId,
-                svgDataUrl: dataUrl,  // Keep property name for compatibility
+                svgDataUrl: dataUrl,
                 fileMtime
             });
 
         } catch (error) {
             console.error('[Excalidraw Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'excalidrawRenderError',
                 requestId,
@@ -589,8 +567,6 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Resolve a document file path and get its modification time.
-     * Common helper for PDF and EPUB handlers.
-     * @throws Error if file not found
      */
     private async resolveDocumentFile(
         filePath: string,
@@ -612,30 +588,30 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Handle PDF page rendering request from webview
-     * Renders a specific page from a PDF file to PNG
-     * Uses backend PDFService with pdftoppm CLI for conversion
      */
     private async handleRenderPDFPage(message: RequestPDFPageRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, pageNumber, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleRenderPDFPage] No panel or webview available');
             return;
         }
 
         try {
-            const { PDFService } = await import('../services/export/PDFService');
-            const service = new PDFService();
+            const plugin = this._getRegistry().findDiagramPluginById('pdf');
+            if (!plugin || !plugin.renderFile) {
+                throw new Error('PDF plugin not available');
+            }
+
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
 
-            // Render PDF page to PNG
-            const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
+            const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
+            if (!result.success) {
+                throw new Error(result.error || 'PDF rendering failed');
+            }
 
-            // Convert PNG to data URL
-            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
 
-            // Send success response to webview with mtime for cache invalidation
             this.postMessage({
                 type: 'pdfPageRenderSuccess',
                 requestId,
@@ -646,7 +622,6 @@ export class DiagramCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[PDF Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'pdfPageRenderError',
                 requestId,
@@ -663,30 +638,29 @@ export class DiagramCommands extends SwitchBasedCommand {
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleGetPDFInfo] No panel or webview available');
             return;
         }
 
         try {
-            const { PDFService } = await import('../services/export/PDFService');
-            const service = new PDFService();
+            const plugin = this._getRegistry().findDiagramPluginById('pdf');
+            if (!plugin || !plugin.getFileInfo) {
+                throw new Error('PDF plugin not available');
+            }
+
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
 
-            // Get page count
-            const pageCount = await service.getPageCount(absolutePath);
+            const info = await plugin.getFileInfo(absolutePath);
 
-            // Send success response
             this.postMessage({
                 type: 'pdfInfoSuccess',
                 requestId,
-                pageCount,
+                pageCount: info.pageCount,
                 fileMtime
             });
 
         } catch (error) {
             console.error('[PDF Info] Error:', error);
 
-            // Send error response
             this.postMessage({
                 type: 'pdfInfoError',
                 requestId,
@@ -699,30 +673,30 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Handle EPUB page rendering request from webview
-     * Renders a specific page from an EPUB file to PNG
-     * Uses backend EPUBService with mutool CLI for conversion
      */
     private async handleRenderEPUBPage(message: RequestEPUBPageRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, pageNumber, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleRenderEPUBPage] No panel or webview available');
             return;
         }
 
         try {
-            const { EPUBService } = await import('../services/export/EPUBService');
-            const service = new EPUBService();
+            const plugin = this._getRegistry().findDiagramPluginById('epub');
+            if (!plugin || !plugin.renderFile) {
+                throw new Error('EPUB plugin not available');
+            }
+
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
 
-            // Render EPUB page to PNG
-            const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
+            const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
+            if (!result.success) {
+                throw new Error(result.error || 'EPUB rendering failed');
+            }
 
-            // Convert PNG to data URL
-            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
 
-            // Send success response to webview with mtime for cache invalidation
             this.postMessage({
                 type: 'epubPageRenderSuccess',
                 requestId,
@@ -733,7 +707,6 @@ export class DiagramCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[EPUB Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'epubPageRenderError',
                 requestId,
@@ -750,30 +723,29 @@ export class DiagramCommands extends SwitchBasedCommand {
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleGetEPUBInfo] No panel or webview available');
             return;
         }
 
         try {
-            const { EPUBService } = await import('../services/export/EPUBService');
-            const service = new EPUBService();
+            const plugin = this._getRegistry().findDiagramPluginById('epub');
+            if (!plugin || !plugin.getFileInfo) {
+                throw new Error('EPUB plugin not available');
+            }
+
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
 
-            // Get page count
-            const pageCount = await service.getPageCount(absolutePath);
+            const info = await plugin.getFileInfo(absolutePath);
 
-            // Send success response
             this.postMessage({
                 type: 'epubInfoSuccess',
                 requestId,
-                pageCount,
+                pageCount: info.pageCount,
                 fileMtime
             });
 
         } catch (error) {
             console.error('[EPUB Info] Error:', error);
 
-            // Send error response
             this.postMessage({
                 type: 'epubInfoError',
                 requestId,
@@ -786,34 +758,34 @@ export class DiagramCommands extends SwitchBasedCommand {
 
     /**
      * Handle Excel spreadsheet rendering request from webview
-     * Renders a specific sheet to PNG using LibreOffice
      */
     private async handleRenderXlsx(message: RequestXlsxRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, sheetNumber, includeDir } = message;
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleRenderXlsx] No panel or webview available');
             return;
         }
 
         try {
-            const { XlsxService } = await import('../services/export/XlsxService');
-            const service = new XlsxService();
+            const plugin = this._getRegistry().findDiagramPluginById('xlsx');
+            if (!plugin || !plugin.renderFile) {
+                throw new Error('XLSX plugin not available');
+            }
+
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'Excel');
 
-            // Check if LibreOffice CLI is available
-            if (!await service.isAvailable()) {
+            if (!await plugin.isAvailable()) {
                 throw new Error('LibreOffice CLI not installed');
             }
 
-            // Render Excel sheet to PNG
-            const pngBuffer = await service.renderPNG(absolutePath, sheetNumber);
+            const result = await plugin.renderFile(absolutePath, { sheetNumber });
+            if (!result.success) {
+                throw new Error(result.error || 'Excel rendering failed');
+            }
 
-            // Convert PNG to data URL
-            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
 
-            // Send success response to webview with mtime for cache invalidation
             this.postMessage({
                 type: 'xlsxRenderSuccess',
                 requestId,
@@ -824,7 +796,6 @@ export class DiagramCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[XLSX Backend] Render error:', error);
 
-            // Send error response to webview
             this.postMessage({
                 type: 'xlsxRenderError',
                 requestId,

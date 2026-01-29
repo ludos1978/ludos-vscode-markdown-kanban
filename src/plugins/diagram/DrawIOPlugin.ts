@@ -1,10 +1,24 @@
+/**
+ * Draw.io Diagram Plugin
+ *
+ * Renders .drawio/.dio files to SVG/PNG using the draw.io CLI.
+ * Migrated from src/services/export/DrawIOService.ts
+ */
+
 import * as vscode from 'vscode';
-import { AbstractCLIService } from './AbstractCLIService';
+import * as path from 'path';
+import { AbstractCLIService } from '../../services/export/AbstractCLIService';
+import {
+    DiagramPlugin,
+    DiagramPluginMetadata,
+    DiagramRenderOptions,
+    DiagramRenderResult
+} from '../interfaces/DiagramPlugin';
 
 /**
- * Service for converting draw.io diagrams to SVG/PNG using draw.io CLI
+ * Internal CLI service for draw.io operations
  */
-export class DrawIOService extends AbstractCLIService {
+class DrawIOCLI extends AbstractCLIService {
     protected getConfigKey(): string {
         return 'drawioPath';
     }
@@ -14,7 +28,7 @@ export class DrawIOService extends AbstractCLIService {
     }
 
     protected getServiceName(): string {
-        return 'DrawIOService';
+        return 'DrawIOPlugin';
     }
 
     protected getVersionCheckArgs(): string[] {
@@ -33,14 +47,10 @@ export class DrawIOService extends AbstractCLIService {
         return 'https://github.com/jgraph/drawio-desktop/releases';
     }
 
-    /**
-     * Override to add draw.io specific paths (app bundle on macOS)
-     */
     protected getCommonPaths(): string[] {
         const basePaths = super.getCommonPaths();
 
         if (process.platform === 'darwin') {
-            // Add macOS app bundle path
             return [
                 ...basePaths,
                 '/Applications/draw.io.app/Contents/MacOS/draw.io',
@@ -50,9 +60,6 @@ export class DrawIOService extends AbstractCLIService {
         return basePaths;
     }
 
-    /**
-     * Override to show platform-specific installation instructions
-     */
     protected showCliWarning(): void {
         const message = this.getCliNotFoundWarning();
         const installAction = 'Installation Instructions';
@@ -75,28 +82,15 @@ export class DrawIOService extends AbstractCLIService {
         });
     }
 
-    /**
-     * Render draw.io diagram file to SVG
-     * @param filePath Absolute path to .drawio or .dio file
-     * @returns SVG string
-     */
     async renderSVG(filePath: string): Promise<string> {
-        return this.renderDiagram(filePath, 'svg') as Promise<string>;
+        return this._renderDiagram(filePath, 'svg') as Promise<string>;
     }
 
-    /**
-     * Render draw.io diagram file to PNG
-     * @param filePath Absolute path to .drawio or .dio file
-     * @returns PNG data as Buffer
-     */
     async renderPNG(filePath: string): Promise<Buffer> {
-        return this.renderDiagram(filePath, 'png') as Promise<Buffer>;
+        return this._renderDiagram(filePath, 'png') as Promise<Buffer>;
     }
 
-    /**
-     * Render draw.io diagram file to specified format
-     */
-    private async renderDiagram(filePath: string, format: 'svg' | 'png'): Promise<string | Buffer> {
+    private async _renderDiagram(filePath: string, format: 'svg' | 'png'): Promise<string | Buffer> {
         const tempOutput = this.getTempFilePath('drawio', format);
         const isPng = format === 'png';
 
@@ -112,5 +106,55 @@ export class DrawIOService extends AbstractCLIService {
         }
 
         return this.executeAndReadOutput(args, tempOutput, { binary: isPng });
+    }
+}
+
+export class DrawIOPlugin implements DiagramPlugin {
+    readonly metadata: DiagramPluginMetadata = {
+        id: 'drawio',
+        name: 'Draw.io Diagram Renderer',
+        version: '1.0.0',
+        supportedCodeBlocks: [],
+        supportedFileExtensions: ['.drawio', '.dio'],
+        renderOutput: 'png',
+        requiresExternalTool: true,
+        externalToolName: 'draw.io Desktop',
+        configKeys: ['drawioPath']
+    };
+
+    private _cli = new DrawIOCLI();
+
+    canRenderCodeBlock(_language: string): boolean {
+        return false;
+    }
+
+    canRenderFile(filePath: string): boolean {
+        const ext = path.extname(filePath).toLowerCase();
+        return this.metadata.supportedFileExtensions.includes(ext);
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this._cli.isAvailable();
+    }
+
+    async renderFile(filePath: string, options?: DiagramRenderOptions): Promise<DiagramRenderResult> {
+        try {
+            const format = options?.outputFormat || this.metadata.renderOutput;
+
+            if (format === 'svg') {
+                const svg = await this._cli.renderSVG(filePath);
+                return { success: true, data: svg, format: 'svg' };
+            } else {
+                const png = await this._cli.renderPNG(filePath);
+                return { success: true, data: png, format: 'png' };
+            }
+        } catch (error) {
+            return {
+                success: false,
+                data: '',
+                format: options?.outputFormat || 'png',
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
     }
 }

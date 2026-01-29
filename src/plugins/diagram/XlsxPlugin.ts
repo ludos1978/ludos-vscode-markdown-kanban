@@ -1,15 +1,25 @@
+/**
+ * XLSX/Spreadsheet Plugin
+ *
+ * Renders Excel/LibreOffice spreadsheets to PNG using LibreOffice CLI.
+ * Migrated from src/services/export/XlsxService.ts
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { AbstractCLIService } from './AbstractCLIService';
+import { AbstractCLIService } from '../../services/export/AbstractCLIService';
+import {
+    DiagramPlugin,
+    DiagramPluginMetadata,
+    DiagramRenderOptions,
+    DiagramRenderResult
+} from '../interfaces/DiagramPlugin';
 
 /**
- * Service for converting Excel spreadsheets (.xlsx, .xls) to PNG images using LibreOffice CLI
- *
- * Each sheet in the spreadsheet becomes a separate PNG file.
- * Use the page parameter to select which sheet to render (1-indexed).
+ * Internal CLI service for spreadsheet operations
  */
-export class XlsxService extends AbstractCLIService {
+class XlsxCLI extends AbstractCLIService {
     protected getConfigKey(): string {
         return 'libreOfficePath';
     }
@@ -19,7 +29,7 @@ export class XlsxService extends AbstractCLIService {
     }
 
     protected getServiceName(): string {
-        return 'XlsxService';
+        return 'XlsxPlugin';
     }
 
     protected getVersionCheckArgs(): string[] {
@@ -38,9 +48,6 @@ export class XlsxService extends AbstractCLIService {
         return 'https://www.libreoffice.org/download/download/';
     }
 
-    /**
-     * Override to add LibreOffice-specific paths
-     */
     protected getCommonPaths(): string[] {
         const cliName = this.getDefaultCliName();
         const platform = process.platform;
@@ -67,9 +74,6 @@ export class XlsxService extends AbstractCLIService {
         }
     }
 
-    /**
-     * Override to show platform-specific installation instructions
-     */
     protected showCliWarning(): void {
         const message = this.getCliNotFoundWarning();
         const installAction = 'Installation Instructions';
@@ -92,12 +96,6 @@ export class XlsxService extends AbstractCLIService {
         });
     }
 
-    /**
-     * Render Excel spreadsheet to PNG
-     * @param filePath Absolute path to .xlsx or .xls file
-     * @param sheetNumber Sheet number to render (1-indexed, default: 1)
-     * @returns PNG data as Buffer
-     */
     async renderPNG(filePath: string, sheetNumber: number = 1): Promise<Buffer> {
         if (!await this.isAvailable()) {
             this.showCliWarning();
@@ -107,8 +105,6 @@ export class XlsxService extends AbstractCLIService {
         const tempDir = this.ensureTempDir();
         const inputFileName = path.basename(filePath, path.extname(filePath));
 
-        // LibreOffice converts each sheet to a separate PNG
-        // soffice --headless --convert-to png --outdir [dir] [file]
         const args = [
             '--headless',
             '--convert-to', 'png',
@@ -119,38 +115,21 @@ export class XlsxService extends AbstractCLIService {
         const { code, stderr } = await this.executeCliCommand(args);
 
         if (code !== 0) {
-            console.error('[XlsxService] Conversion failed:', stderr);
             throw new Error(`LibreOffice exited with code ${code}`);
         }
 
-        // Find the output file(s) - LibreOffice creates files with various naming patterns
-        const outputPath = await this.findSheetOutputFile(tempDir, inputFileName, sheetNumber);
+        const outputPath = await this._findSheetOutputFile(tempDir, inputFileName, sheetNumber);
 
         if (!outputPath) {
-            const errorMsg = `LibreOffice conversion completed but could not find output for sheet ${sheetNumber}`;
-            console.error('[XlsxService]', errorMsg);
-            if (stderr) {
-                console.error('[XlsxService] stderr output:', stderr);
-            }
-            throw new Error(errorMsg);
+            throw new Error(`LibreOffice conversion completed but could not find output for sheet ${sheetNumber}`);
         }
 
         const png = await fs.promises.readFile(outputPath);
-
-        // Cleanup all generated PNG files
-        await this.cleanupGeneratedFiles(tempDir, inputFileName);
-
+        await this._cleanupGeneratedFiles(tempDir, inputFileName);
         return png;
     }
 
-    /**
-     * Find the output file for a specific sheet
-     * LibreOffice may create files with different naming patterns:
-     * - filename.png (single sheet)
-     * - filename-Sheet1.png, filename-Sheet2.png (multiple sheets)
-     * - filename-1.png, filename-2.png (numbered)
-     */
-    private async findSheetOutputFile(tempDir: string, baseName: string, sheetNumber: number): Promise<string | null> {
+    private async _findSheetOutputFile(tempDir: string, baseName: string, sheetNumber: number): Promise<string | null> {
         const files = await fs.promises.readdir(tempDir);
         const pngFiles = files.filter(f =>
             f.toLowerCase().startsWith(baseName.toLowerCase()) &&
@@ -161,18 +140,15 @@ export class XlsxService extends AbstractCLIService {
             return null;
         }
 
-        // Single file case - return it regardless of sheet number requested
         if (pngFiles.length === 1) {
             if (sheetNumber > 1) {
-                console.warn(`[XlsxService] Requested sheet ${sheetNumber} but only 1 sheet exists`);
+                console.warn(`[XlsxPlugin] Requested sheet ${sheetNumber} but only 1 sheet exists`);
             }
             return path.join(tempDir, pngFiles[0]);
         }
 
-        // Multiple files - try to find the right one
-        const sheetIndex = sheetNumber - 1; // Convert to 0-indexed
+        const sheetIndex = sheetNumber - 1;
 
-        // Try exact match patterns
         const patterns = [
             `${baseName}-Sheet${sheetNumber}.png`,
             `${baseName}-${sheetNumber}.png`,
@@ -187,20 +163,15 @@ export class XlsxService extends AbstractCLIService {
             }
         }
 
-        // Fall back to index-based selection
         if (sheetIndex < pngFiles.length) {
             return path.join(tempDir, pngFiles[sheetIndex]);
         }
 
-        // Return first file if requested sheet doesn't exist
-        console.warn(`[XlsxService] Requested sheet ${sheetNumber} not found, returning first sheet`);
+        console.warn(`[XlsxPlugin] Requested sheet ${sheetNumber} not found, returning first sheet`);
         return path.join(tempDir, pngFiles[0]);
     }
 
-    /**
-     * Cleanup generated PNG files
-     */
-    private async cleanupGeneratedFiles(tempDir: string, baseName: string): Promise<void> {
+    private async _cleanupGeneratedFiles(tempDir: string, baseName: string): Promise<void> {
         try {
             const files = await fs.promises.readdir(tempDir);
             const pngFiles = files.filter(f =>
@@ -212,14 +183,51 @@ export class XlsxService extends AbstractCLIService {
                 await fs.promises.unlink(path.join(tempDir, file));
             }
         } catch (error) {
-            console.warn('[XlsxService] Failed to cleanup temp files:', error);
+            console.warn('[XlsxPlugin] Failed to cleanup temp files:', error);
         }
     }
+}
 
-    /**
-     * Get supported file extensions
-     */
-    getSupportedExtensions(): string[] {
-        return ['.xlsx', '.xls', '.ods'];
+export class XlsxPlugin implements DiagramPlugin {
+    readonly metadata: DiagramPluginMetadata = {
+        id: 'xlsx',
+        name: 'Spreadsheet Renderer',
+        version: '1.0.0',
+        supportedCodeBlocks: [],
+        supportedFileExtensions: ['.xlsx', '.xls', '.ods'],
+        renderOutput: 'png',
+        requiresExternalTool: true,
+        externalToolName: 'LibreOffice',
+        configKeys: ['libreOfficePath']
+    };
+
+    private _cli = new XlsxCLI();
+
+    canRenderCodeBlock(_language: string): boolean {
+        return false;
+    }
+
+    canRenderFile(filePath: string): boolean {
+        const ext = path.extname(filePath).toLowerCase();
+        return this.metadata.supportedFileExtensions.includes(ext);
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this._cli.isAvailable();
+    }
+
+    async renderFile(filePath: string, options?: DiagramRenderOptions): Promise<DiagramRenderResult> {
+        try {
+            const sheetNumber = options?.sheetNumber ?? 1;
+            const png = await this._cli.renderPNG(filePath, sheetNumber);
+            return { success: true, data: png, format: 'png' };
+        } catch (error) {
+            return {
+                success: false,
+                data: Buffer.alloc(0),
+                format: 'png',
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
     }
 }

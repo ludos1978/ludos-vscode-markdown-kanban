@@ -177,13 +177,12 @@ export class ExportCommands extends SwitchBasedCommand {
             // Get board for ANY conversion exports (use in-memory board data)
             const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
-            // Get webview panel and mermaid service for diagram rendering (injected to avoid circular dependency)
+            // Get webview panel for diagram rendering
             const webviewPanel = context.getWebviewPanel();
-            const mermaidService = context.getMermaidExportService();
 
             // Handle COPY mode (no progress bar)
             if (options.mode === 'copy') {
-                const result = await ExportService.export(document, options, board, webviewPanel, mermaidService);
+                const result = await ExportService.export(document, options, board, webviewPanel);
 
                 this.postMessage({
                     type: 'copyContentResult',
@@ -219,7 +218,7 @@ export class ExportCommands extends SwitchBasedCommand {
                     return;
                 }
 
-                const result = await ExportService.export(document!, options, board, webviewPanel, mermaidService, token);
+                const result = await ExportService.export(document!, options, board, webviewPanel, token);
 
                 // Check for cancellation after export
                 if (token.isCancellationRequested) {
@@ -266,12 +265,11 @@ export class ExportCommands extends SwitchBasedCommand {
         // Get board for conversion exports
         const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
-        // Get webview panel and mermaid service for diagram rendering (injected to avoid circular dependency)
+        // Get webview panel for diagram rendering
         const webviewPanel = context.getWebviewPanel();
-        const mermaidService = context.getMermaidExportService();
 
         // Do initial export FIRST (to start Marp if needed)
-        const initialResult = await ExportService.export(document, options, board, webviewPanel, mermaidService);
+        const initialResult = await ExportService.export(document, options, board, webviewPanel);
 
         // NOW stop existing handlers/processes for other files
         // Use marpWatchPath (the file Marp is watching) for protection, fallback to exportedPath
@@ -311,10 +309,9 @@ export class ExportCommands extends SwitchBasedCommand {
             try {
                 // Re-read the document to get fresh content
                 const freshDoc = await vscode.workspace.openTextDocument(document.uri);
-                // Get current webview panel and mermaid service (may have changed since initial setup)
+                // Get current webview panel (may have changed since initial setup)
                 const currentWebviewPanel = context.getWebviewPanel();
-                const currentMermaidService = context.getMermaidExportService();
-                const result = await ExportService.export(freshDoc, options, undefined, currentWebviewPanel, currentMermaidService);
+                const result = await ExportService.export(freshDoc, options, undefined, currentWebviewPanel);
 
                 if (result.success && options.openAfterExport && result.exportedPath && !options.marpWatch) {
                     const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');

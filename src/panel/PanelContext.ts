@@ -12,7 +12,7 @@
 import { ScopedEventBus } from '../core/events/ScopedEventBus';
 import { FileSaveService } from '../core/FileSaveService';
 import { ConflictResolver } from '../services/ConflictResolver';
-import { MermaidExportService } from '../services/export/MermaidExportService';
+// MermaidExportService replaced by MermaidPlugin via PluginRegistry
 import { logger } from '../utils/logger';
 
 /**
@@ -63,16 +63,12 @@ export class PanelContext {
     // ============= CONFLICT RESOLVER =============
     private _conflictResolver: ConflictResolver;
 
-    // ============= MERMAID EXPORT SERVICE =============
-    private _mermaidExportService: MermaidExportService;
-
     constructor(panelId?: string, debugMode: boolean = false) {
         this._panelId = panelId || Math.random().toString(36).substr(2, 9);
         this._debugMode = debugMode;
         this._scopedEventBus = new ScopedEventBus(this._panelId);
         this._fileSaveService = new FileSaveService(this._panelId);
         this._conflictResolver = new ConflictResolver(this._panelId);
-        this._mermaidExportService = new MermaidExportService();
     }
 
     // ============= SCOPED EVENT BUS GETTER =============
@@ -98,14 +94,6 @@ export class PanelContext {
      * Each panel has its own dialog tracking to prevent cross-panel interference.
      */
     get conflictResolver(): ConflictResolver { return this._conflictResolver; }
-
-    // ============= MERMAID EXPORT SERVICE GETTER =============
-
-    /**
-     * Get the panel's Mermaid export service for panel-isolated Mermaid rendering.
-     * Each panel has its own service to prevent cross-panel message routing issues.
-     */
-    get mermaidExportService(): MermaidExportService { return this._mermaidExportService; }
 
     // ============= PANEL FLAG GETTERS =============
 
@@ -165,8 +153,6 @@ export class PanelContext {
             this._webviewReady = false;
             // Dispose the scoped event bus
             this._scopedEventBus.dispose();
-            // Cleanup pending Mermaid requests
-            this._mermaidExportService.cleanup();
         }
     }
 

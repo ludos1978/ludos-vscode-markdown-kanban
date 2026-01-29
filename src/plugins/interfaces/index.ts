@@ -28,3 +28,13 @@ export {
     ExportOptions,
     ExportResult
 } from './ExportPlugin';
+
+// Diagram Plugin types
+export {
+    DiagramPlugin,
+    DiagramPluginMetadata,
+    DiagramPluginContext,
+    DiagramRenderOptions,
+    DiagramRenderResult,
+    DiagramFileInfo
+} from './DiagramPlugin';

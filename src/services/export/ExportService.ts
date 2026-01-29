@@ -11,7 +11,7 @@ import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
 import { PandocExportService, PandocOutputFormat } from './PandocExportService';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
-import { MermaidExportService } from './MermaidExportService';
+// MermaidExportService replaced by MermaidPlugin via PluginRegistry
 import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { generateTimestamp } from '../../constants/FileNaming';
@@ -2008,8 +2008,7 @@ export class ExportService {
         transformed: { content: string; notIncludedAssets: ExportAssetInfo[] },
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
-        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
-        mermaidService?: MermaidExportService
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
 
         // MODE: COPY (return content for clipboard)
@@ -2041,12 +2040,12 @@ export class ExportService {
 
         // Handle Marp conversion (only if runMarp = Use Marp checkbox checked)
         if (options.runMarp) {
-            return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel, mermaidService);
+            return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel);
         }
 
         // Handle Pandoc conversion (only if runPandoc = Use Pandoc checkbox checked)
         if (options.runPandoc && options.pandocFormat) {
-            return await this.runPandocConversion(markdownPath, options, webviewPanel, mermaidService);
+            return await this.runPandocConversion(markdownPath, options, webviewPanel);
         }
 
         // Regular save succeeded
@@ -2063,14 +2062,12 @@ export class ExportService {
      * @param markdownPath - Path to the exported markdown file (in _Export folder)
      * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
      * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
-     * @param mermaidService - Optional MermaidExportService for panel-isolated Mermaid rendering
      */
     private static async runMarpConversion(
         markdownPath: string,
         _sourceFilePath: string,  // Reserved for future path normalization
         options: NewExportOptions,
-        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
-        mermaidService?: MermaidExportService
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
         logger.debug(`[ExportService] runMarpConversion - marpFormat: ${marpFormat}, options.marpFormat: ${options.marpFormat}`);
@@ -2087,16 +2084,10 @@ export class ExportService {
 
         try {
             // Use injected webview panel for Mermaid rendering (avoids circular dependency)
-            // webviewPanel and mermaidService are passed from ExportCommands which has access via CommandContext
-
             const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
-            if (panel && mermaidService) {
-                // Set up Mermaid export service with webview
-                mermaidService.setWebviewPanel(panel);
-            }
 
-            // Create diagram preprocessor (mermaidService may be undefined if not provided)
-            const preprocessor = new DiagramPreprocessor(mermaidService, panel);
+            // Create diagram preprocessor (uses PluginRegistry; panel enables Mermaid rendering)
+            const preprocessor = new DiagramPreprocessor(panel);
 
             // STEP 1: Preprocess ALL include files in the export folder
             // This ensures diagrams inside included files are also converted to SVG
@@ -2265,13 +2256,11 @@ export class ExportService {
      * @param markdownPath - Path to the exported markdown file
      * @param options - Export options including pandocFormat
      * @param webviewPanel - Optional webview panel for Mermaid diagram rendering
-     * @param mermaidService - Optional MermaidExportService for panel-isolated Mermaid rendering
      */
     private static async runPandocConversion(
         markdownPath: string,
         options: NewExportOptions,
-        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
-        mermaidService?: MermaidExportService
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
         const pandocFormat: PandocOutputFormat = options.pandocFormat || 'docx';
         logger.debug(`[ExportService] runPandocConversion - pandocFormat: ${pandocFormat}`);
@@ -2300,12 +2289,9 @@ export class ExportService {
         try {
             // Use injected webview panel for Mermaid rendering
             const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
-            if (panel && mermaidService) {
-                mermaidService.setWebviewPanel(panel);
-            }
 
-            // Create diagram preprocessor
-            const preprocessor = new DiagramPreprocessor(mermaidService, panel);
+            // Create diagram preprocessor (uses PluginRegistry; panel enables Mermaid rendering)
+            const preprocessor = new DiagramPreprocessor(panel);
 
             // STEP 1: Preprocess ALL include files in the export folder
             // This ensures diagrams inside included files are also converted to SVG
@@ -2414,7 +2400,6 @@ export class ExportService {
      *
      * @param board - Optional in-memory board object for presentation exports (avoids file parsing)
      * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
-     * @param mermaidService - Optional MermaidExportService for panel-isolated Mermaid rendering
      * @param cancellationToken - Optional cancellation token to abort the export
      */
     public static async export(
@@ -2422,7 +2407,6 @@ export class ExportService {
         options: NewExportOptions,
         board?: KanbanBoard,
         webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel },
-        mermaidService?: MermaidExportService,
         cancellationToken?: vscode.CancellationToken
     ): Promise<ExportResult> {
         try {
@@ -2464,8 +2448,7 @@ export class ExportService {
                 transformed,
                 sourceDocument,
                 options,
-                webviewPanel,
-                mermaidService
+                webviewPanel
             );
 
             return result;

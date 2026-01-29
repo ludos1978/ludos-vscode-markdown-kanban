@@ -172,8 +172,7 @@ export class IncludeCommands extends SwitchBasedCommand {
 
         try {
             const webviewPanel = context.getWebviewPanel();
-            const mermaidService = context.getMermaidExportService();
-            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
+            await ExportService.export(document, autoExportSettings, board, webviewPanel);
         } catch (error) {
             console.error('[IncludeCommands] MarpWatch export failed:', error);
         }

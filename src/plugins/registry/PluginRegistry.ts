@@ -13,7 +13,9 @@ import {
     IncludeMatch,
     ExportPlugin,
     ExportFormat,
-    PluginContext
+    PluginContext,
+    DiagramPlugin,
+    DiagramPluginContext
 } from '../interfaces';
 import { ValidationResult } from '../../shared/interfaces';
 
@@ -31,6 +33,7 @@ export class PluginRegistry {
 
     private _importPlugins: Map<string, ImportPlugin> = new Map();
     private _exportPlugins: Map<string, ExportPlugin> = new Map();
+    private _diagramPlugins: Map<string, DiagramPlugin> = new Map();
     private _initialized: boolean = false;
 
     private constructor() {
@@ -235,6 +238,86 @@ export class PluginRegistry {
         return formats;
     }
 
+    // ============= DIAGRAM PLUGIN REGISTRATION =============
+
+    /**
+     * Register a diagram plugin
+     */
+    registerDiagramPlugin(plugin: DiagramPlugin): void {
+        const validation = this._validateDiagramPlugin(plugin);
+
+        if (!validation.valid) {
+            throw new Error(`Invalid diagram plugin '${plugin.metadata.id}': ${validation.errors.join(', ')}`);
+        }
+
+        if (validation.warnings.length > 0) {
+            console.warn(`[PluginRegistry] Diagram plugin '${plugin.metadata.id}' warnings:`, validation.warnings);
+        }
+
+        if (this._diagramPlugins.has(plugin.metadata.id)) {
+            console.warn(`[PluginRegistry] Replacing existing diagram plugin: ${plugin.metadata.id}`);
+        }
+
+        this._diagramPlugins.set(plugin.metadata.id, plugin);
+    }
+
+    /**
+     * Get all registered diagram plugins
+     */
+    getAllDiagramPlugins(): DiagramPlugin[] {
+        return Array.from(this._diagramPlugins.values());
+    }
+
+    // ============= DIAGRAM PLUGIN DISCOVERY =============
+
+    /**
+     * Find diagram plugin by ID
+     */
+    findDiagramPluginById(id: string): DiagramPlugin | null {
+        return this._diagramPlugins.get(id) ?? null;
+    }
+
+    /**
+     * Find diagram plugin that can render a code block with the given language tag
+     */
+    findDiagramPluginForCodeBlock(language: string): DiagramPlugin | null {
+        for (const plugin of this._diagramPlugins.values()) {
+            if (plugin.canRenderCodeBlock(language)) {
+                return plugin;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find diagram plugin that can render a file at the given path
+     */
+    findDiagramPluginForFile(filePath: string): DiagramPlugin | null {
+        for (const plugin of this._diagramPlugins.values()) {
+            if (plugin.canRenderFile(filePath)) {
+                return plugin;
+            }
+        }
+        return null;
+    }
+
+    // ============= DIAGRAM PLUGIN ACTIVATION =============
+
+    /**
+     * Activate all registered diagram plugins with diagram-specific context
+     */
+    async activateDiagramPlugins(context: DiagramPluginContext): Promise<void> {
+        for (const plugin of this._diagramPlugins.values()) {
+            if (plugin.activate) {
+                try {
+                    await plugin.activate(context);
+                } catch (error) {
+                    console.error(`[PluginRegistry] Failed to activate diagram plugin ${plugin.metadata.id}:`, error);
+                }
+            }
+        }
+    }
+
     // ============= VALIDATION =============
 
     /**
@@ -319,6 +402,70 @@ export class PluginRegistry {
 
         if (typeof plugin.export !== 'function') {
             errors.push('Missing export method');
+        }
+
+        return { valid: errors.length === 0, errors, warnings };
+    }
+
+    /**
+     * Validate a diagram plugin before registration
+     */
+    private _validateDiagramPlugin(plugin: DiagramPlugin): ValidationResult {
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        if (!plugin.metadata) {
+            errors.push('Missing metadata');
+            return { valid: false, errors, warnings };
+        }
+
+        if (!plugin.metadata.id || plugin.metadata.id.trim() === '') {
+            errors.push('Missing or empty plugin ID');
+        }
+
+        // Must implement at least one render method
+        if (typeof plugin.renderCodeBlock !== 'function' && typeof plugin.renderFile !== 'function') {
+            errors.push('Must implement at least one of renderCodeBlock or renderFile');
+        }
+
+        if (typeof plugin.isAvailable !== 'function') {
+            errors.push('Missing isAvailable method');
+        }
+
+        if (typeof plugin.canRenderCodeBlock !== 'function') {
+            errors.push('Missing canRenderCodeBlock method');
+        }
+
+        if (typeof plugin.canRenderFile !== 'function') {
+            errors.push('Missing canRenderFile method');
+        }
+
+        // Check for code block conflicts with existing plugins
+        if (plugin.metadata.supportedCodeBlocks) {
+            for (const existing of this._diagramPlugins.values()) {
+                if (existing.metadata.id !== plugin.metadata.id) {
+                    const overlap = plugin.metadata.supportedCodeBlocks.filter(
+                        cb => existing.metadata.supportedCodeBlocks.includes(cb)
+                    );
+                    if (overlap.length > 0) {
+                        warnings.push(`Code block conflict with '${existing.metadata.id}': ${overlap.join(', ')}`);
+                    }
+                }
+            }
+        }
+
+        // Check for file extension conflicts
+        if (plugin.metadata.supportedFileExtensions) {
+            for (const existing of this._diagramPlugins.values()) {
+                if (existing.metadata.id !== plugin.metadata.id) {
+                    const overlap = plugin.metadata.supportedFileExtensions.filter(
+                        ext => existing.metadata.supportedFileExtensions.includes(ext)
+                    );
+                    if (overlap.length > 0) {
+                        warnings.push(`Extension conflict with '${existing.metadata.id}': ${overlap.join(', ')}`);
+                    }
+                }
+            }
         }
 
         return { valid: errors.length === 0, errors, warnings };

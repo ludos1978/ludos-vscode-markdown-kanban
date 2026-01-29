@@ -4,7 +4,7 @@ import { BoardOperations } from './board';
 import { LinkHandler } from './services/LinkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard, KanbanTask } from './markdownParser';
-import { PlantUMLService } from './services/export/PlantUMLService';
+// PlantUMLService replaced by PlantUMLPlugin via PluginRegistry
 import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
 import { BoardChangeTrigger } from './core/events';
@@ -35,7 +35,7 @@ export class MessageHandler {
     private _boardStore: BoardStore;
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
-    private _plantUMLService: PlantUMLService;
+    // PlantUMLService removed — now handled by PlantUMLPlugin via PluginRegistry
     private _fileSaveService: FileSaveService;
     private _panelContext: PanelContext;
     private _deps: MessageHandlerDeps;
@@ -61,7 +61,6 @@ export class MessageHandler {
         this._boardStore = boardStore;
         this._boardOperations = boardOperations;
         this._linkHandler = linkHandler;
-        this._plantUMLService = new PlantUMLService();
         this._fileSaveService = panelContext.fileSaveService;
         this._panelContext = panelContext;
         this._deps = deps;
@@ -82,8 +81,6 @@ export class MessageHandler {
             boardStore: this._boardStore,
             boardOperations: this._boardOperations,
             linkHandler: this._linkHandler,
-            plantUMLService: this._plantUMLService,
-            getMermaidExportService: () => this._panelContext.mermaidExportService,
             getMediaTracker: () => this._deps.getWebviewPanel()?.getMediaTracker?.(),
             fileSaveService: this._fileSaveService,
             getFileRegistry: () => this._deps.getWebviewPanel()?.fileRegistry,

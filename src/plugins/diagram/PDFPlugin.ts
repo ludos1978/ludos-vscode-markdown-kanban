@@ -1,18 +1,27 @@
+/**
+ * PDF Document Plugin
+ *
+ * Renders PDF pages to PNG using pdftoppm CLI (poppler-utils).
+ * Migrated from src/services/export/PDFService.ts
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import * as vscode from 'vscode';
-import { AbstractCLIService } from './AbstractCLIService';
+import { AbstractCLIService } from '../../services/export/AbstractCLIService';
+import {
+    DiagramPlugin,
+    DiagramPluginMetadata,
+    DiagramRenderOptions,
+    DiagramRenderResult,
+    DiagramFileInfo
+} from '../interfaces/DiagramPlugin';
 
 /**
- * Service for rendering individual PDF pages to images
- * Uses pdftoppm CLI tool from poppler-utils for conversion
- *
- * Supports:
- * - Rendering specific pages from PDF files
- * - PNG output with configurable DPI
+ * Internal CLI service for PDF operations
  */
-export class PDFService extends AbstractCLIService {
+class PDFCLI extends AbstractCLIService {
     protected getConfigKey(): string {
         return 'popplerPath';
     }
@@ -22,7 +31,7 @@ export class PDFService extends AbstractCLIService {
     }
 
     protected getServiceName(): string {
-        return 'PDFService';
+        return 'PDFPlugin';
     }
 
     protected getCliNotFoundWarning(): string {
@@ -33,9 +42,6 @@ export class PDFService extends AbstractCLIService {
         return 'https://poppler.freedesktop.org/';
     }
 
-    /**
-     * Override to add poppler-specific paths
-     */
     protected getCommonPaths(): string[] {
         const cliName = this.getDefaultCliName();
         const platform = process.platform;
@@ -60,13 +66,6 @@ export class PDFService extends AbstractCLIService {
         }
     }
 
-    /**
-     * Render a specific page from a PDF file to PNG
-     * @param filePath Absolute path to .pdf file
-     * @param pageNumber Page number to render (1-indexed)
-     * @param dpi Resolution in DPI (default: 150)
-     * @returns PNG data as Buffer
-     */
     async renderPage(filePath: string, pageNumber: number = 1, dpi: number = 150): Promise<Buffer> {
         if (!await this.isAvailable()) {
             this.showCliWarning();
@@ -76,7 +75,6 @@ export class PDFService extends AbstractCLIService {
         const tempDir = this.ensureTempDir();
         const tempPrefix = path.join(tempDir, `pdf-${Date.now()}`);
 
-        // pdftoppm -png -f PAGE -l PAGE -r DPI input.pdf output-prefix
         const args = [
             '-png',
             '-f', pageNumber.toString(),
@@ -89,20 +87,13 @@ export class PDFService extends AbstractCLIService {
         const { code, stderr } = await this.executeCliCommand(args);
 
         if (code !== 0) {
-            console.error('[PDFService] Conversion failed:', stderr);
             throw new Error(`pdftoppm exited with code ${code}`);
         }
 
-        // pdftoppm creates files like: prefix-N.png where N is the page number
-        const outputPath = await this.findOutputFile(tempDir, tempPrefix, pageNumber);
+        const outputPath = await this._findOutputFile(tempDir, tempPrefix, pageNumber);
 
         if (!outputPath) {
-            const errorMsg = 'pdftoppm exited successfully but did not create output file';
-            console.error('[PDFService]', errorMsg);
-            if (stderr) {
-                console.error('[PDFService] stderr output:', stderr);
-            }
-            throw new Error(errorMsg);
+            throw new Error('pdftoppm exited successfully but did not create output file');
         }
 
         const png = await fs.promises.readFile(outputPath);
@@ -110,10 +101,7 @@ export class PDFService extends AbstractCLIService {
         return png;
     }
 
-    /**
-     * Find the output file created by pdftoppm (handles various naming patterns)
-     */
-    private async findOutputFile(tempDir: string, tempPrefix: string, pageNumber: number): Promise<string | null> {
+    private async _findOutputFile(tempDir: string, tempPrefix: string, pageNumber: number): Promise<string | null> {
         const possibleFiles = [
             `${tempPrefix}-${pageNumber}.png`,
             `${tempPrefix}-${pageNumber.toString().padStart(2, '0')}.png`,
@@ -127,7 +115,6 @@ export class PDFService extends AbstractCLIService {
             }
         }
 
-        // Try to find any file starting with tempPrefix
         const files = fs.readdirSync(tempDir).filter(f => f.startsWith(path.basename(tempPrefix)));
         if (files.length > 0) {
             return path.join(tempDir, files[0]);
@@ -136,14 +123,7 @@ export class PDFService extends AbstractCLIService {
         return null;
     }
 
-    /**
-     * Get the total page count from a PDF file
-     * Uses pdfinfo command from poppler-utils
-     * @param filePath Absolute path to .pdf file
-     * @returns Total number of pages
-     */
     async getPageCount(filePath: string): Promise<number> {
-        // Determine pdfinfo path - derive from cliPath or use config/PATH
         let pdfinfoPath: string;
 
         if (this.cliPath) {
@@ -168,14 +148,12 @@ export class PDFService extends AbstractCLIService {
                 stderr += data.toString();
             });
 
-            child.on('error', (error) => {
-                console.error('[PDFService] pdfinfo error:', error);
+            child.on('error', () => {
                 reject(new Error('pdfinfo command not found'));
             });
 
             child.on('exit', (code) => {
                 if (code !== 0) {
-                    console.error('[PDFService] pdfinfo failed:', stderr);
                     reject(new Error(`pdfinfo exited with code ${code}`));
                     return;
                 }
@@ -194,11 +172,55 @@ export class PDFService extends AbstractCLIService {
             }, 5000);
         });
     }
+}
 
-    /**
-     * Get supported file extensions
-     */
-    getSupportedExtensions(): string[] {
-        return ['.pdf'];
+export class PDFPlugin implements DiagramPlugin {
+    readonly metadata: DiagramPluginMetadata = {
+        id: 'pdf',
+        name: 'PDF Page Renderer',
+        version: '1.0.0',
+        supportedCodeBlocks: [],
+        supportedFileExtensions: ['.pdf'],
+        renderOutput: 'png',
+        requiresExternalTool: true,
+        externalToolName: 'pdftoppm (poppler-utils)',
+        configKeys: ['popplerPath']
+    };
+
+    private _cli = new PDFCLI();
+
+    canRenderCodeBlock(_language: string): boolean {
+        return false;
+    }
+
+    canRenderFile(filePath: string): boolean {
+        const ext = path.extname(filePath).toLowerCase();
+        return this.metadata.supportedFileExtensions.includes(ext);
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this._cli.isAvailable();
+    }
+
+    async renderFile(filePath: string, options?: DiagramRenderOptions): Promise<DiagramRenderResult> {
+        try {
+            const pageNumber = options?.pageNumber ?? 1;
+            const dpi = options?.dpi ?? 150;
+            const png = await this._cli.renderPage(filePath, pageNumber, dpi);
+            return { success: true, data: png, format: 'png' };
+        } catch (error) {
+            return {
+                success: false,
+                data: Buffer.alloc(0),
+                format: 'png',
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
+    }
+
+    async getFileInfo(filePath: string): Promise<DiagramFileInfo> {
+        const pageCount = await this._cli.getPageCount(filePath);
+        const stats = await fs.promises.stat(filePath);
+        return { pageCount, fileMtime: stats.mtimeMs };
     }
 }
