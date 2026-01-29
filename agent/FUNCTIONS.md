@@ -118,7 +118,7 @@ Service for interactive web image search using a headed Playwright browser.
 - `BrowserService.launchHeaded(options?)` - Convenience: resolves path and launches headed (visible) Playwright browser for interactive features
 
 ### Updates to `src/commands/PathCommands.ts`
-- `PathCommands.handleWebSearchForImage(message, context)` - Handler for webSearchForImage messages. Calls WebImageSearchService.searchAndSelect, replaces path, adds source URL as title
+- `PathCommands.handleWebSearchForImage(message, context)` - Handler for webSearchForImage messages. Determines owning file (main or include via includeContext), creates `{baseFileName}-MEDIA/` folder, downloads image there via WebImageSearchService.searchAndSelect, replaces path (relative to owning file's directory), adds source URL as title
 - `PathCommands._addSourceUrlTitle(imagePath, sourceUrl, basePath)` - Adds source URL as markdown image title: ![alt](path "sourceUrl")
 
 ### Updates to `src/core/bridge/MessageTypes.ts`

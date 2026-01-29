@@ -587,7 +587,6 @@ export class PathCommands extends SwitchBasedCommand {
         // Use alt text as search query, fall back to filename from the old path
         const altText = message.altText || path.basename(oldPath, path.extname(oldPath)) || 'image';
 
-        // Get the main file's directory as the base path
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
             return this.failure('File registry not available');
@@ -597,30 +596,44 @@ export class PathCommands extends SwitchBasedCommand {
             return this.failure('No main file found');
         }
 
-        // Use includeContext to determine the correct base path
-        let basePath: string;
-        if (message.includeContext?.includeDir) {
-            basePath = message.includeContext.includeDir;
+        // Determine the owning file's directory and base name for the media folder
+        // (same convention as ClipboardCommands._getDropTargetPaths)
+        let directory: string;
+        let baseFileName: string;
+        if (message.includeContext?.includeFilePath) {
+            const includePath = message.includeContext.includeFilePath;
+            directory = path.dirname(includePath);
+            baseFileName = path.basename(includePath).replace(/\.[^/.]+$/, '');
         } else {
-            basePath = path.dirname(mainFile.getPath());
+            const mainPath = mainFile.getPath();
+            directory = path.dirname(mainPath);
+            baseFileName = path.basename(mainPath).replace(/\.[^/.]+$/, '');
+        }
+
+        // Create the media folder (e.g., board-MEDIA/)
+        const mediaFolderName = `${baseFileName}-MEDIA`;
+        const mediaFolderPath = path.join(directory, mediaFolderName);
+        if (!fs.existsSync(mediaFolderPath)) {
+            fs.mkdirSync(mediaFolderPath, { recursive: true });
         }
 
         try {
-            const result = await WebImageSearchService.searchAndSelect(altText, basePath);
+            // Download the image into the media folder
+            const result = await WebImageSearchService.searchAndSelect(altText, mediaFolderPath);
 
             if (!result) {
                 return this.success({ cancelled: true });
             }
 
-            // Compute the new relative path for the downloaded file
-            const newRelativePath = path.relative(basePath, result.filePath);
+            // Compute the new relative path from the owning file's directory
+            const newRelativePath = path.relative(directory, result.filePath);
             const encodedNewPath = encodeFilePath(newRelativePath);
             const escapedSourceUrl = result.sourceUrl.replace(/"/g, '%22');
 
             if (!oldPath) {
                 // Empty old path (e.g., `![]()`) — _replacePaths can't match empty strings,
                 // so do a direct text replacement in the markdown files
-                const replaced = this._replaceEmptyImagePath(encodedNewPath, escapedSourceUrl, basePath, message);
+                const replaced = this._replaceEmptyImagePath(encodedNewPath, escapedSourceUrl, directory, message);
                 if (replaced) {
                     await this.refreshBoard(context);
                     showInfo('Image downloaded and path updated');
@@ -630,7 +643,7 @@ export class PathCommands extends SwitchBasedCommand {
             }
 
             // Non-empty old path — use the standard replacement pipeline
-            const replaceResult = await this._replacePaths(oldPath, result.filePath, basePath, context, {
+            const replaceResult = await this._replacePaths(oldPath, result.filePath, directory, context, {
                 mode: 'single',
                 pathFormat: 'auto',
                 taskId: message.taskId,
@@ -641,7 +654,7 @@ export class PathCommands extends SwitchBasedCommand {
 
             // After path replacement, add the source URL as the image title
             if (replaceResult.success && (replaceResult.data as any)?.replaced) {
-                this._addSourceUrlTitle(result.filePath, result.sourceUrl, basePath);
+                this._addSourceUrlTitle(result.filePath, result.sourceUrl, directory);
             }
 
             return replaceResult;
