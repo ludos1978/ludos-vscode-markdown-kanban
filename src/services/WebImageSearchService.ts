@@ -11,7 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BrowserService } from './BrowserService';
-import { configService } from './ConfigurationService';
+import { pluginConfigService } from './PluginConfigService';
 import { logger } from '../utils/logger';
 
 /**
@@ -219,11 +219,11 @@ export class WebImageSearchService {
      * Build the search URL for the given query based on configuration
      */
     private static _buildSearchUrl(query: string): string {
-        const engine = configService.getNestedConfig('imageSearch.engine', 'google') as string;
+        const engine = pluginConfigService.getPluginConfig<string>('imagesearch', 'engine', 'google');
         const encodedQuery = encodeURIComponent(query);
 
         if (engine === 'custom') {
-            const customUrl = configService.getNestedConfig('imageSearch.customUrl', '') as string;
+            const customUrl = pluginConfigService.getPluginConfig<string>('imagesearch', 'customUrl', '');
             if (!customUrl) {
                 logger.warn('[WebImageSearchService] Custom engine selected but no customUrl configured, falling back to Google');
                 return SEARCH_ENGINE_URLS.google.replace('${query}', encodedQuery);

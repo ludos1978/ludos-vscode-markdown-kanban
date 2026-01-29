@@ -9,6 +9,50 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
+## Recent Updates (2026-01-29) - Per-Plugin Configuration Files
+
+### New File: `src/services/PluginConfigSchema.ts`
+Schema definitions and defaults for per-plugin JSON config files in `.kanban/`.
+- `PLUGIN_CONFIG_SCHEMAS` - Registry mapping pluginId → { defaults, vscodeKeyMap } for marp, embed, imagesearch
+- Interfaces: `MarpPluginConfig`, `EmbedPluginConfig`, `ImageSearchPluginConfig`, `PluginConfigSchemaEntry`
+
+### New File: `src/services/PluginConfigService.ts`
+Singleton service for reading/writing per-plugin `.kanban/{pluginId}.json` config files with 3-layer fallback (JSON file → VS Code settings → schema defaults).
+- `PluginConfigService.getPluginConfig(pluginId, key, defaultValue)` - Read single config value with 3-layer fallback
+- `PluginConfigService.getPluginConfigAll(pluginId)` - Read all config merged across all layers
+- `PluginConfigService.hasPluginConfigFile(pluginId)` - Check if .kanban/{pluginId}.json exists
+- `PluginConfigService.getConfigFilePath(pluginId)` - Get absolute path to config file
+- `PluginConfigService.setPluginConfig(pluginId, key, value)` - Write single key to JSON file
+- `PluginConfigService.setPluginConfigAll(pluginId, config)` - Replace entire JSON file
+- `PluginConfigService.initializeWatchers(pluginIds)` - Set up FileSystemWatchers for config files
+- `PluginConfigService.dispose()` - Clean up watchers and cache
+- `PluginConfigService.onDidChangeConfig` - Event fired when a plugin config file changes
+
+### Modified: `src/plugins/PluginLoader.ts`
+- `PluginLoader.initializePluginConfigWatchers(configService)` - (NEW) Initialize file watchers for all plugins with schemas
+
+### Modified: `src/extension.ts`
+- Initializes PluginConfigService, calls initializePluginConfigWatchers, adds to disposables
+
+### Modified: `src/services/export/MarpExportService.ts`
+- `buildMarpCliArgs()` - (MODIFIED) Reads browser via pluginConfigService instead of ConfigurationService
+- `getResolvedConfiguredThemeFolders()` - (MODIFIED) Reads themeFolders via pluginConfigService
+
+### Modified: `src/services/export/ExportService.ts`
+- `applyEmbedTransform()` - (MODIFIED) Reads embed config via pluginConfigService.getPluginConfigAll('embed')
+- `transformContent()` - (MODIFIED) Reads marp config via pluginConfigService.getPluginConfigAll('marp') at two call sites
+
+### Modified: `src/commands/ExportCommands.ts`
+- `handleGetMarpAvailableClasses()` - (MODIFIED) Reads marp config via pluginConfigService instead of ConfigurationService
+
+### Modified: `src/services/WebImageSearchService.ts`
+- `_buildSearchUrl()` - (MODIFIED) Reads imageSearch config via pluginConfigService instead of configService
+
+### Modified: `src/services/ConfigurationService.ts`
+- Added @deprecated JSDoc comments on marp behavior settings, embed, and imageSearch interfaces
+
+---
+
 ## Recent Updates (2026-01-29) - Phase 3: Export Plugin Migration
 
 ### New File: `src/plugins/export/PandocExportPlugin.ts`

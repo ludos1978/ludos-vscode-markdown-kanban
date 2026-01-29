@@ -14,6 +14,7 @@ import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { PluginRegistry } from '../../plugins/registry/PluginRegistry';
 // MermaidExportService replaced by MermaidPlugin via PluginRegistry
 import { ConfigurationService } from '../ConfigurationService';
+import { pluginConfigService } from '../PluginConfigService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { generateTimestamp } from '../../constants/FileNaming';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
@@ -537,16 +538,15 @@ export class ExportService {
      */
     private static applyEmbedTransform(content: string, mode: 'url' | 'fallback' | 'remove' | 'iframe'): string {
         // Get embed domains from configuration
-        const config = ConfigurationService.getInstance();
-        const embedConfig = config.getConfig('embed');
-        const knownDomains = embedConfig?.knownDomains || [
+        const embedConfig = pluginConfigService.getPluginConfigAll('embed');
+        const knownDomains = (embedConfig?.knownDomains as string[]) || [
             'miro.com/app/live-embed',
             'miro.com/app/embed',
             'figma.com/embed',
             'youtube.com/embed',
             'vimeo.com/video'
         ];
-        const defaultAttrs = embedConfig?.defaultIframeAttributes || {
+        const defaultAttrs = (embedConfig?.defaultIframeAttributes as Record<string, string | boolean | number>) || {
             width: '100%',
             height: '500px',
             frameborder: '0',
@@ -1482,8 +1482,7 @@ export class ExportService {
         // This prevents double-conversion of files that are already in presentation format
         // (e.g., included files that don't have 'kanban-plugin: board' in their YAML)
         if (options.format === 'presentation' && convertToPresentation) {
-            const config = ConfigurationService.getInstance();
-            const marpConfig = config.getConfig('marp');
+            const marpConfig = pluginConfigService.getPluginConfigAll('marp');
 
             // When mergeIncludes=false, don't resolve includes during parsing
             // This prevents duplicate content (includes will be processed by Marp engine)
@@ -1494,9 +1493,9 @@ export class ExportService {
             filteredContent = PresentationGenerator.fromBoard(board, {
                 includeMarpDirectives: true,
                 marp: {
-                    theme: options.marpTheme || marpConfig.defaultTheme || 'default',
-                    globalClasses: options.marpGlobalClasses || marpConfig.globalClasses || [],
-                    localClasses: options.marpLocalClasses || marpConfig.localClasses || []
+                    theme: options.marpTheme || (marpConfig.defaultTheme as string) || 'default',
+                    globalClasses: options.marpGlobalClasses || (marpConfig.globalClasses as string[]) || [],
+                    localClasses: options.marpLocalClasses || (marpConfig.localClasses as string[]) || []
                 }
             });
         } else if (options.format === 'document' && convertToPresentation) {
@@ -1886,8 +1885,7 @@ export class ExportService {
             // This keeps it consistent with how tagVisibility filtering works
 
             // Use unified presentation generator
-            const config = ConfigurationService.getInstance();
-            const marpConfig = config.getConfig('marp');
+            const marpConfig = pluginConfigService.getPluginConfigAll('marp');
 
             // Extract marp classes from HTML comment directives in markdown
             // Global: from directive after YAML frontmatter
@@ -1903,9 +1901,9 @@ export class ExportService {
                 tagVisibility: options.tagVisibility,
                 excludeTags: options.excludeTags,
                 marp: {
-                    theme: options.marpTheme || marpConfig.defaultTheme || 'default',
-                    globalClasses: marpClasses.global.length > 0 ? marpClasses.global : (marpConfig.globalClasses || []),
-                    localClasses: marpClasses.local.length > 0 ? marpClasses.local : (marpConfig.localClasses || []),
+                    theme: options.marpTheme || (marpConfig.defaultTheme as string) || 'default',
+                    globalClasses: marpClasses.global.length > 0 ? marpClasses.global : ((marpConfig.globalClasses as string[]) || []),
+                    localClasses: marpClasses.local.length > 0 ? marpClasses.local : ((marpConfig.localClasses as string[]) || []),
                     perSlideClasses: marpClasses.perSlide
                 }
             };

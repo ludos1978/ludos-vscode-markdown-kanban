@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { ConfigurationService } from '../ConfigurationService';
+import { pluginConfigService } from '../PluginConfigService';
 import { logger } from '../../utils/logger';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
@@ -366,8 +367,7 @@ export class MarpExportService {
 
         // If no browser in additionalArgs, use from config
         if (!browser) {
-            const configService = ConfigurationService.getInstance();
-            browser = configService.getNestedConfig('marp.browser', 'chrome');
+            browser = pluginConfigService.getPluginConfig('marp', 'browser', 'chrome');
         }
 
         if (browser && browser !== 'auto') {
@@ -554,8 +554,7 @@ export class MarpExportService {
      * @returns Array of resolved theme folder paths that exist on disk
      */
     private static getResolvedConfiguredThemeFolders(): string[] {
-        const configService = ConfigurationService.getInstance();
-        const configuredThemeFolders = configService.getNestedConfig('marp.themeFolders', []) as string[];
+        const configuredThemeFolders = pluginConfigService.getPluginConfig<string[]>('marp', 'themeFolders', []);
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
         if (configuredThemeFolders.length === 0 || !workspaceFolders || workspaceFolders.length === 0) {

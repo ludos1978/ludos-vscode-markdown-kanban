@@ -14,7 +14,7 @@
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler, IncomingMessage } from './interfaces';
 import { ExportService, NewExportOptions } from '../services/export/ExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
-import { ConfigurationService } from '../services/ConfigurationService';
+import { pluginConfigService } from '../services/PluginConfigService';
 import { PluginRegistry } from '../plugins/registry/PluginRegistry';
 import { MarpExportPlugin } from '../plugins/export/MarpExportPlugin';
 import { PandocExportPlugin } from '../plugins/export/PandocExportPlugin';
@@ -584,9 +584,8 @@ export class ExportCommands extends SwitchBasedCommand {
      */
     private async handleGetMarpAvailableClasses(_context: CommandContext): Promise<void> {
         try {
-            const config = ConfigurationService.getInstance();
-            const marpConfig = config.getConfig('marp');
-            const availableClasses = marpConfig.availableClasses || [];
+            const marpConfig = pluginConfigService.getPluginConfigAll('marp');
+            const availableClasses = (marpConfig.availableClasses as string[]) || [];
 
             this.postMessage({
                 type: 'marpAvailableClasses',

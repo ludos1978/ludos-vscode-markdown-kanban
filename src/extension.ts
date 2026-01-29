@@ -11,6 +11,7 @@ import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { KeybindingService } from './services/KeybindingService';
 import { showError, showWarning, showInfo } from './services/NotificationService';
 import { WorkspaceMediaIndex } from './services/WorkspaceMediaIndex';
+import { PluginConfigService } from './services/PluginConfigService';
 
 // Re-export for external access
 export { getOutputChannel } from './services/OutputChannelService';
@@ -30,6 +31,11 @@ export function activate(context: vscode.ExtensionContext) {
 		outputChannel.appendLine(`[Extension] Warning: Plugin system initialization failed: ${error}`);
 		console.error('[Extension] Plugin system initialization failed:', error);
 	}
+
+	// Initialize per-plugin config service (reads .kanban/{pluginId}.json files)
+	const pluginConfigSvc = PluginConfigService.getInstance();
+	PluginLoader.initializePluginConfigWatchers(pluginConfigSvc);
+	context.subscriptions.push(pluginConfigSvc);
 
 	// Initialize workspace media index instance (lazy - scans only on first use)
 	// The actual scan happens when ensureIndexed() is called on first file drop

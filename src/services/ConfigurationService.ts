@@ -41,13 +41,21 @@ export interface KanbanConfiguration {
     overlayEditorFontScale: number;
     marp: {
         enginePath: string;
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'defaultTheme') */
         defaultTheme: string;
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'allowLocalFiles') */
         allowLocalFiles: boolean;
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'browser') */
         browser: 'auto' | 'chrome' | 'edge' | 'firefox';
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'themeFolders') */
         themeFolders: string[];
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'keepTempFiles') */
         keepTempFiles: boolean;
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'availableClasses') */
         availableClasses: string[];
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'globalClasses') */
         globalClasses: string[];
+        /** @deprecated Behavior setting — use PluginConfigService ('marp', 'localClasses') */
         localClasses: string[];
     };
     browser: {
@@ -59,11 +67,13 @@ export interface KanbanConfiguration {
     sidebar: {
         autoScan: boolean;
     };
+    /** @deprecated Behavior settings — use PluginConfigService ('embed', ...) */
     embed: {
         knownDomains: string[];
         defaultIframeAttributes: { [key: string]: string | boolean | number };
         exportHandling: 'url' | 'fallback' | 'remove';
     };
+    /** @deprecated Behavior settings — use PluginConfigService ('imagesearch', ...) */
     imageSearch: {
         engine: 'google' | 'kagi' | 'bing' | 'duckduckgo' | 'custom';
         customUrl: string;

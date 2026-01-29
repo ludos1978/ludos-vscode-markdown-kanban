@@ -13,6 +13,8 @@
 import * as vscode from 'vscode';
 import { PluginRegistry } from './registry/PluginRegistry';
 import { PluginContext, DiagramPluginContext } from './interfaces';
+import { PluginConfigService } from '../services/PluginConfigService';
+import { PLUGIN_CONFIG_SCHEMAS } from '../services/PluginConfigSchema';
 
 // Import plugins
 import { ColumnIncludePlugin } from './import/ColumnIncludePlugin';
@@ -203,5 +205,15 @@ export class PluginLoader {
     static async initializeDiagramPlugins(context: DiagramPluginContext): Promise<void> {
         const registry = PluginRegistry.getInstance();
         await registry.activateDiagramPlugins(context);
+    }
+
+    /**
+     * Initialize file system watchers for per-plugin config files.
+     * Sets up watchers for all plugin IDs that have a schema defined
+     * in PluginConfigSchema.
+     */
+    static initializePluginConfigWatchers(configService: PluginConfigService): void {
+        const pluginIds = Object.keys(PLUGIN_CONFIG_SCHEMAS);
+        configService.initializeWatchers(pluginIds);
     }
 }
