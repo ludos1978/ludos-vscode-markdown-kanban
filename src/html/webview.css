@@ -6090,7 +6090,7 @@ body.font-family-consolas {
 
 .multicolumn-column {
     flex-basis: 0 !important;
-    padding: 10px;
+    /* padding: 10px; */
     min-width: 0; /* Allow columns to shrink */
 }
 
