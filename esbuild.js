@@ -260,7 +260,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/extension.js',
-		external: ['vscode', 'tslib', 'emitter', 'canvas', 'jsdom'],
+		external: ['vscode', 'tslib', 'emitter', 'canvas', 'jsdom', 'playwright', 'playwright-core'],
 		logLevel: 'silent',
 		plugins: [
 			copyStaticFilesPlugin,

@@ -3476,14 +3476,14 @@ function renderMarkdown(text, includeContext) {
             // Use data-file-path for unified path handling across all media types
             if (title) {
                 return `<figure class="media-figure">
-                    <span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
+                    <span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}" data-alt-text="${escapeHtml(alt)}">
                         ${imgTag}
                         <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
                     </span>
                     ${captionHtml}
                 </figure>`;
             }
-            return `<span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}">
+            return `<span class="image-path-overlay-container" data-file-path="${escapeHtml(originalSrc)}" data-alt-text="${escapeHtml(alt)}">
                 ${imgTag}
                 <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
             </span>`;

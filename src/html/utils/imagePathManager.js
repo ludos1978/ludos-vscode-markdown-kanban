@@ -534,11 +534,17 @@ function togglePathMenu(container, filePath, mediaType) {
     const openDisabled = isBroken;
     const escapedIncludeDir = includeDir.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
+    // Extract alt/label text for web search (from data attribute, child img, or filename)
+    const altText = container.dataset.altText || container.querySelector('img')?.alt || container.querySelector('video')?.title || '';
+    const escapedAltText = altText.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const webSearchHtml = `<button class="image-path-menu-item" onclick="event.stopPropagation(); webSearchForImage('${escapedAltText}', '${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">🌐 Web Search</button>`;
+
     menu.innerHTML = `
         <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"`}>📄 Open</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">🔎 Search for File</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">📂 Browse for File</button>
+        ${webSearchHtml}
         <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
         <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
@@ -695,10 +701,8 @@ function toggleMediaNotFoundMenu(container, mediaType = 'image') {
         }
     } else {
         // For overlay containers, create a floating menu
-        const filePath = container.dataset[config.pathDataAttr];
-        if (filePath) {
-            togglePathMenu(container, filePath, mediaType);
-        }
+        const filePath = container.dataset[config.pathDataAttr] || '';
+        togglePathMenu(container, filePath, mediaType);
     }
 }
 
@@ -929,9 +933,7 @@ function createBrokenPathMatcher(brokenPaths) {
  * @returns {string} Menu HTML
  */
 function generateBrokenMediaMenuHtml(htmlEscapedPath, isAbsolutePath, config, mediaType) {
-    const webSearchBtn = mediaType === 'image'
-        ? `<button class="${config.menuItemClass}" data-action="web-search">🌐 Web Search</button>`
-        : '';
+    const webSearchBtn = `<button class="${config.menuItemClass}" data-action="web-search">🌐 Web Search</button>`;
     return `
         <div class="${config.notFoundMenuClass}" data-is-absolute="${isAbsolutePath}">
             <button class="${config.menuItemClass} disabled" disabled>📄 Open</button>
@@ -1030,8 +1032,10 @@ function handleMediaNotFound(element, originalSrc, mediaType) {
     const container = document.createElement('div');
     container.className = `${config.notFoundContainerClass}${mediaType === 'video' ? ' ' + config.brokenClass : ''}`;
     container.dataset[config.pathDataAttr] = originalSrc;
-    if (mediaType === 'image' && element.alt) {
-        container.dataset.altText = element.alt;
+    // Store alt/label text for web search
+    const elementAltText = element.alt || element.title || '';
+    if (elementAltText) {
+        container.dataset.altText = elementAltText;
     }
 
     container.innerHTML = `

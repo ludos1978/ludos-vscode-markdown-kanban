@@ -8,8 +8,8 @@ import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 import { PresentationParser } from './PresentationParser';
 import { PresentationGenerator, PresentationOptions } from './PresentationGenerator';
 import { PathResolver } from '../PathResolver';
-import { MarpExportService, MarpOutputFormat } from './MarpExportService';
-import { PandocExportService, PandocOutputFormat } from './PandocExportService';
+import { MarpOutputFormat } from '../../plugins/export/MarpExportPlugin';
+import { PandocOutputFormat } from '../../plugins/export/PandocExportPlugin';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { PluginRegistry } from '../../plugins/registry/PluginRegistry';
 // MermaidExportService replaced by MermaidPlugin via PluginRegistry
@@ -2196,10 +2196,20 @@ export class ExportService {
         }
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
+        // Get MarpExportPlugin from registry
+        const registry = PluginRegistry.getInstance();
+        const marpPlugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'marp') as import('../../plugins/export/MarpExportPlugin').MarpExportPlugin | undefined;
+        if (!marpPlugin) {
+            return {
+                success: false,
+                message: 'Marp export plugin is not available. Check plugins.disabled setting.'
+            };
+        }
+
         // MODE: PREVIEW (watch mode) - run Marp in watch mode
         if (options.marpWatch) {
             // Check if Marp is already watching this file (check PREPROCESSED path, not original)
-            const isAlreadyWatching = MarpExportService.isWatching(processedMarkdownPath);
+            const isAlreadyWatching = marpPlugin.isWatching(processedMarkdownPath);
             if (isAlreadyWatching) {
                 // DON'T cleanup - Marp is still watching the preprocessed file
                 return {
@@ -2212,7 +2222,7 @@ export class ExportService {
             }
 
             try {
-                await MarpExportService.export({
+                await marpPlugin.marpExport({
                     inputFilePath: processedMarkdownPath, // Use preprocessed markdown
                     format: marpFormat,
                     outputPath: outputPath,
@@ -2254,7 +2264,7 @@ export class ExportService {
         else {
             // MODE: SAVE (single conversion)
             try {
-                await MarpExportService.export({
+                await marpPlugin.marpExport({
                     inputFilePath: processedMarkdownPath, // Use preprocessed markdown
                     format: marpFormat,
                     outputPath: outputPath,
@@ -2301,8 +2311,18 @@ export class ExportService {
         const pandocFormat: PandocOutputFormat = options.pandocFormat || 'docx';
         logger.debug(`[ExportService] runPandocConversion - pandocFormat: ${pandocFormat}`);
 
+        // Get PandocExportPlugin from registry
+        const registry = PluginRegistry.getInstance();
+        const pandocPlugin = registry.getAllExportPlugins().find(p => p.metadata.id === 'pandoc') as import('../../plugins/export/PandocExportPlugin').PandocExportPlugin | undefined;
+        if (!pandocPlugin) {
+            return {
+                success: false,
+                message: 'Pandoc export plugin is not available. Check plugins.disabled setting.'
+            };
+        }
+
         // Check availability
-        const isAvailable = await PandocExportService.isPandocAvailable();
+        const isAvailable = await pandocPlugin.isPandocAvailable();
         if (!isAvailable) {
             return {
                 success: false,
@@ -2313,7 +2333,7 @@ export class ExportService {
         // Build output path
         const dir = path.dirname(markdownPath);
         const baseName = path.basename(markdownPath, '.md');
-        const ext = PandocExportService.getExtensionForFormat(pandocFormat);
+        const ext = pandocPlugin.getExtensionForFormat(pandocFormat);
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
         // Preprocess diagrams (converts code block / file diagrams to SVG/PNG)
@@ -2321,7 +2341,7 @@ export class ExportService {
             await this.preprocessDiagrams(markdownPath, webviewPanel);
 
         try {
-            await PandocExportService.export({
+            await pandocPlugin.pandocExport({
                 inputFilePath: processedMarkdownPath,
                 format: pandocFormat,
                 outputPath: outputPath

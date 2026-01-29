@@ -612,7 +612,24 @@ export class PathCommands extends SwitchBasedCommand {
                 return this.success({ cancelled: true });
             }
 
-            // Replace the old path with the downloaded file
+            // Compute the new relative path for the downloaded file
+            const newRelativePath = path.relative(basePath, result.filePath);
+            const encodedNewPath = encodeFilePath(newRelativePath);
+            const escapedSourceUrl = result.sourceUrl.replace(/"/g, '%22');
+
+            if (!oldPath) {
+                // Empty old path (e.g., `![]()`) — _replacePaths can't match empty strings,
+                // so do a direct text replacement in the markdown files
+                const replaced = this._replaceEmptyImagePath(encodedNewPath, escapedSourceUrl, basePath, message);
+                if (replaced) {
+                    await this.refreshBoard(context);
+                    showInfo('Image downloaded and path updated');
+                    return this.success({ replaced: true });
+                }
+                return this.failure('Could not find empty image path in any file');
+            }
+
+            // Non-empty old path — use the standard replacement pipeline
             const replaceResult = await this._replacePaths(oldPath, result.filePath, basePath, context, {
                 mode: 'single',
                 pathFormat: 'auto',
@@ -623,7 +640,6 @@ export class PathCommands extends SwitchBasedCommand {
             });
 
             // After path replacement, add the source URL as the image title
-            // The markdown syntax: ![alt](path "title") - we add the source URL as title
             if (replaceResult.success && (replaceResult.data as any)?.replaced) {
                 this._addSourceUrlTitle(result.filePath, result.sourceUrl, basePath);
             }
@@ -690,6 +706,43 @@ export class PathCommands extends SwitchBasedCommand {
                 break;
             }
         }
+    }
+
+    /**
+     * Replace an empty image/media path with a new path and source URL.
+     * Handles the case where oldPath is empty (e.g., `![alt]()`) which
+     * _replacePaths/LinkReplacementService cannot match.
+     * Matches: ![any]()\s* or ![any]( )  or ![any]("title")
+     */
+    private _replaceEmptyImagePath(
+        newPath: string,
+        sourceUrl: string,
+        basePath: string,
+        message: { taskId?: string; columnId?: string; isColumnTitle?: boolean }
+    ): boolean {
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) return false;
+
+        const allFiles = fileRegistry.getAll();
+
+        for (const file of allFiles) {
+            let content = file.getContent();
+
+            // Match ![any alt]() or ![any alt]( ) or ![any alt]("existing title")
+            // This is intentionally broad since empty-path images are uncommon
+            const regex = /(!\[[^\]]*\]\()(\s*(?:"[^"]*")?\s*)\)/g;
+
+            const newContent = content.replace(regex, (match, prefix, _inside) => {
+                return `${prefix}${newPath} "${sourceUrl}")`;
+            });
+
+            if (newContent !== content) {
+                file.setContent(newContent, false);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

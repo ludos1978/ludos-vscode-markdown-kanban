@@ -310,30 +310,28 @@ export class WebImageSearchService {
             const page = await context.newPage();
 
             // Set up the selection callback
-            let selectedImageUrl: string | null = null;
             let resolveSelection: ((url: string | null) => void) | null = null;
 
             const selectionPromise = new Promise<string | null>((resolve) => {
                 resolveSelection = resolve;
             });
 
-            // Expose the selection function to the page
-            await page.exposeFunction('_kanbanSelectImage', (imageUrl: string) => {
-                selectedImageUrl = imageUrl;
+            // Expose the selection function and inject overlay on the CONTEXT level
+            // so they apply to ALL pages/tabs opened in this browser session
+            await context.exposeFunction('_kanbanSelectImage', (imageUrl: string) => {
                 if (resolveSelection) {
                     resolveSelection(imageUrl);
                 }
             });
-
-            // Inject the overlay script
-            await page.addInitScript(OVERLAY_SCRIPT);
+            await context.addInitScript(OVERLAY_SCRIPT);
 
             // Navigate to the search page
             await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-            // Wait for user selection or browser close
+            // Wait for user selection or browser close (from any page/tab)
             const closePromise = new Promise<string | null>((resolve) => {
-                page.on('close', () => resolve(null));
+                // Listen for all pages closing or browser disconnect
+                context.on('close', () => resolve(null));
                 browser.on('disconnected', () => resolve(null));
             });
 

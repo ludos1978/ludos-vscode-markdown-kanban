@@ -11,7 +11,7 @@ Goal: simpler core, features as plugins that expand rendering, embedding and exp
 | Phase 1 | DONE | Plugin Infrastructure (Core Changes) |
 | Phase 2 | DONE | Diagram Plugins (7 plugins migrated, 7 service files deleted) |
 | Phase 3a | DONE | Export Plugins — pragmatic routing (Marp, Pandoc through PluginRegistry) |
-| Phase 3b | TODO | Export Plugins — full migration (move service code into plugins, optional) |
+| Phase 3b | PARTIAL | Export Plugins — full migration (Marp/Pandoc services absorbed into plugins, service files deleted) |
 | Phase 4 | TODO | Embed Plugins (optional, lower priority) |
 | Phase 5 | TODO | Markdown-it Processor Plugins (optional, lower priority) |
 
@@ -234,7 +234,7 @@ What was NOT done (deferred to Phase 3b):
 
 ---
 
-## Phase 3b: Export Plugins — Full Migration (optional) -- TODO
+## Phase 3b: Export Plugins — Full Migration (optional) -- PARTIAL
 
 ### 3.1 Enhance ExportPlugin interface
 
@@ -467,8 +467,8 @@ src/plugins/
     RegularIncludePlugin.ts
 
   export/                 -- export format plugins
-    MarpExportPlugin.ts   -- DONE (thin wrapper, routes through PluginRegistry)
-    PandocExportPlugin.ts -- DONE (thin wrapper, routes through PluginRegistry)
+    MarpExportPlugin.ts   -- DONE (full implementation, absorbed MarpExportService)
+    PandocExportPlugin.ts -- DONE (full implementation, absorbed PandocExportService)
     MarkdownExportPlugin.ts -- TODO (Phase 3b)
 
   diagram/                -- DONE -- diagram rendering plugins
@@ -498,11 +498,11 @@ Phase 2 deletions (7 files, ~1431 LOC):
 ## Files To Delete (Phase 3b, optional)
 
 Only if full migration is done (moving service code into plugins):
-- `src/services/export/MarpExportService.ts` (655 LOC)
-- `src/services/export/MarpExtensionService.ts` (208 LOC)
-- `src/services/export/PresentationGenerator.ts` (373 LOC)
-- `src/services/export/PresentationParser.ts` (281 LOC)
-- `src/services/export/PandocExportService.ts` (381 LOC)
+- ~~`src/services/export/MarpExportService.ts`~~ (655 LOC) — DELETED, absorbed into MarpExportPlugin
+- `src/services/export/MarpExtensionService.ts` (208 LOC) — stays as shared utility
+- `src/services/export/PresentationGenerator.ts` (373 LOC) — stays as shared utility
+- `src/services/export/PresentationParser.ts` (281 LOC) — stays as shared utility
+- ~~`src/services/export/PandocExportService.ts`~~ (381 LOC) — DELETED, absorbed into PandocExportPlugin
 
 ## Files That Stay (shared infrastructure)
 

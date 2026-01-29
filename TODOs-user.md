@@ -1,3 +1,6 @@
+
+- [ ] this ![](./EN-Game_Engine_Rendering-MEDIA/1769688184578.png "**Area** (only Baked)"){height=100px} doesnt apply the height anymore in the export to marp!
+
 - [ ] what puppeteer features could we now implement that we have added that addon?
 
 - [ ] could we add more formats similar to notion?
