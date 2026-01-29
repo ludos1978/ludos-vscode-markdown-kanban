@@ -105,10 +105,11 @@ export class ExcalidrawPlugin implements DiagramPlugin {
         const files = excalidrawData.files || {};
 
         const browserPath = await BrowserService.ensureBrowser();
-        const workerPath = path.join(__dirname, '../../excalidraw-worker.js');
+        // After esbuild bundling, __dirname points to dist/
+        const workerPath = path.join(__dirname, 'excalidraw-worker.js');
 
         return new Promise<string>((resolve, reject) => {
-            const extensionRoot = path.join(__dirname, '../..');
+            const extensionRoot = path.join(__dirname, '..');
             const child = spawn('node', [workerPath], {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 cwd: extensionRoot,

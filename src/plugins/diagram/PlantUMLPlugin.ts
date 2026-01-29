@@ -72,7 +72,8 @@ export class PlantUMLPlugin implements DiagramPlugin {
                     this._showGraphvizWarning();
                 }
 
-                const vendorPath = path.join(__dirname, '../../node_modules/node-plantuml/vendor');
+                // After esbuild bundling, __dirname points to dist/
+                const vendorPath = path.join(__dirname, '../node_modules/node-plantuml/vendor');
                 const plantumlJar = path.join(vendorPath, 'plantuml.jar');
 
                 logger.debug('[PlantUMLPlugin] JAR path:', plantumlJar);
