@@ -262,3 +262,32 @@ the replacement file / link search helps finding files if the link to it is brok
   - in the main file it's relative to the main file
   - in an included file it's relative to the included filepath
 - it only re-renders the parts (columns/tasks) of the kanban that has been modified.
+
+### Plugin Architecture
+
+All rendering, import and export features are managed through a central PluginRegistry. Plugins can be individually disabled via the `markdown-kanban.plugins.disabled` setting.
+
+#### Import Plugins
+Handle `!!!include()!!!` syntax in different contexts:
+- **ColumnIncludePlugin** — includes in column headers (loads full markdown files as column content)
+- **TaskIncludePlugin** — includes in task headers (loads markdown as task content)
+- **RegularIncludePlugin** — includes in task descriptions (read-only embedded content)
+
+#### Export Plugins
+Route export operations through the plugin system:
+- **MarpExportPlugin** — PDF, PPTX, HTML exports via Marp CLI. Supports watch mode, custom themes, custom engine, handout generation.
+- **PandocExportPlugin** — DOCX, ODT, EPUB exports via Pandoc CLI. Supports platform-specific path resolution.
+
+ExportService checks plugin availability before conversion. ExportCommands queries plugins for status, themes, and version info.
+
+#### Diagram Plugins
+Render code blocks and file-based diagrams to SVG/PNG for display and export:
+- **PlantUMLPlugin** — renders `plantuml`/`puml` code blocks via Java + PlantUML JAR
+- **MermaidPlugin** — renders `mermaid` code blocks via webview-based Mermaid.js (queue-based with 30s timeout)
+- **DrawIOPlugin** — renders `.drawio`/`.dio` files via draw.io CLI
+- **ExcalidrawPlugin** — renders `.excalidraw` files via excalidraw-worker.js + Playwright
+- **PDFPlugin** — renders PDF pages to PNG via pdftoppm (poppler)
+- **EPUBPlugin** — renders EPUB pages to PNG via mutool
+- **XlsxPlugin** — renders spreadsheet sheets to PNG via LibreOffice
+
+All diagram plugins share a common interface: `isAvailable()`, `canRenderCodeBlock()`, `canRenderFile()`, `renderCodeBlock()`, `renderFile()`. The DiagramPreprocessor uses these plugins to convert diagrams before Marp/Pandoc export.
