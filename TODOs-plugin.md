@@ -11,8 +11,9 @@ Goal: simpler core, features as plugins that expand rendering, embedding and exp
 | Phase 1 | DONE | Plugin Infrastructure (Core Changes) |
 | Phase 2 | DONE | Diagram Plugins (7 plugins migrated, 7 service files deleted) |
 | Phase 3a | DONE | Export Plugins — pragmatic routing (Marp, Pandoc through PluginRegistry) |
-| Phase 3b | PARTIAL | Export Plugins — full migration (Marp/Pandoc services absorbed into plugins, service files deleted) |
-| Phase 4 | TODO | Embed Plugins (optional, lower priority) |
+| Phase 3b | DONE | Export Plugins — full migration (Marp/Pandoc services absorbed into plugins, service files deleted) |
+| Phase 4 | DONE | Embed Plugin (unified EmbedPlugin, config sync, export transform) |
+| Phase 4b | DONE | Plugin API Decoupling Audit (zero concrete imports in core, interface-only access) |
 | Phase 5 | TODO | Markdown-it Processor Plugins (optional, lower priority) |
 
 ### Plugin enable/disable
@@ -234,7 +235,7 @@ What was NOT done (deferred to Phase 3b):
 
 ---
 
-## Phase 3b: Export Plugins — Full Migration (optional) -- PARTIAL
+## Phase 3b: Export Plugins — Full Migration (optional) -- DONE
 
 ### 3.1 Enhance ExportPlugin interface
 
@@ -351,44 +352,70 @@ It stays in `src/services/export/` as shared infrastructure.
 
 ---
 
-## Phase 4: Embed Plugins (optional, lower priority) -- TODO
+## Phase 4: Embed Plugin -- DONE
 
-### 4.1 Create EmbedPlugin interface
+Single `EmbedPlugin` class owns all embed/iframe logic.
 
-File: `src/plugins/interfaces/EmbedPlugin.ts` (new)
+### 4.1 Create EmbedPlugin class -- DONE
 
-```
-EmbedPlugin {
-  metadata: {
-    id: string                       // e.g. 'youtube'
-    name: string
-    version: string
-    urlPatterns: string[]            // domain patterns, e.g. ['youtube.com/embed', 'youtu.be']
-  }
+File: `src/plugins/embed/EmbedPlugin.ts` (new)
 
-  canHandle(url: string): boolean
-  getEmbedHtml(url: string, attributes: Record<string, string>): string
-  getExportFallback(url: string, mode: 'url' | 'fallback' | 'remove'): string
-  getIframeAttributes?(): Record<string, string>   // override defaults per domain
-}
-```
+- metadata.id = `'embed'`
+- `getConfig()` — delegates to pluginConfigService for embed config
+- `getKnownDomains()` / `getDefaultIframeAttributes()` / `getExportHandling()` — config accessors
+- `getWebviewConfig()` — returns `{ knownDomains, defaultIframeAttributes }` for frontend sync
+- `transformForExport(content, mode)` — moved from ExportService.applyEmbedTransform()
+- `isImagePath(str)` — (static) moved from ExportService.isImagePath()
 
-### 4.2 Extend PluginRegistry for embed plugins
+### 4.2 Register in PluginRegistry -- DONE
 
-Add `registerEmbedPlugin()`, `findEmbedPlugin(url)`, `getAllEmbedPlugins()`
+- `registerEmbedPlugin(plugin)` / `getEmbedPlugin()` added to PluginRegistry
+- Registered in PluginLoader (gated by `isPluginDisabled('embed')`)
 
-### 4.3 Extract embed domain handlers from ConfigurationService
+### 4.3 ExportService updated -- DONE
 
-Currently ~20 hardcoded domains in `embedKnownDomains`. Each becomes an embed plugin:
-- `YouTubeEmbedPlugin`, `MiroEmbedPlugin`, `FigmaEmbedPlugin`, `CodeEmbedPlugin`, `GenericEmbedPlugin`
+- `applyEmbedTransform()` and `isImagePath()` deleted from ExportService
+- `applyContentTransformations()` delegates to EmbedPlugin via PluginRegistry
+- Unused imports (`isEmbedUrl`, `parseAttributeBlock`) removed
 
-### 4.4 Update frontend embed detection
+### 4.4 Frontend config sync wired up -- DONE
 
-Backend sends registered embed plugin metadata to frontend during init. Frontend checks URL patterns against plugin-provided patterns.
+- `WebviewUpdateService.refreshAllConfiguration()` injects embed config
+- `webview.js` `configurationUpdate` handler calls `window.updateEmbedConfig()`
+- Frontend `markdownRenderer.js` domain list synced with schema (25 domains)
 
-### 4.5 Update export embed handling
+### 4.5 Unified domain list -- DONE
 
-`applyEmbedTransform()` delegates to embed plugins for export fallback.
+- Schema updated: added 3 missing domains (prezi x2, particify) + `referrerpolicy`
+- Frontend and schema now have identical 25-domain list
+- `'embed'` added to `plugins.disabled` enum in package.json
+
+---
+
+## Phase 4b: Plugin API Decoupling Audit -- DONE
+
+Audited and fixed all coupling between core code and concrete plugin classes.
+
+### Findings (Before)
+6 concrete plugin imports in core code:
+- `ExportCommands.ts` → `MarpExportPlugin`, `PandocExportPlugin`
+- `DiagramCommands.ts` → `MermaidPlugin`
+- `DiagramPreprocessor.ts` → `MermaidPlugin`
+- `ExportService.ts` → `MarpOutputFormat` (type), `PandocOutputFormat` (type)
+- `PluginRegistry.ts` → `EmbedPlugin` (concrete class)
+
+### Fixes Applied
+1. **Extended ExportPlugin interface** with optional methods: `stopAllWatches`, `stopAllWatchesExcept`, `stopWatching`, `engineFileExists`, `getEnginePath`, `isCliAvailable`, `getVersion`, `cliExport`
+2. **Extended DiagramPlugin interface** with optional methods: `isReady`, `setWebviewPanel`, `renderBatch`, `handleRenderSuccess`, `handleRenderError`
+3. **Created EmbedPluginInterface** in `src/plugins/interfaces/EmbedPlugin.ts`
+4. **Moved type aliases** `MarpOutputFormat` and `PandocOutputFormat` to `ExportPlugin.ts` interface file
+5. **Added registry helpers** `getExportPluginById(id)` and `getDiagramPluginById(id)`
+6. **Updated all consumers** to use interfaces + optional chaining instead of concrete casts
+
+### Result (After)
+- **0 concrete `from '...plugins/(export|diagram|embed)/'` imports** in core code
+- 2 inline type-only casts remain in `ExportService.runMarpConversion/runPandocConversion` for plugin-specific option types (compile-time only, acceptable)
+- `npx tsc --noEmit` passes with zero errors
 
 ---
 
@@ -437,7 +464,7 @@ src/plugins/
     ImportPlugin.ts       -- include file handling
     ExportPlugin.ts       -- export format handling
     DiagramPlugin.ts      -- DONE -- diagram/document rendering
-    EmbedPlugin.ts        -- TODO -- embed URL handling
+    EmbedPlugin.ts        -- DONE -- embed URL handling
     MarkdownProcessorPlugin.ts -- TODO -- markdown-it plugins
     index.ts              -- central exports
 
@@ -464,7 +491,8 @@ src/plugins/
     EPUBPlugin.ts
     XlsxPlugin.ts
 
-  embed/                  -- TODO
+  embed/                  -- DONE
+    EmbedPlugin.ts
   markdown/               -- TODO
 ```
 

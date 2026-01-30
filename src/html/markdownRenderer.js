@@ -213,7 +213,7 @@ function updateSourceChildren(token, resolveSourcePath) {
 // Embed Detection and Rendering
 // ============================================================================
 
-// Default known embed domains (can be overridden via configuration)
+// Initial default embed domains — overridden by backend EmbedPlugin config on load
 let embedKnownDomains = [
     'miro.com/app/live-embed',
     'miro.com/app/embed',
@@ -242,7 +242,7 @@ let embedKnownDomains = [
     'ars.particify.de/present'
 ];
 
-// Default iframe attributes (can be overridden via configuration)
+// Initial default iframe attributes — overridden by backend EmbedPlugin config on load
 let embedDefaultIframeAttributes = {
     width: '100%',
     height: '500px',

@@ -30,7 +30,7 @@ import {
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
 import { PluginRegistry } from '../plugins/registry/PluginRegistry';
-import { MermaidPlugin } from '../plugins/diagram/MermaidPlugin';
+import { DiagramPlugin } from '../plugins/interfaces/DiagramPlugin';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -81,17 +81,13 @@ export class DiagramCommands extends SwitchBasedCommand {
         'mermaidExportSuccess': (msg) => {
             const m = msg as { requestId: string; svg: string };
             const mermaidPlugin = this._getMermaidPlugin();
-            if (mermaidPlugin) {
-                mermaidPlugin.handleRenderSuccess(m.requestId, m.svg);
-            }
+            mermaidPlugin?.handleRenderSuccess?.(m.requestId, m.svg);
             return Promise.resolve(this.success());
         },
         'mermaidExportError': (msg) => {
             const m = msg as { requestId: string; error: string };
             const mermaidPlugin = this._getMermaidPlugin();
-            if (mermaidPlugin) {
-                mermaidPlugin.handleRenderError(m.requestId, m.error);
-            }
+            mermaidPlugin?.handleRenderError?.(m.requestId, m.error);
             return Promise.resolve(this.success());
         },
         'requestDrawIORender': async (msg, ctx) => {
@@ -130,9 +126,8 @@ export class DiagramCommands extends SwitchBasedCommand {
         return PluginRegistry.getInstance();
     }
 
-    private _getMermaidPlugin(): MermaidPlugin | null {
-        const plugin = this._getRegistry().findDiagramPluginById('mermaid');
-        return plugin as MermaidPlugin | null;
+    private _getMermaidPlugin(): DiagramPlugin | null {
+        return this._getRegistry().getDiagramPluginById('mermaid') ?? null;
     }
 
     // ============= PLANTUML HANDLERS =============

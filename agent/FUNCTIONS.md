@@ -52,6 +52,120 @@ Singleton service for reading/writing per-plugin `.kanban/{pluginId}.json` confi
 
 ---
 
+## Recent Updates (2026-01-30) - Plugin API Decoupling Audit
+
+### Plugin Coupling Fixes
+Core code no longer imports concrete plugin classes. All access goes through interfaces + PluginRegistry.
+
+**Before:** 6 concrete plugin imports in core code (ExportCommands, DiagramCommands, DiagramPreprocessor, ExportService)
+**After:** 0 concrete `from '...plugins/(export|diagram|embed)/'` imports in core code
+
+### Modified: `src/plugins/interfaces/ExportPlugin.ts`
+- (NEW) `stopAllWatches?()` — optional, for watch-mode plugins
+- (NEW) `stopAllWatchesExcept?(excludeFilePath)` — optional
+- (NEW) `stopWatching?(filePath)` — optional
+- (NEW) `engineFileExists?(enginePath)` — optional, Marp-specific
+- (NEW) `getEnginePath?()` — optional, Marp-specific
+- (NEW) `isCliAvailable?()` — optional
+- (NEW) `getVersion?()` — optional
+- (NEW) `cliExport?(options)` — optional generic CLI export
+- (MOVED) `MarpOutputFormat` type alias — from MarpExportPlugin.ts
+- (MOVED) `PandocOutputFormat` type alias — from PandocExportPlugin.ts
+
+### New File: `src/plugins/interfaces/EmbedPlugin.ts`
+- `EmbedPluginInterface` — contract for embed plugin, used by PluginRegistry instead of concrete class
+
+### Modified: `src/plugins/interfaces/DiagramPlugin.ts`
+- (NEW) `isReady?()` — optional, for plugins needing async init
+- (NEW) `setWebviewPanel?(panel)` — optional, for webview-based renderers
+- (NEW) `renderBatch?(codes)` — optional, for export preprocessing
+- (NEW) `handleRenderSuccess?(requestId, result)` — optional, for webview callbacks
+- (NEW) `handleRenderError?(requestId, error)` — optional, for webview callbacks
+
+### Modified: `src/plugins/interfaces/index.ts`
+- Added exports: `MarpOutputFormat`, `PandocOutputFormat`, `EmbedPluginInterface`
+
+### Modified: `src/plugins/registry/PluginRegistry.ts`
+- (NEW) `getExportPluginById(id)` — get export plugin by metadata.id
+- (NEW) `getDiagramPluginById(id)` — get diagram plugin by metadata.id
+- (CHANGED) `_embedPlugin` field type → `EmbedPluginInterface` (was concrete `EmbedPlugin`)
+- (CHANGED) `registerEmbedPlugin()` / `getEmbedPlugin()` → use `EmbedPluginInterface`
+- Removed import of concrete `EmbedPlugin` class
+
+### Modified: `src/commands/ExportCommands.ts`
+- Removed imports: `MarpExportPlugin`, `PandocExportPlugin`
+- `_getMarpPlugin()` / `_getPandocPlugin()` → return `ExportPlugin` interface, use `getExportPluginById()`
+- All plugin method calls use optional chaining (`?.`)
+
+### Modified: `src/commands/DiagramCommands.ts`
+- Removed import: `MermaidPlugin`
+- `_getMermaidPlugin()` → returns `DiagramPlugin` interface, uses `getDiagramPluginById()`
+- `handleRenderSuccess`/`handleRenderError` calls use optional chaining
+
+### Modified: `src/services/export/DiagramPreprocessor.ts`
+- Removed import: `MermaidPlugin`
+- `_getMermaidPlugin()` → returns `DiagramPlugin` interface, uses `getDiagramPluginById()`
+- `setWebviewPanel`, `isReady`, `renderBatch` calls use optional chaining
+
+### Modified: `src/services/export/ExportService.ts`
+- Removed static imports of `MarpExportPlugin`, `PandocExportPlugin`
+- `MarpOutputFormat`/`PandocOutputFormat` now imported from interface file
+- `runMarpConversion`/`runPandocConversion` use `getExportPluginById()` + inline type-only cast
+
+### Modified: `src/plugins/export/MarpExportPlugin.ts`
+- `MarpOutputFormat` now re-exported from interface: `export type { MarpOutputFormat } from '../interfaces'`
+
+### Modified: `src/plugins/export/PandocExportPlugin.ts`
+- `PandocOutputFormat` now re-exported from interface: `export type { PandocOutputFormat } from '../interfaces'`
+
+---
+
+## Recent Updates (2026-01-29) - Phase 4: Embed Plugin
+
+### New File: `src/plugins/embed/EmbedPlugin.ts`
+Owns all embed/iframe logic: config access, export transforms, webview config sync.
+- `EmbedPlugin.getConfig()` - Get full embed config merged across layers via pluginConfigService
+- `EmbedPlugin.getKnownDomains()` - Get known embed domains from config
+- `EmbedPlugin.getDefaultIframeAttributes()` - Get default iframe attributes from config
+- `EmbedPlugin.getExportHandling()` - Get export handling mode from config
+- `EmbedPlugin.getWebviewConfig()` - Get { knownDomains, defaultIframeAttributes } for frontend sync
+- `EmbedPlugin.transformForExport(content, mode)` - Apply embed transform for export (moved from ExportService.applyEmbedTransform)
+- `EmbedPlugin.isImagePath(str)` - (static) Check if string looks like an image path (moved from ExportService.isImagePath)
+
+### Modified: `src/plugins/registry/PluginRegistry.ts`
+- `PluginRegistry.registerEmbedPlugin(plugin)` - (NEW) Register the embed plugin
+- `PluginRegistry.getEmbedPlugin()` - (NEW) Get the registered embed plugin (or null)
+
+### Modified: `src/plugins/PluginLoader.ts`
+- Registers EmbedPlugin (gated by `isPluginDisabled('embed')`)
+
+### Modified: `src/services/export/ExportService.ts`
+- `applyEmbedTransform()` - DELETED, moved to EmbedPlugin.transformForExport()
+- `isImagePath()` - DELETED, moved to EmbedPlugin.isImagePath()
+- `applyContentTransformations()` - (MODIFIED) Now delegates embed transforms to EmbedPlugin via PluginRegistry
+- Removed unused imports: `isEmbedUrl`, `parseAttributeBlock` from regexPatterns
+
+### Modified: `src/services/WebviewUpdateService.ts`
+- `refreshAllConfiguration()` - (MODIFIED) Injects embed config from EmbedPlugin into configurationUpdate message
+
+### Modified: `src/html/webview.js`
+- `configurationUpdate` handler - (MODIFIED) Calls window.updateEmbedConfig() with embedConfig from backend
+
+### Modified: `src/html/markdownRenderer.js`
+- Updated comments on hardcoded domain list to note backend override on load
+
+### Modified: `src/services/PluginConfigSchema.ts`
+- Added 3 missing domains to embed.defaults.knownDomains: prezi.com/p/embed, prezi.com/v/embed, ars.particify.de/present
+- Added referrerpolicy to defaultIframeAttributes
+
+### Modified: `src/plugins/index.ts`
+- Added EmbedPlugin export
+
+### Modified: `package.json`
+- Added 'embed' to plugins.disabled enum
+
+---
+
 ## Recent Updates (2026-01-29) - Phase 3: Export Plugin Migration
 
 ### Rewritten: `src/plugins/export/PandocExportPlugin.ts`

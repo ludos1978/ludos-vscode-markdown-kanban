@@ -35,6 +35,7 @@ import {
     ConfigurationUpdateMessage
 } from '../core/bridge/MessageTypes';
 import { BoardContentScanner } from './BoardContentScanner';
+import { PluginRegistry } from '../plugins/registry/PluginRegistry';
 import * as path from 'path';
 
 /**
@@ -232,7 +233,13 @@ export class WebviewUpdateService {
 
             // 2. Load all workspace settings and send to webview
             const layoutPresets = this._deps.webviewManager.getLayoutPresetsConfiguration();
-            const config = this._applyDocumentMarpPreference(configService.getBoardViewConfig(layoutPresets));
+            const config: Record<string, unknown> = this._applyDocumentMarpPreference(configService.getBoardViewConfig(layoutPresets));
+
+            // 3. Inject embed plugin config for frontend sync
+            const embedPlugin = PluginRegistry.getInstance().getEmbedPlugin();
+            if (embedPlugin) {
+                config.embedConfig = embedPlugin.getWebviewConfig();
+            }
 
             // Send configuration to webview
             const configMessage: ConfigurationUpdateMessage = {

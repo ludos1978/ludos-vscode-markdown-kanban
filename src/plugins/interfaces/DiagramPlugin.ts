@@ -131,6 +131,31 @@ export interface DiagramPlugin {
      * Get file info for paginated types (PDF page count, EPUB page count)
      */
     getFileInfo?(filePath: string): Promise<DiagramFileInfo>;
+
+    /**
+     * Check if the plugin is ready to render (optional, for plugins that need async initialization)
+     */
+    isReady?(): boolean;
+
+    /**
+     * Set the webview panel for browser-based rendering (optional, for webview-based renderers)
+     */
+    setWebviewPanel?(panel: import('vscode').WebviewPanel): void;
+
+    /**
+     * Render multiple code blocks in batch (optional, for export preprocessing)
+     */
+    renderBatch?(codes: string[]): Promise<Array<string | null>>;
+
+    /**
+     * Handle a successful render response from the webview (optional, for webview-based renderers)
+     */
+    handleRenderSuccess?(requestId: string, result: string): void;
+
+    /**
+     * Handle a render error response from the webview (optional, for webview-based renderers)
+     */
+    handleRenderError?(requestId: string, error: string): void;
 }
 
 /**

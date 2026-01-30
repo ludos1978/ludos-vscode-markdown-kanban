@@ -24,16 +24,16 @@ import {
     ExportPluginMetadata,
     ExportFormat,
     ExportOptions,
-    ExportResult
+    ExportResult,
+    MarpOutputFormat
 } from '../interfaces';
 import { pluginConfigService } from '../../services/PluginConfigService';
 import { getErrorMessage } from '../../utils/stringUtils';
 import { logger } from '../../utils/logger';
 import { KanbanBoard } from '../../board/KanbanTypes';
 
-// ============= EXPORTED TYPES =============
-
-export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
+// Re-export so existing imports don't break
+export type { MarpOutputFormat } from '../interfaces';
 
 export interface MarpExportOptions {
     /** Input markdown file path */

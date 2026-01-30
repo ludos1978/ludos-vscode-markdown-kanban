@@ -172,4 +172,55 @@ export interface ExportPlugin {
      * @returns Array of theme names
      */
     getAvailableThemes?(): Promise<string[]>;
+
+    /**
+     * Stop watching all files (optional)
+     */
+    stopAllWatches?(): void;
+
+    /**
+     * Stop watching all files except the given path (optional)
+     */
+    stopAllWatchesExcept?(excludeFilePath?: string): void;
+
+    /**
+     * Stop watching a specific file (optional)
+     */
+    stopWatching?(filePath: string): void;
+
+    /**
+     * Check if the plugin's engine file exists (optional, Marp-specific)
+     */
+    engineFileExists?(enginePath?: string): boolean;
+
+    /**
+     * Get the path to the plugin's engine (optional, Marp-specific)
+     */
+    getEnginePath?(): string;
+
+    /**
+     * Check if the plugin's CLI tool is available (optional)
+     */
+    isCliAvailable?(): Promise<boolean>;
+
+    /**
+     * Get the version string of the plugin's external tool (optional)
+     */
+    getVersion?(): Promise<string | null>;
+
+    /**
+     * Export content directly via the plugin's CLI
+     * This is the plugin-specific export method (e.g., marpExport, pandocExport)
+     */
+    cliExport?(options: Record<string, unknown>): Promise<void>;
 }
+
+// ============= Output Format Types =============
+// These are here (not in plugin files) so core code can reference them
+// without importing concrete plugin classes.
+
+/** Marp output formats */
+export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
+
+/** Pandoc output formats */
+export type PandocOutputFormat = 'docx' | 'odt' | 'epub';

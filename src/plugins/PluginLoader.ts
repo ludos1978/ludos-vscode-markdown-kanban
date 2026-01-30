@@ -22,6 +22,7 @@ import { TaskIncludePlugin } from './import/TaskIncludePlugin';
 import { RegularIncludePlugin } from './import/RegularIncludePlugin';
 import { MarpExportPlugin } from './export/MarpExportPlugin';
 import { PandocExportPlugin } from './export/PandocExportPlugin';
+import { EmbedPlugin } from './embed/EmbedPlugin';
 
 // Diagram plugins
 import { PlantUMLPlugin } from './diagram/PlantUMLPlugin';
@@ -109,6 +110,17 @@ export class PluginLoader {
                 registry.registerExportPlugin(new PandocExportPlugin());
             } catch (error) {
                 console.error('[PluginLoader] Failed to register PandocExportPlugin:', error);
+            }
+        }
+
+        // ============= EMBED PLUGIN =============
+
+        // Embed Plugin — owns embed/iframe config, export transform, webview sync
+        if (!isPluginDisabled('embed')) {
+            try {
+                registry.registerEmbedPlugin(new EmbedPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register EmbedPlugin:', error);
             }
         }
 

@@ -1,5 +1,5 @@
 import { PluginRegistry } from '../../plugins/registry/PluginRegistry';
-import { MermaidPlugin } from '../../plugins/diagram/MermaidPlugin';
+import { DiagramPlugin } from '../../plugins/interfaces/DiagramPlugin';
 import { DiagramPatterns, parseAttributeBlock } from '../../shared/regexPatterns';
 import { showError } from '../NotificationService';
 import * as path from 'path';
@@ -46,15 +46,12 @@ export class DiagramPreprocessor {
         // Set up Mermaid rendering via plugin if panel is available
         if (webviewPanel) {
             const mermaidPlugin = this._getMermaidPlugin();
-            if (mermaidPlugin) {
-                mermaidPlugin.setWebviewPanel(webviewPanel);
-            }
+            mermaidPlugin?.setWebviewPanel?.(webviewPanel);
         }
     }
 
-    private _getMermaidPlugin(): MermaidPlugin | null {
-        const plugin = this._registry.findDiagramPluginById('mermaid');
-        return plugin as MermaidPlugin | null;
+    private _getMermaidPlugin(): DiagramPlugin | null {
+        return this._registry.getDiagramPluginById('mermaid') ?? null;
     }
 
     /**
@@ -326,7 +323,7 @@ export class DiagramPreprocessor {
         const mermaidPlugin = this._getMermaidPlugin();
 
         // Check if plugin is ready
-        if (!mermaidPlugin || !mermaidPlugin.isReady()) {
+        if (!mermaidPlugin || !mermaidPlugin.isReady?.()) {
             console.error('[DiagramPreprocessor] ❌ Mermaid plugin not ready (no webview)');
             showError(
                 'Cannot export Mermaid diagrams: Please open the Kanban board view first, then try exporting again.'
@@ -338,6 +335,10 @@ export class DiagramPreprocessor {
         const codes = diagrams.map(d => d.code);
 
         // Render via plugin (handles queuing and responses)
+        if (!mermaidPlugin.renderBatch) {
+            console.error('[DiagramPreprocessor] ❌ Mermaid plugin does not support renderBatch');
+            return [];
+        }
         const svgs = await mermaidPlugin.renderBatch(codes);
 
         // Save results

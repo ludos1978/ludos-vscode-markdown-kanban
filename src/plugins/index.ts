@@ -23,3 +23,6 @@ export { RegularIncludePlugin } from './import/RegularIncludePlugin';
 
 // Export Plugins
 export { MarpExportPlugin } from './export/MarpExportPlugin';
+
+// Embed Plugin
+export { EmbedPlugin } from './embed/EmbedPlugin';

@@ -14,16 +14,16 @@ import {
     ExportPluginMetadata,
     ExportFormat,
     ExportOptions,
-    ExportResult
+    ExportResult,
+    PandocOutputFormat
 } from '../interfaces';
 import { ConfigurationService } from '../../services/ConfigurationService';
 import { getErrorMessage } from '../../utils/stringUtils';
 import { logger } from '../../utils/logger';
 import { KanbanBoard } from '../../board/KanbanTypes';
 
-// ============= EXPORTED TYPES =============
-
-export type PandocOutputFormat = 'docx' | 'odt' | 'epub';
+// Re-export so existing imports don't break
+export type { PandocOutputFormat } from '../interfaces';
 
 export interface PandocExportOptions {
     /** Input markdown file path */

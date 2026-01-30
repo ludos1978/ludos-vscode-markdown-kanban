@@ -26,7 +26,9 @@ export {
     ExportPluginMetadata,
     ExportFormat,
     ExportOptions,
-    ExportResult
+    ExportResult,
+    MarpOutputFormat,
+    PandocOutputFormat
 } from './ExportPlugin';
 
 // Diagram Plugin types
@@ -38,3 +40,6 @@ export {
     DiagramRenderResult,
     DiagramFileInfo
 } from './DiagramPlugin';
+
+// Embed Plugin interface
+export { EmbedPluginInterface } from './EmbedPlugin';

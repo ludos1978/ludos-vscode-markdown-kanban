@@ -4766,7 +4766,8 @@
               "epub",
               "xlsx",
               "marp",
-              "pandoc"
+              "pandoc",
+              "embed"
             ]
           },
           "default": [],

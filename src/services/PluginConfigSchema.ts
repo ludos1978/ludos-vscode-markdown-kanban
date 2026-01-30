@@ -98,7 +98,10 @@ export const PLUGIN_CONFIG_SCHEMAS: Record<string, PluginConfigSchemaEntry> = {
                 'notion.so',
                 'airtable.com/embed',
                 'loom.com/embed',
-                'loom.com/share'
+                'loom.com/share',
+                'prezi.com/p/embed',
+                'prezi.com/v/embed',
+                'ars.particify.de/present'
             ],
             defaultIframeAttributes: {
                 width: '100%',
@@ -106,7 +109,8 @@ export const PLUGIN_CONFIG_SCHEMAS: Record<string, PluginConfigSchemaEntry> = {
                 frameborder: '0',
                 allowfullscreen: true,
                 loading: 'lazy',
-                allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture'
+                allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture',
+                referrerpolicy: 'strict-origin-when-cross-origin'
             },
             exportHandling: 'url'
         } satisfies EmbedPluginConfig as Record<string, unknown>,

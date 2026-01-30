@@ -18,6 +18,7 @@ import {
     DiagramPluginContext
 } from '../interfaces';
 import { ValidationResult } from '../../shared/interfaces';
+import { EmbedPluginInterface } from '../interfaces/EmbedPlugin';
 
 // Re-export for external access
 export { ValidationResult };
@@ -34,6 +35,7 @@ export class PluginRegistry {
     private _importPlugins: Map<string, ImportPlugin> = new Map();
     private _exportPlugins: Map<string, ExportPlugin> = new Map();
     private _diagramPlugins: Map<string, DiagramPlugin> = new Map();
+    private _embedPlugin: EmbedPluginInterface | null = null;
     private _initialized: boolean = false;
 
     private constructor() {
@@ -146,6 +148,20 @@ export class PluginRegistry {
      */
     getAllExportPlugins(): ExportPlugin[] {
         return Array.from(this._exportPlugins.values());
+    }
+
+    /**
+     * Get an export plugin by its metadata.id (e.g., 'marp', 'pandoc')
+     */
+    getExportPluginById(id: string): ExportPlugin | undefined {
+        return this._exportPlugins.get(id);
+    }
+
+    /**
+     * Get a diagram plugin by its metadata.id (e.g., 'mermaid', 'plantuml')
+     */
+    getDiagramPluginById(id: string): DiagramPlugin | undefined {
+        return this._diagramPlugins.get(id);
     }
 
     // ============= IMPORT PLUGIN DISCOVERY =============
@@ -299,6 +315,22 @@ export class PluginRegistry {
             }
         }
         return null;
+    }
+
+    // ============= EMBED PLUGIN =============
+
+    /**
+     * Register the embed plugin
+     */
+    registerEmbedPlugin(plugin: EmbedPluginInterface): void {
+        this._embedPlugin = plugin;
+    }
+
+    /**
+     * Get the registered embed plugin (or null)
+     */
+    getEmbedPlugin(): EmbedPluginInterface | null {
+        return this._embedPlugin;
     }
 
     // ============= DIAGRAM PLUGIN ACTIVATION =============

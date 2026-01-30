@@ -2862,6 +2862,11 @@ if (!webviewEventListenersInitialized) {
             if (typeof window.regenerateAllBurgerMenus === 'function') {
                 window.regenerateAllBurgerMenus();
             }
+
+            // Sync embed config from backend EmbedPlugin
+            if (configData.embedConfig && typeof window.updateEmbedConfig === 'function') {
+                window.updateEmbedConfig(configData.embedConfig);
+            }
             break;
         }
         case 'unfoldColumnsBeforeUpdate':

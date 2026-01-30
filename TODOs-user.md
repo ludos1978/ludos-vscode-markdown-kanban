@@ -1,47 +1,8 @@
-
-- [ ] this ![](./EN-Game_Engine_Rendering-MEDIA/1769688184578.png "**Area** (only Baked)"){height=100px} doesnt apply the height anymore in the export to marp!
-
 - [ ] what puppeteer features could we now implement that we have added that addon?
 
-- [ ] could we add more formats similar to notion?
+- [ ] could we add more formats/features similar to notion?
 
-- [x] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in playwright that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the playwright?
-
-- [x] we have so many addons and features. would it make sense to refactor the features so they function as plugins that can be added.
-
-i am thinking about the features:
-- "marp export"
-- "pandoc export"
-- "excalidraw rendering & export"
-- "drawio rendering & export"
-- "mermaid rendering & export"
-- "plantuml rendering and export"
-- "website embedding & export"
-- "alternative image search (using web)"
-- puppeteer
-- export to specific formats 
-- integration of other markdown-it plugins
-
-where would the base sytem require modular systems that this could be integrated? my first guesses would be:
-- kanban
-  - rendering and display of the kanban board/columns/tasks/elements
-  - board/column/task burger options menu
-  - element burger options (images, videos, other elements)
-  - different tags
-  - card and column source (template) system
-  - sorting features
-  - yaml header editing
-  - modification of elements, tasks, columns
-  - processing after content changed (definition of order)
-  - in the active processes menu
-  - data loading & saving
-- kanban dashboard integration
-- kanban search intergation
-- export
-  - options
-  - filters 
-  - postprocessors
-
+- [ ] i want to be able to do ![](file.csv) to import an csv.
 
 - [ ] the filterTagsForExport in the frontend might be obsolete. is it used?
 
@@ -51,13 +12,7 @@ where would the base sytem require modular systems that this could be integrated
 
 - [ ] Add some internal navigation functionality. it could use user defined tags such as #2.1 and somethink like <#2.1> or what would you suggest?
 
-- [ ] add Excourse to the Teaching-Content 
-
-- [ ] i want an addiitonal side panel that. for each kanban panel that is within it.
-  - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
-  - list all tags (for example #todo )
-  - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
-
+- [ ] add Excourse to the Teaching-Content  tags
 
 - [ ] when focussing a search result: activate a scroll locking on the target, if the target position doesnt move for 0.2 seconds, then release the locking on the target. if the user moves the scrollbar or the mouse wheel or uses the arrow keys, release the locking early. 
 
@@ -65,11 +20,7 @@ where would the base sytem require modular systems that this could be integrated
 
 - [ ] if we replace links by using "search for file" and do multiple replacements at once, i want all of them undone in one step. not individual ones.
 
-- [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
-
 - [ ] add a table editor that allows sorting of content by each category.
-
-- [ ] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
@@ -114,6 +65,54 @@ Collects all cards that didn't match any gather rule:
 ---
 
 # DONE
+
+- [x] in the marp presentation export the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
+
+- [x] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality.
+
+
+- [x] i want an addiitonal side panel that. for each kanban panel that is within it.
+  - analyze the dates, times etc. for a defined timeframe into the future (3days, 7days, 30days)
+  - list all tags (for example #todo )
+  - the timeframe and tags should be configurable for each kanban board. these settings should be stored in the workspace settings!
+
+- [x] if a link !(alt text)[] only has an alt text, then the search feature could open a web-search (search url should be defineable (google, kagi, etc.)) in playwright that does a direct image search for the alt text. the user can select an image which is then directly downloaded, set as the image path and the source is set as the image text !(alt)[image.png "image text"] . What options do we have to right click an image and add a option there within the playwright?
+
+- [x] we have so many addons and features. would it make sense to refactor the features so they function as plugins that can be added.
+
+i am thinking about the features:
+- "marp export"
+- "pandoc export"
+- "excalidraw rendering & export"
+- "drawio rendering & export"
+- "mermaid rendering & export"
+- "plantuml rendering and export"
+- "website embedding & export"
+- "alternative image search (using web)"
+- puppeteer
+- export to specific formats 
+- integration of other markdown-it plugins
+
+where would the base sytem require modular systems that this could be integrated? my first guesses would be:
+- kanban
+  - rendering and display of the kanban board/columns/tasks/elements
+  - board/column/task burger options menu
+  - element burger options (images, videos, other elements)
+  - different tags
+  - card and column source (template) system
+  - sorting features
+  - yaml header editing
+  - modification of elements, tasks, columns
+  - processing after content changed (definition of order)
+  - in the active processes menu
+  - data loading & saving
+- kanban dashboard integration
+- kanban search intergation
+- export
+  - options
+  - filters 
+  - postprocessors
+
 
 - [x] /refactor the burger menu is for the embeds, links, etc:
 - types that show the menu
