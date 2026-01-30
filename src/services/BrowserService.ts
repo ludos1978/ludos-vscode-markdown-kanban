@@ -127,4 +127,39 @@ export class BrowserService {
             ...options,
         });
     }
+
+    /**
+     * Launch a headed browser with a persistent user data directory.
+     * Cookies, localStorage, and session data are retained across launches.
+     *
+     * Uses Playwright's launchPersistentContext() which returns a BrowserContext
+     * directly (not a Browser). The caller should use the context for pages
+     * and call context.close() when done.
+     *
+     * @param userDataDir - Directory to store the browser profile
+     * @param options - Additional Playwright launch options
+     * @returns Playwright BrowserContext with persistent storage
+     */
+    static async launchPersistentHeaded(userDataDir: string, options?: Record<string, unknown>): Promise<any> {
+        const execPath = await BrowserService.ensureBrowser();
+        const { chromium } = require('playwright');
+
+        // Ensure the profile directory exists
+        if (!fs.existsSync(userDataDir)) {
+            fs.mkdirSync(userDataDir, { recursive: true });
+        }
+
+        return chromium.launchPersistentContext(userDataDir, {
+            headless: false,
+            executablePath: execPath,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-session-crashed-bubble',
+                '--hide-crash-restore-bubble',
+                '--noerrdialogs',
+            ],
+            ...options,
+        });
+    }
 }

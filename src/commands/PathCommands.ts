@@ -628,7 +628,7 @@ export class PathCommands extends SwitchBasedCommand {
             // Compute the new relative path from the owning file's directory
             const newRelativePath = path.relative(directory, result.filePath);
             const encodedNewPath = encodeFilePath(newRelativePath);
-            const escapedSourceUrl = result.sourceUrl.replace(/"/g, '%22');
+            const escapedSourceUrl = result.sourceUrl ? result.sourceUrl.replace(/"/g, '%22') : '';
 
             if (!oldPath) {
                 // Empty old path (e.g., `![]()`) — _replacePaths can't match empty strings,
@@ -652,9 +652,22 @@ export class PathCommands extends SwitchBasedCommand {
                 successMessage: 'Image downloaded and path updated'
             });
 
-            // After path replacement, add the source URL as the image title
-            if (replaceResult.success && (replaceResult.data as any)?.replaced) {
-                this._addSourceUrlTitle(result.filePath, result.sourceUrl, directory);
+            // After path replacement, add the source URL as the image title.
+            // _replacePaths already sent a targeted updateTaskContent WITHOUT the title.
+            // A full refreshBoard won't help (isFullRefresh=false, webview skips re-render).
+            // So we update the file, THEN update the board task, THEN send a targeted update.
+            if (replaceResult.success && (replaceResult.data as any)?.replaced && result.sourceUrl) {
+                const actualNewPath = (replaceResult.data as any)?.newPath;
+                if (actualNewPath) {
+                    // 1. Update the file content with the source URL title
+                    this._addSourceUrlToImageTitle(actualNewPath, result.sourceUrl);
+
+                    // 2. Also update the board task object and send targeted webview update
+                    this._updateBoardTaskWithSourceUrl(
+                        context, actualNewPath, result.sourceUrl,
+                        message.taskId, message.columnId
+                    );
+                }
             }
 
             return replaceResult;
@@ -666,58 +679,94 @@ export class PathCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Add source URL as title to a markdown image after path replacement.
+     * Add source URL to the title of a markdown image that was just replaced.
+     * Uses the actual path string written by LinkReplacementService.
      * Transforms ![alt](path) into ![alt](path "sourceUrl")
+     * Preserves existing title: ![alt](path "old") => ![alt](path "sourceUrl, old")
      */
-    private _addSourceUrlTitle(imagePath: string, sourceUrl: string, basePath: string): void {
+    private _addSourceUrlToImageTitle(newPathInFile: string, sourceUrl: string): void {
+        if (!sourceUrl || !newPathInFile) return;
+
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) return;
 
-        const allFiles = fileRegistry.getAll();
-        const relativePath = path.relative(basePath, imagePath);
-        const encodedRelativePath = encodeFilePath(relativePath);
+        const escapedSourceUrl = sourceUrl.replace(/"/g, '%22');
+        const escapedPath = newPathInFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match image syntax with this exact path, with or without existing title
+        const regex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedPath}(\\s+"[^"]*")?\\)`, 'g');
 
-        // Search for the image path in all files
-        for (const file of allFiles) {
-            let content = file.getContent();
+        for (const file of fileRegistry.getAll()) {
+            const content = file.getContent();
 
-            // Match ![any alt](our-path) or ![any alt](our-path "existing-title")
-            // We need to find the exact path variant used in the file
-            const pathVariants = [relativePath, encodedRelativePath, imagePath];
-            // Also try with ./ prefix
-            if (!relativePath.startsWith('./') && !relativePath.startsWith('/')) {
-                pathVariants.push('./' + relativePath);
-            }
-            // Also try encoded variants with ./ prefix
-            if (!encodedRelativePath.startsWith('./') && !encodedRelativePath.startsWith('/')) {
-                pathVariants.push('./' + encodedRelativePath);
-            }
-            // Try just the basename as last resort
-            pathVariants.push(path.basename(imagePath));
-
-            let modified = false;
-            for (const pathVariant of pathVariants) {
-                const escapedPath = pathVariant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                // Match image syntax with this path, with or without existing title
-                const regex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedPath}(\\s+"[^"]*")?\\)`, 'g');
-
-                const escapedSourceUrl = sourceUrl.replace(/"/g, '%22');
-                const newContent = content.replace(regex, (match, prefix, existingTitle) => {
-                    // Replace or add the title with the source URL
-                    return `${prefix}${pathVariant} "${escapedSourceUrl}")`;
-                });
-
-                if (newContent !== content) {
-                    content = newContent;
-                    modified = true;
-                    break;
+            const newContent = content.replace(regex, (match, prefix, existingTitle) => {
+                if (existingTitle) {
+                    const oldContent = existingTitle.trim().replace(/^"/, '').replace(/"$/, '');
+                    return `${prefix}${newPathInFile} "${escapedSourceUrl}, ${oldContent}")`;
                 }
-            }
+                return `${prefix}${newPathInFile} "${escapedSourceUrl}")`;
+            });
 
-            if (modified) {
-                file.setContent(content, false);
+            if (newContent !== content) {
+                file.setContent(newContent, false);
                 break;
             }
+        }
+    }
+
+    /**
+     * After adding a source URL title to the file, also update the in-memory
+     * board task and send a targeted updateTaskContent so the webview reflects
+     * the change immediately. A full refreshBoard doesn't work because
+     * isFullRefresh=false and the webview skips re-rendering already-updated tasks.
+     */
+    private _updateBoardTaskWithSourceUrl(
+        context: CommandContext,
+        newPath: string,
+        sourceUrl: string,
+        taskId?: string,
+        columnId?: string
+    ): void {
+        if (!taskId) return;
+
+        const board = context.boardStore.getBoard();
+        if (!board) return;
+
+        const column = columnId
+            ? findColumn(board, columnId)
+            : findColumnContainingTask(board, taskId);
+        if (!column) return;
+
+        const task = column.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Apply the same title transformation used by _addSourceUrlToImageTitle
+        const escapedSourceUrl = sourceUrl.replace(/"/g, '%22');
+        const escapedPath = newPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedPath}(\\s+"[^"]*")?\\)`, 'g');
+
+        const addTitle = (text: string) => text.replace(regex, (_match, prefix, existingTitle) => {
+            if (existingTitle) {
+                const oldContent = existingTitle.trim().replace(/^"/, '').replace(/"$/, '');
+                return `${prefix}${newPath} "${escapedSourceUrl}, ${oldContent}")`;
+            }
+            return `${prefix}${newPath} "${escapedSourceUrl}")`;
+        });
+
+        task.title = addTitle(task.title);
+        if (task.description) {
+            task.description = addTitle(task.description);
+        }
+
+        // Send targeted update to the webview
+        const webviewBridge = context.getWebviewBridge();
+        if (webviewBridge) {
+            webviewBridge.send({
+                type: 'updateTaskContent',
+                taskId: task.id,
+                columnId: column.id,
+                task: task,
+                imageMappings: {}
+            });
         }
     }
 
@@ -745,7 +794,15 @@ export class PathCommands extends SwitchBasedCommand {
             // This is intentionally broad since empty-path images are uncommon
             const regex = /(!\[[^\]]*\]\()(\s*(?:"[^"]*")?\s*)\)/g;
 
-            const newContent = content.replace(regex, (match, prefix, _inside) => {
+            const newContent = content.replace(regex, (match, prefix, inside) => {
+                if (!sourceUrl) {
+                    return `${prefix}${newPath})`;
+                }
+                // Check if there's an existing title to preserve
+                const titleMatch = inside && inside.trim().match(/^"([^"]*)"$/);
+                if (titleMatch && titleMatch[1]) {
+                    return `${prefix}${newPath} "${sourceUrl}, ${titleMatch[1]}")`;
+                }
                 return `${prefix}${newPath} "${sourceUrl}")`;
             });
 

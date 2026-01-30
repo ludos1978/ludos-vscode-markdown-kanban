@@ -9,10 +9,14 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { BrowserService } from './BrowserService';
 import { pluginConfigService } from './PluginConfigService';
 import { logger } from '../utils/logger';
+
+/** Browser profile directory — per-user, shared across workspaces */
+const BROWSER_PROFILE_DIR = path.join(os.homedir(), '.kanban', 'browser-profile');
 
 /**
  * Result of a successful image search and selection
@@ -54,141 +58,155 @@ const CONTENT_TYPE_EXTENSIONS: Record<string, string> = {
  * Overlay injection script - adds hover overlays with "Select" button on images.
  * Injected via page.addInitScript() so it runs before page scripts.
  */
+/**
+ * Floating overlay approach: a single fixed-position overlay that tracks
+ * the hovered image via getBoundingClientRect(). No DOM wrapping — avoids
+ * breaking search engine layouts and click/hover handlers.
+ */
 const OVERLAY_SCRIPT = `
 (function() {
-    const STYLE_ID = '_kanban_image_select_style';
-    const MIN_SIZE = 50;
+    'use strict';
+    var STYLE_ID = '_kanban_image_select_style';
+    var MIN_SIZE = 50;
+    var overlay = null;
+    var currentImg = null;
 
     function addStyles() {
         if (document.getElementById(STYLE_ID)) return;
-        const style = document.createElement('style');
+        var style = document.createElement('style');
         style.id = STYLE_ID;
-        style.textContent = \`
-            ._kanban_img_overlay {
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(59, 130, 246, 0.3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                opacity: 0;
-                transition: opacity 0.15s;
-                pointer-events: none;
-                z-index: 999999;
-            }
-            ._kanban_img_wrapper:hover ._kanban_img_overlay {
-                opacity: 1;
-                pointer-events: auto;
-            }
-            ._kanban_img_wrapper {
-                position: relative;
-                display: inline-block;
-            }
-            ._kanban_select_btn {
-                background: #2563eb;
-                color: white;
-                border: 2px solid white;
-                border-radius: 6px;
-                padding: 6px 16px;
-                font-size: 14px;
-                font-weight: bold;
-                cursor: pointer;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                z-index: 1000000;
-            }
-            ._kanban_select_btn:hover {
-                background: #1d4ed8;
-            }
-        \`;
+        style.textContent = [
+            '#_kanban_overlay {',
+            '  position: fixed;',
+            '  background: rgba(59,130,246,0.3);',
+            '  display: flex;',
+            '  align-items: center;',
+            '  justify-content: center;',
+            '  z-index: 2147483647;',
+            '  pointer-events: none;',
+            '  opacity: 0;',
+            '  transition: opacity 0.15s;',
+            '}',
+            '#_kanban_overlay.visible {',
+            '  opacity: 1;',
+            '  pointer-events: auto;',
+            '}',
+            '#_kanban_overlay button {',
+            '  background: #2563eb;',
+            '  color: white;',
+            '  border: 2px solid white;',
+            '  border-radius: 6px;',
+            '  padding: 6px 16px;',
+            '  font-size: 14px;',
+            '  font-weight: bold;',
+            '  cursor: pointer;',
+            '  box-shadow: 0 2px 8px rgba(0,0,0,0.3);',
+            '  pointer-events: auto;',
+            '}',
+            '#_kanban_overlay button:hover {',
+            '  background: #1d4ed8;',
+            '}'
+        ].join('\\n');
         document.head.appendChild(style);
     }
 
-    function isLargeEnough(el) {
-        const rect = el.getBoundingClientRect();
-        return rect.width >= MIN_SIZE && rect.height >= MIN_SIZE;
-    }
+    function ensureOverlay() {
+        if (overlay) return;
+        overlay = document.createElement('div');
+        overlay.id = '_kanban_overlay';
 
-    function getImageSrc(el) {
-        if (el.tagName === 'IMG') {
-            return el.src || el.currentSrc;
-        }
-        const bg = getComputedStyle(el).backgroundImage;
-        if (bg && bg !== 'none') {
-            const match = bg.match(/url\\(["']?(.+?)["']?\\)/);
-            if (match) return match[1];
-        }
-        return null;
-    }
-
-    function wrapElement(el) {
-        if (el.dataset._kanbanWrapped) return;
-        if (!isLargeEnough(el)) return;
-
-        const src = getImageSrc(el);
-        if (!src) return;
-
-        el.dataset._kanbanWrapped = 'true';
-
-        const wrapper = document.createElement('span');
-        wrapper.className = '_kanban_img_wrapper';
-
-        const overlay = document.createElement('div');
-        overlay.className = '_kanban_img_overlay';
-
-        const btn = document.createElement('button');
-        btn.className = '_kanban_select_btn';
+        var btn = document.createElement('button');
         btn.textContent = 'Select this image';
+
+        btn.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }, true);
+
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            // Re-read src at click time in case it changed (lazy loading)
-            const currentSrc = getImageSrc(el) || src;
-            if (window._kanbanSelectImage) {
-                window._kanbanSelectImage(currentSrc);
+            if (!currentImg) return;
+            var src = currentImg.src || currentImg.currentSrc;
+            if (src && window._kanbanSelectImage) {
+                window._kanbanSelectImage(JSON.stringify({
+                    imageUrl: src,
+                    pageUrl: window.location.href
+                }));
             }
         }, true);
 
         overlay.appendChild(btn);
 
-        el.parentNode.insertBefore(wrapper, el);
-        wrapper.appendChild(el);
-        wrapper.appendChild(overlay);
+        overlay.addEventListener('mouseleave', function() {
+            overlay.classList.remove('visible');
+            currentImg = null;
+        });
+
+        document.body.appendChild(overlay);
     }
 
-    function scanExistingElements() {
+    function positionOverlay(img) {
+        var rect = img.getBoundingClientRect();
+        overlay.style.top = rect.top + 'px';
+        overlay.style.left = rect.left + 'px';
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+    }
+
+    function trackImage(img) {
+        if (img._kanbanTracked) return;
+        img._kanbanTracked = true;
+
+        img.addEventListener('mouseenter', function() {
+            var rect = img.getBoundingClientRect();
+            if (rect.width < MIN_SIZE || rect.height < MIN_SIZE) return;
+            if (!(img.src || img.currentSrc)) return;
+
+            currentImg = img;
+            ensureOverlay();
+            positionOverlay(img);
+            overlay.classList.add('visible');
+        });
+
+        img.addEventListener('mouseleave', function(e) {
+            if (overlay && overlay.contains(e.relatedTarget)) return;
+            if (overlay) overlay.classList.remove('visible');
+            currentImg = null;
+        });
+    }
+
+    function scanImages() {
         document.querySelectorAll('img').forEach(function(img) {
             if (img.complete && img.naturalWidth >= MIN_SIZE && img.naturalHeight >= MIN_SIZE) {
-                wrapElement(img);
+                trackImage(img);
             } else if (!img.complete) {
                 img.addEventListener('load', function() {
                     if (img.naturalWidth >= MIN_SIZE && img.naturalHeight >= MIN_SIZE) {
-                        wrapElement(img);
+                        trackImage(img);
                     }
                 }, { once: true });
             }
         });
     }
 
-    function observeNewElements() {
-        const observer = new MutationObserver(function(mutations) {
-            for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
+    function observeNewImages() {
+        var observer = new MutationObserver(function(mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var nodes = mutations[i].addedNodes;
+                for (var j = 0; j < nodes.length; j++) {
+                    var node = nodes[j];
                     if (node.nodeType !== 1) continue;
                     if (node.tagName === 'IMG') {
-                        if (node.complete) {
-                            wrapElement(node);
-                        } else {
-                            node.addEventListener('load', function() { wrapElement(node); }, { once: true });
-                        }
+                        if (node.complete) { trackImage(node); }
+                        else { node.addEventListener('load', function() { trackImage(this); }, { once: true }); }
                     }
                     if (node.querySelectorAll) {
                         node.querySelectorAll('img').forEach(function(img) {
-                            if (img.complete) {
-                                wrapElement(img);
-                            } else {
-                                img.addEventListener('load', function() { wrapElement(img); }, { once: true });
-                            }
+                            if (img.complete) { trackImage(img); }
+                            else { img.addEventListener('load', function() { trackImage(this); }, { once: true }); }
                         });
                     }
                 }
@@ -199,18 +217,12 @@ const OVERLAY_SCRIPT = `
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            addStyles();
-            scanExistingElements();
-            observeNewElements();
+            addStyles(); scanImages(); observeNewImages();
         });
     } else {
-        addStyles();
-        scanExistingElements();
-        observeNewElements();
+        addStyles(); scanImages(); observeNewImages();
     }
 
-    // Re-scan periodically for lazy-loaded images
-    setInterval(scanExistingElements, 2000);
 })();
 `;
 
@@ -302,12 +314,23 @@ export class WebImageSearchService {
         const searchUrl = WebImageSearchService._buildSearchUrl(altText);
         logger.debug('[WebImageSearchService.searchAndSelect] Opening search', { altText, searchUrl, basePath });
 
-        let browser: any = null;
+        let context: any = null;
 
         try {
-            browser = await BrowserService.launchHeaded();
-            const context = await browser.newContext();
-            const page = await context.newPage();
+            // Remove stale lock/crash markers left by a previous crash or improper shutdown.
+            // Chrome refuses to open a persistent profile if these exist.
+            // SingletonLock is a symlink on POSIX (target: "hostname-pid") — use lstat
+            // because existsSync follows symlinks and returns false for dangling ones.
+            const staleFiles = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+            for (const name of staleFiles) {
+                try { fs.unlinkSync(path.join(BROWSER_PROFILE_DIR, name)); } catch { /* not present */ }
+            }
+
+            // Use persistent context so cookies/sessions survive across launches
+            context = await BrowserService.launchPersistentHeaded(BROWSER_PROFILE_DIR);
+            // Persistent context opens a default page — reuse it instead of creating a second tab
+            const pages = context.pages();
+            const page = pages.length > 0 ? pages[0] : await context.newPage();
 
             // Set up the selection callback
             let resolveSelection: ((url: string | null) => void) | null = null;
@@ -330,35 +353,64 @@ export class WebImageSearchService {
 
             // Wait for user selection or browser close (from any page/tab)
             const closePromise = new Promise<string | null>((resolve) => {
-                // Listen for all pages closing or browser disconnect
+                // Persistent context: listen for context close and browser disconnect
                 context.on('close', () => resolve(null));
-                browser.on('disconnected', () => resolve(null));
+                const browser = context.browser();
+                if (browser) {
+                    browser.on('disconnected', () => resolve(null));
+                }
             });
 
-            const result = await Promise.race([selectionPromise, closePromise]);
+            const rawResult = await Promise.race([selectionPromise, closePromise]);
 
-            if (!result) {
+            if (!rawResult) {
                 logger.debug('[WebImageSearchService.searchAndSelect] Cancelled (browser closed without selection)');
                 return null;
             }
 
-            logger.debug('[WebImageSearchService.searchAndSelect] Image selected', { url: result });
+            // Parse the JSON payload: { imageUrl, pageUrl }
+            let imageUrl: string;
+            let pageUrl: string = '';
+            try {
+                const parsed = JSON.parse(rawResult);
+                imageUrl = parsed.imageUrl || '';
+                pageUrl = parsed.pageUrl || '';
+            } catch {
+                // Fallback: raw string is the image URL (backward compat)
+                imageUrl = rawResult;
+            }
 
-            // Download the image using the browser's network stack (bypasses CORS/hotlink issues)
-            const downloadPage = await context.newPage();
+            if (!imageUrl) {
+                logger.warn('[WebImageSearchService] No image URL in selection');
+                return null;
+            }
+
+            logger.debug('[WebImageSearchService.searchAndSelect] Image selected', { imageUrl: imageUrl.substring(0, 100), pageUrl });
+
+            // Download the image
             let imageBytes: Buffer;
             let contentType = '';
 
-            try {
-                const response = await downloadPage.goto(result, { waitUntil: 'load', timeout: 30000 });
-                if (!response || !response.ok()) {
-                    logger.warn('[WebImageSearchService] Failed to download image', { status: response?.status() });
-                    return null;
+            // Handle data: URLs (base64-encoded images from browser UI)
+            const dataUrlMatch = imageUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+            if (dataUrlMatch) {
+                contentType = dataUrlMatch[1];
+                imageBytes = Buffer.from(dataUrlMatch[2], 'base64');
+                logger.debug('[WebImageSearchService] Decoded data URL', { contentType, size: imageBytes.length });
+            } else {
+                // HTTP(S) URL — use the browser's network stack (bypasses CORS/hotlink issues)
+                const downloadPage = await context.newPage();
+                try {
+                    const response = await downloadPage.goto(imageUrl, { waitUntil: 'load', timeout: 30000 });
+                    if (!response || !response.ok()) {
+                        logger.warn('[WebImageSearchService] Failed to download image', { status: response?.status() });
+                        return null;
+                    }
+                    imageBytes = await response.body();
+                    contentType = response.headers()['content-type'] || '';
+                } finally {
+                    await downloadPage.close().catch(() => {});
                 }
-                imageBytes = await response.body();
-                contentType = response.headers()['content-type'] || '';
-            } finally {
-                await downloadPage.close().catch(() => {});
             }
 
             // Determine file extension: prefer content-type, fall back to URL extension
@@ -368,7 +420,7 @@ export class WebImageSearchService {
                 ext = ctExt;
             } else {
                 // Content-type unknown or missing, try URL-based extension
-                const urlExt = WebImageSearchService._getExtensionFromUrl(result);
+                const urlExt = imageUrl.startsWith('data:') ? '' : WebImageSearchService._getExtensionFromUrl(imageUrl);
                 ext = urlExt || '.jpg';
             }
 
@@ -382,14 +434,15 @@ export class WebImageSearchService {
 
             return {
                 filePath,
-                sourceUrl: result
+                // Use the page URL where the image was found (not the image data URL)
+                sourceUrl: pageUrl
             };
         } catch (error) {
             logger.error('[WebImageSearchService.searchAndSelect] Error', error);
             throw error;
         } finally {
-            if (browser) {
-                await browser.close().catch(() => {});
+            if (context) {
+                await context.close().catch(() => {});
             }
         }
     }
