@@ -1888,3 +1888,41 @@ WebviewBridge provides a typed, promise-based interface for webview communicatio
 - **Incremental migration**: Coexists with existing postMessage calls
 
 ---
+
+## Phase 5: Markdown-it Processor Plugin System (2026-01-30)
+
+### New File: `src/plugins/interfaces/MarkdownProcessorPlugin.ts`
+- `MarkdownPluginEntry` - Interface for markdown-it plugin metadata (id, name, priority, scope, type, windowGlobal, npmPackage, containerTypes, options)
+
+### New File: `src/plugins/markdown/markdownPluginManifest.ts`
+- `MARKDOWN_PLUGIN_MANIFEST` - Array of all 22 markdown-it plugin entries (single source of truth for IDs, priorities, scope, window globals)
+
+### New Files: Extracted custom browser plugins (`src/html/`)
+- `markdown-it-wiki-links-browser.js` - window.markdownitWikiLinks — [[document]] and [[document|title]] syntax
+- `markdown-it-tag-browser.js` - window.markdownitTag — #tag detection and rendering
+- `markdown-it-task-checkbox-browser.js` - window.markdownitTaskCheckbox — - [ ] / - [x] task checkboxes
+- `markdown-it-date-person-tag-browser.js` - window.markdownitDatePersonTag — @person, @2025-01-28 tags
+- `markdown-it-temporal-tag-browser.js` - window.markdownitTemporalTag — !date, !time, !week temporal tags
+- `markdown-it-enhanced-strikethrough-browser.js` - window.markdownitEnhancedStrikethrough — strikethrough with delete buttons
+- `markdown-it-speaker-note-browser.js` - window.markdownitSpeakerNote — ;; speaker note syntax
+- `markdown-it-html-comment-browser.js` - window.markdownitHtmlComment — HTML comment and content rendering
+
+### Modified: `src/html/markdownRenderer.js`
+- `createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode)` - (MODIFIED) Now loads all plugins via window.* globals instead of inline function references. ~730 LOC of inline plugin definitions removed.
+
+### Modified: `src/html/webview.html`
+- Added 8 `<script>` tags for extracted custom browser plugins before markdownRenderer.js
+
+### Modified: `src/plugins/registry/PluginRegistry.ts`
+- `PluginRegistry._markdownPlugins` - (NEW) Map<string, MarkdownPluginEntry> for markdown-it plugin entries
+- `PluginRegistry.registerMarkdownPlugin(entry)` - (NEW) Register a markdown plugin entry
+- `PluginRegistry.getMarkdownPlugins(scope?)` - (NEW) Get all markdown plugin entries sorted by priority, optionally filtered by scope
+- `PluginRegistry.getMarkdownPluginById(id)` - (NEW) Get a markdown plugin entry by ID
+
+### Modified: `src/plugins/PluginLoader.ts`
+- `PluginLoader.loadBuiltinPlugins()` - (MODIFIED) Now registers markdown plugin entries from MARKDOWN_PLUGIN_MANIFEST, gated by isPluginDisabled()
+
+### Modified: `package.json`
+- `markdown-kanban.plugins.disabled` - (MODIFIED) Added 22 markdown plugin IDs to the enum (wiki-links, tag, task-checkbox, etc.)
+
+---

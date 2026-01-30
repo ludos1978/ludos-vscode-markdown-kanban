@@ -26,3 +26,6 @@ export { MarpExportPlugin } from './export/MarpExportPlugin';
 
 // Embed Plugin
 export { EmbedPlugin } from './embed/EmbedPlugin';
+
+// Markdown Plugin Manifest
+export { MARKDOWN_PLUGIN_MANIFEST } from './markdown/markdownPluginManifest';

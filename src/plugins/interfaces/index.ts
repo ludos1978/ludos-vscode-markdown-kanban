@@ -43,3 +43,6 @@ export {
 
 // Embed Plugin interface
 export { EmbedPluginInterface } from './EmbedPlugin';
+
+// Markdown Processor Plugin types
+export { MarkdownPluginEntry } from './MarkdownProcessorPlugin';

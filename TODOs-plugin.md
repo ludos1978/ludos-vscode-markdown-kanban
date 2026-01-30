@@ -14,7 +14,7 @@ Goal: simpler core, features as plugins that expand rendering, embedding and exp
 | Phase 3b | DONE | Export Plugins — full migration (Marp/Pandoc services absorbed into plugins, service files deleted) |
 | Phase 4 | DONE | Embed Plugin (unified EmbedPlugin, config sync, export transform) |
 | Phase 4b | DONE | Plugin API Decoupling Audit (zero concrete imports in core, interface-only access) |
-| Phase 5 | TODO | Markdown-it Processor Plugins (optional, lower priority) |
+| Phase 5 | DONE | Markdown-it Processor Plugins (8 custom plugins extracted, manifest + registry + per-plugin disable) |
 
 ### Plugin enable/disable
 

@@ -442,62 +442,97 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
 
 // Factory function to create markdown-it instance with all plugins
 // This is called once per configuration change, not per render
+//
+// All plugins are loaded uniformly via window.* globals from <script> tags.
+// The plugin manifest (markdownPluginManifest.ts) is the single source of truth
+// for plugin IDs, priorities, and window global names.
 function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
     const md = window.markdownit({
         html: true,
         linkify: false,
         typographer: true,
         breaks: true
-    })
-    .use(wikiLinksPlugin, {
-        className: 'wiki-link'
-    })
-    .use(tagPlugin, {
-        tagColors: window.tagColors || {}
-    })
-    .use(taskCheckboxPlugin) // Task list checkboxes (- [ ] / - [x])
-    .use(datePersonTagPlugin) // @ prefix: @person, @2025-01-28
-    .use(temporalTagPlugin)  // . prefix: .w49, .2025.12.05, .mon, .15:30, .09:00-17:00
-    .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
-    .use(speakerNotePlugin) // Speaker notes (;; syntax)
-    .use(htmlCommentPlugin, {
-        commentMode: htmlCommentRenderMode,
-        contentMode: htmlContentRenderMode
-    }); // HTML comment and content rendering
+    });
 
-    // Add plugins that are available from CDN (CSP-compliant)
+    // === Custom plugins (loaded from extracted -browser.js files) ===
+    // Each plugin is registered on window.* and loaded via <script> tags in webview.html
+
+    // Wiki Links: [[document]] and [[document|title]]
+    if (typeof window.markdownitWikiLinks !== 'undefined') {
+        md.use(window.markdownitWikiLinks, { className: 'wiki-link' });
+    }
+
+    // Tag detection: #tag syntax
+    if (typeof window.markdownitTag !== 'undefined') {
+        md.use(window.markdownitTag, { tagColors: window.tagColors || {} });
+    }
+
+    // Task checkboxes: - [ ] / - [x]
+    if (typeof window.markdownitTaskCheckbox !== 'undefined') {
+        md.use(window.markdownitTaskCheckbox);
+    }
+
+    // Date and person tags: @person, @2025-01-28
+    if (typeof window.markdownitDatePersonTag !== 'undefined') {
+        md.use(window.markdownitDatePersonTag);
+    }
+
+    // Temporal tags: !w49, !2025.12.05, !mon, !15:30, !09:00-17:00
+    if (typeof window.markdownitTemporalTag !== 'undefined') {
+        md.use(window.markdownitTemporalTag);
+    }
+
+    // Enhanced strikethrough with delete buttons
+    if (typeof window.markdownitEnhancedStrikethrough !== 'undefined') {
+        md.use(window.markdownitEnhancedStrikethrough);
+    }
+
+    // Speaker notes: ;; syntax
+    if (typeof window.markdownitSpeakerNote !== 'undefined') {
+        md.use(window.markdownitSpeakerNote);
+    }
+
+    // HTML comment and content rendering
+    if (typeof window.markdownitHtmlComment !== 'undefined') {
+        md.use(window.markdownitHtmlComment, {
+            commentMode: htmlCommentRenderMode,
+            contentMode: htmlContentRenderMode
+        });
+    }
+
+    // === NPM/CDN plugins (loaded from CDN or local -browser.js files) ===
+
     if (typeof window.markdownitEmoji !== 'undefined') {
-        md.use(window.markdownitEmoji); // :smile: => 😊
+        md.use(window.markdownitEmoji);
     }
     if (typeof window.markdownitFootnote !== 'undefined') {
-        md.use(window.markdownitFootnote); // [^1]: footnote
+        md.use(window.markdownitFootnote);
     }
     if (typeof window.markdownItMulticolumn !== 'undefined') {
-        md.use(window.markdownItMulticolumn); // Multi-column layout support
+        md.use(window.markdownItMulticolumn);
     }
     if (typeof window.markdownitMark !== 'undefined') {
-        md.use(window.markdownitMark); // ==mark== syntax support
+        md.use(window.markdownitMark);
     }
     if (typeof window.markdownitSub !== 'undefined') {
-        md.use(window.markdownitSub); // H~2~O subscript support
+        md.use(window.markdownitSub);
     }
     if (typeof window.markdownitSup !== 'undefined') {
-        md.use(window.markdownitSup); // 29^th^ superscript support
+        md.use(window.markdownitSup);
     }
     if (typeof window.markdownitIns !== 'undefined') {
-        md.use(window.markdownitIns); // ++inserted++ text support
+        md.use(window.markdownitIns);
     }
     if (typeof window.markdownitStrikethroughAlt !== 'undefined') {
-        md.use(window.markdownitStrikethroughAlt); // --strikethrough-- support
+        md.use(window.markdownitStrikethroughAlt);
     }
     if (typeof window.markdownitUnderline !== 'undefined') {
-        md.use(window.markdownitUnderline); // _underline_ support
+        md.use(window.markdownitUnderline);
     }
     if (typeof window.markdownitAbbr !== 'undefined') {
-        md.use(window.markdownitAbbr); // *[HTML]: Hyper Text Markup Language
+        md.use(window.markdownitAbbr);
     }
     if (typeof window.markdownitContainer !== 'undefined') {
-        // Add common container types from engine.js
         md.use(window.markdownitContainer, 'note');
         md.use(window.markdownitContainer, 'comment');
         md.use(window.markdownitContainer, 'highlight');
@@ -513,767 +548,34 @@ function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) 
         md.use(window.markdownitContainer, 'caption');
     }
     if (typeof window.markdownItInclude !== 'undefined') {
-        md.use(window.markdownItInclude); // !!!include()!!! file inclusion support
+        md.use(window.markdownItInclude);
     }
     if (typeof window.markdownItImageFigures !== 'undefined') {
-        md.use(window.markdownItImageFigures, {
-            figcaption: 'title'
-        }); // Image figures with captions from title attribute
+        md.use(window.markdownItImageFigures, { figcaption: 'title' });
     }
     if (typeof window.markdownItImageAttrs !== 'undefined') {
-        md.use(window.markdownItImageAttrs); // ![alt](url){.class key=value} attribute support
+        md.use(window.markdownItImageAttrs);
     }
-
-    // Note: Most other plugins can't be loaded via CDN due to CSP restrictions
-    // Advanced plugin functionality would need to be bundled or implemented differently
     if (typeof window.markdownItMediaCustom !== 'undefined') {
         md.use(window.markdownItMediaCustom, {
             controls: true,
-            attrs: {
-                image: {},
-                audio: {},
-                video: {}
-            }
-        }); // Custom media plugin for video/audio
+            attrs: { image: {}, audio: {}, video: {} }
+        });
     }
 
     return md;
 }
 
-// Wiki Links Plugin for markdown-it
-function wikiLinksPlugin(md, options = {}) {
-    const {
-        baseUrl = '',
-        generatePath = (filename) => filename + '.md',
-        target = '',
-        className = 'wiki-link'
-    } = options;
-
-    function parseWikiLink(state, silent) {
-        let pos = state.pos;
-        
-        // Check for opening [[
-        if (pos + 1 >= state.posMax) {return false;}
-        if (state.src.charCodeAt(pos) !== 0x5B /* [ */) {return false;}
-        if (state.src.charCodeAt(pos + 1) !== 0x5B /* [ */) {return false;}
-        
-        pos += 2;
-        
-        // Find closing ]]
-        let found = false;
-        let content = '';
-        let contentStart = pos;
-        
-        while (pos < state.posMax) {
-            if (state.src.charCodeAt(pos) === 0x5D /* ] */ && 
-                pos + 1 < state.posMax && 
-                state.src.charCodeAt(pos + 1) === 0x5D /* ] */) {
-                found = true;
-                content = state.src.slice(contentStart, pos);
-                break;
-            }
-            pos++;
-        }
-        
-        if (!found) {return false;}
-        
-        // Parse content: [[document|title]] or [[document]]
-        const parts = content.split('|');
-        const document = parts[0].trim();
-        const title = parts[1] ? parts[1].trim() : document;
-        
-        if (!document) {return false;}
-
-        // IMPORTANT: When returning true, state.pos MUST always be advanced
-        state.pos = pos + 2; // Skip closing ]]
-
-        // Don't process if we're in silent mode
-        if (silent) {return true;}
-
-        // Create token
-        const token_open = state.push('wiki_link_open', 'a', 1);
-        token_open.attrSet('href', '#'); // Use # as placeholder
-        if (className) {token_open.attrSet('class', className);}
-        token_open.attrSet('data-document', document);
-        token_open.attrSet('title', `Wiki link: ${document}`);
-
-        const token_text = state.push('text', '', 0);
-        token_text.content = title;
-
-        const token_close = state.push('wiki_link_close', 'a', -1);
-
-        return true;
-    }
-
-    // Register the inline rule
-    md.inline.ruler.before('emphasis', 'wiki_link', parseWikiLink);
-    
-    // Add render rules
-    md.renderer.rules.wiki_link_open = function(tokens, idx) {
-        const token = tokens[idx];
-        const document = token.attrGet('data-document') || '';
-        let attrs = '';
-
-        if (token.attrIndex('href') >= 0) {
-            attrs += ` href="${token.attrGet('href')}"`;
-        }
-        if (token.attrIndex('class') >= 0) {
-            attrs += ` class="${token.attrGet('class')}"`;
-        }
-        if (token.attrIndex('title') >= 0) {
-            attrs += ` title="${token.attrGet('title')}"`;
-        }
-        if (document) {
-            attrs += ` data-document="${escapeHtml(document)}"`;
-        }
-
-        // Wrap wiki link in a container for the menu button
-        return `<span class="wiki-link-container" data-document="${escapeHtml(document)}"><a${attrs}>`;
-    };
-
-    md.renderer.rules.wiki_link_close = function() {
-        // Add menu button after the link
-        return `</a><button class="wiki-menu-btn" data-action="wiki-menu" title="Wiki link options">☰</button></span>`;
-    };
-}
-
-// Task checkbox plugin for markdown-it
-function taskCheckboxPlugin(md) {
-    md.core.ruler.after('inline', 'task-checkbox', function(state) {
-        const env = state.env || {};
-        let checkboxIndex = Number.isFinite(env.taskCheckboxIndex) ? env.taskCheckboxIndex : 0;
-
-        for (let i = 0; i < state.tokens.length; i++) {
-            const token = state.tokens[i];
-            if (token.type !== 'inline' || !token.children || token.children.length === 0) {
-                continue;
-            }
-
-            const prev = state.tokens[i - 1];
-            const prevPrev = state.tokens[i - 2];
-            if (!prev || !prevPrev || prev.type !== 'paragraph_open' || prevPrev.type !== 'list_item_open') {
-                continue;
-            }
-
-            const firstChild = token.children[0];
-            if (!firstChild || firstChild.type !== 'text') {
-                continue;
-            }
-
-            const match = firstChild.content.match(/^\[( |x|X)\]\s+/);
-            if (!match) {
-                continue;
-            }
-
-            const checked = match[1].toLowerCase() === 'x';
-            const checkboxToken = new state.Token('task_checkbox', 'span', 0);
-            checkboxToken.meta = {
-                checked,
-                index: checkboxIndex
-            };
-            checkboxIndex += 1;
-
-            firstChild.content = firstChild.content.slice(match[0].length);
-            token.children.unshift(checkboxToken);
-        }
-
-        env.taskCheckboxIndex = checkboxIndex;
-        state.env = env;
-    });
-
-    md.renderer.rules.task_checkbox = function(tokens, idx) {
-        const meta = tokens[idx]?.meta || {};
-        const checked = !!meta.checked;
-        const index = Number.isFinite(meta.index) ? meta.index : 0;
-        const classes = `md-task-checkbox${checked ? ' checked' : ''}`;
-        const aria = checked ? 'true' : 'false';
-        return `<span class="${classes}" data-checkbox-index="${index}" data-checked="${checked ? 'true' : 'false'}" role="checkbox" aria-checked="${aria}" tabindex="0"></span>`;
-    };
-}
-
-// Tag detection and rendering plugin for markdown-it
-function tagPlugin(md, options = {}) {
-    const tagColors = options.tagColors || {};
-    
-    function parseTag(state, silent) {
-        let pos = state.pos;
-
-        // Check for # at word boundary
-        if (state.src.charCodeAt(pos) !== 0x23 /* # */) {return false;}
-        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ &&
-            state.src.charCodeAt(pos - 1) !== 0x0A /* newline */ &&
-            pos !== 0) {return false;}
-
-        // Exclude ATX headers: # followed by space or more # characters (##, ###, etc.)
-        // This prevents treating "# Header" as a tag
-        if (pos === 0 || state.src.charCodeAt(pos - 1) === 0x0A /* newline */) {
-            let headerCheckPos = pos + 1;
-            // Check if followed by space (single #) or more # chars (##, ###, etc.)
-            if (headerCheckPos < state.posMax) {
-                const nextChar = state.src.charCodeAt(headerCheckPos);
-                if (nextChar === 0x20 /* space */ || nextChar === 0x23 /* # */) {
-                    return false; // This is a header, not a tag
-                }
-            }
-        }
-        
-        pos++;
-        if (pos >= state.posMax) {return false;}
-        
-        // Parse tag content - for gather tags, include full expression
-        let tagStart = pos;
-        let tagContent = '';
-
-        // Check for special positivity tags: ++, +, ø, Ø, --, -
-        const remaining = state.src.slice(pos);
-        const positivityMatch = remaining.match(/^(\+\+|\+|ø|Ø|--|-(?!-))/);
-        if (positivityMatch) {
-            tagContent = positivityMatch[1];
-            pos += tagContent.length;
-        }
-        // Check if it's a gather tag
-        else if (state.src.substr(pos, 7) === 'gather_') {
-            // For gather tags, capture everything until next space or end
-            while (pos < state.posMax) {
-                const char = state.src.charCodeAt(pos);
-                // Stop at space or newline
-                if (char === 0x20 || char === 0x0A) {break;}
-                pos++;
-            }
-            tagContent = state.src.slice(tagStart, pos);
-        } else {
-            // For regular tags, use existing logic
-            while (pos < state.posMax) {
-                const char = state.src.charCodeAt(pos);
-                // Allow alphanumeric, underscore, hyphen, dot
-                if ((char >= 0x30 && char <= 0x39) || // 0-9
-                    (char >= 0x41 && char <= 0x5A) || // A-Z
-                    (char >= 0x61 && char <= 0x7A) || // a-z
-                    char === 0x5F || // _
-                    char === 0x2D || // -
-                    char === 0x2E) { // .
-                    pos++;
-                } else {
-                    break;
-                }
-            }
-            tagContent = state.src.slice(tagStart, pos);
-        }
-        
-        if (tagContent.length === 0) {return false;}
-
-        // IMPORTANT: When returning true, state.pos MUST always be advanced
-        state.pos = pos;
-
-        if (silent) {return true;}
-
-        // Create token
-        const token = state.push('tag', 'span', 0);
-        token.content = tagContent;
-        token.markup = '#';
-
-        return true;
-    }
-    
-    md.inline.ruler.before('emphasis', 'tag', parseTag);
-    
-    md.renderer.rules.tag = function(tokens, idx) {
-        const token = tokens[idx];
-        const tagContent = token.content;
-        const fullTag = '#' + token.content;
-
-        // Extract base tag name for styling (before any operators)
-        let baseTagName = tagContent;
-        if (tagContent.startsWith('gather_')) {
-            baseTagName = 'gather'; // Use 'gather' as base for all gather tags
-        } else if (/^(\+\+|\+|ø|Ø|--|-(?!-))$/.test(tagContent)) {
-            // Positivity tags - use as-is but lowercase
-            baseTagName = tagContent.toLowerCase();
-        } else {
-            const baseMatch = tagContent.match(/^([a-zA-Z0-9_.-]+)/);
-            baseTagName = baseMatch ? baseMatch[1].toLowerCase() : tagContent.toLowerCase();
-        }
-
-        return `<span class="kanban-tag" data-tag="${escapeHtml(baseTagName)}">${escapeHtml(fullTag)}</span>`;
-    };
-}
-
-// Date and person tag plugin for markdown-it
-function datePersonTagPlugin(md, options = {}) {
-    function parseDatePersonTag(state, silent) {
-        let pos = state.pos;
-        
-        // Check for @ at word boundary
-        if (state.src.charCodeAt(pos) !== 0x40 /* @ */) {return false;}
-        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ && 
-            state.src.charCodeAt(pos - 1) !== 0x0A /* newline */ &&
-            pos !== 0) {return false;}
-        
-        pos++;
-        if (pos >= state.posMax) {return false;}
-        
-        let tagStart = pos;
-        let tagContent = '';
-        let tagType = '';
-        
-        // Check if it's a week date pattern (@YYYY-WNN, @YYYYWNN, @WNN)
-        const remaining = state.src.slice(pos);
-        const weekMatch = remaining.match(/^(\d{4}-?W\d{1,2}|W\d{1,2})/i);
-
-        if (weekMatch) {
-            tagContent = weekMatch[1];
-            tagType = 'week';
-            pos += tagContent.length;
-        }
-        // Check if it's a date pattern (YYYY-MM-DD or DD-MM-YYYY)
-        else {
-            const dateMatch = remaining.match(/^(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/);
-
-            if (dateMatch) {
-                tagContent = dateMatch[1];
-                tagType = 'date';
-                pos += tagContent.length;
-            } else {
-            // Parse as person name (letters, numbers, underscore, hyphen)
-            while (pos < state.posMax) {
-                const char = state.src.charCodeAt(pos);
-                if ((char >= 0x30 && char <= 0x39) || // 0-9
-                    (char >= 0x41 && char <= 0x5A) || // A-Z
-                    (char >= 0x61 && char <= 0x7A) || // a-z
-                    char === 0x5F || // _
-                    char === 0x2D) { // -
-                    pos++;
-                } else {
-                    break;
-                }
-            }
-            
-                if (pos === tagStart) {return false;} // No content
-
-                tagContent = state.src.slice(tagStart, pos);
-                tagType = 'person';
-            }
-        }
-
-        // IMPORTANT: When returning true, state.pos MUST always be advanced
-        state.pos = pos;
-
-        if (silent) {return true;}
-
-        // Create token
-        const token = state.push('date_person_tag', 'span', 0);
-        token.content = tagContent;
-        token.markup = '@';
-        token.meta = { type: tagType };
-
-        return true;
-    }
-    
-    md.inline.ruler.before('emphasis', 'date_person_tag', parseDatePersonTag);
-    
-    md.renderer.rules.date_person_tag = function(tokens, idx) {
-        const token = tokens[idx];
-        const tagContent = token.content;
-        const tagType = token.meta.type;
-        const fullTag = '@' + token.content;
-
-        // Week tags get their own class (no icon)
-        if (tagType === 'week') {
-            return `<span class="kanban-week-tag" data-week="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
-        }
-
-        const className = tagType === 'date' ? 'kanban-date-tag' : 'kanban-person-tag';
-        const dataAttr = tagType === 'date' ? 'data-date' : 'data-person';
-
-        return `<span class="${className}" ${dataAttr}="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
-    };
-}
-
-// =============================================================================
-// TEMPORAL TAG CONFIGURATION - Easy to customize icons and styling
-// =============================================================================
-const TEMPORAL_TAG_CONFIG = {
-    // Icons for different temporal tag types (can be emoji or text)
-    icons: {
-        date: '📅',      // Date tags: !2025.01.28
-        week: '📆',      // Week tags: !w49, !2025.w49
-        weekday: '📅',   // Weekday tags: !mon, !friday
-        time: '🕐',      // Time tags: !15:30, !9am
-        timeSlot: '⏱️',  // Time slot tags: !09:00-17:00
-        minuteSlot: '⏱️', // Minute slot tags: !:15-:30
-        generic: '🕐'    // Generic temporal: fallback
-    },
-    // Whether to show icons (set to false to hide all icons)
-    showIcons: true,
-    // Base CSS class for all temporal tags
-    baseClass: 'kanban-temporal-tag'
-};
-
-// Temporal tag plugin for markdown-it (handles temporal prefix from TAG_PREFIXES)
-function temporalTagPlugin(md, options = {}) {
-    const config = { ...TEMPORAL_TAG_CONFIG, ...options };
-    // Get temporal prefix from centralized config (defaults to '!' if not available)
-    const TEMPORAL_PREFIX = (typeof window !== 'undefined' && window.TAG_PREFIXES)
-        ? window.TAG_PREFIXES.TEMPORAL
-        : '!';
-    const TEMPORAL_CHAR_CODE = TEMPORAL_PREFIX.charCodeAt(0);
-
-    function parseTemporalTag(state, silent) {
-        let pos = state.pos;
-
-        // Check for temporal prefix at word boundary
-        if (state.src.charCodeAt(pos) !== TEMPORAL_CHAR_CODE) { return false; }
-
-        // Must be at start or after whitespace
-        if (pos > 0) {
-            const prevChar = state.src.charCodeAt(pos - 1);
-            if (prevChar !== 0x20 /* space */ && prevChar !== 0x0A /* newline */ && prevChar !== 0x09 /* tab */) {
-                return false;
-            }
-        }
-
-        pos++;
-        if (pos >= state.posMax) { return false; }
-
-        const remaining = state.src.slice(pos);
-        let tagContent = '';
-        let tagType = '';
-
-        // Try matching patterns in order of specificity
-
-        // 1. Time slot: HH:MM-HH:MM or Ham-Hpm
-        const timeSlotMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)-(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
-        if (timeSlotMatch) {
-            tagContent = timeSlotMatch[0];
-            tagType = 'timeSlot';
-            pos += tagContent.length;
-        }
-        // 2. Week with year: YYYY.wNN, YYYY-wNN, YYYY.kwNN, YYYY-kwNN
-        else {
-            const weekYearMatch = remaining.match(/^(\d{4})[-.]?(?:[wW]|[kK][wW])(\d{1,2})(?=\s|$)/);
-            if (weekYearMatch) {
-                tagContent = weekYearMatch[0];
-                tagType = 'week';
-                pos += tagContent.length;
-            }
-            // 3. Week without year: wNN, WNN, kwNN, KW4 (German Kalenderwoche)
-            else {
-                const weekMatch = remaining.match(/^(?:[wW]|[kK][wW])(\d{1,2})(?=\s|$)/);
-                if (weekMatch) {
-                    tagContent = weekMatch[0];
-                    tagType = 'week';
-                    pos += tagContent.length;
-                }
-                // 4. Date: YYYY.MM.DD, DD.MM.YYYY, DD.MM.YY, or DD.MM (multiple formats)
-                else {
-                    const dateMatch = remaining.match(/^(\d{1,4})[-./](\d{1,2})(?:[-./](\d{2,4}))?(?=\s|$)/);
-                    if (dateMatch) {
-                        tagContent = dateMatch[0];
-                        tagType = 'date';
-                        pos += tagContent.length;
-                    }
-                    // 5. Weekday: mon, monday, tue, tuesday, etc.
-                    else {
-                        const weekdayMatch = remaining.match(/^(mon|monday|tue|tuesday|wed|wednesday|thu|thursday|fri|friday|sat|saturday|sun|sunday)(?=\s|$)/i);
-                        if (weekdayMatch) {
-                            tagContent = weekdayMatch[0];
-                            tagType = 'weekday';
-                            pos += tagContent.length;
-                        }
-                        // 6. Minute slot: :MM-:MM (inherits hour from parent)
-                        else {
-                            const minuteSlotMatch = remaining.match(/^:(\d{1,2})-:(\d{1,2})(?=\s|$)/i);
-                            if (minuteSlotMatch) {
-                                tagContent = minuteSlotMatch[0];
-                                tagType = 'minuteSlot';
-                                pos += tagContent.length;
-                            }
-                            // 7. Time: HH:MM or Ham/Hpm
-                            else {
-                                const timeMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
-                                if (timeMatch) {
-                                    tagContent = timeMatch[0];
-                                    tagType = 'time';
-                                    pos += tagContent.length;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // No match found
-        if (!tagContent) { return false; }
-
-        // IMPORTANT: When returning true, state.pos MUST always be advanced
-        state.pos = pos;
-
-        if (silent) { return true; }
-
-        // Create token
-        const token = state.push('temporal_tag', 'span', 0);
-        token.content = tagContent;
-        token.markup = '.';
-        token.meta = { type: tagType, config };
-
-        return true;
-    }
-
-    // Register before 'emphasis' - temporal prefix must be a markdown-it terminator char
-    md.inline.ruler.before('emphasis', 'temporal_tag', parseTemporalTag);
-
-    md.renderer.rules.temporal_tag = function(tokens, idx) {
-        const token = tokens[idx];
-        const tagContent = token.content;
-        const tagType = token.meta.type;
-        const cfg = token.meta.config;
-        const fullTag = TEMPORAL_PREFIX + tagContent;
-
-        // Determine CSS class based on type
-        const typeClass = `kanban-temporal-${tagType}`;
-        const classes = [cfg.baseClass, typeClass].join(' ');
-
-        // Get icon for this type
-        const icon = cfg.showIcons ? (cfg.icons[tagType] || cfg.icons.generic) : '';
-
-        // Check if currently active (for highlighting)
-        let isActive = false;
-        if (typeof window !== 'undefined' && window.tagUtils) {
-            switch (tagType) {
-                case 'date': isActive = window.tagUtils.isCurrentDate(fullTag); break;
-                case 'week': isActive = window.tagUtils.isCurrentWeek(fullTag); break;
-                case 'weekday': isActive = window.tagUtils.isCurrentWeekday(fullTag); break;
-                case 'time': isActive = window.tagUtils.isCurrentTime(fullTag); break;
-                case 'timeSlot': isActive = window.tagUtils.isCurrentTimeSlot(fullTag); break;
-                case 'minuteSlot':
-                    // Minute slots inherit from parent time slot context
-                    // The parent time slot is set before rendering via window.currentRenderingTimeSlot
-                    if (window.currentRenderingTimeSlot) {
-                        isActive = window.tagUtils.isCurrentMinuteSlot(fullTag, window.currentRenderingTimeSlot);
-                    }
-                    break;
-            }
-        }
-
-        const activeClass = isActive ? ' temporal-active' : '';
-        // Use simple HTML escaping inline to avoid dependency issues
-        const escContent = tagContent.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const escFull = fullTag.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const dataAttr = `data-temporal-type="${tagType}" data-temporal="${escContent}"`;
-
-        // For minute slots, add an extra attribute to help with line-level styling
-        const lineActiveAttr = (tagType === 'minuteSlot' && isActive) ? ' data-temporal-line-active="true"' : '';
-
-        return `<span class="${classes}${activeClass}" ${dataAttr}${lineActiveAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escFull}</span>`;
-    };
-}
-
-// Tag extraction functions now in utils/tagUtils.js
-
-// Enhanced strikethrough plugin with delete buttons
-function enhancedStrikethroughPlugin(md) {
-    // Override the default strikethrough renderer
-    md.renderer.rules.s_open = function(tokens, idx, options, env, renderer) {
-        const token = tokens[idx];
-        // Generate unique ID for this strikethrough element
-        const uniqueId = 'strike-' + Math.random().toString(36).substr(2, 9);
-        return `<span class="strikethrough-container" data-strike-id="${uniqueId}">` +
-               `<del class="strikethrough-content">`;
-    };
-
-    md.renderer.rules.s_close = function(tokens, idx, options, env, renderer) {
-        return `</del></span>`;
-    };
-}
-
-// Speaker Notes Plugin
-// Handles lines starting with ;; as speaker notes
-// Consecutive ;; lines are grouped into a single div
-function speakerNotePlugin(md) {
-    // Parse speaker note lines (starting with ;;)
-    function parseSpeakerNote(state, startLine, endLine, silent) {
-        let pos = state.bMarks[startLine] + state.tShift[startLine];
-        let max = state.eMarks[startLine];
-
-        // Check if line starts with ;;
-        if (pos + 1 >= max) { return false; }
-        if (state.src.charCodeAt(pos) !== 0x3B /* ; */) { return false; }
-        if (state.src.charCodeAt(pos + 1) !== 0x3B /* ; */) { return false; }
-
-        // Don't process if we're in silent mode
-        if (silent) { return true; }
-
-        // Collect all consecutive ;; lines
-        const lines = [];
-        let nextLine = startLine;
-
-        while (nextLine < endLine) {
-            let linePos = state.bMarks[nextLine] + state.tShift[nextLine];
-            let lineMax = state.eMarks[nextLine];
-
-            // Check if this line starts with ;;
-            if (linePos + 1 < lineMax &&
-                state.src.charCodeAt(linePos) === 0x3B /* ; */ &&
-                state.src.charCodeAt(linePos + 1) === 0x3B /* ; */) {
-
-                // Get content after ;;
-                const content = state.src.slice(linePos + 2, lineMax).trim();
-                lines.push(content);
-                nextLine++;
-            } else {
-                // Stop when we hit a non-;; line
-                break;
-            }
-        }
-
-        // Create token with combined content
-        const token = state.push('speaker_note', 'div', 0);
-        token.content = lines.join('\n');
-        token.markup = ';;';
-
-        state.line = nextLine;
-        return true;
-    }
-
-    // Register the block rule
-    md.block.ruler.before('paragraph', 'speaker_note', parseSpeakerNote);
-
-    // Render rule for speaker notes (supports multiline with <br>)
-    md.renderer.rules.speaker_note = function(tokens, idx) {
-        const token = tokens[idx];
-        // Replace newlines with <br> for multiline notes
-        const content = escapeHtml(token.content).replace(/\n/g, '<br>');
-        return `<div class="speaker-note">${content}</div>\n`;
-    };
-}
-
-// HTML Comment and Content Rendering Plugin
-// Handles HTML comments and HTML content based on user settings
-function htmlCommentPlugin(md, options = {}) {
-    const commentMode = options.commentMode || 'hidden'; // 'hidden' or 'text'
-    const contentMode = options.contentMode || 'html'; // 'html' or 'text'
-
-    // Parse HTML comments as inline tokens
-    function parseHtmlComment(state, silent) {
-        let pos = state.pos;
-
-        // Check for opening <!--
-        if (pos + 3 >= state.posMax) {return false;}
-        if (state.src.charCodeAt(pos) !== 0x3C /* < */) {return false;}
-        if (state.src.charCodeAt(pos + 1) !== 0x21 /* ! */) {return false;}
-        if (state.src.charCodeAt(pos + 2) !== 0x2D /* - */) {return false;}
-        if (state.src.charCodeAt(pos + 3) !== 0x2D /* - */) {return false;}
-
-        pos += 4;
-
-        // Find closing -->
-        let found = false;
-        let content = '';
-        let contentStart = pos;
-
-        while (pos < state.posMax - 2) {
-            if (state.src.charCodeAt(pos) === 0x2D /* - */ &&
-                state.src.charCodeAt(pos + 1) === 0x2D /* - */ &&
-                state.src.charCodeAt(pos + 2) === 0x3E /* > */) {
-                found = true;
-                content = state.src.slice(contentStart, pos);
-                break;
-            }
-            pos++;
-        }
-
-        if (!found) {return false;}
-
-        // IMPORTANT: When returning true, state.pos MUST always be advanced
-        state.pos = pos + 3; // Skip closing -->
-
-        if (silent) {return true;}
-
-        // Create token
-        const token = state.push('html_comment', 'span', 0);
-        token.content = content.trim();
-        token.markup = '<!--';
-
-        return true;
-    }
-
-    // Register the inline rule - before 'html_inline' to capture comments first
-    md.inline.ruler.before('html_inline', 'html_comment', parseHtmlComment);
-
-    // Also register as block rule to catch block-level comments
-    md.block.ruler.before('html_block', 'html_comment_block', parseHtmlComment);
-
-    // Render rule for HTML comments
-    md.renderer.rules.html_comment = function(tokens, idx) {
-        const token = tokens[idx];
-        const content = token.content;
-
-        if (commentMode === 'hidden') {
-            // Hide comment completely
-            return '';
-        }
-
-        // Return visible comment marker (escaped so it shows as text)
-        return `<span class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(content)}--&gt;</span>`;
-    };
-
-    // Override default html_block renderer to handle comments and content
-    const originalHtmlBlock = md.renderer.rules.html_block;
-    md.renderer.rules.html_block = function(tokens, idx, options, env, self) {
-        const token = tokens[idx];
-        const content = token.content;
-
-        // Check if this is an HTML comment
-        if (content.trim().startsWith('<!--') && content.trim().endsWith('-->')) {
-            const commentContent = content.trim().slice(4, -3).trim();
-
-            if (commentMode === 'hidden') {
-                return '';
-            }
-
-            return `<div class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(commentContent)}--&gt;</div>`;
-        }
-
-        // Check if this is HTML content (not a comment, not a URL)
-        // HTML content starts with < but not <http or <https
-        const trimmedContent = content.trim();
-        const isHtmlContent = trimmedContent.startsWith('<') &&
-                              !trimmedContent.match(/^<https?:\/\//i);
-
-        if (isHtmlContent && contentMode === 'text') {
-            // Render HTML tags as visible text
-            return `<pre class="html-content-text">${escapeHtml(content)}</pre>`;
-        }
-
-        // Not a comment or should render as HTML, use original renderer
-        return originalHtmlBlock ? originalHtmlBlock(tokens, idx, options, env, self) : content;
-    };
-
-    // Override default html_inline renderer for inline HTML content
-    const originalHtmlInline = md.renderer.rules.html_inline;
-    md.renderer.rules.html_inline = function(tokens, idx, options, env, self) {
-        const token = tokens[idx];
-        const content = token.content;
-
-        // Check if this is inline HTML content (not a URL)
-        const trimmedContent = content.trim();
-        const isHtmlContent = trimmedContent.startsWith('<') &&
-                              !trimmedContent.match(/^<https?:\/\//i);
-
-        if (isHtmlContent && contentMode === 'text') {
-            // Render HTML tags as visible text
-            return `<code class="html-content-text">${escapeHtml(content)}</code>`;
-        }
-
-        // Should render as HTML, use original renderer
-        return originalHtmlInline ? originalHtmlInline(tokens, idx, options, env, self) : content;
-    };
-}
-
-// ============================================================================
-// PlantUML Rendering System
-// ============================================================================
+// Custom markdown-it plugins have been extracted to individual -browser.js files:
+// - markdown-it-wiki-links-browser.js       (window.markdownitWikiLinks)
+// - markdown-it-tag-browser.js              (window.markdownitTag)
+// - markdown-it-task-checkbox-browser.js    (window.markdownitTaskCheckbox)
+// - markdown-it-date-person-tag-browser.js  (window.markdownitDatePersonTag)
+// - markdown-it-temporal-tag-browser.js     (window.markdownitTemporalTag)
+// - markdown-it-enhanced-strikethrough-browser.js (window.markdownitEnhancedStrikethrough)
+// - markdown-it-speaker-note-browser.js     (window.markdownitSpeakerNote)
+// - markdown-it-html-comment-browser.js     (window.markdownitHtmlComment)
+// See Phase 5 in TODOs-plugin.md for details.
 
 // MEMORY SAFETY: Cache size limits to prevent unbounded growth
 const DIAGRAM_CACHE_MAX_SIZE = 100;

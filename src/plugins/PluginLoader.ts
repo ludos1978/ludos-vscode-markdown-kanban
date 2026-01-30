@@ -33,6 +33,9 @@ import { PDFPlugin } from './diagram/PDFPlugin';
 import { EPUBPlugin } from './diagram/EPUBPlugin';
 import { XlsxPlugin } from './diagram/XlsxPlugin';
 
+// Markdown-it plugin manifest
+import { MARKDOWN_PLUGIN_MANIFEST } from './markdown/markdownPluginManifest';
+
 /**
  * Check if a plugin is disabled via VS Code settings
  */
@@ -186,6 +189,15 @@ export class PluginLoader {
                 registry.registerDiagramPlugin(new XlsxPlugin());
             } catch (error) {
                 console.error('[PluginLoader] Failed to register XlsxPlugin:', error);
+            }
+        }
+
+        // ============= MARKDOWN-IT PLUGINS =============
+        // Register metadata entries from the shared manifest (Phase 5).
+        // Actual plugin code is loaded at runtime by each rendering context.
+        for (const entry of MARKDOWN_PLUGIN_MANIFEST) {
+            if (!isPluginDisabled(entry.id)) {
+                registry.registerMarkdownPlugin(entry);
             }
         }
 

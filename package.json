@@ -4767,12 +4767,35 @@
               "xlsx",
               "marp",
               "pandoc",
-              "embed"
+              "embed",
+              "wiki-links",
+              "tag",
+              "task-checkbox",
+              "date-person-tag",
+              "temporal-tag",
+              "enhanced-strikethrough",
+              "speaker-note",
+              "html-comment",
+              "emoji",
+              "footnote",
+              "multicolumn",
+              "mark",
+              "sub",
+              "sup",
+              "ins",
+              "strikethrough-alt",
+              "underline",
+              "abbr",
+              "container",
+              "include",
+              "image-figures",
+              "image-attrs",
+              "media"
             ]
           },
           "default": [],
           "description": "List of built-in plugin IDs to disable. Disabled plugins will not be loaded at startup.",
-          "markdownDescription": "List of built-in plugin IDs to disable. Available plugins:\n- `plantuml` — PlantUML diagram rendering\n- `mermaid` — Mermaid diagram rendering\n- `drawio` — Draw.io file rendering\n- `excalidraw` — Excalidraw file rendering\n- `pdf` — PDF page rendering\n- `epub` — EPUB page rendering\n- `xlsx` — Excel/spreadsheet rendering\n- `marp` — Marp presentation export\n- `pandoc` — Pandoc document export"
+          "markdownDescription": "List of built-in plugin IDs to disable. Available plugins:\n- `plantuml` — PlantUML diagram rendering\n- `mermaid` — Mermaid diagram rendering\n- `drawio` — Draw.io file rendering\n- `excalidraw` — Excalidraw file rendering\n- `pdf` — PDF page rendering\n- `epub` — EPUB page rendering\n- `xlsx` — Excel/spreadsheet rendering\n- `marp` — Marp presentation export\n- `pandoc` — Pandoc document export\n- `wiki-links` — [[wiki link]] syntax\n- `tag` — #tag detection\n- `task-checkbox` — Task list checkboxes\n- `date-person-tag` — @person and @date tags\n- `temporal-tag` — Temporal tags (!date, !time)\n- `enhanced-strikethrough` — Strikethrough with delete buttons\n- `speaker-note` — Speaker notes (;; syntax)\n- `html-comment` — HTML comment rendering\n- `emoji` — Emoji :shortcodes:\n- `footnote` — Footnotes [^1]\n- `multicolumn` — Multi-column layout\n- `mark` — ==highlight== syntax\n- `sub` — H~2~O subscript\n- `sup` — 29^th^ superscript\n- `ins` — ++inserted++ text\n- `strikethrough-alt` — --strikethrough-- text\n- `underline` — _underline_ text\n- `abbr` — Abbreviation definitions\n- `container` — ::: container blocks\n- `include` — !!!include()!!! syntax\n- `image-figures` — Image figures with captions\n- `image-attrs` — Image attribute syntax\n- `media` — Video/audio media"
         },
         "markdown-kanban.popplerPath": {
           "type": "string",

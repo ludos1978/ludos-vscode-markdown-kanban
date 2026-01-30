@@ -15,7 +15,8 @@ import {
     ExportFormat,
     PluginContext,
     DiagramPlugin,
-    DiagramPluginContext
+    DiagramPluginContext,
+    MarkdownPluginEntry
 } from '../interfaces';
 import { ValidationResult } from '../../shared/interfaces';
 import { EmbedPluginInterface } from '../interfaces/EmbedPlugin';
@@ -35,6 +36,7 @@ export class PluginRegistry {
     private _importPlugins: Map<string, ImportPlugin> = new Map();
     private _exportPlugins: Map<string, ExportPlugin> = new Map();
     private _diagramPlugins: Map<string, DiagramPlugin> = new Map();
+    private _markdownPlugins: Map<string, MarkdownPluginEntry> = new Map();
     private _embedPlugin: EmbedPluginInterface | null = null;
     private _initialized: boolean = false;
 
@@ -331,6 +333,37 @@ export class PluginRegistry {
      */
     getEmbedPlugin(): EmbedPluginInterface | null {
         return this._embedPlugin;
+    }
+
+    // ============= MARKDOWN PLUGIN REGISTRATION =============
+
+    /**
+     * Register a markdown-it plugin entry (metadata only)
+     */
+    registerMarkdownPlugin(entry: MarkdownPluginEntry): void {
+        if (this._markdownPlugins.has(entry.id)) {
+            console.warn(`[PluginRegistry] Replacing existing markdown plugin: ${entry.id}`);
+        }
+        this._markdownPlugins.set(entry.id, entry);
+    }
+
+    /**
+     * Get all registered markdown plugin entries, optionally filtered by scope.
+     * Returns entries sorted by priority (ascending — lower loads first).
+     */
+    getMarkdownPlugins(scope?: 'frontend' | 'export' | 'both'): MarkdownPluginEntry[] {
+        const entries = Array.from(this._markdownPlugins.values());
+        const filtered = scope
+            ? entries.filter(e => e.scope === scope || e.scope === 'both')
+            : entries;
+        return filtered.sort((a, b) => a.priority - b.priority);
+    }
+
+    /**
+     * Get a markdown plugin entry by ID
+     */
+    getMarkdownPluginById(id: string): MarkdownPluginEntry | undefined {
+        return this._markdownPlugins.get(id);
     }
 
     // ============= DIAGRAM PLUGIN ACTIVATION =============
