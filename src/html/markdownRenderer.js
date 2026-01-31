@@ -1598,6 +1598,20 @@ window.addEventListener('message', event => {
             request.reject(new Error(error));
             diagramRenderRequests.delete(requestId);
         }
+    } else if (message.type === 'mermaidCacheHit') {
+        const { requestId, svg } = message;
+        const request = mermaidCacheRequests.get(requestId);
+        if (request) {
+            request.resolve(svg);
+            mermaidCacheRequests.delete(requestId);
+        }
+    } else if (message.type === 'mermaidCacheMiss') {
+        const { requestId } = message;
+        const request = mermaidCacheRequests.get(requestId);
+        if (request) {
+            request.resolve(null);
+            mermaidCacheRequests.delete(requestId);
+        }
     }
 });
 
@@ -1768,6 +1782,48 @@ let mermaidQueueProcessing = false;
 const mermaidRenderCache = new Map();
 window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
 
+// Pending mermaid cache lookup requests (requestId → { resolve, reject })
+const mermaidCacheRequests = new Map();
+let mermaidCacheRequestId = 0;
+
+/**
+ * Deterministic hash for mermaid code (djb2 algorithm, base36 encoded)
+ */
+function hashMermaidCode(code) {
+    let hash = 5381;
+    for (let i = 0; i < code.length; i++) {
+        hash = ((hash << 5) + hash) + code.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return (hash >>> 0).toString(36);
+}
+
+/**
+ * Try to get a cached mermaid SVG from the backend filesystem cache.
+ * Returns the SVG string if cached, or null on cache miss.
+ */
+function getMermaidFromBackendCache(codeHash) {
+    return new Promise((resolve) => {
+        const requestId = `mermaid-cache-${++mermaidCacheRequestId}`;
+
+        mermaidCacheRequests.set(requestId, { resolve });
+
+        vscode.postMessage({
+            type: 'getMermaidCache',
+            requestId,
+            codeHash
+        });
+
+        // Timeout after 2 seconds — fall back to rendering
+        setTimeout(() => {
+            if (mermaidCacheRequests.has(requestId)) {
+                mermaidCacheRequests.delete(requestId);
+                resolve(null);
+            }
+        }, 2000);
+    });
+}
+
 /**
  * Queue a Mermaid diagram for rendering
  * @param {string} id - Unique placeholder ID
@@ -1781,14 +1837,22 @@ function queueMermaidRender(id, code) {
 }
 
 /**
- * Render Mermaid code to SVG (browser-based, pure JavaScript)
+ * Render Mermaid code to SVG (browser-based, with backend filesystem cache)
  * @param {string} code - Mermaid source code
  * @returns {Promise<string>} SVG content
  */
 async function renderMermaid(code) {
-    // Check cache first
+    // Check in-memory cache first
     if (mermaidRenderCache.has(code)) {
         return mermaidRenderCache.get(code);
+    }
+
+    // Try backend filesystem cache (persists across board reopens)
+    const codeHash = hashMermaidCode(code);
+    const cachedSvg = await getMermaidFromBackendCache(codeHash);
+    if (cachedSvg) {
+        setCacheWithLimit(mermaidRenderCache, code, cachedSvg);
+        return cachedSvg;
     }
 
     // Lazy-load Mermaid if not ready
@@ -1803,11 +1867,12 @@ async function renderMermaid(code) {
     try {
         const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // Use mermaid.render() to generate SVG
         const { svg } = await mermaid.render(diagramId, code);
 
-        // Cache the result (with size limit)
         setCacheWithLimit(mermaidRenderCache, code, svg);
+
+        // Store in backend filesystem cache (fire-and-forget)
+        vscode.postMessage({ type: 'cacheMermaidSvg', codeHash, svg });
 
         return svg;
     } catch (error) {

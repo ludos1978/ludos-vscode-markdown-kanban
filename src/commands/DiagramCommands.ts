@@ -33,6 +33,7 @@ import { PluginRegistry } from '../plugins/registry/PluginRegistry';
 import { DiagramPlugin } from '../plugins/interfaces/DiagramPlugin';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 /**
  * Diagram Commands Handler
@@ -57,7 +58,9 @@ export class DiagramCommands extends SwitchBasedCommand {
             'requestPDFInfo',
             'requestEPUBPageRender',
             'requestEPUBInfo',
-            'requestXlsxRender'
+            'requestXlsxRender',
+            'getMermaidCache',
+            'cacheMermaidSvg'
         ],
         priority: 100
     };
@@ -117,6 +120,14 @@ export class DiagramCommands extends SwitchBasedCommand {
         'requestXlsxRender': async (msg, ctx) => {
             await this.handleRenderXlsx(msg as RequestXlsxRenderMessage, ctx);
             return this.success();
+        },
+        'getMermaidCache': async (msg, ctx) => {
+            await this.handleGetMermaidCache(msg as unknown as { requestId: string; codeHash: string }, ctx);
+            return this.success();
+        },
+        'cacheMermaidSvg': async (msg, ctx) => {
+            await this.handleCacheMermaidSvg(msg as unknown as { codeHash: string; svg: string }, ctx);
+            return this.success();
         }
     };
 
@@ -145,20 +156,36 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
 
         try {
-            const plugin = this._getRegistry().findDiagramPluginForCodeBlock('plantuml');
-            if (!plugin || !plugin.renderCodeBlock) {
-                throw new Error('PlantUML plugin not available');
-            }
+            // Check filesystem cache (keyed by code hash)
+            const codeHash = this.hashInlineCode(code);
+            const cacheDir = this.getInlineDiagramCacheDir(context, 'plantuml-cache');
+            const cachePath = path.join(cacheDir, `${codeHash}.svg`);
 
-            const result = await plugin.renderCodeBlock(code);
-            if (!result.success) {
-                throw new Error(result.error || 'PlantUML rendering failed');
+            let svg: string;
+
+            if (fs.existsSync(cachePath)) {
+                svg = await fs.promises.readFile(cachePath, 'utf8');
+            } else {
+                const plugin = this._getRegistry().findDiagramPluginForCodeBlock('plantuml');
+                if (!plugin || !plugin.renderCodeBlock) {
+                    throw new Error('PlantUML plugin not available');
+                }
+
+                const result = await plugin.renderCodeBlock(code);
+                if (!result.success) {
+                    throw new Error(result.error || 'PlantUML rendering failed');
+                }
+
+                svg = result.data as string;
+
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+                await fs.promises.writeFile(cachePath, svg, 'utf8');
             }
 
             this.postMessage({
                 type: 'plantUMLRenderSuccess',
                 requestId,
-                svg: result.data
+                svg
             });
 
         } catch (error) {
@@ -392,10 +419,11 @@ export class DiagramCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Generate cache file name based on source file path, mtime, and output extension
+     * Generate cache file name based on source file path, mtime, and output extension.
+     * Optional suffix for paged content (e.g., '-p3' for page 3).
      */
-    private getDiagramCacheFileName(sourcePath: string, mtime: number, extension: string): string {
-        return `${this.getDiagramCachePrefix(sourcePath)}${Math.floor(mtime)}.${extension}`;
+    private getDiagramCacheFileName(sourcePath: string, mtime: number, extension: string, suffix?: string): string {
+        return `${this.getDiagramCachePrefix(sourcePath)}${Math.floor(mtime)}${suffix || ''}.${extension}`;
     }
 
     /**
@@ -413,6 +441,27 @@ export class DiagramCommands extends SwitchBasedCommand {
         } catch (error) {
             console.warn(`[${logPrefix}] Cache cleanup warning:`, error);
         }
+    }
+
+    /**
+     * Get cache directory for inline diagrams (PlantUML, Mermaid) that don't have a source file path.
+     * Stored in the kanban board's media folder.
+     */
+    private getInlineDiagramCacheDir(context: CommandContext, cacheFolderName: string): string {
+        const kanbanPath = context.fileManager.getFilePath() || context.fileManager.getDocument()?.uri.fsPath;
+        if (!kanbanPath) {
+            return path.join(process.cwd(), cacheFolderName);
+        }
+        const kanbanDir = path.dirname(kanbanPath);
+        const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
+        return path.join(kanbanDir, `${kanbanBaseName}-Media`, cacheFolderName);
+    }
+
+    /**
+     * Hash inline diagram code to a short, filesystem-safe string for cache keying.
+     */
+    private hashInlineCode(code: string): string {
+        return crypto.createHash('md5').update(code).digest('hex').substring(0, 12);
     }
 
     /**
@@ -621,12 +670,30 @@ export class DiagramCommands extends SwitchBasedCommand {
 
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
 
-            const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
-            if (!result.success) {
-                throw new Error(result.error || 'PDF rendering failed');
-            }
+            // Check filesystem cache
+            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'pdf-cache');
+            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-p${pageNumber}`);
+            const cachePath = path.join(cacheDir, cacheFileName);
 
-            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
+            let pngDataUrl: string;
+
+            if (fs.existsSync(cachePath)) {
+                const cachedPng = await fs.promises.readFile(cachePath);
+                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
+            } else {
+                const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
+                if (!result.success) {
+                    throw new Error(result.error || 'PDF rendering failed');
+                }
+
+                const pngBuffer = result.data as Buffer;
+
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+                await fs.promises.writeFile(cachePath, pngBuffer);
+                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'PDF Backend');
+
+                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            }
 
             this.postMessage({
                 type: 'pdfPageRenderSuccess',
@@ -706,12 +773,30 @@ export class DiagramCommands extends SwitchBasedCommand {
 
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
 
-            const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
-            if (!result.success) {
-                throw new Error(result.error || 'EPUB rendering failed');
-            }
+            // Check filesystem cache
+            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'epub-cache');
+            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-p${pageNumber}`);
+            const cachePath = path.join(cacheDir, cacheFileName);
 
-            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
+            let pngDataUrl: string;
+
+            if (fs.existsSync(cachePath)) {
+                const cachedPng = await fs.promises.readFile(cachePath);
+                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
+            } else {
+                const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
+                if (!result.success) {
+                    throw new Error(result.error || 'EPUB rendering failed');
+                }
+
+                const pngBuffer = result.data as Buffer;
+
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+                await fs.promises.writeFile(cachePath, pngBuffer);
+                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'EPUB Backend');
+
+                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            }
 
             this.postMessage({
                 type: 'epubPageRenderSuccess',
@@ -791,16 +876,34 @@ export class DiagramCommands extends SwitchBasedCommand {
 
             const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'Excel');
 
-            if (!await plugin.isAvailable()) {
-                throw new Error('LibreOffice CLI not installed');
-            }
+            // Check filesystem cache
+            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'xlsx-cache');
+            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-s${sheetNumber}`);
+            const cachePath = path.join(cacheDir, cacheFileName);
 
-            const result = await plugin.renderFile(absolutePath, { sheetNumber });
-            if (!result.success) {
-                throw new Error(result.error || 'Excel rendering failed');
-            }
+            let pngDataUrl: string;
 
-            const pngDataUrl = `data:image/png;base64,${(result.data as Buffer).toString('base64')}`;
+            if (fs.existsSync(cachePath)) {
+                const cachedPng = await fs.promises.readFile(cachePath);
+                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
+            } else {
+                if (!await plugin.isAvailable()) {
+                    throw new Error('LibreOffice CLI not installed');
+                }
+
+                const result = await plugin.renderFile(absolutePath, { sheetNumber });
+                if (!result.success) {
+                    throw new Error(result.error || 'Excel rendering failed');
+                }
+
+                const pngBuffer = result.data as Buffer;
+
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+                await fs.promises.writeFile(cachePath, pngBuffer);
+                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'XLSX Backend');
+
+                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            }
 
             this.postMessage({
                 type: 'xlsxRenderSuccess',
@@ -817,6 +920,44 @@ export class DiagramCommands extends SwitchBasedCommand {
                 requestId,
                 error: getErrorMessage(error)
             });
+        }
+    }
+
+    // ============= MERMAID CACHE HANDLERS =============
+
+    /**
+     * Handle mermaid cache lookup request from webview.
+     * Returns cached SVG if available, otherwise signals cache miss.
+     */
+    private async handleGetMermaidCache(message: { requestId: string; codeHash: string }, context: CommandContext): Promise<void> {
+        const { requestId, codeHash } = message;
+        try {
+            const cacheDir = this.getInlineDiagramCacheDir(context, 'mermaid-cache');
+            const cachePath = path.join(cacheDir, `${codeHash}.svg`);
+
+            if (fs.existsSync(cachePath)) {
+                const svg = await fs.promises.readFile(cachePath, 'utf8');
+                this.postMessage({ type: 'mermaidCacheHit', requestId, svg });
+            } else {
+                this.postMessage({ type: 'mermaidCacheMiss', requestId });
+            }
+        } catch {
+            this.postMessage({ type: 'mermaidCacheMiss', requestId });
+        }
+    }
+
+    /**
+     * Handle mermaid cache store request from webview (fire-and-forget).
+     * Stores rendered SVG to filesystem for persistent caching across board reopens.
+     */
+    private async handleCacheMermaidSvg(message: { codeHash: string; svg: string }, context: CommandContext): Promise<void> {
+        const { codeHash, svg } = message;
+        try {
+            const cacheDir = this.getInlineDiagramCacheDir(context, 'mermaid-cache');
+            await fs.promises.mkdir(cacheDir, { recursive: true });
+            await fs.promises.writeFile(path.join(cacheDir, `${codeHash}.svg`), svg, 'utf8');
+        } catch (error) {
+            console.warn('[Mermaid Backend] Cache write warning:', error);
         }
     }
 }
