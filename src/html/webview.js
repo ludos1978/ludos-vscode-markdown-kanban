@@ -2996,6 +2996,13 @@ if (!webviewEventListenersInitialized) {
                             window.invalidateDiagramCache(file.path, 'drawio');
                             window.invalidateDiagramCache(file.path, 'excalidraw');
                         }
+                    } else if (file.type === 'document') {
+                        // Clear rendered media cache for document types (PDF, XLSX, EPUB)
+                        if (typeof window.invalidateDiagramCache === 'function') {
+                            window.invalidateDiagramCache(file.path, 'pdf');
+                            window.invalidateDiagramCache(file.path, 'xlsx');
+                            window.invalidateDiagramCache(file.path, 'epub-slideshow');
+                        }
                     }
 
                     // For images/diagrams, find and re-render all img elements with matching src
@@ -3023,12 +3030,12 @@ if (!webviewEventListenersInitialized) {
                         }
                     });
 
-                    // For diagram files, find rendered diagram images and trigger re-render
-                    if (file.type === 'diagram') {
-                        // Diagrams are rendered as <img class="diagram-rendered" data-original-src="path">
-                        // inside a container div with class "diagram-placeholder"
-                        const allDiagramImages = document.querySelectorAll('img.diagram-rendered[data-original-src]');
-                        const matchingImages = Array.from(allDiagramImages).filter(img => {
+                    // For diagram and document files, find rendered images and trigger re-render
+                    if (file.type === 'diagram' || file.type === 'document') {
+                        // Both diagrams and documents (XLSX, PDF) render as:
+                        // <img class="diagram-rendered" data-original-src="path"> inside a container
+                        const allRenderedImages = document.querySelectorAll('img.diagram-rendered[data-original-src]');
+                        const matchingImages = Array.from(allRenderedImages).filter(img => {
                             const originalSrc = img.getAttribute('data-original-src') || '';
                             return originalSrc.includes(fileName);
                         });
@@ -3037,12 +3044,16 @@ if (!webviewEventListenersInitialized) {
                             const originalSrc = img.getAttribute('data-original-src');
                             if (!originalSrc) return;
 
-                            // Determine diagram type from file extension
+                            // Determine render type from file extension
                             let diagramType = 'drawio';
                             if (originalSrc.endsWith('.excalidraw') ||
                                 originalSrc.endsWith('.excalidraw.json') ||
                                 originalSrc.endsWith('.excalidraw.svg')) {
                                 diagramType = 'excalidraw';
+                            } else if (/\.(?:xlsx|xls|ods)$/i.test(originalSrc)) {
+                                diagramType = 'xlsx';
+                            } else if (/\.pdf$/i.test(originalSrc)) {
+                                diagramType = 'pdf';
                             }
 
                             // Get the parent container (diagram-placeholder div)
@@ -3051,7 +3062,7 @@ if (!webviewEventListenersInitialized) {
                                 // Show loading state and queue re-render
                                 container.innerHTML = '<div class="diagram-loading">Reloading...</div>';
 
-                                // Queue the diagram for re-rendering using the existing queue system
+                                // Queue for re-rendering using the existing queue system
                                 if (typeof window.queueDiagramRender === 'function') {
                                     const newId = `diagram-reload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                                     container.id = newId;

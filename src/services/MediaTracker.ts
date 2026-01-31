@@ -10,7 +10,7 @@
  * - Images: .png, .jpg, .jpeg, .gif, .svg, .webp, .avif, .bmp, .ico
  * - Audio: .mp3, .wav, .ogg, .m4a, .flac, .aac
  * - Video: .mp4, .webm, .mov, .avi, .mkv
- * - Documents: .pdf
+ * - Documents: .pdf, .xlsx, .xls, .ods, .epub
  */
 
 import * as fs from 'fs';
@@ -60,8 +60,12 @@ export class MediaTracker {
         ...Object.fromEntries(DOTTED_EXTENSIONS.audio.map(ext => [ext, 'audio' as const])),
         // Video (from centralized DOTTED_EXTENSIONS)
         ...Object.fromEntries(DOTTED_EXTENSIONS.video.map(ext => [ext, 'video' as const])),
-        // Documents - only PDF for media tracking
-        '.pdf': 'document'
+        // Documents - renderable document types (PDF, spreadsheets, EPUB)
+        '.pdf': 'document',
+        '.xlsx': 'document',
+        '.xls': 'document',
+        '.ods': 'document',
+        '.epub': 'document'
     };
 
     private _kanbanPath: string;
