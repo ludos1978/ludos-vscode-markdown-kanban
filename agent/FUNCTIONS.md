@@ -2,10 +2,62 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2026-01-29
+**Last Updated:** 2026-01-31
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Updates (2026-01-31) - WYSIWYG Module Extraction
+
+The monolithic `src/html/wysiwygEditor.ts` (1,936 lines) was split into focused modules:
+
+### New File: `src/wysiwyg/nodeViews.ts`
+Media and diagram ProseMirror node view factories.
+- `resolveDisplaySrc(originalSrc)` — Resolve image/media paths for display in webview (handles relative, absolute, Windows paths)
+- `getDiagramFileInfo(src)` — Parse file extensions to detect diagram/PDF types
+- `createMediaInlineView(node, view, getPos)` — ProseMirror NodeView factory for inline media (image/video/audio)
+- `createMediaBlockView(node, view, getPos)` — ProseMirror NodeView factory for block media
+- `createDiagramFenceView(node)` — ProseMirror NodeView factory for code fence diagrams (mermaid/plantuml)
+- `syncWysiwygImages(container)` — Sync all image src attributes in WYSIWYG editor DOM
+
+### New File: `src/wysiwyg/normalizer.ts`
+Document structure normalization applied after every edit.
+- `normalizeMediaBlocks(state)` — Convert paragraph-only inline media to block media nodes
+- `normalizeBlockBoundaries(state)` — Insert paragraph boundaries around atom/diagram nodes
+- `normalizeTaskCheckboxes(state)` — Parse `[ ]`/`[x]` text into task_checkbox nodes
+- `normalizeEditableDoc(schema, doc)` — Run all three normalizations on a document
+
+### New File: `src/wysiwyg/commands.ts`
+Editor commands, state management, and interaction helpers.
+- `convertMediaBlockToInline(view, nodePos, placeAfter, insertText?)` — Convert block media to inline + place cursor
+- `toggleTaskCheckbox(view, nodePos, node)` — Toggle checkbox checked state
+- `insertTextNextToSelectedMediaBlock(view, text)` — Type text next to selected media block
+- `openPathEditor(view, node, pos)` — Open modal to edit include path
+- `openMediaEditor(view, node, pos)` — Open modal to edit media source
+- `toggleDiagramEditing(view, block, nodePos?, node?)` — Toggle diagram code editing mode
+- `addMulticolumnColumn(view, node, nodePos)` — Add column to multicolumn layout
+- `removeMulticolumnColumn(view, node, nodePos)` — Remove last column from multicolumn layout
+- `wrapSelectionWithText(view, start, end)` — Wrap selected text with delimiters
+- `inlineNodeToMarkdown(node, temporalPrefix)` — Convert ProseMirror inline node back to markdown syntax
+- `getWysiwygViewFromDom(target)` — Find EditorView from DOM element
+- `attachViewToDom(dom, view)` — Attach EditorView reference to DOM
+
+### New File: `src/wysiwyg/inputRules.ts`
+Markdown auto-formatting input rules for the WYSIWYG editor.
+- `buildMarkdownInputRules(schema)` — Build all markdown input rules (lists, headings, images, links, includes, wiki links, tags, multicolumn)
+- `createMulticolumnTransaction(state, schema, growth, start, end)` — Create multicolumn structure from text
+
+### Modified: `src/html/wysiwygEditor.ts`
+Reduced from 1,936 to 664 lines. Now only contains:
+- `WysiwygEditor` class (constructor, focus, destroy, getMarkdown, setMarkdown, getViewDom, insertText, applyCommand)
+- Editor-specific helpers: `isMarkActive`, `buildSelectionState`, `isLikelyPathSelection`, `toggleMarkOnce`, `getStyleKey`
+- Constants: `STYLE_PAIRS`, `TILDE_DEAD_CODES`
+- Global `window.WysiwygEditor` and `window.toggleWysiwygDiagramEdit` exposure
+
+### Modified: `src/wysiwyg/prosemirrorSchema.ts`
+- (NEW) `mediaImageDomSpec(tag, blockClass, node)` — Shared DOM spec for media_inline and media_block image rendering (de-duplicated)
 
 ---
 

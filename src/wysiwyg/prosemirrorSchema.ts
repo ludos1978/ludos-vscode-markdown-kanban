@@ -14,6 +14,31 @@ function buildAttrs(spec?: WysiwygNodeSpec['attrs']): Record<string, { default?:
     return attrs;
 }
 
+function mediaImageDomSpec(tag: 'span' | 'div', blockClass: string, node: { attrs: Record<string, unknown> }): readonly [string, ...unknown[]] {
+    const src = node.attrs.src || '';
+    const alt = node.attrs.alt || '';
+    const title = node.attrs.title || '';
+    const mediaType = node.attrs.mediaType || 'image';
+    return [
+        tag,
+        {
+            class: `image-path-overlay-container wysiwyg-media${blockClass}`,
+            'data-image-path': src,
+            'data-src': src,
+            'data-type': mediaType
+        },
+        ['img', {
+            src,
+            alt,
+            title,
+            class: 'markdown-image',
+            'data-original-src': src,
+            contenteditable: 'false'
+        }],
+        ['button', { class: 'image-menu-btn', 'data-action': 'image-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰']
+    ];
+}
+
 function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] {
     switch (name) {
         case 'paragraph':
@@ -118,24 +143,7 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'media_inline':
             return (node) => (
                 (node.attrs.mediaType || 'image') === 'image'
-                    ? [
-                        'span',
-                        {
-                            class: 'image-path-overlay-container wysiwyg-media',
-                            'data-image-path': node.attrs.src || '',
-                            'data-src': node.attrs.src || '',
-                            'data-type': node.attrs.mediaType || 'image'
-                        },
-                        ['img', {
-                            src: node.attrs.src || '',
-                            alt: node.attrs.alt || '',
-                            title: node.attrs.title || '',
-                            class: 'markdown-image',
-                            'data-original-src': node.attrs.src || '',
-                            contenteditable: 'false'
-                        }],
-                        ['button', { class: 'image-menu-btn', 'data-action': 'image-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰']
-                    ]
+                    ? mediaImageDomSpec('span', '', node)
                     : [
                         'span',
                         { class: 'wysiwyg-media', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
@@ -146,24 +154,7 @@ function buildNodeToDOM(name: string, spec: WysiwygNodeSpec): NodeSpec['toDOM'] 
         case 'media_block':
             return (node) => (
                 (node.attrs.mediaType || 'image') === 'image'
-                    ? [
-                        'div',
-                        {
-                            class: 'image-path-overlay-container wysiwyg-media wysiwyg-media-block',
-                            'data-image-path': node.attrs.src || '',
-                            'data-src': node.attrs.src || '',
-                            'data-type': node.attrs.mediaType || 'image'
-                        },
-                        ['img', {
-                            src: node.attrs.src || '',
-                            alt: node.attrs.alt || '',
-                            title: node.attrs.title || '',
-                            class: 'markdown-image',
-                            'data-original-src': node.attrs.src || '',
-                            contenteditable: 'false'
-                        }],
-                        ['button', { class: 'image-menu-btn', 'data-action': 'image-menu', type: 'button', title: 'Path options', contenteditable: 'false' }, '☰']
-                    ]
+                    ? mediaImageDomSpec('div', ' wysiwyg-media-block', node)
                     : [
                         'div',
                         { class: 'video-path-overlay-container wysiwyg-media wysiwyg-media-block', 'data-src': node.attrs.src || '', 'data-type': node.attrs.mediaType || 'image' },
