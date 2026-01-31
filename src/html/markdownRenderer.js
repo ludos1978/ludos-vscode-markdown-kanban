@@ -92,6 +92,26 @@ window._handleMediaError = function(mediaEl, path, mediaType) {
 };
 
 /**
+ * Error handler for web preview iframes that fail to load (e.g. x-frame-options).
+ * Replaces the iframe with a fallback message and "Open in browser" link.
+ * @param {HTMLIFrameElement} iframeEl - The iframe element that failed
+ * @param {string} url - The original URL
+ */
+window._handleIframeError = function(iframeEl, url) {
+    const container = iframeEl.parentElement;
+    if (!container) return;
+
+    const fallback = document.createElement('div');
+    fallback.className = 'web-preview-fallback';
+    fallback.innerHTML =
+        '<span class="web-preview-fallback-icon">⚠️</span>' +
+        '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
+        '<a class="web-preview-fallback-link" href="' + url + '" target="_blank" rel="noopener noreferrer">Open in browser</a>';
+
+    iframeEl.replaceWith(fallback);
+};
+
+/**
  * Create a diagram wrapper with burger menu button for PlantUML/Mermaid diagrams.
  * @param {string} diagramType - 'plantuml' or 'mermaid'
  * @param {string} code - The diagram source code
@@ -253,6 +273,14 @@ let embedDefaultIframeAttributes = {
     referrerpolicy: 'strict-origin-when-cross-origin'
 };
 
+// Web preview config — synced from backend EmbedPlugin via updateEmbedConfig
+let webPreviewConfig = {
+    enabled: true,
+    mode: 'embed',
+    height: '400px',
+    sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups'
+};
+
 /**
  * Update embed configuration from settings
  * Called when configuration is received from the extension
@@ -263,6 +291,9 @@ function updateEmbedConfig(config) {
     }
     if (config && config.defaultIframeAttributes && typeof config.defaultIframeAttributes === 'object') {
         embedDefaultIframeAttributes = { ...embedDefaultIframeAttributes, ...config.defaultIframeAttributes };
+    }
+    if (config && config.webPreview && typeof config.webPreview === 'object') {
+        webPreviewConfig = { ...webPreviewConfig, ...config.webPreview };
     }
 }
 
@@ -375,6 +406,19 @@ function isImagePath(str) {
 }
 
 /**
+ * Check if a URL points to an image file (by pathname extension, ignoring query params)
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if the URL pathname ends with a known image extension
+ */
+function isImageUrl(url) {
+    if (!url) return false;
+    let pathname;
+    try { pathname = new URL(url).pathname; } catch { pathname = url.split('?')[0]; }
+    const exts = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.bmp', '.ico'];
+    return exts.some(ext => pathname.toLowerCase().endsWith(ext));
+}
+
+/**
  * Render an embed as an iframe with container
  * @param {Object} embedInfo - Embed information from detectEmbed
  * @param {string} originalSrc - Original source URL
@@ -436,6 +480,28 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
         <div class="embed-frame-wrapper">
             <iframe ${iframeAttrs}></iframe>
         </div>
+        ${captionHtml}
+    </div>`;
+}
+
+/**
+ * Render a web preview as a minimal iframe container (no header chrome).
+ * Used when webPreviewConfig.mode === 'iframe'.
+ * @param {string} url - The URL to preview
+ * @param {string} alt - Alt text (used as accessible title)
+ * @param {string} title - Title/caption text
+ * @returns {string} HTML for the web preview container
+ */
+function renderWebPreview(url, alt, title) {
+    const height = webPreviewConfig.height || '400px';
+    const sandbox = webPreviewConfig.sandbox || 'allow-scripts allow-same-origin allow-forms allow-popups';
+    const escapedUrl = escapeHtml(url);
+
+    const captionHtml = title ? `<div class="web-preview-caption media-caption">${escapeHtml(title)}</div>` : '';
+    const titleAttr = alt ? ` title="${escapeHtml(alt)}"` : '';
+
+    return `<div class="web-preview-container">
+        <iframe src="${escapedUrl}" sandbox="${escapeHtml(sandbox)}" width="100%" height="${escapeHtml(height)}" frameborder="0" loading="lazy"${titleAttr} onerror="window._handleIframeError(this,'${escapedUrl.replace(/'/g, "\\'")}')"></iframe>
         ${captionHtml}
     </div>`;
 }
@@ -1002,6 +1068,91 @@ function queueEPUBSlideshow(id, filePath, includeDir) {
     pendingDiagramQueue.push({ id, filePath, diagramType: 'epub-slideshow', includeDir, timestamp: Date.now() });
 }
 
+// ============= DOCUMENT RENDERING FUNCTIONS =============
+
+/**
+ * Render a specific document page to PNG using backend (LibreOffice + pdftoppm)
+ * @param {string} filePath - Path to document file (DOCX, DOC, ODT, PPTX, PPT, ODP)
+ * @param {number} pageNumber - Page number to render (1-indexed)
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
+ * @returns {Promise<{pngDataUrl: string, fileMtime: number}>} PNG data URL and file mtime
+ */
+async function renderDocumentPage(filePath, pageNumber, includeDir) {
+    return new Promise((resolve, reject) => {
+        const requestId = `document-${++diagramRequestId}`;
+
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath, pageNumber });
+
+        const message = {
+            type: 'requestDocumentPageRender',
+            requestId: requestId,
+            filePath: filePath,
+            pageNumber: pageNumber
+        };
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
+
+        // Timeout after 60 seconds (LibreOffice can be slow on cold start)
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`Document page ${pageNumber} rendering timeout`));
+            }
+        }, 60000);
+    });
+}
+
+/**
+ * Request document info (page count) from backend
+ * @param {string} filePath - Path to document file
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
+ * @returns {Promise<{pageCount: number, fileMtime: number}>}
+ */
+async function getDocumentInfo(filePath, includeDir) {
+    return new Promise((resolve, reject) => {
+        const requestId = `docinfo-${++diagramRequestId}`;
+
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath });
+
+        const message = {
+            type: 'requestDocumentInfo',
+            requestId: requestId,
+            filePath: filePath
+        };
+        if (includeDir) {
+            message.includeDir = includeDir;
+        }
+        vscode.postMessage(message);
+
+        // Timeout after 60 seconds (LibreOffice can be slow on cold start)
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`Document info request timeout`));
+            }
+        }, 60000);
+    });
+}
+
+function queueDocumentRender(id, filePath, pageNumber, includeDir) {
+    pendingDiagramQueue.push({ id, filePath, pageNumber, diagramType: 'document', includeDir, timestamp: Date.now() });
+}
+
+function queueDocumentSlideshow(id, filePath, includeDir, initialPage = 1, alt = '', title = '') {
+    pendingDiagramQueue.push({
+        id,
+        filePath,
+        diagramType: 'document-slideshow',
+        includeDir,
+        initialPage,
+        alt,
+        title,
+        timestamp: Date.now()
+    });
+}
+
 /**
  * Create interactive EPUB slideshow with navigation controls
  * @param {HTMLElement} element - Container element
@@ -1310,6 +1461,156 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
 }
 
 /**
+ * Create interactive document slideshow with navigation controls
+ * @param {HTMLElement} element - Container element
+ * @param {string} filePath - Path to document file (DOCX, DOC, ODT, PPTX, PPT, ODP)
+ * @param {number} pageCount - Total number of pages
+ * @param {number} fileMtime - File modification time for caching
+ * @param {string} [includeDir] - Directory of include file for relative path resolution
+ * @param {number} [initialPage=1] - Starting page number (1-indexed)
+ * @param {string} [alt=''] - Alt text from markdown (displayed as title)
+ * @param {string} [title=''] - Title/description from markdown (displayed as tooltip)
+ */
+async function createDocumentSlideshow(element, filePath, pageCount, fileMtime, includeDir, initialPage = 1, alt = '', title = '') {
+    const slideshowId = `document-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const startPage = Math.max(1, Math.min(initialPage, pageCount));
+    let currentPage = startPage;
+
+    const wrapper = document.createElement('span');
+    wrapper.className = 'image-path-overlay-container pdf-slideshow-wrapper';
+    wrapper.dataset.filePath = filePath;
+    if (title) {
+        wrapper.title = title;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'pdf-slideshow';
+    container.id = slideshowId;
+    container.setAttribute('data-document-path', filePath);
+    container.setAttribute('data-page-count', pageCount);
+    container.setAttribute('data-current-page', currentPage);
+    container.setAttribute('data-initial-page', startPage);
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'image-menu-btn';
+    menuBtn.title = 'Path options';
+    menuBtn.textContent = '☰';
+    menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof togglePathMenu === 'function') {
+            togglePathMenu(wrapper, filePath, 'image');
+        }
+    };
+
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'pdf-slideshow-image';
+
+    const controls = document.createElement('div');
+    controls.className = 'pdf-slideshow-controls';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pdf-slideshow-btn pdf-slideshow-prev';
+    prevBtn.innerHTML = '◀ Prev';
+    prevBtn.disabled = (currentPage === 1);
+
+    const pageInfo = document.createElement('span');
+    pageInfo.className = 'pdf-slideshow-page-info';
+    pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pdf-slideshow-btn pdf-slideshow-next';
+    nextBtn.innerHTML = 'Next ▶';
+    nextBtn.disabled = (currentPage === pageCount);
+
+    controls.appendChild(prevBtn);
+    controls.appendChild(pageInfo);
+    controls.appendChild(nextBtn);
+
+    if (alt) {
+        const titleHeader = document.createElement('div');
+        titleHeader.className = 'pdf-slideshow-title';
+        titleHeader.textContent = alt;
+        container.appendChild(titleHeader);
+    }
+
+    container.appendChild(imageContainer);
+    container.appendChild(controls);
+
+    wrapper.appendChild(container);
+    wrapper.appendChild(menuBtn);
+
+    element.innerHTML = '';
+    element.appendChild(wrapper);
+
+    const pageCache = new Map();
+
+    const loadPage = async (pageNumber) => {
+        try {
+            const cachedUrl = pageCache.get(pageNumber);
+            if (cachedUrl) {
+                imageContainer.innerHTML = `<img src="${cachedUrl}" alt="Document page ${pageNumber}" class="diagram-rendered" />`;
+            } else {
+                imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
+
+                const result = await renderDocumentPage(filePath, pageNumber, includeDir);
+                const { pngDataUrl } = result;
+                pageCache.set(pageNumber, pngDataUrl);
+                imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="Document page ${pageNumber}" class="diagram-rendered" />`;
+            }
+
+            const img = imageContainer.querySelector('img');
+            if (img) {
+                const triggerRecalc = () => {
+                    const columnElement = imageContainer.closest('.kanban-full-height-column');
+                    const columnId = columnElement?.getAttribute('data-column-id');
+                    if (typeof window.applyStackedColumnStyles === 'function') {
+                        window.applyStackedColumnStyles(columnId);
+                    }
+                };
+                if (img.complete) {
+                    requestAnimationFrame(triggerRecalc);
+                } else {
+                    img.onload = triggerRecalc;
+                }
+            }
+
+            currentPage = pageNumber;
+            container.setAttribute('data-current-page', currentPage);
+            pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
+            prevBtn.disabled = (currentPage === 1);
+            nextBtn.disabled = (currentPage === pageCount);
+
+        } catch (error) {
+            console.error(`[Document Slideshow] Failed to load page ${pageNumber}:`, error);
+            const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
+            imageContainer.innerHTML = '';
+            imageContainer.appendChild(createBrokenMediaPlaceholder(
+                filePath, '📄',
+                `Failed to load document page ${pageNumber}: ${filePath}`,
+                `${shortPath} (page ${pageNumber})`
+            ));
+        }
+    };
+
+    prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentPage > 1) {
+            loadPage(currentPage - 1);
+        }
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentPage < pageCount) {
+            loadPage(currentPage + 1);
+        }
+    });
+
+    await loadPage(startPage);
+}
+
+/**
  * Process all pending diagram renders in the queue
  * Height recalculation is handled automatically by the column ResizeObserver
  */
@@ -1361,6 +1662,24 @@ async function processDiagramQueue() {
                 continue;
             }
 
+            // Handle Document slideshow separately (DOCX, DOC, ODT, PPTX, PPT, ODP)
+            if (item.diagramType === 'document-slideshow') {
+                const docInfo = await getDocumentInfo(item.filePath, item.includeDir);
+                const { pageCount, fileMtime } = docInfo;
+
+                await createDocumentSlideshow(
+                    element,
+                    item.filePath,
+                    pageCount,
+                    fileMtime,
+                    item.includeDir,
+                    item.initialPage || 1,
+                    item.alt || '',
+                    item.title || ''
+                );
+                continue;
+            }
+
             let imageDataUrl, fileMtime, displayLabel;
 
             // Render based on type (all types use cachedRenderMedia for consistent cache behavior)
@@ -1383,6 +1702,15 @@ async function processDiagramQueue() {
                     }
                 ));
                 displayLabel = `Excel sheet ${sheetNum}`;
+            } else if (item.diagramType === 'document') {
+                ({ imageDataUrl, fileMtime } = await cachedRenderMedia(
+                    item.filePath, 'document', item.includeDir, `page${item.pageNumber}`,
+                    async () => {
+                        const r = await renderDocumentPage(item.filePath, item.pageNumber, item.includeDir);
+                        return { dataUrl: r.pngDataUrl, mtime: r.fileMtime };
+                    }
+                ));
+                displayLabel = `Document page ${item.pageNumber}`;
             } else {
                 ({ imageDataUrl, fileMtime } = await cachedRenderMedia(
                     item.filePath, item.diagramType, item.includeDir, '',
@@ -1463,7 +1791,9 @@ async function processDiagramQueue() {
                 'epub-slideshow': { label: 'EPUB', emoji: '📚' },
                 'drawio': { label: 'DrawIO diagram', emoji: '📊' },
                 'excalidraw': { label: 'Excalidraw diagram', emoji: '🎨' },
-                'xlsx': { label: `Excel sheet ${item.sheetNumber || 1}`, emoji: '📊' }
+                'xlsx': { label: `Excel sheet ${item.sheetNumber || 1}`, emoji: '📊' },
+                'document': { label: `Document page ${item.pageNumber || 1}`, emoji: '📄' },
+                'document-slideshow': { label: 'Document', emoji: '📄' }
             }[item.diagramType] || { label: `${item.diagramType} diagram`, emoji: '📷' };
             // Wrap error in overlay container with burger menu for path operations
             let decodedPath = item.filePath;
@@ -1613,6 +1943,40 @@ window.addEventListener('message', event => {
 
         if (request) {
             console.error(`[EPUB] Info request failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'documentPageRenderSuccess') {
+        const { requestId, pngDataUrl, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            request.resolve({ pngDataUrl, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'documentPageRenderError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[Document] Page rendering failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'documentInfoSuccess') {
+        const { requestId, pageCount, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            request.resolve({ pageCount, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'documentInfoError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[Document] Info request failed:`, error);
             request.reject(new Error(error));
             diagramRenderRequests.delete(requestId);
         }
@@ -2758,10 +3122,67 @@ function renderMarkdown(text, includeContext) {
                 return createLoadingPlaceholder(xlsxId, 'diagram-placeholder', `Loading Excel sheet ${sheetNumber}...`);
             }
 
+            // Check if this is a document file (DOCX, DOC, ODT, PPTX, PPT, ODP)
+            const parseDocumentPath = (src) => {
+                if (!src) return null;
+                // Hash fragment: file.docx#3 → single page mode
+                const hashMatch = src.match(/^(.+\.(?:docx|doc|odt|pptx|ppt|odp))#(\d+)$/i);
+                if (hashMatch) return { docPath: hashMatch[1], pageNumber: parseInt(hashMatch[2], 10), mode: 'single' };
+                // Query param: file.docx?p=3 → slideshow starting at page 3
+                const queryMatch = src.match(/^(.+\.(?:docx|doc|odt|pptx|ppt|odp))\?(?:p|page)=(\d+)$/i);
+                if (queryMatch) return { docPath: queryMatch[1], pageNumber: parseInt(queryMatch[2], 10), mode: 'slideshow' };
+                // Plain file: file.docx → slideshow starting at page 1
+                if (src.match(/\.(?:docx|doc|odt|pptx|ppt|odp)$/i)) return { docPath: src, pageNumber: 1, mode: 'slideshow' };
+                return null;
+            };
+            const docInfo = parseDocumentPath(originalSrc);
+
+            // Single page mode: file.docx#3
+            if (docInfo && docInfo.mode === 'single') {
+                const docId = createUniqueId('document-page');
+                queueDocumentRender(docId, docInfo.docPath, docInfo.pageNumber, includeDir);
+                const displayLabel = alt || `Document page ${docInfo.pageNumber}`;
+                return createLoadingPlaceholder(docId, 'diagram-placeholder', `Loading ${displayLabel}...`);
+            }
+
+            // Slideshow mode: file.docx or file.docx?p=3
+            if (docInfo && docInfo.mode === 'slideshow') {
+                const docId = createUniqueId('document-slideshow');
+                queueDocumentSlideshow(docId, docInfo.docPath, includeDir, docInfo.pageNumber, alt, title);
+                const displayLabel = alt || 'Document slideshow';
+                return createLoadingPlaceholder(docId, 'diagram-placeholder', `Loading ${displayLabel}...`);
+            }
+
             // Check if this is an embed URL (external iframe content)
             const embedInfo = detectEmbed(originalSrc, alt, title, token);
             if (embedInfo) {
                 return renderEmbed(embedInfo, originalSrc, alt, title);
+            }
+
+            // Web preview: HTTP(S) URLs that are not image files
+            if (webPreviewConfig.enabled &&
+                (originalSrc.startsWith('http://') || originalSrc.startsWith('https://')) &&
+                !isImageUrl(originalSrc)) {
+                if (webPreviewConfig.mode === 'iframe') {
+                    return renderWebPreview(originalSrc, alt, title);
+                } else {
+                    // 'embed' mode: reuse renderEmbed with sandbox in customAttrs
+                    const height = webPreviewConfig.height || '400px';
+                    const sandbox = webPreviewConfig.sandbox || 'allow-scripts allow-same-origin allow-forms allow-popups';
+                    const webEmbedInfo = {
+                        url: originalSrc,
+                        fallback: null,
+                        width: embedDefaultIframeAttributes.width || '100%',
+                        height: height,
+                        frameborder: embedDefaultIframeAttributes.frameborder || '0',
+                        allowfullscreen: embedDefaultIframeAttributes.allowfullscreen ?? true,
+                        loading: 'lazy',
+                        allow: embedDefaultIframeAttributes.allow || '',
+                        referrerpolicy: embedDefaultIframeAttributes.referrerpolicy || '',
+                        customAttrs: { sandbox: sandbox }
+                    };
+                    return renderEmbed(webEmbedInfo, originalSrc, alt, title);
+                }
             }
 
             let displaySrc = originalSrc;

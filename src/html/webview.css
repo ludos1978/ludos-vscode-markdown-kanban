@@ -1620,6 +1620,76 @@ figure:has(.diagram-placeholder .image-not-found) {
 }
 
 /* ============================================================================
+   WEB PREVIEW - Inline iframe for non-image HTTP(S) URLs
+   ============================================================================ */
+
+.web-preview-container {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0.5em 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+.web-preview-container iframe {
+  display: block;
+  width: 100%;
+  border: none;
+}
+
+.web-preview-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2em 1em;
+  gap: 8px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+}
+
+.web-preview-fallback-icon {
+  font-size: 1.5em;
+}
+
+.web-preview-fallback-text {
+  font-size: 0.9em;
+}
+
+.web-preview-fallback-link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  font-size: 0.85em;
+  transition: background 0.15s;
+}
+
+.web-preview-fallback-link:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.web-preview-caption {
+  display: block;
+  padding: 4px 0;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  font-style: italic;
+}
+
+.task-description .web-preview-container,
+.task-description-wysiwyg .web-preview-container {
+  margin: 0.5em 0;
+}
+
+/* ============================================================================
    MEDIA CAPTIONS - For images, videos, audio, and embeds
    ============================================================================ */
 

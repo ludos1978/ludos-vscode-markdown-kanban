@@ -24,10 +24,19 @@ export interface EmbedPluginInterface {
     /** Get export handling mode from config */
     getExportHandling(): 'url' | 'fallback' | 'remove';
 
+    /** Get web preview configuration */
+    getWebPreviewConfig(): {
+        enabled: boolean;
+        mode: 'embed' | 'iframe';
+        height: string;
+        sandbox: string;
+    };
+
     /** Get config subset for frontend webview sync */
     getWebviewConfig(): {
         knownDomains: string[];
         defaultIframeAttributes: Record<string, string | boolean | number>;
+        webPreview: { enabled: boolean; mode: string; height: string; sandbox: string };
     };
 
     /** Apply embed transformation for export */

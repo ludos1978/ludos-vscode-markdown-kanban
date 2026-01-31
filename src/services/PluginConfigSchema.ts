@@ -28,6 +28,12 @@ export interface EmbedPluginConfig {
     knownDomains: string[];
     defaultIframeAttributes: Record<string, string | boolean | number>;
     exportHandling: 'url' | 'fallback' | 'remove';
+    webPreview: {
+        enabled: boolean;
+        mode: 'embed' | 'iframe';
+        height: string;
+        sandbox: string;
+    };
 }
 
 export interface ImageSearchPluginConfig {
@@ -112,12 +118,22 @@ export const PLUGIN_CONFIG_SCHEMAS: Record<string, PluginConfigSchemaEntry> = {
                 allow: 'fullscreen; clipboard-read; clipboard-write; autoplay; encrypted-media; picture-in-picture',
                 referrerpolicy: 'strict-origin-when-cross-origin'
             },
-            exportHandling: 'url'
+            exportHandling: 'url',
+            webPreview: {
+                enabled: true,
+                mode: 'embed',
+                height: '400px',
+                sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups'
+            }
         } satisfies EmbedPluginConfig as Record<string, unknown>,
         vscodeKeyMap: {
             knownDomains: 'embed.knownDomains',
             defaultIframeAttributes: 'embed.defaultIframeAttributes',
-            exportHandling: 'embed.exportHandling'
+            exportHandling: 'embed.exportHandling',
+            'webPreview.enabled': 'embed.webPreview.enabled',
+            'webPreview.mode': 'embed.webPreview.mode',
+            'webPreview.height': 'embed.webPreview.height',
+            'webPreview.sandbox': 'embed.webPreview.sandbox'
         }
     },
     imagesearch: {

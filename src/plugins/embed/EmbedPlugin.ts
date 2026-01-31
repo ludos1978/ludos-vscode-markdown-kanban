@@ -54,12 +54,26 @@ export class EmbedPlugin implements EmbedPluginInterface {
     }
 
     /**
+     * Get web preview configuration from config
+     */
+    getWebPreviewConfig(): { enabled: boolean; mode: 'embed' | 'iframe'; height: string; sandbox: string } {
+        const config = this.getConfig();
+        return config?.webPreview ?? {
+            enabled: true,
+            mode: 'embed',
+            height: '400px',
+            sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups'
+        };
+    }
+
+    /**
      * Get config subset for frontend webview sync
      */
-    getWebviewConfig(): { knownDomains: string[]; defaultIframeAttributes: Record<string, string | boolean | number> } {
+    getWebviewConfig(): { knownDomains: string[]; defaultIframeAttributes: Record<string, string | boolean | number>; webPreview: { enabled: boolean; mode: string; height: string; sandbox: string } } {
         return {
             knownDomains: this.getKnownDomains(),
-            defaultIframeAttributes: this.getDefaultIframeAttributes()
+            defaultIframeAttributes: this.getDefaultIframeAttributes(),
+            webPreview: this.getWebPreviewConfig()
         };
     }
 

@@ -9,6 +9,29 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
+## Recent Updates (2026-01-31) - Inline Web Preview for URLs
+
+### Modified: `src/services/PluginConfigSchema.ts`
+- `EmbedPluginConfig.webPreview` — New nested config: { enabled, mode, height, sandbox } for web preview settings
+
+### Modified: `src/plugins/embed/EmbedPlugin.ts`
+- `EmbedPlugin.getWebPreviewConfig()` — Get web preview config { enabled, mode, height, sandbox }
+- `EmbedPlugin.getWebviewConfig()` — (MODIFIED) Now also returns webPreview in the config subset
+
+### Modified: `src/plugins/interfaces/EmbedPlugin.ts`
+- `EmbedPluginInterface.getWebPreviewConfig()` — New method in interface
+- `EmbedPluginInterface.getWebviewConfig()` — (MODIFIED) Return type now includes webPreview
+
+### Modified: `src/html/markdownRenderer.js`
+- `webPreviewConfig` — Module-level config variable synced from backend via updateEmbedConfig
+- `updateEmbedConfig(config)` — (MODIFIED) Now also syncs config.webPreview into webPreviewConfig
+- `isImageUrl(url)` — Check if a URL points to an image file by pathname extension (ignoring query params)
+- `renderWebPreview(url, alt, title)` — Render web preview as minimal iframe container (mode='iframe')
+- `window._handleIframeError(iframeEl, url)` — Error handler for web preview iframes, shows fallback with "Open in browser" link
+- Image rendering rule — (MODIFIED) Added web preview detection after detectEmbed, before img fallback
+
+---
+
 ## Recent Updates (2026-01-31) - WYSIWYG Module Extraction
 
 The monolithic `src/html/wysiwygEditor.ts` (1,936 lines) was split into focused modules:
@@ -180,7 +203,8 @@ Owns all embed/iframe logic: config access, export transforms, webview config sy
 - `EmbedPlugin.getKnownDomains()` - Get known embed domains from config
 - `EmbedPlugin.getDefaultIframeAttributes()` - Get default iframe attributes from config
 - `EmbedPlugin.getExportHandling()` - Get export handling mode from config
-- `EmbedPlugin.getWebviewConfig()` - Get { knownDomains, defaultIframeAttributes } for frontend sync
+- `EmbedPlugin.getWebPreviewConfig()` - Get web preview config { enabled, mode, height, sandbox }
+- `EmbedPlugin.getWebviewConfig()` - Get { knownDomains, defaultIframeAttributes, webPreview } for frontend sync
 - `EmbedPlugin.transformForExport(content, mode)` - Apply embed transform for export (moved from ExportService.applyEmbedTransform)
 - `EmbedPlugin.isImagePath(str)` - (static) Check if string looks like an image path (moved from ExportService.isImagePath)
 

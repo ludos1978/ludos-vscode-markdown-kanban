@@ -553,6 +553,34 @@
             "Remove embeds entirely from the export"
           ]
         },
+        "markdown-kanban.embed.webPreview.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render non-image HTTP(S) URLs in ![](url) syntax as inline web page previews instead of broken images."
+        },
+        "markdown-kanban.embed.webPreview.mode": {
+          "type": "string",
+          "enum": [
+            "embed",
+            "iframe"
+          ],
+          "default": "embed",
+          "description": "Display mode for web previews. 'embed' shows a styled container with domain header, 'iframe' shows a minimal plain iframe.",
+          "enumDescriptions": [
+            "Styled container with domain header and embed chrome",
+            "Minimal plain iframe without header"
+          ]
+        },
+        "markdown-kanban.embed.webPreview.height": {
+          "type": "string",
+          "default": "400px",
+          "description": "Default height for web preview iframes (CSS value, e.g. '400px', '50vh')."
+        },
+        "markdown-kanban.embed.webPreview.sandbox": {
+          "type": "string",
+          "default": "allow-scripts allow-same-origin allow-forms allow-popups",
+          "description": "Sandbox policy for web preview iframes. Controls what the embedded page is allowed to do."
+        },
         "markdown-kanban.openLinksInNewTab": {
           "type": "boolean",
           "default": false,
