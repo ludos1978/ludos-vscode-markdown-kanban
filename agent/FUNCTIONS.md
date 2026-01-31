@@ -2002,3 +2002,13 @@ WebviewBridge provides a typed, promise-based interface for webview communicatio
 - `markdown-kanban.plugins.disabled` - (MODIFIED) Added 22 markdown plugin IDs to the enum (wiki-links, tag, task-checkbox, etc.)
 
 ---
+
+## Internal Tag Navigation (2026-01-31)
+
+### Modified: `src/html/boardRenderer.js`
+- Wiki link click handler now intercepts `[[#tag]]` links (documentName starts with `#`): opens in-board search panel, sets query to the tag, triggers performSearch — reuses existing KanbanSearch highlight/cycle infrastructure. Regular `[[document]]` wiki links unchanged.
+
+### Modified: `src/html/webview.js`
+- Added Alt+G keyboard shortcut inside the `kanbanSearch.isSearching` guard: calls `kanbanSearch.nextResult()` to cycle to next search match.
+
+---

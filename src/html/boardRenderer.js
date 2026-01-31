@@ -2415,6 +2415,16 @@ function handleMediaOpen(event, target, taskId = null, columnId = null) {
         event.stopPropagation();
         const documentName = wikiLink.getAttribute('data-document');
         if (documentName) {
+            // [[#tag]] → trigger in-board search instead of opening a file
+            if (documentName.startsWith('#')) {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput && window.kanbanSearch) {
+                    window.kanbanSearch.openSearch();
+                    searchInput.value = documentName;
+                    window.kanbanSearch.performSearch();
+                }
+                return true;
+            }
             // Calculate index for wiki links
             linkIndex = findElementIndex(wikiLink, containerElement, 'data-document');
             sendOpenLinkMessage(LinkType.WIKI, documentName, { taskId, columnId, linkIndex, includeContext });

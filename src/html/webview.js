@@ -5037,6 +5037,13 @@ document.addEventListener('keydown', (e) => {
             kanbanSearch.previousResult();
             return;
         }
+
+        // Alt+G for next result
+        if (e.altKey && e.key.toLowerCase() === 'g') {
+            e.preventDefault();
+            kanbanSearch.nextResult();
+            return;
+        }
     }
     
     // Kanban-specific shortcuts (only when NOT editing)
