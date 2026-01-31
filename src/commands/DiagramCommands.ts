@@ -298,95 +298,80 @@ export class DiagramCommands extends SwitchBasedCommand {
      */
     private async handleRenderDrawIO(message: RequestDrawIORenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleRenderDrawIO] No panel or webview available');
-            return;
-        }
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const includeContext = includeDir ? { includeDir } : undefined;
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-
-            if (!resolution || !resolution.exists) {
-                throw new Error(`draw.io file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
-
-            const mediaTracker = context.getMediaTracker?.();
-            if (mediaTracker) {
-                mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
-            }
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'draw.io', 'diagram');
 
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
-            const isEmptyDiagram = this.isEmptyDrawIOFile(fileContent);
-
-            if (isEmptyDiagram) {
+            if (this.isEmptyDrawIOFile(fileContent)) {
                 const placeholderSvg = this.createEmptyDrawIOPlaceholder();
-                const pngDataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
-
                 this.postMessage({
-                    type: 'drawioRenderSuccess',
-                    requestId,
-                    svgDataUrl: pngDataUrl,
+                    type: 'drawioRenderSuccess', requestId,
+                    svgDataUrl: `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`,
                     fileMtime
                 });
                 return;
             }
 
-            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'drawio-cache');
-            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png');
-            const cachePath = path.join(cacheDir, cacheFileName);
-
-            let pngDataUrl: string;
-
-            if (fs.existsSync(cachePath)) {
-                const cachedPng = await fs.promises.readFile(cachePath);
-                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
-            } else {
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'drawio-cache', extension: 'png', logPrefix: 'DrawIO Backend'
+            }, async () => {
                 const plugin = this._getRegistry().findDiagramPluginById('drawio');
-                if (!plugin || !plugin.renderFile) {
-                    throw new Error('Draw.io plugin not available');
-                }
-
-                if (!await plugin.isAvailable()) {
-                    throw new Error('draw.io CLI not installed');
-                }
-
+                if (!plugin || !plugin.renderFile) { throw new Error('Draw.io plugin not available'); }
+                if (!await plugin.isAvailable()) { throw new Error('draw.io CLI not installed'); }
                 const result = await plugin.renderFile(absolutePath, { outputFormat: 'png' });
-                if (!result.success) {
-                    throw new Error(result.error || 'Draw.io rendering failed');
-                }
-
-                const pngBuffer = result.data as Buffer;
-
-                await fs.promises.mkdir(cacheDir, { recursive: true });
-                await fs.promises.writeFile(cachePath, pngBuffer);
-                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'DrawIO Backend');
-
-                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            }
-
-            this.postMessage({
-                type: 'drawioRenderSuccess',
-                requestId,
-                svgDataUrl: pngDataUrl,
-                fileMtime
+                if (!result.success) { throw new Error(result.error || 'Draw.io rendering failed'); }
+                return result.data as Buffer;
             });
 
+            this.postMessage({ type: 'drawioRenderSuccess', requestId, svgDataUrl: dataUrl, fileMtime });
         } catch (error) {
             console.error('[DrawIO Backend] Render error:', error);
-
-            this.postMessage({
-                type: 'drawioRenderError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            this.postMessage({ type: 'drawioRenderError', requestId, error: getErrorMessage(error) });
         }
+    }
+
+    /**
+     * Unified file-based cache: check for cached render, or render + store + cleanup.
+     * Shared by all file-based render handlers (drawio, excalidraw, pdf, epub, xlsx).
+     *
+     * @returns data URL of the rendered content (e.g. data:image/png;base64,...)
+     */
+    private async renderWithFileCache(
+        absolutePath: string,
+        fileMtime: number,
+        context: CommandContext,
+        config: {
+            cacheFolderName: string;
+            extension: string;
+            suffix?: string;
+            logPrefix: string;
+        },
+        renderFn: () => Promise<Buffer | string>
+    ): Promise<string> {
+        const cacheDir = this.getDiagramCacheDir(absolutePath, context, config.cacheFolderName);
+        const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, config.extension, config.suffix);
+        const cachePath = path.join(cacheDir, cacheFileName);
+
+        const mimeType = config.extension === 'svg' ? 'image/svg+xml' : 'image/png';
+
+        if (fs.existsSync(cachePath)) {
+            const cached = await fs.promises.readFile(cachePath);
+            return `data:${mimeType};base64,${cached.toString('base64')}`;
+        }
+
+        const data = await renderFn();
+
+        await fs.promises.mkdir(cacheDir, { recursive: true });
+        if (typeof data === 'string') {
+            await fs.promises.writeFile(cachePath, data, 'utf8');
+        } else {
+            await fs.promises.writeFile(cachePath, data);
+        }
+        await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, config.extension, config.logPrefix);
+
+        return `data:${mimeType};base64,${Buffer.from(data).toString('base64')}`;
     }
 
     /**
@@ -539,105 +524,51 @@ export class DiagramCommands extends SwitchBasedCommand {
      */
     private async handleRenderExcalidraw(message: RequestExcalidrawRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            console.error('[DiagramCommands.handleRenderExcalidraw] No panel or webview available');
-            return;
-        }
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const includeContext = includeDir ? { includeDir } : undefined;
-            const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
-
-            if (!resolution || !resolution.exists) {
-                throw new Error(`Excalidraw file not found: ${filePath}`);
-            }
-
-            const absolutePath = resolution.resolvedPath;
-            const stats = await fs.promises.stat(absolutePath);
-            const fileMtime = stats.mtimeMs;
-
-            const mediaTracker = context.getMediaTracker?.();
-            if (mediaTracker) {
-                mediaTracker.ensureFileWatched(filePath, absolutePath, 'diagram', fileMtime);
-            }
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'Excalidraw', 'diagram');
 
             const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
-            const isEmptyDiagram = this.isEmptyExcalidrawFile(fileContent, absolutePath);
-
-            if (isEmptyDiagram) {
+            if (this.isEmptyExcalidrawFile(fileContent, absolutePath)) {
                 const placeholderSvg = this.createEmptyExcalidrawPlaceholder();
-                const dataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
-
                 this.postMessage({
-                    type: 'excalidrawRenderSuccess',
-                    requestId,
-                    svgDataUrl: dataUrl,
+                    type: 'excalidrawRenderSuccess', requestId,
+                    svgDataUrl: `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`,
                     fileMtime
                 });
                 return;
             }
 
-            // Check filesystem cache before rendering
-            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'excalidraw-cache');
-            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'svg');
-            const cachePath = path.join(cacheDir, cacheFileName);
-
-            let dataUrl: string;
-
-            if (fs.existsSync(cachePath)) {
-                const cachedSvg = await fs.promises.readFile(cachePath, 'utf8');
-                dataUrl = `data:image/svg+xml;base64,${Buffer.from(cachedSvg).toString('base64')}`;
-            } else {
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'excalidraw-cache', extension: 'svg', logPrefix: 'Excalidraw Backend'
+            }, async () => {
                 const plugin = this._getRegistry().findDiagramPluginById('excalidraw');
-                if (!plugin || !plugin.renderFile) {
-                    throw new Error('Excalidraw plugin not available');
-                }
-
+                if (!plugin || !plugin.renderFile) { throw new Error('Excalidraw plugin not available'); }
                 const result = await plugin.renderFile(absolutePath);
-                if (!result.success) {
-                    throw new Error(result.error || 'Excalidraw rendering failed');
-                }
-
-                const svg = result.data as string;
-
-                // Write to filesystem cache
-                await fs.promises.mkdir(cacheDir, { recursive: true });
-                await fs.promises.writeFile(cachePath, svg, 'utf8');
-                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'svg', 'Excalidraw Backend');
-
-                dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-            }
-
-            this.postMessage({
-                type: 'excalidrawRenderSuccess',
-                requestId,
-                svgDataUrl: dataUrl,
-                fileMtime
+                if (!result.success) { throw new Error(result.error || 'Excalidraw rendering failed'); }
+                return result.data as string;
             });
 
+            this.postMessage({ type: 'excalidrawRenderSuccess', requestId, svgDataUrl: dataUrl, fileMtime });
         } catch (error) {
             console.error('[Excalidraw Backend] Render error:', error);
-
-            this.postMessage({
-                type: 'excalidrawRenderError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            this.postMessage({ type: 'excalidrawRenderError', requestId, error: getErrorMessage(error) });
         }
     }
 
-    // ============= DOCUMENT FILE HELPERS =============
+    // ============= FILE RESOLUTION HELPERS =============
 
     /**
-     * Resolve a document file path and get its modification time.
+     * Resolve a file path, stat it, and register with MediaTracker for change detection.
+     * Shared by all file-based handlers (diagram, document, etc.).
      */
-    private async resolveDocumentFile(
+    private async resolveTrackedFile(
         filePath: string,
         includeDir: string | undefined,
         context: CommandContext,
-        fileType: string
+        fileType: string,
+        trackerType: 'diagram' | 'image' | 'audio' | 'video' | 'document' = 'document'
     ): Promise<{ absolutePath: string; fileMtime: number }> {
         const includeContext = includeDir ? { includeDir } : undefined;
         const resolution = await context.fileManager.resolveFilePath(filePath, includeContext);
@@ -646,7 +577,14 @@ export class DiagramCommands extends SwitchBasedCommand {
         }
         const absolutePath = resolution.resolvedPath;
         const stats = await fs.promises.stat(absolutePath);
-        return { absolutePath, fileMtime: stats.mtimeMs };
+        const fileMtime = stats.mtimeMs;
+
+        const mediaTracker = context.getMediaTracker?.();
+        if (mediaTracker) {
+            mediaTracker.ensureFileWatched(filePath, absolutePath, trackerType, fileMtime);
+        }
+
+        return { absolutePath, fileMtime };
     }
 
     // ============= PDF HANDLERS =============
@@ -656,100 +594,61 @@ export class DiagramCommands extends SwitchBasedCommand {
      */
     private async handleRenderPDFPage(message: RequestPDFPageRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, pageNumber, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            return;
-        }
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const plugin = this._getRegistry().findDiagramPluginById('pdf');
-            if (!plugin || !plugin.renderFile) {
-                throw new Error('PDF plugin not available');
-            }
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'PDF');
 
-            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
-
-            // Check filesystem cache
-            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'pdf-cache');
-            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-p${pageNumber}`);
-            const cachePath = path.join(cacheDir, cacheFileName);
-
-            let pngDataUrl: string;
-
-            if (fs.existsSync(cachePath)) {
-                const cachedPng = await fs.promises.readFile(cachePath);
-                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
-            } else {
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'pdf-cache', extension: 'png', suffix: `-p${pageNumber}`, logPrefix: 'PDF Backend'
+            }, async () => {
+                const plugin = this._getRegistry().findDiagramPluginById('pdf');
+                if (!plugin || !plugin.renderFile) { throw new Error('PDF plugin not available'); }
                 const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
-                if (!result.success) {
-                    throw new Error(result.error || 'PDF rendering failed');
-                }
-
-                const pngBuffer = result.data as Buffer;
-
-                await fs.promises.mkdir(cacheDir, { recursive: true });
-                await fs.promises.writeFile(cachePath, pngBuffer);
-                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'PDF Backend');
-
-                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            }
-
-            this.postMessage({
-                type: 'pdfPageRenderSuccess',
-                requestId,
-                pngDataUrl,
-                fileMtime
+                if (!result.success) { throw new Error(result.error || 'PDF rendering failed'); }
+                return result.data as Buffer;
             });
 
+            this.postMessage({ type: 'pdfPageRenderSuccess', requestId, pngDataUrl: dataUrl, fileMtime });
         } catch (error) {
             console.error('[PDF Backend] Render error:', error);
-
-            this.postMessage({
-                type: 'pdfPageRenderError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            this.postMessage({ type: 'pdfPageRenderError', requestId, error: getErrorMessage(error) });
         }
     }
 
     /**
-     * Handle PDF info request (get page count)
+     * Handle file info request (page count) for paged document types (PDF, EPUB).
      */
-    private async handleGetPDFInfo(message: RequestPDFInfoMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            return;
-        }
+    private async handleFileInfo(
+        requestId: string,
+        filePath: string,
+        includeDir: string | undefined,
+        context: CommandContext,
+        pluginId: string,
+        fileType: string,
+        successType: string,
+        errorType: string
+    ): Promise<void> {
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const plugin = this._getRegistry().findDiagramPluginById('pdf');
+            const plugin = this._getRegistry().findDiagramPluginById(pluginId);
             if (!plugin || !plugin.getFileInfo) {
-                throw new Error('PDF plugin not available');
+                throw new Error(`${fileType} plugin not available`);
             }
 
-            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'PDF');
-
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, fileType);
             const info = await plugin.getFileInfo(absolutePath);
 
-            this.postMessage({
-                type: 'pdfInfoSuccess',
-                requestId,
-                pageCount: info.pageCount,
-                fileMtime
-            });
-
+            this.postMessage({ type: successType, requestId, pageCount: info.pageCount, fileMtime });
         } catch (error) {
-            console.error('[PDF Info] Error:', error);
-
-            this.postMessage({
-                type: 'pdfInfoError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            console.error(`[${fileType} Info] Error:`, error);
+            this.postMessage({ type: errorType, requestId, error: getErrorMessage(error) });
         }
+    }
+
+    private async handleGetPDFInfo(message: RequestPDFInfoMessage, context: CommandContext): Promise<void> {
+        await this.handleFileInfo(message.requestId, message.filePath, message.includeDir, context, 'pdf', 'PDF', 'pdfInfoSuccess', 'pdfInfoError');
     }
 
     // ============= EPUB HANDLERS =============
@@ -759,100 +658,30 @@ export class DiagramCommands extends SwitchBasedCommand {
      */
     private async handleRenderEPUBPage(message: RequestEPUBPageRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, pageNumber, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            return;
-        }
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const plugin = this._getRegistry().findDiagramPluginById('epub');
-            if (!plugin || !plugin.renderFile) {
-                throw new Error('EPUB plugin not available');
-            }
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'EPUB');
 
-            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
-
-            // Check filesystem cache
-            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'epub-cache');
-            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-p${pageNumber}`);
-            const cachePath = path.join(cacheDir, cacheFileName);
-
-            let pngDataUrl: string;
-
-            if (fs.existsSync(cachePath)) {
-                const cachedPng = await fs.promises.readFile(cachePath);
-                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
-            } else {
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'epub-cache', extension: 'png', suffix: `-p${pageNumber}`, logPrefix: 'EPUB Backend'
+            }, async () => {
+                const plugin = this._getRegistry().findDiagramPluginById('epub');
+                if (!plugin || !plugin.renderFile) { throw new Error('EPUB plugin not available'); }
                 const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
-                if (!result.success) {
-                    throw new Error(result.error || 'EPUB rendering failed');
-                }
-
-                const pngBuffer = result.data as Buffer;
-
-                await fs.promises.mkdir(cacheDir, { recursive: true });
-                await fs.promises.writeFile(cachePath, pngBuffer);
-                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'EPUB Backend');
-
-                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            }
-
-            this.postMessage({
-                type: 'epubPageRenderSuccess',
-                requestId,
-                pngDataUrl,
-                fileMtime
+                if (!result.success) { throw new Error(result.error || 'EPUB rendering failed'); }
+                return result.data as Buffer;
             });
 
+            this.postMessage({ type: 'epubPageRenderSuccess', requestId, pngDataUrl: dataUrl, fileMtime });
         } catch (error) {
             console.error('[EPUB Backend] Render error:', error);
-
-            this.postMessage({
-                type: 'epubPageRenderError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            this.postMessage({ type: 'epubPageRenderError', requestId, error: getErrorMessage(error) });
         }
     }
 
-    /**
-     * Handle EPUB info request (get page count)
-     */
     private async handleGetEPUBInfo(message: RequestEPUBInfoMessage, context: CommandContext): Promise<void> {
-        const { requestId, filePath, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            return;
-        }
-
-        try {
-            const plugin = this._getRegistry().findDiagramPluginById('epub');
-            if (!plugin || !plugin.getFileInfo) {
-                throw new Error('EPUB plugin not available');
-            }
-
-            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'EPUB');
-
-            const info = await plugin.getFileInfo(absolutePath);
-
-            this.postMessage({
-                type: 'epubInfoSuccess',
-                requestId,
-                pageCount: info.pageCount,
-                fileMtime
-            });
-
-        } catch (error) {
-            console.error('[EPUB Info] Error:', error);
-
-            this.postMessage({
-                type: 'epubInfoError',
-                requestId,
-                error: getErrorMessage(error)
-            });
-        }
+        await this.handleFileInfo(message.requestId, message.filePath, message.includeDir, context, 'epub', 'EPUB', 'epubInfoSuccess', 'epubInfoError');
     }
 
     // ============= XLSX HANDLERS =============
@@ -862,64 +691,26 @@ export class DiagramCommands extends SwitchBasedCommand {
      */
     private async handleRenderXlsx(message: RequestXlsxRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, sheetNumber, includeDir } = message;
-        const panel = context.getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            return;
-        }
+        if (!context.getWebviewPanel()?.webview) { return; }
 
         try {
-            const plugin = this._getRegistry().findDiagramPluginById('xlsx');
-            if (!plugin || !plugin.renderFile) {
-                throw new Error('XLSX plugin not available');
-            }
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'Excel');
 
-            const { absolutePath, fileMtime } = await this.resolveDocumentFile(filePath, includeDir, context, 'Excel');
-
-            // Check filesystem cache
-            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'xlsx-cache');
-            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png', `-s${sheetNumber}`);
-            const cachePath = path.join(cacheDir, cacheFileName);
-
-            let pngDataUrl: string;
-
-            if (fs.existsSync(cachePath)) {
-                const cachedPng = await fs.promises.readFile(cachePath);
-                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
-            } else {
-                if (!await plugin.isAvailable()) {
-                    throw new Error('LibreOffice CLI not installed');
-                }
-
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'xlsx-cache', extension: 'png', suffix: `-s${sheetNumber}`, logPrefix: 'XLSX Backend'
+            }, async () => {
+                const plugin = this._getRegistry().findDiagramPluginById('xlsx');
+                if (!plugin || !plugin.renderFile) { throw new Error('XLSX plugin not available'); }
+                if (!await plugin.isAvailable()) { throw new Error('LibreOffice CLI not installed'); }
                 const result = await plugin.renderFile(absolutePath, { sheetNumber });
-                if (!result.success) {
-                    throw new Error(result.error || 'Excel rendering failed');
-                }
-
-                const pngBuffer = result.data as Buffer;
-
-                await fs.promises.mkdir(cacheDir, { recursive: true });
-                await fs.promises.writeFile(cachePath, pngBuffer);
-                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'XLSX Backend');
-
-                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            }
-
-            this.postMessage({
-                type: 'xlsxRenderSuccess',
-                requestId,
-                pngDataUrl,
-                fileMtime
+                if (!result.success) { throw new Error(result.error || 'Excel rendering failed'); }
+                return result.data as Buffer;
             });
 
+            this.postMessage({ type: 'xlsxRenderSuccess', requestId, pngDataUrl: dataUrl, fileMtime });
         } catch (error) {
             console.error('[XLSX Backend] Render error:', error);
-
-            this.postMessage({
-                type: 'xlsxRenderError',
-                requestId,
-                error: getErrorMessage(error)
-            });
+            this.postMessage({ type: 'xlsxRenderError', requestId, error: getErrorMessage(error) });
         }
     }
 
