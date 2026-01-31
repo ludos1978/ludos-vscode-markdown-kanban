@@ -1973,6 +1973,12 @@ export interface CancelMediaIndexScanMessage extends BaseMessage {
     type: 'cancelMediaIndexScan';
 }
 
+/** Check if a URL blocks iframe embedding (Frontend -> Backend) */
+export interface CheckIframeUrlMessage extends BaseMessage {
+    type: 'checkIframeUrl';
+    url: string;
+}
+
 /**
  * Media index status info
  */
@@ -2013,6 +2019,13 @@ export interface MediaIndexScanCompletedMessage extends BaseMessage {
  */
 export interface MediaIndexScanCancelledMessage extends BaseMessage {
     type: 'mediaIndexScanCancelled';
+}
+
+/** Result of iframe URL preflight check (Backend -> Frontend) */
+export interface IframeUrlCheckResultMessage extends BaseMessage {
+    type: 'iframeUrlCheckResult';
+    url: string;
+    blocked: boolean;
 }
 
 // ============= TYPE UNIONS =============
@@ -2057,6 +2070,7 @@ export type OutgoingMessage =
     | MediaIndexScanStartedMessage
     | MediaIndexScanCompletedMessage
     | MediaIndexScanCancelledMessage
+    | IframeUrlCheckResultMessage
     // Search messages
     | ScrollToElementMessage
     | ScrollToElementByIndexMessage
@@ -2212,6 +2226,7 @@ export type IncomingMessage =
     | GetProcessesStatusMessage
     | RequestMediaIndexScanMessage
     | CancelMediaIndexScanMessage
+    | CheckIframeUrlMessage
     // Search messages
     | SearchBrokenElementsMessage
     | SearchTextMessage

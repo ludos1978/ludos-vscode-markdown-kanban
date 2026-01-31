@@ -959,6 +959,9 @@ function renderSingleColumn(columnId, columnData) {
     // Note: Visual tag elements (badges, bars) are now created within createColumnElement
     // before the element is inserted into the DOM, eliminating timing/race conditions
 
+    if (typeof window._checkRenderedIframes === 'function') {
+        window._checkRenderedIframes();
+    }
 }
 
 /**

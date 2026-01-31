@@ -2075,6 +2075,10 @@ window.onBoardRenderingComplete = function() {
     if (typeof window.flushPostRenderFocusQueue === 'function') {
         window.flushPostRenderFocusQueue();
     }
+
+    if (typeof window._checkRenderedIframes === 'function') {
+        window._checkRenderedIframes();
+    }
 };
 
 // Function to handle focusing on objects after undo/redo
@@ -3992,6 +3996,12 @@ if (!webviewEventListenersInitialized) {
             // Refresh full status
             if (typeof requestProcessesStatus === 'function') {
                 requestProcessesStatus();
+            }
+            break;
+
+        case 'iframeUrlCheckResult':
+            if (message.blocked && message.url && typeof window._markIframeUrlBlocked === 'function') {
+                window._markIframeUrlBlocked(message.url);
             }
             break;
 

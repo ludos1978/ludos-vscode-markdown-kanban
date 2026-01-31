@@ -12,6 +12,9 @@
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { WorkspaceMediaIndex, MediaIndexScanScope } from '../services/WorkspaceMediaIndex';
 import { configService } from '../services/ConfigurationService';
+import { CheckIframeUrlMessage } from '../core/bridge/MessageTypes';
+import * as https from 'https';
+import * as http from 'http';
 
 /**
  * Process Commands Handler
@@ -27,7 +30,8 @@ export class ProcessCommands extends SwitchBasedCommand {
         messageTypes: [
             'getProcessesStatus',
             'requestMediaIndexScan',
-            'cancelMediaIndexScan'
+            'cancelMediaIndexScan',
+            'checkIframeUrl'
         ],
         priority: 100
     };
@@ -46,6 +50,10 @@ export class ProcessCommands extends SwitchBasedCommand {
         },
         'cancelMediaIndexScan': async (_msg, _ctx) => {
             await this.handleCancelMediaIndexScan();
+            return this.success();
+        },
+        'checkIframeUrl': async (msg, _ctx) => {
+            this.handleCheckIframeUrl((msg as CheckIframeUrlMessage).url);
             return this.success();
         }
     };
@@ -127,5 +135,70 @@ export class ProcessCommands extends SwitchBasedCommand {
         }
 
         this.postMessage({ type: 'mediaIndexScanCancelled' });
+    }
+
+    /**
+     * Handle iframe URL preflight check.
+     * Performs a HEAD request to detect X-Frame-Options or CSP frame-ancestors
+     * headers that would block iframe embedding.
+     * Responds with iframeUrlCheckResult message.
+     */
+    private handleCheckIframeUrl(url: string): void {
+        if (!url) return;
+
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            // Invalid URL — not blocked, let iframe try
+            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
+            return;
+        }
+
+        const transport = parsedUrl.protocol === 'https:' ? https : http;
+        const req = transport.request(parsedUrl, { method: 'HEAD', timeout: 5000 }, (res) => {
+            let blocked = false;
+            const headers = res.headers;
+
+            // Check X-Frame-Options
+            const xfo = headers['x-frame-options'];
+            if (xfo) {
+                const val = (typeof xfo === 'string' ? xfo : xfo[0]).toUpperCase();
+                if (val === 'DENY' || val === 'SAMEORIGIN') {
+                    blocked = true;
+                }
+            }
+
+            // Check Content-Security-Policy frame-ancestors
+            if (!blocked) {
+                const csp = headers['content-security-policy'];
+                if (csp) {
+                    const cspStr = typeof csp === 'string' ? csp : csp.join('; ');
+                    const faMatch = cspStr.match(/frame-ancestors\s+([^;]+)/i);
+                    if (faMatch) {
+                        const ancestors = faMatch[1].trim().toLowerCase();
+                        // Blocked if 'none', 'self' only, or no wildcard *
+                        if (ancestors === "'none'" || ancestors === "'self'" || !ancestors.includes('*')) {
+                            blocked = true;
+                        }
+                    }
+                }
+            }
+
+            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked });
+        });
+
+        req.on('error', () => {
+            // Network error — not blocked, let iframe try
+            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            // Timeout — not blocked, let iframe try
+            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
+        });
+
+        req.end();
     }
 }

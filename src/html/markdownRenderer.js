@@ -112,6 +112,93 @@ window._handleIframeError = function(iframeEl, url) {
 };
 
 /**
+ * Check if a URL's origin is in the blocked cache.
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if the origin is known to block iframes
+ */
+function _isIframeBlocked(url) {
+    try {
+        return _iframeBlockedOrigins.has(new URL(url).origin);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Render an iframe fallback as an HTML string (for use during markdown rendering).
+ * Unlike _handleIframeError which operates on live DOM elements, this returns HTML
+ * so it can be used in renderEmbed/renderWebPreview before the iframe is created.
+ * @param {string} url - The blocked URL
+ * @returns {string} Fallback HTML string
+ */
+function _renderIframeFallback(url) {
+    const escapedUrl = escapeHtml(url);
+    return '<div class="web-preview-fallback">' +
+        '<span class="web-preview-fallback-icon">⚠️</span>' +
+        '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
+        '<a class="web-preview-fallback-link" href="' + escapedUrl + '" target="_blank" rel="noopener noreferrer">Open in browser</a>' +
+        '</div>';
+}
+
+/**
+ * Mark a URL's origin as blocked for iframe embedding and replace all live iframes
+ * from that origin with a fallback.
+ * Called from webview.js when backend responds with iframeUrlCheckResult.
+ * @param {string} url - The URL that is blocked
+ */
+window._markIframeUrlBlocked = function(url) {
+    if (!url) return;
+    try {
+        _iframeBlockedOrigins.add(new URL(url).origin);
+    } catch {
+        return;
+    }
+
+    // Replace all live iframes whose origin matches the blocked one
+    const iframes = document.querySelectorAll('.web-preview-container iframe, .embed-frame-wrapper iframe');
+    iframes.forEach(function(iframe) {
+        const src = iframe.getAttribute('src');
+        if (src && _isIframeBlocked(src)) {
+            const fallback = document.createElement('div');
+            fallback.className = 'web-preview-fallback';
+            fallback.innerHTML =
+                '<span class="web-preview-fallback-icon">⚠️</span>' +
+                '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
+                '<a class="web-preview-fallback-link" href="' + src + '" target="_blank" rel="noopener noreferrer">Open in browser</a>';
+            iframe.replaceWith(fallback);
+        }
+    });
+};
+
+/**
+ * Scan rendered iframes and send preflight check requests to the backend.
+ * Deduplicates by origin and skips origins already known to be blocked.
+ * Called after board rendering or single column rendering completes.
+ */
+window._checkRenderedIframes = function() {
+    const iframes = document.querySelectorAll('.web-preview-container iframe, .embed-frame-wrapper iframe');
+    const originsToCheck = new Set();
+    const urlPerOrigin = {};
+
+    iframes.forEach(function(iframe) {
+        const src = iframe.getAttribute('src');
+        if (!src || !src.startsWith('http') || _isIframeBlocked(src)) return;
+        try {
+            const origin = new URL(src).origin;
+            if (!originsToCheck.has(origin)) {
+                originsToCheck.add(origin);
+                urlPerOrigin[origin] = src;
+            }
+        } catch { /* invalid URL, skip */ }
+    });
+
+    // Send one check per origin (using the first URL encountered for that origin)
+    originsToCheck.forEach(function(origin) {
+        vscode.postMessage({ type: 'checkIframeUrl', url: urlPerOrigin[origin] });
+    });
+};
+
+/**
  * Create a diagram wrapper with burger menu button for PlantUML/Mermaid diagrams.
  * @param {string} diagramType - 'plantuml' or 'mermaid'
  * @param {string} code - The diagram source code
@@ -281,6 +368,10 @@ let webPreviewConfig = {
     sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups'
 };
 
+// Session-level cache of origins known to block iframe embedding (X-Frame-Options / CSP).
+// Caches at origin level (e.g. "https://www.youtube.com") because these headers are set server-wide.
+const _iframeBlockedOrigins = new Set();
+
 /**
  * Update embed configuration from settings
  * Called when configuration is received from the extension
@@ -429,6 +520,11 @@ function isImageUrl(url) {
 function renderEmbed(embedInfo, originalSrc, alt, title) {
     const { url, fallback, width, height, frameborder, allowfullscreen, loading, allow, referrerpolicy, customAttrs } = embedInfo;
 
+    // If URL's origin is known to block iframes, render fallback immediately (no blank flash)
+    if (_isIframeBlocked(url)) {
+        return `<div class="embed-container"><div class="embed-frame-wrapper">${_renderIframeFallback(url)}</div></div>`;
+    }
+
     // Build iframe attributes
     let iframeAttrs = `src="${escapeHtml(url)}"`;
     iframeAttrs += ` width="${escapeHtml(width)}"`;
@@ -493,6 +589,12 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
  * @returns {string} HTML for the web preview container
  */
 function renderWebPreview(url, alt, title) {
+    // If URL's origin is known to block iframes, render fallback immediately (no blank flash)
+    if (_isIframeBlocked(url)) {
+        const captionHtml = title ? `<div class="web-preview-caption media-caption">${escapeHtml(title)}</div>` : '';
+        return `<div class="web-preview-container">${_renderIframeFallback(url)}${captionHtml}</div>`;
+    }
+
     const height = webPreviewConfig.height || '400px';
     const sandbox = webPreviewConfig.sandbox || 'allow-scripts allow-same-origin allow-forms allow-popups';
     const escapedUrl = escapeHtml(url);

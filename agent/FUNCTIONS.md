@@ -2,10 +2,39 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2026-01-31
+**Last Updated:** 2026-02-01
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Updates (2026-02-01) - Backend Preflight Check for Iframe Embeds
+
+### Modified: `src/core/bridge/MessageTypes.ts`
+- `CheckIframeUrlMessage` — Frontend->Backend message to check if a URL blocks iframe embedding (type: 'checkIframeUrl', url: string)
+- `IframeUrlCheckResultMessage` — Backend->Frontend response with preflight result (type: 'iframeUrlCheckResult', url: string, blocked: boolean)
+- `IncomingMessage` — (MODIFIED) Added CheckIframeUrlMessage to union
+- `OutgoingMessage` — (MODIFIED) Added IframeUrlCheckResultMessage to union
+
+### Modified: `src/commands/ProcessCommands.ts`
+- `ProcessCommands.handleCheckIframeUrl(url)` — HEAD request to check X-Frame-Options and CSP frame-ancestors headers; responds with iframeUrlCheckResult message
+
+### Modified: `src/html/markdownRenderer.js`
+- `_iframeBlockedOrigins` — Session-level Set cache of origins (e.g. "https://www.youtube.com") known to block iframe embedding
+- `_isIframeBlocked(url)` — Check if a URL's origin is in the blocked origin cache
+- `_renderIframeFallback(url)` — Returns fallback HTML string for blocked iframe URLs (used during markdown rendering)
+- `window._markIframeUrlBlocked(url)` — Extracts origin, adds to _iframeBlockedOrigins, replaces all live iframes from that origin with fallback
+- `window._checkRenderedIframes()` — Scans DOM for iframes, deduplicates by origin, sends one checkIframeUrl per unchecked origin
+- `renderEmbed()` — (MODIFIED) Checks _isIframeBlocked at top, returns fallback if origin is blocked
+- `renderWebPreview()` — (MODIFIED) Checks _isIframeBlocked at top, returns fallback if origin is blocked
+
+### Modified: `src/html/webview.js`
+- Message handler `iframeUrlCheckResult` — Calls window._markIframeUrlBlocked when backend reports URL is blocked
+- `onBoardRenderingComplete` — (MODIFIED) Calls window._checkRenderedIframes after render
+
+### Modified: `src/html/boardRenderer.js`
+- `renderSingleColumn()` — (MODIFIED) Calls window._checkRenderedIframes after column render
 
 ---
 
