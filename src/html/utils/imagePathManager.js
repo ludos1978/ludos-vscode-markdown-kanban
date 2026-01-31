@@ -549,6 +549,8 @@ function togglePathMenu(container, filePath, mediaType) {
         <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
         <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
         <div class="image-path-menu-divider"></div>
+        <button class="image-path-menu-item" onclick="event.stopPropagation(); forceRefreshMedia('${escapedPath}', '${escapedIncludeDir}')">🔄 Force Refresh</button>
+        <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
     `;
 
@@ -1591,6 +1593,99 @@ if (!window._imagePathManagerInitialized) {
 }
 
 // ============================================================================
+// FORCE REFRESH MEDIA
+// ============================================================================
+
+/**
+ * Determine the render type from a file path extension.
+ * Returns the diagramType string used by the render queue, or null for regular images.
+ */
+function getRenderTypeFromPath(filePath) {
+    if (!filePath) return null;
+    const lower = filePath.toLowerCase();
+    if (lower.endsWith('.drawio') || lower.endsWith('.dio')) return 'drawio';
+    if (lower.endsWith('.excalidraw') || lower.endsWith('.excalidraw.json') || lower.endsWith('.excalidraw.svg')) return 'excalidraw';
+    if (/\.(?:xlsx|xls|ods)$/.test(lower)) return 'xlsx';
+    if (lower.endsWith('.pdf')) return 'pdf';
+    if (lower.endsWith('.epub')) return 'epub-slideshow';
+    return null;
+}
+
+/**
+ * Force refresh a media element by clearing its cache and triggering re-render.
+ * Works for rendered diagrams/documents (drawio, excalidraw, pdf, xlsx, epub)
+ * and for regular images (cache-busting reload).
+ *
+ * @param {string} filePath - The file path of the media
+ * @param {string} [includeDir] - Optional include directory for path resolution
+ */
+function forceRefreshMedia(filePath, includeDir) {
+    closeAllPathMenus();
+
+    const renderType = getRenderTypeFromPath(filePath);
+    const fileName = filePath.split('/').pop();
+
+    if (renderType) {
+        // Rendered media (diagrams, PDF, XLSX, EPUB): invalidate cache + re-render
+        if (typeof window.invalidateDiagramCache === 'function') {
+            window.invalidateDiagramCache(filePath, renderType);
+        }
+
+        // Find all rendered images matching this file
+        const allRendered = document.querySelectorAll('img.diagram-rendered[data-original-src]');
+        const matching = Array.from(allRendered).filter(img => {
+            const src = img.getAttribute('data-original-src') || '';
+            return src.includes(fileName);
+        });
+
+        matching.forEach(img => {
+            const container = img.closest('.image-path-overlay-container') || img.parentElement;
+            if (!container) return;
+
+            // Show loading state
+            container.innerHTML = '<div class="diagram-loading">Refreshing...</div>';
+
+            // Queue re-render
+            if (typeof window.queueDiagramRender === 'function') {
+                const newId = `refresh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                container.id = newId;
+                window.queueDiagramRender(newId, filePath, renderType, includeDir || undefined);
+                if (typeof window.processDiagramQueue === 'function') {
+                    window.processDiagramQueue();
+                }
+            }
+        });
+
+        // If no rendered images found, also check for slideshow containers (PDF/EPUB)
+        if (matching.length === 0) {
+            const slideshows = document.querySelectorAll('[data-epub-path], [data-pdf-path]');
+            slideshows.forEach(container => {
+                const epubPath = container.getAttribute('data-epub-path') || '';
+                const pdfPath = container.getAttribute('data-pdf-path') || '';
+                if (epubPath.includes(fileName) || pdfPath.includes(fileName)) {
+                    // For slideshows, clear the page cache by re-triggering current page load
+                    const loadBtn = container.querySelector('.slideshow-page-indicator');
+                    if (loadBtn) loadBtn.click();
+                }
+            });
+        }
+    } else {
+        // Regular image: cache-bust reload
+        const allImages = document.querySelectorAll('img');
+        Array.from(allImages).filter(img => {
+            const src = img.getAttribute('src') || '';
+            const origSrc = img.getAttribute('data-original-src') || '';
+            return src.includes(fileName) || origSrc.includes(fileName);
+        }).forEach(img => {
+            const src = img.getAttribute('src') || '';
+            const cleanSrc = src.replace(/[?&]_cb=\d+/, '');
+            const separator = cleanSrc.includes('?') ? '&' : '?';
+            img.setAttribute('src', `${cleanSrc}${separator}_cb=${Date.now()}`);
+        });
+    }
+}
+
+// ============================================================================
 // WINDOW EXPORTS
 // ============================================================================
 
@@ -1629,6 +1724,9 @@ window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFound
 
 // DOM updates
 window.updatePathInDOM = updatePathInDOM;
+
+// Force refresh
+window.forceRefreshMedia = forceRefreshMedia;
 
 // ============================================================================
 // DIAGRAM MENUS (Mermaid, PlantUML)
