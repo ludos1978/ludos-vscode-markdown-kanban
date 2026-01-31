@@ -2987,9 +2987,11 @@ if (!webviewEventListenersInitialized) {
             // Only re-renders the specific files that changed, not everything
             // Backend sends "changedFiles", support both for compatibility
             const changedMediaFiles = message.changedFiles || message.files;
+            console.log('[mediaFilesChanged] Received:', changedMediaFiles?.length || 0, 'files', changedMediaFiles);
             if (changedMediaFiles && changedMediaFiles.length > 0) {
                 // Process each changed file
                 changedMediaFiles.forEach(file => {
+                    console.log(`[mediaFilesChanged] Processing: ${file.path} (type=${file.type})`);
                     if (file.type === 'diagram') {
                         // Clear diagram cache for this specific file
                         if (typeof window.invalidateDiagramCache === 'function') {
@@ -3012,12 +3014,13 @@ if (!webviewEventListenersInitialized) {
                     // Find all images referencing this file (match by filename, not full path)
                     // Don't use CSS.escape on paths as it over-escapes and breaks matching
                     const images = document.querySelectorAll('img');
-                    const matchingImages = Array.from(images).filter(img => {
+                    const matchingRegularImages = Array.from(images).filter(img => {
                         const src = img.getAttribute('src') || '';
                         return src.includes(fileName);
                     });
+                    console.log(`[mediaFilesChanged] Regular img matches for '${fileName}': ${matchingRegularImages.length}`);
 
-                    matchingImages.forEach(img => {
+                    matchingRegularImages.forEach(img => {
                         // Force reload by appending cache-busting timestamp
                         const originalSrc = img.getAttribute('src');
                         if (originalSrc) {
@@ -3035,12 +3038,17 @@ if (!webviewEventListenersInitialized) {
                         // Both diagrams and documents (XLSX, PDF) render as:
                         // <img class="diagram-rendered" data-original-src="path"> inside a container
                         const allRenderedImages = document.querySelectorAll('img.diagram-rendered[data-original-src]');
-                        const matchingImages = Array.from(allRenderedImages).filter(img => {
+                        console.log(`[mediaFilesChanged] Total diagram-rendered images in DOM: ${allRenderedImages.length}`);
+                        const matchingRenderedImages = Array.from(allRenderedImages).filter(img => {
                             const originalSrc = img.getAttribute('data-original-src') || '';
                             return originalSrc.includes(fileName);
                         });
+                        console.log(`[mediaFilesChanged] Matching rendered images for '${fileName}': ${matchingRenderedImages.length}`);
+                        if (matchingRenderedImages.length === 0 && allRenderedImages.length > 0) {
+                            console.log('[mediaFilesChanged] All data-original-src values:', Array.from(allRenderedImages).map(img => img.getAttribute('data-original-src')));
+                        }
 
-                        matchingImages.forEach(img => {
+                        matchingRenderedImages.forEach(img => {
                             const originalSrc = img.getAttribute('data-original-src');
                             if (!originalSrc) return;
 
@@ -3056,17 +3064,22 @@ if (!webviewEventListenersInitialized) {
                                 diagramType = 'pdf';
                             }
 
+                            // Extract includeDir from the container's DOM context
+                            const includeContainer = img.closest('.include-container');
+                            const includeDir = includeContainer?.dataset?.includeDir || undefined;
+
                             // Get the parent container (diagram-placeholder div)
                             const container = img.parentElement;
                             if (container) {
                                 // Show loading state and queue re-render
+                                console.log(`[mediaFilesChanged] Queuing re-render: ${originalSrc} as ${diagramType}, includeDir=${includeDir || 'none'}`);
                                 container.innerHTML = '<div class="diagram-loading">Reloading...</div>';
 
                                 // Queue for re-rendering using the existing queue system
                                 if (typeof window.queueDiagramRender === 'function') {
                                     const newId = `diagram-reload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                                     container.id = newId;
-                                    window.queueDiagramRender(newId, originalSrc, diagramType);
+                                    window.queueDiagramRender(newId, originalSrc, diagramType, includeDir);
                                     // Trigger queue processing
                                     if (typeof window.processDiagramQueue === 'function') {
                                         window.processDiagramQueue();

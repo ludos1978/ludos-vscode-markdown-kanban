@@ -569,6 +569,12 @@ export class KanbanWebviewPanel {
         }
         this._fileManager.sendFileInfo();
         await this._ensureMainFileContext('other');
+
+        // Emit focus:gained to trigger media file change detection via FileSyncHandler
+        // This is needed when the VS Code window regains OS-level focus (e.g., returning from Excel)
+        // as onDidChangeViewState only fires when switching between VS Code tabs
+        logger.debug('[KanbanWebviewPanel._refreshFileContextOnFocus] Emitting focus:gained for window focus');
+        this._context.scopedEventBus.emit('focus:gained', {});
     }
 
     private _handleWebviewReady(): void {
