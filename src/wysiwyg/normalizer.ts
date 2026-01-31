@@ -144,12 +144,12 @@ export function normalizeTaskCheckboxes(state: EditorState): Transaction | null 
         if (!paragraphNode) {
             return;
         }
-        const paragraphValue = paragraphNode as ProseMirrorNode;
+        const para = paragraphNode as ProseMirrorNode;
 
         let firstInline: { node: ProseMirrorNode; pos: number } | null = null;
         let inlineOffset = 0;
-        for (let i = 0; i < paragraphValue.childCount; i += 1) {
-            const child = paragraphValue.child(i);
+        for (let i = 0; i < para.childCount; i += 1) {
+            const child = para.child(i);
             if (child.type === checkboxNode) {
                 firstInline = { node: child, pos: paragraphPos + 1 + inlineOffset };
                 break;
@@ -162,12 +162,11 @@ export function normalizeTaskCheckboxes(state: EditorState): Transaction | null 
             break;
         }
 
-        const inlineTarget: { node: ProseMirrorNode; pos: number } | null = firstInline;
-        if (!inlineTarget || inlineTarget.node.type === checkboxNode || !inlineTarget.node.isText) {
+        if (!firstInline || firstInline.node.type === checkboxNode || !firstInline.node.isText) {
             return;
         }
 
-        const text = inlineTarget.node.text || '';
+        const text = firstInline.node.text || '';
         const match = text.match(/^\[( |x|X)\]\s+/);
         if (!match) {
             return;
@@ -177,9 +176,9 @@ export function normalizeTaskCheckboxes(state: EditorState): Transaction | null 
         const rest = text.slice(match[0].length);
         const replacement: ProseMirrorNode[] = [checkboxNode.create({ checked })];
         if (rest) {
-            replacement.push(state.schema.text(rest, inlineTarget.node.marks));
+            replacement.push(state.schema.text(rest, firstInline.node.marks));
         }
-        targets.push({ from: inlineTarget.pos, to: inlineTarget.pos + inlineTarget.node.nodeSize, nodes: replacement });
+        targets.push({ from: firstInline.pos, to: firstInline.pos + firstInline.node.nodeSize, nodes: replacement });
     });
 
     if (targets.length === 0) {
@@ -196,17 +195,11 @@ export function normalizeTaskCheckboxes(state: EditorState): Transaction | null 
 
 export function normalizeEditableDoc(schema: Schema, doc: ProseMirrorNode): ProseMirrorNode {
     let state = EditorState.create({ schema, doc });
-    const mediaTr = normalizeMediaBlocks(state);
-    if (mediaTr) {
-        state = state.apply(mediaTr);
-    }
-    const boundaryTr = normalizeBlockBoundaries(state);
-    if (boundaryTr) {
-        state = state.apply(boundaryTr);
-    }
-    const checkboxTr = normalizeTaskCheckboxes(state);
-    if (checkboxTr) {
-        state = state.apply(checkboxTr);
+    for (const normalize of [normalizeMediaBlocks, normalizeBlockBoundaries, normalizeTaskCheckboxes]) {
+        const tr = normalize(state);
+        if (tr) {
+            state = state.apply(tr);
+        }
     }
     return state.doc;
 }

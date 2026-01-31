@@ -1,5 +1,5 @@
 import { EditorState, TextSelection, Selection, Transaction } from 'prosemirror-state';
-import type { MarkType, Node as ProseMirrorNode } from 'prosemirror-model';
+import type { MarkType } from 'prosemirror-model';
 import { EditorView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -56,6 +56,12 @@ const STYLE_PAIRS: Record<string, { start: string; end: string }> = {
     '<': { start: '<', end: '>' }
 };
 
+const COMMAND_TO_MARK: Record<string, string> = {
+    bold: 'strong', italic: 'em', underline: 'underline',
+    strike: 'strike', mark: 'mark', sub: 'sub',
+    sup: 'sup', code: 'code', ins: 'ins'
+};
+
 const TILDE_DEAD_CODES = new Set([
     'IntlBackslash',
     'Backquote',
@@ -70,20 +76,20 @@ function isMarkActive(state: EditorState, type: MarkType): boolean {
     const { from, to, empty, $from } = state.selection;
     if (empty) {
         const marks = state.storedMarks || $from.marks();
-        return Boolean(type?.isInSet(marks));
+        return Boolean(type.isInSet(marks));
     }
-    return Boolean(type && state.doc.rangeHasMark(from, to, type));
+    return state.doc.rangeHasMark(from, to, type);
 }
 
 function buildSelectionState(state: EditorState): WysiwygSelectionState {
     const marks: string[] = [];
-    const schemaMarks = state.schema?.marks || {};
+    const schemaMarks = state.schema.marks;
     Object.entries(schemaMarks).forEach(([name, type]) => {
         if (isMarkActive(state, type)) {
             marks.push(name);
         }
     });
-    const block = state.selection.$from.parent?.type?.name || null;
+    const block = state.selection.$from.parent.type.name || null;
     return { marks, block };
 }
 
@@ -121,9 +127,6 @@ function toggleMarkOnce(markType: MarkType) {
 }
 
 function getStyleKey(event: KeyboardEvent): string | null {
-    if (!event) {
-        return null;
-    }
     if (event.key && STYLE_PAIRS[event.key]) {
         return event.key;
     }
@@ -308,8 +311,8 @@ export class WysiwygEditor {
                 plugins
             }),
             nodeViews: {
-                media_inline: (node, view, getPos) => createMediaInlineView(node, view, getPos as () => number | undefined),
-                media_block: (node, view, getPos) => createMediaBlockView(node, view, getPos as () => number | undefined),
+                media_inline: (node, view, getPos) => createMediaInlineView(node, view, getPos),
+                media_block: (node, view, getPos) => createMediaBlockView(node, view, getPos),
                 diagram_fence: (node) => createDiagramFenceView(node)
             },
             handleKeyDown: (view, event) => {
@@ -459,24 +462,17 @@ export class WysiwygEditor {
             },
             dispatchTransaction: (transaction) => {
                 let newState = this.view.state.apply(transaction);
-                let normalized = null;
-                let boundaryNormalized = null;
-                let checkboxNormalized = null;
+                let extraNormalization = false;
                 if (transaction.docChanged) {
-                    normalized = normalizeMediaBlocks(newState);
-                    if (normalized) {
-                        newState = newState.apply(normalized);
-                    }
-                    boundaryNormalized = normalizeBlockBoundaries(newState);
-                    if (boundaryNormalized) {
-                        newState = newState.apply(boundaryNormalized);
-                    }
-                    checkboxNormalized = normalizeTaskCheckboxes(newState);
-                    if (checkboxNormalized) {
-                        newState = newState.apply(checkboxNormalized);
+                    for (const normalize of [normalizeMediaBlocks, normalizeBlockBoundaries, normalizeTaskCheckboxes]) {
+                        const tr = normalize(newState);
+                        if (tr) {
+                            newState = newState.apply(tr);
+                            extraNormalization = true;
+                        }
                     }
                 }
-                const docChanged = transaction.docChanged || Boolean(normalized) || Boolean(boundaryNormalized) || Boolean(checkboxNormalized);
+                const docChanged = transaction.docChanged || extraNormalization;
                 this.view.updateState(newState);
                 const selectionChanged = transaction.selectionSet || transaction.storedMarksSet || transaction.docChanged;
 
@@ -575,25 +571,13 @@ export class WysiwygEditor {
         const dispatch = this.view.dispatch.bind(this.view);
         const schema = state.schema;
 
+        const markName = COMMAND_TO_MARK[command];
+        if (markName) {
+            const markType = schema.marks[markName];
+            return markType ? toggleMarkOnce(markType)(state, dispatch) : false;
+        }
+
         switch (command) {
-            case 'bold':
-                return schema.marks.strong ? toggleMarkOnce(schema.marks.strong)(state, dispatch) : false;
-            case 'italic':
-                return schema.marks.em ? toggleMarkOnce(schema.marks.em)(state, dispatch) : false;
-            case 'underline':
-                return schema.marks.underline ? toggleMarkOnce(schema.marks.underline)(state, dispatch) : false;
-            case 'strike':
-                return schema.marks.strike ? toggleMarkOnce(schema.marks.strike)(state, dispatch) : false;
-            case 'mark':
-                return schema.marks.mark ? toggleMarkOnce(schema.marks.mark)(state, dispatch) : false;
-            case 'sub':
-                return schema.marks.sub ? toggleMarkOnce(schema.marks.sub)(state, dispatch) : false;
-            case 'sup':
-                return schema.marks.sup ? toggleMarkOnce(schema.marks.sup)(state, dispatch) : false;
-            case 'code':
-                return schema.marks.code ? toggleMarkOnce(schema.marks.code)(state, dispatch) : false;
-            case 'ins':
-                return schema.marks.ins ? toggleMarkOnce(schema.marks.ins)(state, dispatch) : false;
             case 'link': {
                 const { from, to, empty } = state.selection;
                 const selectedText = empty
@@ -617,7 +601,7 @@ export class WysiwygEditor {
             case 'code-block':
                 return schema.nodes.code_block ? setBlockType(schema.nodes.code_block)(state, dispatch) : false;
             case 'multicolumn': {
-                const tr = createMulticolumnTransaction(state, schema, 1, state.selection.from, state.selection.to);
+                const tr = createMulticolumnTransaction(state, schema, 1);
                 if (!tr) {
                     return false;
                 }

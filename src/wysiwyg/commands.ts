@@ -1,5 +1,5 @@
 import { EditorView } from 'prosemirror-view';
-import { EditorState, NodeSelection, TextSelection, Selection, Transaction } from 'prosemirror-state';
+import { NodeSelection, TextSelection } from 'prosemirror-state';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
 export function convertMediaBlockToInline(view: EditorView, nodePos: number, placeAfter: boolean, insertText?: string): boolean {
@@ -33,7 +33,7 @@ export function toggleTaskCheckbox(view: EditorView, nodePos: number, node: Pros
     if (!node || node.type.name !== 'task_checkbox') {
         return false;
     }
-    const checked = Boolean(node.attrs?.checked);
+    const checked = Boolean(node.attrs.checked);
     const nextAttrs = { ...node.attrs, checked: !checked };
     const tr = view.state.tr.setNodeMarkup(nodePos, undefined, nextAttrs);
     view.dispatch(tr);
@@ -62,48 +62,42 @@ function getModalApi(): { showInputModal?: (...args: unknown[]) => void } {
     return window as unknown as { showInputModal?: (...args: unknown[]) => void };
 }
 
-export function openPathEditor(view: EditorView, node: { attrs?: Record<string, unknown> }, pos: number): void {
-    const currentPath = typeof node.attrs?.path === 'string' ? node.attrs.path : '';
+function openAttrEditor(
+    view: EditorView,
+    node: { attrs?: Record<string, unknown> },
+    pos: number,
+    attrName: string,
+    modalTitle: string,
+    modalDescription: string,
+    label: string
+): void {
+    const currentValue = typeof node.attrs?.[attrName] === 'string' ? node.attrs[attrName] as string : '';
     const modalApi = getModalApi();
     if (typeof modalApi.showInputModal === 'function') {
         modalApi.showInputModal(
-            'Edit include path',
-            'Update include path',
-            'Path',
+            modalTitle,
+            modalDescription,
+            label,
             (value: string) => {
-                updateNodeAttrs(view, pos, { ...node.attrs, path: value });
+                updateNodeAttrs(view, pos, { ...node.attrs, [attrName]: value });
             },
             null,
-            { defaultValue: currentPath }
+            { defaultValue: currentValue }
         );
         return;
     }
-    const nextValue = window.prompt('Include path', currentPath);
+    const nextValue = window.prompt(label, currentValue);
     if (nextValue !== null) {
-        updateNodeAttrs(view, pos, { ...node.attrs, path: nextValue });
+        updateNodeAttrs(view, pos, { ...node.attrs, [attrName]: nextValue });
     }
 }
 
+export function openPathEditor(view: EditorView, node: { attrs?: Record<string, unknown> }, pos: number): void {
+    openAttrEditor(view, node, pos, 'path', 'Edit include path', 'Update include path', 'Path');
+}
+
 export function openMediaEditor(view: EditorView, node: { attrs?: Record<string, unknown> }, pos: number): void {
-    const currentSrc = typeof node.attrs?.src === 'string' ? node.attrs.src : '';
-    const modalApi = getModalApi();
-    if (typeof modalApi.showInputModal === 'function') {
-        modalApi.showInputModal(
-            'Edit media source',
-            'Update media source URL/path',
-            'Source',
-            (value: string) => {
-                updateNodeAttrs(view, pos, { ...node.attrs, src: value });
-            },
-            null,
-            { defaultValue: currentSrc }
-        );
-        return;
-    }
-    const nextValue = window.prompt('Media source', currentSrc);
-    if (nextValue !== null) {
-        updateNodeAttrs(view, pos, { ...node.attrs, src: nextValue });
-    }
+    openAttrEditor(view, node, pos, 'src', 'Edit media source', 'Update media source URL/path', 'Source');
 }
 
 function focusDiagram(view: EditorView, nodePos: number): void {
@@ -128,13 +122,10 @@ export function attachViewToDom(dom: HTMLElement, view: EditorView): void {
 }
 
 function findDiagramNodeFromDom(view: EditorView, block: HTMLElement): { nodePos: number; node: ProseMirrorNode } | null {
-    let pos: number | null = null;
+    let pos: number;
     try {
         pos = view.posAtDOM(block, 0);
     } catch {
-        pos = null;
-    }
-    if (pos === null) {
         return null;
     }
     const $pos = view.state.doc.resolve(pos);
@@ -170,7 +161,7 @@ export function toggleDiagramEditing(view: EditorView, block: HTMLElement, nodeP
 }
 
 export function addMulticolumnColumn(view: EditorView, node: ProseMirrorNode, nodePos: number): void {
-    if (!node || node.type?.name !== 'multicolumn') {
+    if (!node || node.type.name !== 'multicolumn') {
         return;
     }
     const schema = view.state.schema;
@@ -183,7 +174,7 @@ export function addMulticolumnColumn(view: EditorView, node: ProseMirrorNode, no
 }
 
 export function removeMulticolumnColumn(view: EditorView, node: ProseMirrorNode, nodePos: number): void {
-    if (!node || node.type?.name !== 'multicolumn') {
+    if (!node || node.type.name !== 'multicolumn') {
         return;
     }
     if (node.childCount <= 1) {
@@ -218,49 +209,46 @@ export function wrapSelectionWithText(view: EditorView, start: string, end: stri
 }
 
 export function inlineNodeToMarkdown(node: ProseMirrorNode, temporalPrefix: string): string | null {
-    if (!node || !node.type?.name) {
+    if (!node) {
         return null;
     }
     switch (node.type.name) {
         case 'media_inline': {
-            const src = node.attrs?.src || '';
+            const src = node.attrs.src || '';
             if (!src) {
                 return null;
             }
-            const alt = node.attrs?.alt || '';
-            const title = node.attrs?.title ? ` "${node.attrs.title}"` : '';
+            const alt = node.attrs.alt || '';
+            const title = node.attrs.title ? ` "${node.attrs.title}"` : '';
             return `![${alt}](${src}${title})`;
         }
         case 'include_inline': {
-            const path = node.attrs?.path || '';
+            const path = node.attrs.path || '';
             return path ? `!!!include(${path})!!!` : null;
         }
         case 'wiki_link': {
-            const document = node.attrs?.document || '';
-            const title = node.attrs?.title || '';
+            const document = node.attrs.document || '';
+            const title = node.attrs.title || '';
             if (!document) {
                 return null;
             }
             return title && title !== document ? `[[${document}|${title}]]` : `[[${document}]]`;
         }
         case 'tag': {
-            const value = node.attrs?.value || '';
+            const value = node.attrs.value || '';
             return value ? `#${value}` : null;
         }
-        case 'date_tag': {
-            const value = node.attrs?.value || '';
-            return value ? `@${value}` : null;
-        }
+        case 'date_tag':
         case 'person_tag': {
-            const value = node.attrs?.value || '';
+            const value = node.attrs.value || '';
             return value ? `@${value}` : null;
         }
         case 'temporal_tag': {
-            const value = node.attrs?.value || '';
+            const value = node.attrs.value || '';
             return value ? `${temporalPrefix}${value}` : null;
         }
         case 'footnote': {
-            const id = node.attrs?.id || '';
+            const id = node.attrs.id || '';
             return id ? `[^${id}]` : null;
         }
         default:

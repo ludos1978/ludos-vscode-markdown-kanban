@@ -24,6 +24,31 @@ export type MediaPathHelpers = {
 const DIAGRAM_PREVIEW_DEBOUNCE_MS = 200;
 const diagramPreviewTimers = new WeakMap<HTMLElement, number>();
 
+// --- DOM construction helpers ---
+
+function createMenuButton(className: string, action: string, label: string = '☰'): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = className;
+    btn.type = 'button';
+    btn.title = 'Path options';
+    btn.textContent = label;
+    btn.setAttribute('data-action', action);
+    btn.contentEditable = 'false';
+    return btn;
+}
+
+function createEditButton(action: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'wysiwyg-edit-btn';
+    btn.type = 'button';
+    btn.textContent = 'Edit';
+    btn.setAttribute('data-action', action);
+    btn.contentEditable = 'false';
+    return btn;
+}
+
+// --- Path resolution ---
+
 export function resolveDisplaySrc(originalSrc: string): string {
     if (!originalSrc) {
         return '';
@@ -84,6 +109,8 @@ export function resolveDisplaySrc(originalSrc: string): string {
     return originalSrc;
 }
 
+// --- Diagram detection ---
+
 function makePreviewId(prefix: string): string {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -108,21 +135,21 @@ export function getDiagramFileInfo(src: string): { mode: 'diagram' | 'pdf-page' 
     return null;
 }
 
+// --- Diagram preview rendering ---
+
 function renderDiagramPreview(preview: HTMLElement, lang: string, code: string): void {
-    if (!preview) {
-        return;
-    }
     const api = window as unknown as MediaPathHelpers;
-    const normalizedLang = (lang || '').toLowerCase();
-    const isMermaid = normalizedLang === 'mermaid';
-    const isPlantUml = normalizedLang === 'plantuml' || normalizedLang === 'puml';
+    const lowerLang = (lang || '').toLowerCase();
+    const isMermaid = lowerLang === 'mermaid';
+    const isPlantUml = lowerLang === 'plantuml' || lowerLang === 'puml';
+
+    const existingTimer = diagramPreviewTimers.get(preview);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
+        diagramPreviewTimers.delete(preview);
+    }
 
     if (!isMermaid && !isPlantUml) {
-        const existingTimer = diagramPreviewTimers.get(preview);
-        if (existingTimer) {
-            clearTimeout(existingTimer);
-            diagramPreviewTimers.delete(preview);
-        }
         preview.innerHTML = '';
         preview.style.display = 'none';
         return;
@@ -137,10 +164,6 @@ function renderDiagramPreview(preview: HTMLElement, lang: string, code: string):
     placeholder.textContent = isMermaid ? 'Rendering Mermaid diagram...' : 'Rendering PlantUML diagram...';
     preview.appendChild(placeholder);
 
-    const existingTimer = diagramPreviewTimers.get(preview);
-    if (existingTimer) {
-        clearTimeout(existingTimer);
-    }
     const timer = window.setTimeout(() => {
         if (isMermaid && typeof api.queueMermaidRender === 'function') {
             api.queueMermaidRender(previewId, code);
@@ -152,6 +175,8 @@ function renderDiagramPreview(preview: HTMLElement, lang: string, code: string):
     }, DIAGRAM_PREVIEW_DEBOUNCE_MS);
     diagramPreviewTimers.set(preview, timer);
 }
+
+// --- Diagram file rendering (drawio, excalidraw, PDF) ---
 
 function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     const api = window as unknown as MediaPathHelpers;
@@ -169,14 +194,7 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
     placeholder.dataset.wysiwygHost = 'true';
     dom.innerHTML = '';
     dom.appendChild(placeholder);
-    const menuBtn = document.createElement('button');
-    menuBtn.className = 'image-menu-btn';
-    menuBtn.type = 'button';
-    menuBtn.title = 'Path options';
-    menuBtn.textContent = '☰';
-    menuBtn.setAttribute('data-action', 'image-menu');
-    menuBtn.contentEditable = 'false';
-    dom.appendChild(menuBtn);
+    dom.appendChild(createMenuButton('image-menu-btn', 'image-menu'));
 
     const includeDir = api.currentTaskIncludeContext?.includeDir;
     const scheduleProcess = () => {
@@ -204,6 +222,66 @@ function syncWysiwygDiagramFile(dom: HTMLElement, originalSrc: string): void {
         scheduleProcess();
     }
 }
+
+// --- Per-type render functions for createMediaView ---
+
+function renderImageNode(dom: HTMLElement, src: string, alt: string, title: string): void {
+    dom.dataset.filePath = src;
+    dom.dataset.src = src;
+
+    const diagramInfo = getDiagramFileInfo(src);
+    if (diagramInfo) {
+        syncWysiwygDiagramFile(dom, src);
+        return;
+    }
+
+    const img = document.createElement('img');
+    img.className = 'markdown-image';
+    img.alt = alt;
+    img.title = title;
+    img.dataset.originalSrc = src;
+    img.src = resolveDisplaySrc(src);
+    img.contentEditable = 'false';
+
+    img.addEventListener('error', () => dom.classList.add('image-broken'));
+    img.addEventListener('load', () => dom.classList.remove('image-broken'));
+
+    dom.appendChild(img);
+    dom.appendChild(createMenuButton('image-menu-btn', 'image-menu'));
+}
+
+function renderVideoAudioNode(dom: HTMLElement, src: string, mediaType: string): void {
+    dom.dataset.src = src;
+    dom.dataset.filePath = src;
+
+    const mediaEl = document.createElement(mediaType === 'audio' ? 'audio' : 'video');
+    mediaEl.controls = true;
+    mediaEl.src = resolveDisplaySrc(src);
+    mediaEl.dataset.originalSrc = src;
+    mediaEl.contentEditable = 'false';
+
+    if (src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+        const api = window as unknown as MediaPathHelpers;
+        mediaEl.addEventListener('error', () => {
+            if (typeof api.handleMediaNotFound === 'function') {
+                api.handleMediaNotFound(mediaEl, src, 'video');
+            }
+        });
+    }
+
+    dom.appendChild(mediaEl);
+    dom.appendChild(createMenuButton('video-menu-btn', 'video-menu'));
+}
+
+function renderFallbackNode(dom: HTMLElement, src: string): void {
+    dom.dataset.src = src;
+    dom.appendChild(createEditButton('media'));
+    if (src) {
+        dom.appendChild(document.createTextNode(src));
+    }
+}
+
+// --- Media NodeView factory ---
 
 function createMediaView(
     node: ProseMirrorNode,
@@ -248,106 +326,22 @@ function createMediaView(
     });
 
     const render = (currentNode: ProseMirrorNode) => {
-        const mediaType = currentNode.attrs?.mediaType || 'image';
-        const src = currentNode.attrs?.src || '';
-        const alt = currentNode.attrs?.alt || '';
-        const title = currentNode.attrs?.title || '';
+        const mediaType = currentNode.attrs.mediaType || 'image';
+        const src = currentNode.attrs.src || '';
         const blockClass = isBlock ? ' wysiwyg-media-block' : '';
 
         dom.innerHTML = '';
-        dom.className = mediaType === 'image'
-            ? `image-path-overlay-container wysiwyg-media${blockClass}`
-            : (mediaType === 'video' || mediaType === 'audio')
-                ? `video-path-overlay-container wysiwyg-media${blockClass}`
-                : `wysiwyg-media${blockClass}`;
         dom.dataset.type = mediaType;
 
         if (mediaType === 'image') {
-            dom.dataset.filePath = src;
-            dom.dataset.src = src;
-
-            const diagramInfo = getDiagramFileInfo(src);
-            if (diagramInfo) {
-                syncWysiwygDiagramFile(dom, src);
-                return;
-            }
-
-            const img = document.createElement('img');
-            img.className = 'markdown-image';
-            img.alt = alt;
-            img.title = title;
-            img.dataset.originalSrc = src;
-            img.setAttribute('data-original-src', src);
-            img.src = resolveDisplaySrc(src);
-            img.contentEditable = 'false';
-
-            img.addEventListener('error', () => {
-                if (dom && dom.classList) {
-                    dom.classList.add('image-broken');
-                }
-            });
-            img.addEventListener('load', () => {
-                if (dom && dom.classList) {
-                    dom.classList.remove('image-broken');
-                }
-            });
-
-            const menuBtn = document.createElement('button');
-            menuBtn.className = 'image-menu-btn';
-            menuBtn.type = 'button';
-            menuBtn.title = 'Path options';
-            menuBtn.textContent = '☰';
-            menuBtn.setAttribute('data-action', 'image-menu');
-            menuBtn.contentEditable = 'false';
-
-            dom.appendChild(img);
-            dom.appendChild(menuBtn);
-            return;
-        }
-
-        if (mediaType === 'video' || mediaType === 'audio') {
-            dom.dataset.src = src;
-            dom.dataset.filePath = src;
-
-            const mediaEl = document.createElement(mediaType === 'audio' ? 'audio' : 'video');
-            mediaEl.controls = true;
-            mediaEl.src = resolveDisplaySrc(src);
-            mediaEl.dataset.originalSrc = src;
-            mediaEl.setAttribute('data-original-src', src);
-            mediaEl.contentEditable = 'false';
-
-            if ((mediaType === 'video' || mediaType === 'audio') && src && !src.startsWith('data:') && !src.startsWith('blob:')) {
-                const api = window as unknown as MediaPathHelpers;
-                mediaEl.addEventListener('error', () => {
-                    if (typeof api.handleMediaNotFound === 'function') {
-                        api.handleMediaNotFound(mediaEl, src, 'video');
-                    }
-                });
-            }
-
-            const menuBtn = document.createElement('button');
-            menuBtn.className = 'video-menu-btn';
-            menuBtn.type = 'button';
-            menuBtn.title = 'Path options';
-            menuBtn.textContent = '☰';
-            menuBtn.setAttribute('data-action', 'video-menu');
-            menuBtn.contentEditable = 'false';
-
-            dom.appendChild(mediaEl);
-            dom.appendChild(menuBtn);
-            return;
-        }
-
-        dom.dataset.src = src;
-        const button = document.createElement('button');
-        button.className = 'wysiwyg-edit-btn';
-        button.type = 'button';
-        button.setAttribute('data-action', 'media');
-        button.textContent = 'Edit';
-        button.contentEditable = 'false';
-        dom.appendChild(button);
-        if (src) {
-            dom.appendChild(document.createTextNode(src));
+            dom.className = `image-path-overlay-container wysiwyg-media${blockClass}`;
+            renderImageNode(dom, src, currentNode.attrs.alt || '', currentNode.attrs.title || '');
+        } else if (mediaType === 'video' || mediaType === 'audio') {
+            dom.className = `video-path-overlay-container wysiwyg-media${blockClass}`;
+            renderVideoAudioNode(dom, src, mediaType);
+        } else {
+            dom.className = `wysiwyg-media${blockClass}`;
+            renderFallbackNode(dom, src);
         }
     };
 
@@ -359,14 +353,10 @@ function createMediaView(
             if (nextNode.type !== node.type) {
                 return false;
             }
-            const nextSrc = nextNode.attrs?.src || '';
-            const nextType = nextNode.attrs?.mediaType || 'image';
-            const nextAlt = nextNode.attrs?.alt || '';
-            const nextTitle = nextNode.attrs?.title || '';
-            const needsUpdate = nextSrc !== node.attrs?.src ||
-                nextType !== node.attrs?.mediaType ||
-                nextAlt !== node.attrs?.alt ||
-                nextTitle !== node.attrs?.title;
+            const needsUpdate = nextNode.attrs.src !== node.attrs.src ||
+                nextNode.attrs.mediaType !== node.attrs.mediaType ||
+                nextNode.attrs.alt !== node.attrs.alt ||
+                nextNode.attrs.title !== node.attrs.title;
             node = nextNode;
             if (needsUpdate) {
                 render(nextNode);
@@ -384,6 +374,8 @@ export function createMediaBlockView(node: ProseMirrorNode, view: EditorView, ge
     return createMediaView(node, view, getPos, true);
 }
 
+// --- Diagram fence NodeView ---
+
 export function createDiagramFenceView(node: ProseMirrorNode): NodeView {
     const dom = document.createElement('div');
     dom.className = 'wysiwyg-diagram-block';
@@ -392,27 +384,20 @@ export function createDiagramFenceView(node: ProseMirrorNode): NodeView {
     preview.className = 'wysiwyg-diagram-preview';
     preview.contentEditable = 'false';
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'wysiwyg-edit-btn';
-    editBtn.type = 'button';
-    editBtn.textContent = 'Edit';
-    editBtn.setAttribute('data-action', 'diagram');
-    editBtn.contentEditable = 'false';
-
     const pre = document.createElement('pre');
     pre.className = 'wysiwyg-diagram';
     const code = document.createElement('code');
     pre.appendChild(code);
 
     dom.appendChild(preview);
-    dom.appendChild(editBtn);
+    dom.appendChild(createEditButton('diagram'));
     dom.appendChild(pre);
 
     const render = (currentNode: ProseMirrorNode) => {
-        const lang = currentNode.attrs?.lang || '';
+        const lang = currentNode.attrs.lang || '';
         dom.dataset.lang = lang;
         pre.dataset.lang = lang;
-        renderDiagramPreview(preview, lang, currentNode.textContent || '');
+        renderDiagramPreview(preview, lang, currentNode.textContent);
     };
 
     render(node);
@@ -425,7 +410,7 @@ export function createDiagramFenceView(node: ProseMirrorNode): NodeView {
             if (nextNode.type !== node.type) {
                 return false;
             }
-            const langChanged = nextNode.attrs?.lang !== node.attrs?.lang;
+            const langChanged = nextNode.attrs.lang !== node.attrs.lang;
             const codeChanged = nextNode.textContent !== node.textContent;
             node = nextNode;
             if (langChanged || codeChanged) {
@@ -436,10 +421,9 @@ export function createDiagramFenceView(node: ProseMirrorNode): NodeView {
     };
 }
 
+// --- Image sync utility ---
+
 export function syncWysiwygImages(container: HTMLElement): void {
-    if (!container) {
-        return;
-    }
     const api = window as unknown as MediaPathHelpers;
     const images = container.querySelectorAll<HTMLImageElement>('.image-path-overlay-container img');
     images.forEach((img) => {

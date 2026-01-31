@@ -4,9 +4,9 @@ import { InputRule, wrappingInputRule, textblockTypeInputRule } from 'prosemirro
 import { inferMediaTypeFromSrc, getTagFlavor, isDateLike } from './utils';
 
 function replaceInlineWithNodePreserveSpace(state: EditorState, match: RegExpMatchArray, start: number, end: number, node: ProseMirrorNode): Transaction | null {
-    const full = match[0] || '';
-    const leadingSpace = full.length > 0 && /\s/.test(full[0]) ? full[0] : '';
-    const trailingSpace = full.length > 0 && /\s/.test(full[full.length - 1]) ? full[full.length - 1] : '';
+    const full = match[0];
+    const leadingSpace = /\s/.test(full[0]) ? full[0] : '';
+    const trailingSpace = /\s/.test(full[full.length - 1]) ? full[full.length - 1] : '';
     const replaceStart = start + (leadingSpace ? 1 : 0);
     const replaceEnd = end;
     if (replaceEnd <= replaceStart) {
@@ -44,9 +44,7 @@ function findMulticolumnAncestor(state: EditorState): { node: ProseMirrorNode; p
 export function createMulticolumnTransaction(
     state: EditorState,
     schema: Schema,
-    growth: number,
-    _start: number,
-    _end: number
+    growth: number
 ): Transaction | null {
     if (!schema.nodes.multicolumn || !schema.nodes.multicolumn_column || !schema.nodes.paragraph) {
         return null;
@@ -160,38 +158,33 @@ export function buildMarkdownInputRules(schema: Schema): InputRule[] {
     }
 
     if (schema.nodes.media_inline) {
-        rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)$/, (state, match, start, end) => {
-            const alt = match[1] || '';
+        const buildMediaAttrs = (match: RegExpMatchArray): Record<string, unknown> | null => {
             const src = match[2] || '';
-            const title = match[3] || '';
             if (!src) {
                 return null;
             }
-            const inferred = inferMediaTypeFromSrc(src);
-            const attrs: Record<string, unknown> = { src, mediaType: inferred || 'image' };
-            if (alt) {
-                attrs.alt = alt;
+            const attrs: Record<string, unknown> = { src, mediaType: inferMediaTypeFromSrc(src) || 'image' };
+            if (match[1]) {
+                attrs.alt = match[1];
             }
-            if (title) {
-                attrs.title = title;
+            if (match[3]) {
+                attrs.title = match[3];
+            }
+            return attrs;
+        };
+
+        rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)$/, (state, match, start, end) => {
+            const attrs = buildMediaAttrs(match);
+            if (!attrs) {
+                return null;
             }
             return state.tr.replaceWith(start, end, schema.nodes.media_inline.create(attrs));
         }));
 
         rules.push(new InputRule(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)\s$/, (state, match, start, end) => {
-            const alt = match[1] || '';
-            const src = match[2] || '';
-            const title = match[3] || '';
-            if (!src) {
+            const attrs = buildMediaAttrs(match);
+            if (!attrs) {
                 return null;
-            }
-            const inferred = inferMediaTypeFromSrc(src);
-            const attrs: Record<string, unknown> = { src, mediaType: inferred || 'image' };
-            if (alt) {
-                attrs.alt = alt;
-            }
-            if (title) {
-                attrs.title = title;
             }
             return replaceInlineWithNodePreserveSpace(state, match, start, end, schema.nodes.media_inline.create(attrs));
         }));
@@ -306,12 +299,12 @@ export function buildMarkdownInputRules(schema: Schema): InputRule[] {
     }
 
     if (schema.nodes.multicolumn) {
-        rules.push(new InputRule(/^---:\s*(\d*)\s$/, (state, match, start, end) => {
+        rules.push(new InputRule(/^---:\s*(\d*)\s$/, (state, match) => {
             if (isInsideMulticolumn(state)) {
                 return null;
             }
             const growth = parseInt(match[1]) || 1;
-            return createMulticolumnTransaction(state, schema, growth, start, end);
+            return createMulticolumnTransaction(state, schema, growth);
         }));
 
         rules.push(new InputRule(/^:--:\s*(\d*)\s$/, (state, match, start, end) => {
