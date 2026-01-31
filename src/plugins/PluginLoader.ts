@@ -32,6 +32,7 @@ import { ExcalidrawPlugin } from './diagram/ExcalidrawPlugin';
 import { PDFPlugin } from './diagram/PDFPlugin';
 import { EPUBPlugin } from './diagram/EPUBPlugin';
 import { XlsxPlugin } from './diagram/XlsxPlugin';
+import { DocumentPlugin } from './diagram/DocumentPlugin';
 
 // Markdown-it plugin manifest
 import { MARKDOWN_PLUGIN_MANIFEST } from './markdown/markdownPluginManifest';
@@ -189,6 +190,15 @@ export class PluginLoader {
                 registry.registerDiagramPlugin(new XlsxPlugin());
             } catch (error) {
                 console.error('[PluginLoader] Failed to register XlsxPlugin:', error);
+            }
+        }
+
+        // Document Plugin — renders DOCX, DOC, ODT, PPTX, PPT, ODP via LibreOffice + pdftoppm
+        if (!isPluginDisabled('document')) {
+            try {
+                registry.registerDiagramPlugin(new DocumentPlugin());
+            } catch (error) {
+                console.error('[PluginLoader] Failed to register DocumentPlugin:', error);
             }
         }
 

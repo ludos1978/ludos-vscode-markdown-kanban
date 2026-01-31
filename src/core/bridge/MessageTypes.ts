@@ -889,6 +889,27 @@ export interface RequestXlsxRenderMessage extends RequestMessage {
     includeDir?: string;
 }
 
+/**
+ * Request document page render (DOCX, DOC, ODT, PPTX, PPT, ODP via LibreOffice + pdftoppm)
+ */
+export interface RequestDocumentPageRenderMessage extends RequestMessage {
+    type: 'requestDocumentPageRender';
+    filePath: string;
+    pageNumber: number;
+    /** Directory of include file if document is inside an include (for relative path resolution) */
+    includeDir?: string;
+}
+
+/**
+ * Request document info (page count for DOCX, DOC, ODT, PPTX, PPT, ODP)
+ */
+export interface RequestDocumentInfoMessage extends RequestMessage {
+    type: 'requestDocumentInfo';
+    filePath: string;
+    /** Directory of include file if document is inside an include (for relative path resolution) */
+    includeDir?: string;
+}
+
 // ============= UI MESSAGES =============
 
 /**
@@ -2089,6 +2110,8 @@ export type IncomingMessage =
     | RequestEPUBPageRenderMessage
     | RequestEPUBInfoMessage
     | RequestXlsxRenderMessage
+    | RequestDocumentPageRenderMessage
+    | RequestDocumentInfoMessage
     | EditModeStartMessage
     | EditModeEndMessage
     | EditingStoppedMessage

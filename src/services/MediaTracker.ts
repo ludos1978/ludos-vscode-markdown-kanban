@@ -10,7 +10,7 @@
  * - Images: .png, .jpg, .jpeg, .gif, .svg, .webp, .avif, .bmp, .ico
  * - Audio: .mp3, .wav, .ogg, .m4a, .flac, .aac
  * - Video: .mp4, .webm, .mov, .avi, .mkv
- * - Documents: .pdf, .xlsx, .xls, .ods, .epub
+ * - Documents: .pdf, .xlsx, .xls, .ods, .epub, .docx, .doc, .odt, .pptx, .ppt, .odp
  */
 
 import * as fs from 'fs';
@@ -60,12 +60,18 @@ export class MediaTracker {
         ...Object.fromEntries(DOTTED_EXTENSIONS.audio.map(ext => [ext, 'audio' as const])),
         // Video (from centralized DOTTED_EXTENSIONS)
         ...Object.fromEntries(DOTTED_EXTENSIONS.video.map(ext => [ext, 'video' as const])),
-        // Documents - renderable document types (PDF, spreadsheets, EPUB)
+        // Documents - renderable document types (PDF, spreadsheets, EPUB, LibreOffice documents)
         '.pdf': 'document',
         '.xlsx': 'document',
         '.xls': 'document',
         '.ods': 'document',
-        '.epub': 'document'
+        '.epub': 'document',
+        '.docx': 'document',
+        '.doc': 'document',
+        '.odt': 'document',
+        '.pptx': 'document',
+        '.ppt': 'document',
+        '.odp': 'document'
     };
 
     private _kanbanPath: string;

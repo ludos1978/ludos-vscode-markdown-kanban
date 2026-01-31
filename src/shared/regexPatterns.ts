@@ -86,6 +86,12 @@ export const DiagramPatterns = {
      * Captures: [1] = file path, [2] = optional title, [3] = optional attributes block
      */
     xlsx: () => /!\[[^\]]*\]\(([^\s"]+\.(?:xlsx|xls|ods))(?:\s+"([^"]+)")?\)(\{[^}]+\})?/g,
+
+    /**
+     * Document file reference: ![alt](path.docx "title") or ![alt](path.pptx/.odt/.odp/.doc/.ppt)
+     * Captures: [1] = file path, [2] = optional title, [3] = optional attributes block
+     */
+    document: () => /!\[[^\]]*\]\(([^\s"]+\.(?:docx|doc|odt|pptx|ppt|odp))(?:\s+"([^"]+)")?\)(\{[^}]+\})?/g,
 };
 
 /**

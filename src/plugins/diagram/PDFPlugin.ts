@@ -21,7 +21,7 @@ import {
 /**
  * Internal CLI service for PDF operations
  */
-class PDFCLI extends AbstractCLIService {
+export class PDFCLI extends AbstractCLIService {
     protected getConfigKey(): string {
         return 'popplerPath';
     }

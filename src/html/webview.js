@@ -2999,11 +2999,13 @@ if (!webviewEventListenersInitialized) {
                             window.invalidateDiagramCache(file.path, 'excalidraw');
                         }
                     } else if (file.type === 'document') {
-                        // Clear rendered media cache for document types (PDF, XLSX, EPUB)
+                        // Clear rendered media cache for document types (PDF, XLSX, EPUB, DOCX, PPTX, etc.)
                         if (typeof window.invalidateDiagramCache === 'function') {
                             window.invalidateDiagramCache(file.path, 'pdf');
                             window.invalidateDiagramCache(file.path, 'xlsx');
                             window.invalidateDiagramCache(file.path, 'epub-slideshow');
+                            window.invalidateDiagramCache(file.path, 'document');
+                            window.invalidateDiagramCache(file.path, 'document-slideshow');
                         }
                     }
 
@@ -3062,6 +3064,8 @@ if (!webviewEventListenersInitialized) {
                                 diagramType = 'xlsx';
                             } else if (/\.pdf$/i.test(originalSrc)) {
                                 diagramType = 'pdf';
+                            } else if (/\.(?:docx|doc|odt|pptx|ppt|odp)$/i.test(originalSrc)) {
+                                diagramType = 'document';
                             }
 
                             // Extract includeDir from the container's DOM context

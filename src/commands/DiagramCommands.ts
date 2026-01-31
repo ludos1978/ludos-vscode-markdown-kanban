@@ -25,7 +25,9 @@ import {
     RequestPDFInfoMessage,
     RequestEPUBPageRenderMessage,
     RequestEPUBInfoMessage,
-    RequestXlsxRenderMessage
+    RequestXlsxRenderMessage,
+    RequestDocumentPageRenderMessage,
+    RequestDocumentInfoMessage
 } from '../core/bridge/MessageTypes';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
@@ -45,7 +47,7 @@ export class DiagramCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'diagram-commands',
         name: 'Diagram Commands',
-        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, PDF, EPUB, and Excel rendering',
+        description: 'Handles PlantUML, Mermaid, Draw.io, Excalidraw, PDF, EPUB, Excel, and Document rendering',
         messageTypes: [
             'renderPlantUML',
             'convertPlantUMLToSVG',
@@ -59,6 +61,8 @@ export class DiagramCommands extends SwitchBasedCommand {
             'requestEPUBPageRender',
             'requestEPUBInfo',
             'requestXlsxRender',
+            'requestDocumentPageRender',
+            'requestDocumentInfo',
             'getMermaidCache',
             'cacheMermaidSvg'
         ],
@@ -119,6 +123,14 @@ export class DiagramCommands extends SwitchBasedCommand {
         },
         'requestXlsxRender': async (msg, ctx) => {
             await this.handleRenderXlsx(msg as RequestXlsxRenderMessage, ctx);
+            return this.success();
+        },
+        'requestDocumentPageRender': async (msg, ctx) => {
+            await this.handleRenderDocumentPage(msg as RequestDocumentPageRenderMessage, ctx);
+            return this.success();
+        },
+        'requestDocumentInfo': async (msg, ctx) => {
+            await this.handleGetDocumentInfo(msg as RequestDocumentInfoMessage, ctx);
             return this.success();
         },
         'getMermaidCache': async (msg, ctx) => {
@@ -712,6 +724,41 @@ export class DiagramCommands extends SwitchBasedCommand {
             console.error('[XLSX Backend] Render error:', error);
             this.postMessage({ type: 'xlsxRenderError', requestId, error: getErrorMessage(error) });
         }
+    }
+
+    // ============= DOCUMENT HANDLERS =============
+
+    /**
+     * Handle document page rendering request from webview
+     * Converts doc to PDF via LibreOffice, then renders page via pdftoppm
+     */
+    private async handleRenderDocumentPage(message: RequestDocumentPageRenderMessage, context: CommandContext): Promise<void> {
+        const { requestId, filePath, pageNumber, includeDir } = message;
+        if (!context.getWebviewPanel()?.webview) { return; }
+
+        try {
+            const { absolutePath, fileMtime } = await this.resolveTrackedFile(filePath, includeDir, context, 'Document');
+
+            const dataUrl = await this.renderWithFileCache(absolutePath, fileMtime, context, {
+                cacheFolderName: 'document-cache', extension: 'png', suffix: `-p${pageNumber}`, logPrefix: 'Document Backend'
+            }, async () => {
+                const plugin = this._getRegistry().findDiagramPluginById('document');
+                if (!plugin || !plugin.renderFile) { throw new Error('Document plugin not available'); }
+                if (!await plugin.isAvailable()) { throw new Error('LibreOffice or pdftoppm CLI not installed'); }
+                const result = await plugin.renderFile(absolutePath, { pageNumber, dpi: 150 });
+                if (!result.success) { throw new Error(result.error || 'Document rendering failed'); }
+                return result.data as Buffer;
+            });
+
+            this.postMessage({ type: 'documentPageRenderSuccess', requestId, pngDataUrl: dataUrl, fileMtime });
+        } catch (error) {
+            console.error('[Document Backend] Render error:', error);
+            this.postMessage({ type: 'documentPageRenderError', requestId, error: getErrorMessage(error) });
+        }
+    }
+
+    private async handleGetDocumentInfo(message: RequestDocumentInfoMessage, context: CommandContext): Promise<void> {
+        await this.handleFileInfo(message.requestId, message.filePath, message.includeDir, context, 'document', 'Document', 'documentInfoSuccess', 'documentInfoError');
     }
 
     // ============= MERMAID CACHE HANDLERS =============
