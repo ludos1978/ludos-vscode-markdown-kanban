@@ -1481,6 +1481,14 @@ export interface GetTrackedFilesDebugInfoMessage extends BaseMessage {
 }
 
 /**
+ * Get media tracking status for a specific file
+ */
+export interface GetMediaTrackingStatusMessage extends BaseMessage {
+    type: 'getMediaTrackingStatus';
+    filePath: string;
+}
+
+/**
  * Clear tracked files cache
  */
 export interface ClearTrackedFilesCacheMessage extends BaseMessage {
@@ -2164,6 +2172,7 @@ export type IncomingMessage =
     | ForceWriteAllContentMessage
     | VerifyContentSyncMessage
     | GetTrackedFilesDebugInfoMessage
+    | GetMediaTrackingStatusMessage
     | ClearTrackedFilesCacheMessage
     | SetDebugModeMessage
     // Path conversion messages

@@ -3841,6 +3841,13 @@ if (!webviewEventListenersInitialized) {
             // Handle debug cache clear confirmation
             break;
 
+        case 'mediaTrackingStatus':
+            // Handle media tracking status response (for burger menu info display)
+            if (typeof window._onMediaTrackingStatus === 'function') {
+                window._onMediaTrackingStatus(message);
+            }
+            break;
+
         case 'allIncludedFilesReloaded':
             // Handle reload confirmation (no UI notification needed)
             break;

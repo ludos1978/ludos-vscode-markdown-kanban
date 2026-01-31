@@ -220,13 +220,21 @@ export class FileSyncHandler {
     private _checkMediaForExternalChanges(): { hasChanges: boolean; changedFiles: string[] } {
         const mediaTracker = this._deps.getMediaTracker();
         if (!mediaTracker) {
+            console.log('[FileSyncHandler] No media tracker available - skipping media check');
             return { hasChanges: false, changedFiles: [] };
         }
 
         try {
+            const trackedFiles = mediaTracker.getTrackedFiles();
+            console.log(`[FileSyncHandler] Checking ${trackedFiles.length} tracked media files for changes`);
+
             // checkForChanges() compares mtimes and triggers callback if changes found
             // The callback (set in KanbanWebviewPanel) handles notifying the frontend
             const changedFiles = mediaTracker.checkForChanges();
+
+            if (changedFiles.length > 0) {
+                console.log('[FileSyncHandler] Media files changed:', changedFiles.map(f => `${f.path} (${f.type})`));
+            }
 
             return {
                 hasChanges: changedFiles.length > 0,

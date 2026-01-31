@@ -539,6 +539,22 @@ function togglePathMenu(container, filePath, mediaType) {
     const escapedAltText = altText.replace(/'/g, "\\'").replace(/"/g, '\\"');
     const webSearchHtml = `<button class="image-path-menu-item" onclick="event.stopPropagation(); webSearchForImage('${escapedAltText}', '${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}', '${escapedIncludeDir}')">🌐 Web Search</button>`;
 
+    // Build frontend cache status inline
+    const renderType = getRenderTypeFromPath(filePath);
+    let cacheStatusHtml = '';
+    if (renderType) {
+        const cacheEntries = typeof window.getRenderedMediaCacheStatus === 'function'
+            ? window.getRenderedMediaCacheStatus(filePath) : [];
+        const cacheLabel = cacheEntries.length > 0
+            ? `Cached (${cacheEntries.length} ${cacheEntries.length === 1 ? 'entry' : 'entries'})`
+            : 'Not cached';
+        cacheStatusHtml = `<div class="image-path-menu-divider"></div>
+            <div class="image-path-menu-info" id="media-status-info" style="padding: 4px 10px; font-size: 11px; opacity: 0.8; cursor: default;">
+                <div>Frontend: ${cacheLabel}</div>
+                <div id="media-tracking-status">Backend: checking...</div>
+            </div>`;
+    }
+
     menu.innerHTML = `
         <button class="image-path-menu-item${openDisabled ? ' disabled' : ''}" ${openDisabled ? 'disabled' : `onclick="event.stopPropagation(); openPath('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')"`}>📄 Open</button>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
@@ -550,9 +566,30 @@ function togglePathMenu(container, filePath, mediaType) {
         <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
         <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); forceRefreshMedia('${escapedPath}', '${escapedIncludeDir}')">🔄 Force Refresh</button>
+        ${cacheStatusHtml}
         <div class="image-path-menu-divider"></div>
         <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
     `;
+
+    // Request backend tracking status asynchronously
+    if (renderType && typeof vscode !== 'undefined') {
+        window._onMediaTrackingStatus = (msg) => {
+            const statusEl = menu.querySelector('#media-tracking-status');
+            if (!statusEl) return;
+            if (msg.tracked && msg.matches && msg.matches.length > 0) {
+                const m = msg.matches[0];
+                const diffInfo = m.mtimeDiffers ? ' (MTIME DIFFERS!)' : ' (up to date)';
+                statusEl.textContent = `Backend: Tracked as ${m.type}${diffInfo}`;
+                if (m.mtimeDiffers) {
+                    statusEl.style.color = 'var(--vscode-errorForeground, #f44)';
+                }
+            } else {
+                statusEl.textContent = `Backend: NOT tracked (${msg.totalTrackedFiles || 0} total files)`;
+                statusEl.style.color = 'var(--vscode-errorForeground, #f44)';
+            }
+        };
+        vscode.postMessage({ type: 'getMediaTrackingStatus', filePath: filePath });
+    }
 
     document.body.appendChild(menu);
 

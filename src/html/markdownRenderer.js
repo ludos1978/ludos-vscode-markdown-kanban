@@ -726,9 +726,27 @@ function clearDiagramCache() {
     renderedMediaTracker.clear();
 }
 
+/**
+ * Get frontend cache status for a media file.
+ * Returns an array of matching cache entries with their keys and mtimes.
+ * @param {string} filePath - The file path to query
+ * @returns {Array<{key: string, mtime: number}>}
+ */
+function getRenderedMediaCacheStatus(filePath) {
+    const results = [];
+    const fileName = filePath.split('/').pop() || filePath;
+    for (const [key, value] of renderedMediaTracker.entries()) {
+        if (key.includes(filePath) || key.includes(fileName)) {
+            results.push({ key, mtime: value.mtime });
+        }
+    }
+    return results;
+}
+
 // Expose diagram cache functions for external calls (e.g., from webview.js)
 window.clearDiagramCache = clearDiagramCache;
 window.invalidateDiagramCache = invalidateDiagramCache;
+window.getRenderedMediaCacheStatus = getRenderedMediaCacheStatus;
 // Expose diagram rendering functions for re-rendering on file changes
 window.queueDiagramRender = queueDiagramRender;
 window.processDiagramQueue = processDiagramQueue;

@@ -437,9 +437,15 @@ export class KanbanWebviewPanel {
             fileRegistry: this._fileRegistry, fileFactory: this._fileFactory, includeCoordinator: this._includeCoordinator,
             panelContext: this._context, getFileSyncHandler: () => this._fileSyncHandler,
             getBoard: () => this.getBoard(), getPanel: () => this._panel,
-            onMediaChanged: (files) => this._panel?.webview.postMessage({
-                type: 'mediaFilesChanged', changedFiles: files.map(f => ({ path: f.path, absolutePath: f.absolutePath, type: f.type }))
-            })
+            onMediaChanged: (files) => {
+                console.log(`[KanbanWebviewPanel] onMediaChanged fired with ${files.length} files:`, files.map(f => `${f.path} (${f.type})`));
+                const hasPanel = !!this._panel;
+                const hasWebview = !!this._panel?.webview;
+                console.log(`[KanbanWebviewPanel] onMediaChanged panel=${hasPanel} webview=${hasWebview}`);
+                this._panel?.webview.postMessage({
+                    type: 'mediaFilesChanged', changedFiles: files.map(f => ({ path: f.path, absolutePath: f.absolutePath, type: f.type }))
+                });
+            }
         });
 
         this._disposables.push(this._fileRegistry.onDidChangeRegistry((event) => {

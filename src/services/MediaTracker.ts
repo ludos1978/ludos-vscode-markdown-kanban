@@ -285,17 +285,20 @@ export class MediaTracker {
      */
     public checkForChanges(triggerCallback: boolean = true): ChangedMediaFile[] {
         const changedFiles: ChangedMediaFile[] = [];
+        const fileEntries = Object.entries(this._cache.files);
+        console.log(`[MediaTracker.checkForChanges] Checking ${fileEntries.length} cached files, triggerCallback=${triggerCallback}, hasCallback=${!!this._onMediaChanged}`);
 
-        for (const [relativePath, entry] of Object.entries(this._cache.files)) {
+        for (const [relativePath, entry] of fileEntries) {
             const absolutePath = this._resolveMediaPath(relativePath);
             const currentMtime = this._getFileMtime(absolutePath);
 
             if (currentMtime === null) {
-                // File no longer exists - skip
+                console.log(`[MediaTracker.checkForChanges] ${relativePath} → file not found (skipping)`);
                 continue;
             }
 
             if (currentMtime !== entry.mtime) {
+                console.log(`[MediaTracker.checkForChanges] CHANGED: ${relativePath} (${entry.type}) cachedMtime=${entry.mtime} currentMtime=${currentMtime} diff=${currentMtime - entry.mtime}ms`);
                 changedFiles.push({
                     path: relativePath,
                     absolutePath: absolutePath,
@@ -314,8 +317,13 @@ export class MediaTracker {
 
             // UNIFIED: Notify through single callback (same path as file watchers)
             if (triggerCallback && this._onMediaChanged) {
+                console.log(`[MediaTracker.checkForChanges] Triggering _onMediaChanged callback with ${changedFiles.length} changed files`);
                 this._onMediaChanged(changedFiles);
+            } else if (changedFiles.length > 0 && !this._onMediaChanged) {
+                console.warn(`[MediaTracker.checkForChanges] ${changedFiles.length} files changed but NO callback set!`);
             }
+        } else {
+            console.log(`[MediaTracker.checkForChanges] No changes detected`);
         }
 
         return changedFiles;

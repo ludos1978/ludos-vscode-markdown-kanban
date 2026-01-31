@@ -138,7 +138,8 @@ export class DebugCommands extends SwitchBasedCommand {
             'verifyContentSync',
             'getTrackedFilesDebugInfo',
             'clearTrackedFilesCache',
-            'setDebugMode'
+            'setDebugMode',
+            'getMediaTrackingStatus'
         ],
         priority: 50
     };
@@ -148,7 +149,8 @@ export class DebugCommands extends SwitchBasedCommand {
         'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, ctx),
         'getTrackedFilesDebugInfo': (_msg, ctx) => this.handleGetTrackedFilesDebugInfo(ctx),
         'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx),
-        'setDebugMode': (msg, ctx) => this.handleSetDebugMode(msg as SetDebugModeMessage, ctx)
+        'setDebugMode': (msg, ctx) => this.handleSetDebugMode(msg as SetDebugModeMessage, ctx),
+        'getMediaTrackingStatus': (msg, ctx) => this.handleGetMediaTrackingStatus((msg as any).filePath, ctx)
     };
 
     private async handleSetDebugMode(message: SetDebugModeMessage, context: CommandContext): Promise<CommandResult> {
@@ -463,6 +465,62 @@ export class DebugCommands extends SwitchBasedCommand {
         this.postMessage({
             type: 'debugCacheCleared'
         });
+        return this.success();
+    }
+
+    private async handleGetMediaTrackingStatus(filePath: string, context: CommandContext): Promise<CommandResult> {
+        const mediaTracker = context.getMediaTracker?.();
+        const fileName = filePath ? path.basename(filePath) : '';
+
+        if (!mediaTracker) {
+            this.postMessage({
+                type: 'mediaTrackingStatus',
+                filePath,
+                tracked: false,
+                error: 'MediaTracker not available',
+                trackedFiles: []
+            });
+            return this.success();
+        }
+
+        const trackedFiles = mediaTracker.getTrackedFiles();
+
+        // Find matching entries (by exact path or filename match)
+        const matches = trackedFiles.filter(f => {
+            const trackedName = path.basename(f.path);
+            return f.path === filePath || trackedName === fileName;
+        });
+
+        // Get current disk mtime for matched files
+        const matchDetails = matches.map(m => {
+            let currentMtime: number | null = null;
+            try {
+                const absPath = path.isAbsolute(m.path)
+                    ? m.path
+                    : path.resolve(path.dirname(context.fileManager.getDocument()?.uri.fsPath || ''), m.path);
+                const stats = fs.statSync(absPath);
+                currentMtime = stats.mtimeMs;
+            } catch { /* file may not exist */ }
+
+            return {
+                path: m.path,
+                type: m.type,
+                cachedMtime: m.mtime,
+                currentMtime,
+                mtimeDiffers: currentMtime !== null && currentMtime !== m.mtime,
+                mtimeDiffMs: currentMtime !== null ? currentMtime - m.mtime : null
+            };
+        });
+
+        this.postMessage({
+            type: 'mediaTrackingStatus',
+            filePath,
+            tracked: matches.length > 0,
+            matches: matchDetails,
+            totalTrackedFiles: trackedFiles.length,
+            allTrackedPaths: trackedFiles.map(f => `${f.path} (${f.type})`)
+        });
+
         return this.success();
     }
 

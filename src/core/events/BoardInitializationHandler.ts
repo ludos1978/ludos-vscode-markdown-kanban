@@ -118,8 +118,10 @@ export class BoardInitializationHandler {
 
         // Set up callback for real-time media file change detection
         mediaTracker.setOnMediaChanged((changedFiles) => {
+            console.log(`[BoardInitializationHandler] onMediaChanged callback invoked with ${changedFiles.length} files`);
             this._deps.onMediaChanged(changedFiles);
         });
+        console.log('[BoardInitializationHandler] MediaTracker callback registered');
 
         // Update tracked media files from current content
         const content = mainFile.getContent();
