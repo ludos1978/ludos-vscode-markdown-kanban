@@ -669,42 +669,52 @@ async function renderPlantUML(code) {
 window.renderPlantUML = renderPlantUML;
 
 // Diagram rendering (draw.io, excalidraw)
-// MEMORY SAFETY: Limited to DIAGRAM_CACHE_MAX_SIZE entries
-const diagramRenderCache = new Map();  // Cache key: `${type}:${path}:${mtime}` → svgDataUrl
 const diagramRenderRequests = new Map();
 let diagramRequestId = 0;
 const pendingDiagramQueue = [];
 let diagramQueueProcessing = false;
 
-// Track rendered diagram files with their mtimes for change detection
-// Key: `${diagramType}:${filePath}:${includeDir || ''}`, Value: { mtime, imageDataUrl }
+// Cache for all rendered media (diagrams, PDFs, XLSX, etc.)
+// Key: `${diagramType}:${filePath}:${includeDir}:${subKey}`, Value: { mtime, imageDataUrl }
 const renderedMediaTracker = new Map();
 
-function getRenderedDiagramKey(filePath, diagramType, includeDir) {
-    return `${diagramType}:${filePath}:${includeDir || ''}`;
+function getRenderedDiagramKey(filePath, diagramType, includeDir, subKey) {
+    return `${diagramType}:${filePath}:${includeDir || ''}:${subKey || ''}`;
 }
 
-function getRenderedDiagramCache(filePath, diagramType, includeDir) {
-    const key = getRenderedDiagramKey(filePath, diagramType, includeDir);
-    return renderedMediaTracker.get(key);
+function getRenderedDiagramCache(filePath, diagramType, includeDir, subKey) {
+    return renderedMediaTracker.get(getRenderedDiagramKey(filePath, diagramType, includeDir, subKey));
 }
 
-function setRenderedDiagramCache(filePath, diagramType, includeDir, mtime, imageDataUrl) {
-    const key = getRenderedDiagramKey(filePath, diagramType, includeDir);
-    renderedMediaTracker.set(key, { mtime, imageDataUrl });
+function setRenderedDiagramCache(filePath, diagramType, includeDir, subKey, mtime, imageDataUrl) {
+    setCacheWithLimit(renderedMediaTracker, getRenderedDiagramKey(filePath, diagramType, includeDir, subKey), { mtime, imageDataUrl });
 }
 
 /**
- * Invalidate cached diagram renders for a specific file path
- * Removes all cache entries for the file (regardless of mtime)
+ * Check cache or render media, returning { imageDataUrl, fileMtime }.
+ * Encapsulates the cache-check, render, cache-store pattern used by all media types.
+ * @param {string} filePath
+ * @param {string} diagramType
+ * @param {string} [includeDir]
+ * @param {string} [subKey] - Sub-key for page/sheet variants (e.g., 'page1', 'sheet2')
+ * @param {Function} renderFn - Async function returning { dataUrl, mtime }
+ * @returns {Promise<{imageDataUrl: string, fileMtime: number}>}
+ */
+async function cachedRenderMedia(filePath, diagramType, includeDir, subKey, renderFn) {
+    const cached = getRenderedDiagramCache(filePath, diagramType, includeDir, subKey);
+    if (cached) {
+        return { imageDataUrl: cached.imageDataUrl, fileMtime: cached.mtime };
+    }
+    const { dataUrl, mtime } = await renderFn();
+    setRenderedDiagramCache(filePath, diagramType, includeDir, subKey, mtime, dataUrl);
+    return { imageDataUrl: dataUrl, fileMtime: mtime };
+}
+
+/**
+ * Invalidate cached diagram renders for a specific file path (all entries regardless of mtime)
  */
 function invalidateDiagramCache(filePath, diagramType) {
     const prefix = `${diagramType}:${filePath}:`;
-    for (const key of diagramRenderCache.keys()) {
-        if (key.startsWith(prefix)) {
-            diagramRenderCache.delete(key);
-        }
-    }
     for (const key of renderedMediaTracker.keys()) {
         if (key.startsWith(prefix)) {
             renderedMediaTracker.delete(key);
@@ -712,11 +722,7 @@ function invalidateDiagramCache(filePath, diagramType) {
     }
 }
 
-/**
- * Clear all diagram render cache (called on webview focus)
- */
 function clearDiagramCache() {
-    diagramRenderCache.clear();
     renderedMediaTracker.clear();
 }
 
@@ -1054,17 +1060,21 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
     element.innerHTML = '';
     element.appendChild(wrapper);
 
-    // Function to load and display a specific page
+    const pageCache = new Map();
+
     const loadPage = async (pageNumber) => {
         try {
-            imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
+            const cachedUrl = pageCache.get(pageNumber);
+            if (cachedUrl) {
+                imageContainer.innerHTML = `<img src="${cachedUrl}" alt="EPUB page ${pageNumber}" class="diagram-rendered" />`;
+            } else {
+                imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
 
-            // Request page rendering (pass includeDir for correct relative path resolution)
-            const result = await renderEPUBPage(filePath, pageNumber, includeDir);
-            const { pngDataUrl } = result;
-
-            // Update image
-            imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="EPUB page ${pageNumber}" class="diagram-rendered" />`;
+                const result = await renderEPUBPage(filePath, pageNumber, includeDir);
+                const { pngDataUrl } = result;
+                pageCache.set(pageNumber, pngDataUrl);
+                imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="EPUB page ${pageNumber}" class="diagram-rendered" />`;
+            }
 
             // Trigger height recalculation after image loads
             const img = imageContainer.querySelector('img');
@@ -1083,17 +1093,14 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
                 }
             }
 
-            // Update state
             currentPage = pageNumber;
             container.setAttribute('data-current-page', currentPage);
-
-            // Update controls
+            pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
             prevBtn.disabled = (currentPage === 1);
             nextBtn.disabled = (currentPage === pageCount);
-            pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
 
         } catch (error) {
-            console.error('[EPUB Slideshow] Failed to load page:', error);
+            console.error(`[EPUB Slideshow] Failed to load page ${pageNumber}:`, error);
             const shortPath = typeof getShortDisplayPath === 'function' ? getShortDisplayPath(filePath) : filePath.split('/').pop() || filePath;
             imageContainer.innerHTML = '';
             imageContainer.appendChild(createBrokenMediaPlaceholder(
@@ -1104,7 +1111,6 @@ async function createEPUBSlideshow(element, filePath, pageCount, fileMtime, incl
         }
     };
 
-    // Button event handlers
     prevBtn.onclick = (e) => {
         e.stopPropagation();
         if (currentPage > 1) {
@@ -1216,17 +1222,21 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
     element.innerHTML = '';
     element.appendChild(wrapper);
 
-    // Function to load and display a specific page
+    const pageCache = new Map();
+
     const loadPage = async (pageNumber) => {
         try {
-            imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
+            const cachedUrl = pageCache.get(pageNumber);
+            if (cachedUrl) {
+                imageContainer.innerHTML = `<img src="${cachedUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
+            } else {
+                imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
 
-            // Request page rendering (pass includeDir for correct relative path resolution)
-            const result = await renderPDFPage(filePath, pageNumber, includeDir);
-            const { pngDataUrl } = result;
-
-            // Update image
-            imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
+                const result = await renderPDFPage(filePath, pageNumber, includeDir);
+                const { pngDataUrl } = result;
+                pageCache.set(pageNumber, pngDataUrl);
+                imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
+            }
 
             // Trigger height recalculation after image loads
             const img = imageContainer.querySelector('img');
@@ -1245,11 +1255,8 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
                 }
             }
 
-            // Update state
             currentPage = pageNumber;
             container.setAttribute('data-current-page', currentPage);
-
-            // Update controls
             pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
             prevBtn.disabled = (currentPage === 1);
             nextBtn.disabled = (currentPage === pageCount);
@@ -1266,7 +1273,6 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime, inclu
         }
     };
 
-    // Event listeners for navigation (stopPropagation prevents opening editor)
     prevBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (currentPage > 1) {
@@ -1339,66 +1345,46 @@ async function processDiagramQueue() {
 
             let imageDataUrl, fileMtime, displayLabel;
 
-            // Render based on type
+            // Render based on type (all types use cachedRenderMedia for consistent cache behavior)
             if (item.diagramType === 'pdf') {
-                // Render PDF page
-                const result = await renderPDFPage(item.filePath, item.pageNumber, item.includeDir);
-                imageDataUrl = result.pngDataUrl;
-                fileMtime = result.fileMtime;
+                ({ imageDataUrl, fileMtime } = await cachedRenderMedia(
+                    item.filePath, 'pdf', item.includeDir, `page${item.pageNumber}`,
+                    async () => {
+                        const r = await renderPDFPage(item.filePath, item.pageNumber, item.includeDir);
+                        return { dataUrl: r.pngDataUrl, mtime: r.fileMtime };
+                    }
+                ));
                 displayLabel = `PDF page ${item.pageNumber}`;
             } else if (item.diagramType === 'xlsx') {
-                // Render Excel spreadsheet sheet
-                const result = await renderXlsxSheet(item.filePath, item.sheetNumber || 1, item.includeDir);
-                imageDataUrl = result.pngDataUrl;
-                fileMtime = result.fileMtime;
-                displayLabel = `Excel sheet ${item.sheetNumber || 1}`;
+                const sheetNum = item.sheetNumber || 1;
+                ({ imageDataUrl, fileMtime } = await cachedRenderMedia(
+                    item.filePath, 'xlsx', item.includeDir, `sheet${sheetNum}`,
+                    async () => {
+                        const r = await renderXlsxSheet(item.filePath, sheetNum, item.includeDir);
+                        return { dataUrl: r.pngDataUrl, mtime: r.fileMtime };
+                    }
+                ));
+                displayLabel = `Excel sheet ${sheetNum}`;
             } else {
-                // Render diagram (draw.io or excalidraw) with cache reuse when unchanged
-                const cachedDiagram = getRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir);
-                if (cachedDiagram) {
-                    imageDataUrl = cachedDiagram.imageDataUrl;
-                    fileMtime = cachedDiagram.mtime;
-                } else {
-                    const result = await renderDiagram(item.filePath, item.diagramType, item.includeDir);
-                    imageDataUrl = result.svgDataUrl;
-                    fileMtime = result.fileMtime;
-                    setRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir, fileMtime, imageDataUrl);
-                }
+                ({ imageDataUrl, fileMtime } = await cachedRenderMedia(
+                    item.filePath, item.diagramType, item.includeDir, '',
+                    async () => {
+                        const r = await renderDiagram(item.filePath, item.diagramType, item.includeDir);
+                        return { dataUrl: r.svgDataUrl, mtime: r.fileMtime };
+                    }
+                ));
                 displayLabel = `${item.diagramType} diagram`;
             }
 
-            // Cache with mtime for invalidation on file changes
-            let cacheKey;
-            if (item.diagramType === 'pdf') {
-                cacheKey = `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`;
-            } else if (item.diagramType === 'xlsx') {
-                cacheKey = `xlsx:${item.filePath}:${item.sheetNumber || 1}:${fileMtime}`;
-            } else {
-                cacheKey = `${item.diagramType}:${item.filePath}:${item.includeDir || ''}:${fileMtime}`;
-            }
-
-            // Invalidate old cache entries for this file first
-            invalidateDiagramCache(item.filePath, item.diagramType);
-            // Add current version (with size limit)
-            setCacheWithLimit(diagramRenderCache, cacheKey, imageDataUrl);
-            if (item.diagramType !== 'pdf' && item.diagramType !== 'pdf-slideshow' && item.diagramType !== 'epub-slideshow' && item.diagramType !== 'xlsx') {
-                setRenderedDiagramCache(item.filePath, item.diagramType, item.includeDir, fileMtime, imageDataUrl);
-            }
-
-            // Replace placeholder with rendered image wrapped in overlay container with menu
-            // Include data-original-src for alt-click to open in editor
-            // Height recalculation is handled automatically by the column ResizeObserver
-            // Decode URL-encoded paths (e.g., %20 -> space) before escaping for JS string
+            // Replace placeholder with rendered image in overlay container
             let decodedPath = item.filePath;
             try {
                 decodedPath = decodeURIComponent(item.filePath);
             } catch (e) {
-                // If decoding fails, use original path
+                // decodeURIComponent can throw on malformed sequences
             }
-            const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
             if (element.dataset && element.dataset.wysiwygHost === 'true') {
                 element.classList.remove('diagram-placeholder');
-                // Add image-path-overlay-container class and data-file-path for unified handling
                 element.classList.add('image-path-overlay-container');
                 element.dataset.filePath = decodedPath;
 
@@ -1425,8 +1411,6 @@ async function processDiagramQueue() {
                 element.appendChild(img);
                 element.appendChild(menuBtn);
             } else {
-                // Use data-file-path for unified path handling across all media types
-                // Use data-action for event delegation instead of inline onclick
                 element.innerHTML = `<span class="image-path-overlay-container" data-file-path="${decodedPath.replace(/"/g, '&quot;')}">
                     <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath.replace(/"/g, '&quot;')}" />
                     <button class="image-menu-btn" data-action="image-menu" title="Path options">☰</button>
@@ -1617,18 +1601,11 @@ window.addEventListener('message', event => {
     }
 });
 
-// Clear diagram cache when webview gains focus
-// The actual re-rendering of changed files will be triggered by backend after mtime check
-window.addEventListener('focus', () => {
-    clearDiagramCache();
-});
-
-// Also listen for visibility change (when tab becomes visible)
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        clearDiagramCache();
-    }
-});
+// NOTE: Blanket cache clearing on focus/visibility was removed.
+// The backend already sends targeted 'mediaFilesChanged' messages (via FileSyncHandler + MediaTracker)
+// when files actually change on disk, which triggers invalidateDiagramCache() for specific files.
+// Clearing all caches on every focus/visibility change caused unnecessary re-rendering of all
+// embedded media (draw.io, excalidraw, PDF, XLSX, EPUB) even when files hadn't changed.
 
 /**
  * Process all pending PlantUML diagrams in the queue

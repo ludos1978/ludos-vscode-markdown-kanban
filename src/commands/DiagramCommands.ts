@@ -311,8 +311,8 @@ export class DiagramCommands extends SwitchBasedCommand {
                 return;
             }
 
-            const cacheDir = this.getDrawIOCacheDir(absolutePath, context);
-            const cacheFileName = this.getDrawIOCacheFileName(absolutePath, fileMtime);
+            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'drawio-cache');
+            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'png');
             const cachePath = path.join(cacheDir, cacheFileName);
 
             let pngDataUrl: string;
@@ -339,7 +339,7 @@ export class DiagramCommands extends SwitchBasedCommand {
 
                 await fs.promises.mkdir(cacheDir, { recursive: true });
                 await fs.promises.writeFile(cachePath, pngBuffer);
-                await this.cleanOldDrawIOCache(cacheDir, absolutePath, cacheFileName);
+                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'png', 'DrawIO Backend');
 
                 pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
             }
@@ -363,52 +363,55 @@ export class DiagramCommands extends SwitchBasedCommand {
     }
 
     /**
-     * Get cache directory for draw.io rendered images
+     * Get cache directory for rendered diagram images/SVGs
      */
-    private getDrawIOCacheDir(diagramPath: string, context: CommandContext): string {
+    private getDiagramCacheDir(diagramPath: string, context: CommandContext, cacheFolderName: string): string {
         const diagramDir = path.dirname(diagramPath);
         const kanbanPath = context.fileManager.getFilePath() || context.fileManager.getDocument()?.uri.fsPath;
         if (!kanbanPath) {
-            return path.join(diagramDir, 'drawio-cache');
+            return path.join(diagramDir, cacheFolderName);
         }
         const kanbanDir = path.dirname(kanbanPath);
         const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
 
         if (diagramDir !== kanbanDir) {
             const diagramBaseName = path.basename(diagramDir);
-            return path.join(diagramDir, `${diagramBaseName}-Media`, 'drawio-cache');
+            return path.join(diagramDir, `${diagramBaseName}-Media`, cacheFolderName);
         }
 
-        return path.join(kanbanDir, `${kanbanBaseName}-Media`, 'drawio-cache');
+        return path.join(kanbanDir, `${kanbanBaseName}-Media`, cacheFolderName);
     }
 
     /**
-     * Generate cache file name based on source file path and mtime
+     * Build a stable prefix for cache file names: `basename-pathHash-`
      */
-    private getDrawIOCacheFileName(sourcePath: string, mtime: number): string {
+    private getDiagramCachePrefix(sourcePath: string): string {
         const basename = path.basename(sourcePath, path.extname(sourcePath));
         const pathHash = Buffer.from(sourcePath).toString('base64').replace(/[/+=]/g, '').substring(0, 8);
-        return `${basename}-${pathHash}-${Math.floor(mtime)}.png`;
+        return `${basename}-${pathHash}-`;
     }
 
     /**
-     * Clean up old cache files for a diagram
+     * Generate cache file name based on source file path, mtime, and output extension
      */
-    private async cleanOldDrawIOCache(cacheDir: string, sourcePath: string, currentCacheFile: string): Promise<void> {
-        try {
-            const basename = path.basename(sourcePath, path.extname(sourcePath));
-            const pathHash = Buffer.from(sourcePath).toString('base64').replace(/[/+=]/g, '').substring(0, 8);
-            const prefix = `${basename}-${pathHash}-`;
+    private getDiagramCacheFileName(sourcePath: string, mtime: number, extension: string): string {
+        return `${this.getDiagramCachePrefix(sourcePath)}${Math.floor(mtime)}.${extension}`;
+    }
 
+    /**
+     * Clean up old cache files for a diagram, keeping only the current version
+     */
+    private async cleanOldDiagramCache(cacheDir: string, sourcePath: string, currentCacheFile: string, extension: string, logPrefix: string): Promise<void> {
+        try {
+            const prefix = this.getDiagramCachePrefix(sourcePath);
             const files = await fs.promises.readdir(cacheDir);
             for (const file of files) {
-                if (file.startsWith(prefix) && file !== currentCacheFile && file.endsWith('.png')) {
-                    const oldPath = path.join(cacheDir, file);
-                    await fs.promises.unlink(oldPath);
+                if (file.startsWith(prefix) && file !== currentCacheFile && file.endsWith(`.${extension}`)) {
+                    await fs.promises.unlink(path.join(cacheDir, file));
                 }
             }
         } catch (error) {
-            console.warn('[DrawIO Backend] Cache cleanup warning:', error);
+            console.warn(`[${logPrefix}] Cache cleanup warning:`, error);
         }
     }
 
@@ -527,18 +530,36 @@ export class DiagramCommands extends SwitchBasedCommand {
                 return;
             }
 
-            const plugin = this._getRegistry().findDiagramPluginById('excalidraw');
-            if (!plugin || !plugin.renderFile) {
-                throw new Error('Excalidraw plugin not available');
-            }
+            // Check filesystem cache before rendering
+            const cacheDir = this.getDiagramCacheDir(absolutePath, context, 'excalidraw-cache');
+            const cacheFileName = this.getDiagramCacheFileName(absolutePath, fileMtime, 'svg');
+            const cachePath = path.join(cacheDir, cacheFileName);
 
-            const result = await plugin.renderFile(absolutePath);
-            if (!result.success) {
-                throw new Error(result.error || 'Excalidraw rendering failed');
-            }
+            let dataUrl: string;
 
-            const svg = result.data as string;
-            const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+            if (fs.existsSync(cachePath)) {
+                const cachedSvg = await fs.promises.readFile(cachePath, 'utf8');
+                dataUrl = `data:image/svg+xml;base64,${Buffer.from(cachedSvg).toString('base64')}`;
+            } else {
+                const plugin = this._getRegistry().findDiagramPluginById('excalidraw');
+                if (!plugin || !plugin.renderFile) {
+                    throw new Error('Excalidraw plugin not available');
+                }
+
+                const result = await plugin.renderFile(absolutePath);
+                if (!result.success) {
+                    throw new Error(result.error || 'Excalidraw rendering failed');
+                }
+
+                const svg = result.data as string;
+
+                // Write to filesystem cache
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+                await fs.promises.writeFile(cachePath, svg, 'utf8');
+                await this.cleanOldDiagramCache(cacheDir, absolutePath, cacheFileName, 'svg', 'Excalidraw Backend');
+
+                dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+            }
 
             this.postMessage({
                 type: 'excalidrawRenderSuccess',
