@@ -23,7 +23,7 @@ import { BoardStore, UndoCapture } from '../core/stores';
 import { WebviewBridge } from '../core/bridge/WebviewBridge';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 import { LinkOperations, MARKDOWN_PATH_PATTERN, extractPathFromMatch } from '../utils/linkOperations';
-import { encodeFilePath, safeDecodeURIComponent, normalizeDirForComparison } from '../utils/stringUtils';
+import { encodeFilePath, safeDecodeURIComponent, normalizeDirForComparison, escapeRegExp } from '../utils/stringUtils';
 import { showInfo, showWarning } from './NotificationService';
 import { logger } from '../utils/logger';
 import { PathFormat } from './FileSearchWebview';
@@ -181,6 +181,14 @@ export class LinkReplacementService {
         }
 
         const modifiedFiles = this._executeReplacements(replacements, filesToModify, options.pathFormat);
+
+        if (modifiedFiles.length === 0 && replacements.size > 0) {
+            logger.warn('[LinkReplacementService.replacePath] Replacements found but no files were modified', {
+                replacementCount: replacements.size,
+                filesToModifyCount: filesToModify.length,
+                replacementKeys: Array.from(replacements.keys())
+            });
+        }
 
         // Apply board updates
         await this._applyBoardUpdates(deps, board, modifiedFiles, mainFile, replacements, options);
@@ -394,6 +402,18 @@ export class LinkReplacementService {
             }
         }
 
+        // Log diagnostic info when no variant was found
+        if (replacements.size === 0) {
+            logger.warn('[LinkReplacementService._findSinglePath] No variant found in any file', {
+                variants,
+                fileCount: files.length,
+                filePaths: files.map(f => f.getPath()),
+                boardAvailable: !!board,
+                taskId: options.taskId,
+                columnId: options.columnId
+            });
+        }
+
         return replacements;
     }
 
@@ -507,6 +527,40 @@ export class LinkReplacementService {
 
                 if (newContent === content && replacement.decodedOldPath !== oldPath) {
                     newContent = LinkOperations.replaceSingleLink(content, replacement.decodedOldPath, encodedNewPath, 0);
+                }
+
+                // Fallback: if replaceSingleLink didn't match any link pattern,
+                // try a broader regex that matches the path in any image/link context.
+                // This handles edge cases where the primary regex fails due to
+                // unexpected formatting, encoding differences, or special characters.
+                if (newContent === content && content.includes(oldPath)) {
+                    logger.warn('[LinkReplacementService._executeReplacements] replaceSingleLink failed, trying fallback regex', {
+                        oldPath,
+                        encodedNewPath,
+                        file: file.getPath()
+                    });
+                    const escapedOld = escapeRegExp(oldPath);
+                    // Try replacing in image syntax: ![...](oldPath...)
+                    const imgFallback = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedOld}((?:\\s+"[^"]*")?\\s*\\))`, 'g');
+                    newContent = content.replace(imgFallback, `$1${encodedNewPath}$2`);
+                    // Also try replacing in link syntax: [...](oldPath...)
+                    if (newContent === content) {
+                        const linkFallback = new RegExp(`(\\[[^\\]]*\\]\\()${escapedOld}((?:\\s+"[^"]*")?\\s*\\))`, 'g');
+                        newContent = content.replace(linkFallback, `$1${encodedNewPath}$2`);
+                    }
+                    // Also try wiki links: [[oldPath...]]
+                    if (newContent === content) {
+                        const wikiFallback = new RegExp(`(\\[\\[)${escapedOld}((?:\\|[^\\]]*)?\\]\\])`, 'g');
+                        newContent = content.replace(wikiFallback, `$1${encodedNewPath}$2`);
+                    }
+                    // Also try include syntax: !!!include(oldPath)!!!
+                    if (newContent === content) {
+                        const includeFallback = new RegExp(`(!!!include\\()${escapedOld}(\\)!!!)`, 'g');
+                        newContent = content.replace(includeFallback, `$1${encodedNewPath}$2`);
+                    }
+                    if (newContent !== content) {
+                        logger.warn('[LinkReplacementService._executeReplacements] Fallback regex succeeded');
+                    }
                 }
 
                 if (newContent !== content) {
@@ -753,6 +807,16 @@ export class LinkReplacementService {
             let newResult = LinkOperations.replaceSingleLink(result, replacement.oldPath, encodedNewPath, 0);
             if (newResult === result && replacement.decodedOldPath !== replacement.oldPath) {
                 newResult = LinkOperations.replaceSingleLink(result, replacement.decodedOldPath, encodedNewPath, 0);
+            }
+            // Fallback: broader regex replacement for board model text
+            if (newResult === result && result.includes(replacement.oldPath)) {
+                const escapedOld = escapeRegExp(replacement.oldPath);
+                const imgFallback = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedOld}((?:\\s+"[^"]*")?\\s*\\))`, 'g');
+                newResult = result.replace(imgFallback, `$1${encodedNewPath}$2`);
+                if (newResult === result) {
+                    const linkFallback = new RegExp(`(\\[[^\\]]*\\]\\()${escapedOld}((?:\\s+"[^"]*")?\\s*\\))`, 'g');
+                    newResult = result.replace(linkFallback, `$1${encodedNewPath}$2`);
+                }
             }
             result = newResult;
         }
