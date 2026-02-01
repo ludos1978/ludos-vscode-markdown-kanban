@@ -982,6 +982,7 @@ export interface RequestConfigurationRefreshMessage extends BaseMessage {
  */
 export interface OpenSearchPanelMessage extends BaseMessage {
     type: 'openSearchPanel';
+    query?: string;
 }
 
 // ============= CLIPBOARD MESSAGES =============

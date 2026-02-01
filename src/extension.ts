@@ -71,6 +71,13 @@ export function activate(context: vscode.ExtensionContext) {
 		)
 	);
 
+	// Internal command for routing [[#tag]] clicks to the search sidebar
+	context.subscriptions.push(
+		vscode.commands.registerCommand('markdown-kanban.internal.searchWithQuery', (query: string) => {
+			searchProvider.setSearchQuery(query);
+		})
+	);
+
 	// Initialize kanban dashboard sidebar
 	const dashboardProvider = new KanbanDashboardProvider(context.extensionUri, context);
 	context.subscriptions.push(

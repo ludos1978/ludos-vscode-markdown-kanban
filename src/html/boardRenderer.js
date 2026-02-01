@@ -2418,14 +2418,9 @@ function handleMediaOpen(event, target, taskId = null, columnId = null) {
         event.stopPropagation();
         const documentName = wikiLink.getAttribute('data-document');
         if (documentName) {
-            // [[#tag]] → trigger in-board search instead of opening a file
+            // [[#tag]] → open sidebar search with the tag pre-filled
             if (documentName.startsWith('#')) {
-                const searchInput = document.getElementById('search-input');
-                if (searchInput && window.kanbanSearch) {
-                    window.kanbanSearch.openSearch();
-                    searchInput.value = documentName;
-                    window.kanbanSearch.performSearch();
-                }
+                vscode.postMessage({ type: 'openSearchPanel', query: documentName });
                 return true;
             }
             // Calculate index for wiki links
@@ -2502,12 +2497,7 @@ function handleColumnTitleClick(event, columnId) {
     if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
         event.preventDefault();
         event.stopPropagation();
-        const searchInput = document.getElementById('search-input');
-        if (searchInput && window.kanbanSearch) {
-            window.kanbanSearch.openSearch();
-            searchInput.value = internalTag;
-            window.kanbanSearch.performSearch();
-        }
+        vscode.postMessage({ type: 'openSearchPanel', query: internalTag });
         return;
     }
 
@@ -2564,12 +2554,7 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
     if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
         event.preventDefault();
         event.stopPropagation();
-        const searchInput = document.getElementById('search-input');
-        if (searchInput && window.kanbanSearch) {
-            window.kanbanSearch.openSearch();
-            searchInput.value = internalTag;
-            window.kanbanSearch.performSearch();
-        }
+        vscode.postMessage({ type: 'openSearchPanel', query: internalTag });
         return;
     }
 
@@ -2645,27 +2630,10 @@ function handleDescriptionClick(event, element, taskId, columnId) {
     const internalTag = internalWikiLink
         ? internalWikiLink.getAttribute('data-document')
         : internalAnchor && (internalAnchor.getAttribute('data-original-href') || internalAnchor.getAttribute('href'));
-    console.log('[CLICK-DEBUG] internal tag check', {
-        target: event.target?.tagName,
-        targetClass: event.target?.className,
-        internalWikiLink: !!internalWikiLink,
-        internalAnchor: !!internalAnchor,
-        internalTag,
-        hasSearchInput: !!document.getElementById('search-input'),
-        hasKanbanSearch: !!window.kanbanSearch
-    });
     if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
         event.preventDefault();
         event.stopPropagation();
-        const searchInput = document.getElementById('search-input');
-        if (searchInput && window.kanbanSearch) {
-            console.log('[CLICK-DEBUG] opening search for tag:', internalTag);
-            window.kanbanSearch.openSearch();
-            searchInput.value = internalTag;
-            window.kanbanSearch.performSearch();
-        } else {
-            console.warn('[CLICK-DEBUG] search not available:', { searchInput: !!searchInput, kanbanSearch: !!window.kanbanSearch });
-        }
+        vscode.postMessage({ type: 'openSearchPanel', query: internalTag });
         return;
     }
 

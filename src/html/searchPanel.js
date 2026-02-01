@@ -199,6 +199,16 @@
             case 'noActivePanel':
                 showNoActivePanel();
                 break;
+
+            case 'setSearchQuery':
+                if (message.query) {
+                    if (currentMode !== 'text') {
+                        setMode('text', { clearResults: false });
+                    }
+                    searchInput.value = message.query;
+                    performTextSearch();
+                }
+                break;
         }
     }
 

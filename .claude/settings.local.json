@@ -170,7 +170,8 @@
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian commit -m \"$\\(cat <<''EOF''\nfix: prevent embedded media re-rendering on board focus\n\nRemove blanket cache clearing on focus/visibility events that forced all\nembedded media \\(draw.io, excalidraw, PDF, XLSX, EPUB\\) to re-render even\nwhen files hadn''t changed. The backend already sends targeted\nmediaFilesChanged messages for actual file modifications.\n\n- Add frontend cache for PDF pages and XLSX sheets via renderedMediaTracker\n- Add backend filesystem cache for excalidraw \\(excalidraw-cache/ directory\\)\n- Add per-slideshow page cache for PDF and EPUB slideshows\n- Unify draw.io/excalidraw cache helpers into shared parameterized methods\n- Remove redundant diagramRenderCache \\(never read for cache hits\\)\n- Extract cachedRenderMedia\\(\\) helper for consistent cache-or-render pattern\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian push)",
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian commit:*)",
-      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian add package.json package-lock.json)"
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian add package.json package-lock.json)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

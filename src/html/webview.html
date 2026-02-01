@@ -579,45 +579,6 @@
         </div>
     </div>
 
-    <!-- Search Panel -->
-    <div id="search-panel" class="search-panel hidden">
-        <div class="search-panel-content">
-            <input type="text" 
-                   id="search-input" 
-                   class="search-input" 
-                   placeholder="Search..."
-                   oninput="kanbanSearch.handleSearchInput(event)">
-            
-            <div class="search-controls">
-                <button id="search-case-btn" 
-                        class="search-toggle-btn" 
-                        onclick="kanbanSearch.toggleCaseSensitive()"
-                        title="Match case">Aa</button>
-                <button id="search-word-btn" 
-                        class="search-toggle-btn" 
-                        onclick="kanbanSearch.toggleWholeWords()"
-                        title="Match whole word">W</button>
-                <button id="search-regex-btn" 
-                        class="search-toggle-btn" 
-                        onclick="kanbanSearch.toggleRegex()"
-                        title="Use regular expression">.*</button>
-                
-                <span id="search-counter" class="search-counter">No results</span>
-                
-                <button class="search-nav-btn" 
-                        onclick="kanbanSearch.previousResult()"
-                        title="Previous result (Shift+Enter)">↑</button>
-                <button class="search-nav-btn" 
-                        onclick="kanbanSearch.nextResult()"
-                        title="Next result (Enter)">↓</button>
-                
-                <button class="search-close-btn" 
-                        onclick="kanbanSearch.closeSearch()"
-                        title="Close search (Esc)">×</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Drop zone feedback -->
     <!-- <div id="drop-zone-feedback" class="drop-zone-feedback">
         Drop files here to create links
@@ -1164,7 +1125,7 @@
     <script src="boardRenderer.js"></script>
     <script src="dragDrop.js"></script>
     <script src="menuOperations.js"></script>
-    <script src="search.js"></script>
+
     <script src="debugOverlay.js"></script>
     <script src="clipboardHandler.js"></script>
     <script src="navigationHandler.js"></script>

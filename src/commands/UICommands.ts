@@ -336,10 +336,13 @@ export class UICommands extends SwitchBasedCommand {
         return this.success();
     }
 
-    private async handleOpenSearchPanel(_message: OpenSearchPanelMessage, _context: CommandContext): Promise<CommandResult> {
+    private async handleOpenSearchPanel(message: OpenSearchPanelMessage, _context: CommandContext): Promise<CommandResult> {
         try {
             await vscode.commands.executeCommand('workbench.view.extension.kanbanBoards');
             await vscode.commands.executeCommand('kanbanSearch.focus');
+            if (message.query) {
+                await vscode.commands.executeCommand('markdown-kanban.internal.searchWithQuery', message.query);
+            }
         } catch (error) {
             console.error('[UICommands] Failed to open kanban search panel:', error);
         }

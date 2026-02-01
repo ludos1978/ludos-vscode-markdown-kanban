@@ -29,7 +29,6 @@ import './taskEditor.js';
 import './boardRenderer.js';
 import './dragDrop.js';
 import './menuOperations.js';
-import './search.js';
 import './debugOverlay.js';
 import './clipboardHandler.js';
 import './navigationHandler.js';

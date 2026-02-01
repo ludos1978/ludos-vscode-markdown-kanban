@@ -4957,9 +4957,6 @@ document.addEventListener('keydown', (e) => {
     );
     
     
-    // Don't trigger search shortcuts when editing (except when in search input)
-    const isInSearchInput = activeElement && activeElement.id === 'search-input';
-
     // Check if focused on a task section
     const isFocusedOnSection = activeElement && activeElement.classList.contains('task-section');
     const isFocusedOnTask = window.getCurrentFocusedCard() !== null;
@@ -5011,53 +5008,8 @@ document.addEventListener('keydown', (e) => {
         return;
     }
     
-    // Handle search-specific shortcuts when search panel is open
-    if (kanbanSearch && kanbanSearch.isSearching) {
-        // Escape to close search
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            kanbanSearch.closeSearch();
-            return;
-        }
-        
-        // Enter for next result (when in search input)
-        if (e.key === 'Enter' && isInSearchInput && !e.shiftKey) {
-            e.preventDefault();
-            kanbanSearch.nextResult();
-            return;
-        }
-        
-        // Shift+Enter for previous result (when in search input)
-        if (e.key === 'Enter' && isInSearchInput && e.shiftKey) {
-            e.preventDefault();
-            kanbanSearch.previousResult();
-            return;
-        }
-        
-        // F3 for next result
-        if (e.key === 'F3' && !e.shiftKey) {
-            e.preventDefault();
-            kanbanSearch.nextResult();
-            return;
-        }
-        
-        // Shift+F3 for previous result
-        if (e.key === 'F3' && e.shiftKey) {
-            e.preventDefault();
-            kanbanSearch.previousResult();
-            return;
-        }
-
-        // Alt+G for next result
-        if (e.altKey && e.key.toLowerCase() === 'g') {
-            e.preventDefault();
-            kanbanSearch.nextResult();
-            return;
-        }
-    }
-    
     // Kanban-specific shortcuts (only when NOT editing)
-    if (!isEditing && !isInSearchInput) {
+    if (!isEditing) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             undo();

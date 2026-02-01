@@ -31,6 +31,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _extensionUri: vscode.Uri;
     private _lastResultsPanel: KanbanWebviewPanel | null = null;
+    private _pendingQuery: string | null = null;
 
     constructor(extensionUri: vscode.Uri) {
         this._extensionUri = extensionUri;
@@ -68,6 +69,10 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
                 case 'ready':
                     // Webview is ready, check if there's an active panel
                     this._updatePanelStatus();
+                    if (this._pendingQuery) {
+                        this._view?.webview.postMessage({ type: 'setSearchQuery', query: this._pendingQuery });
+                        this._pendingQuery = null;
+                    }
                     break;
             }
         });
@@ -368,6 +373,19 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
+    }
+
+    /**
+     * Set a search query from an external command (e.g. [[#tag]] navigation).
+     * If the webview is already visible, sends the query immediately.
+     * Otherwise stores it as pending so it's sent on the next 'ready' message.
+     */
+    public setSearchQuery(query: string): void {
+        this._pendingQuery = query;
+        if (this._view?.webview) {
+            this._view.webview.postMessage({ type: 'setSearchQuery', query });
+            this._pendingQuery = null;
+        }
     }
 
     /**
