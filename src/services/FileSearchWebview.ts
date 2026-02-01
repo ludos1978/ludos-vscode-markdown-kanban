@@ -378,7 +378,7 @@ export class FileSearchWebview {
             try {
                 const visited = new Set<string>();
                 let foundCount = 0;
-                const maxResults = MAX_SEARCH_RESULTS;
+                const maxResults = this._useRegex ? MAX_REGEX_RESULTS : MAX_SEARCH_RESULTS;
 
                 const scan = async (dirFsPath: string): Promise<void> => {
                     if (seq !== this._searchSeq) { return; }

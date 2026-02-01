@@ -60,9 +60,14 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
                 case 'searchBrokenElements':
                     await this._handleBrokenElementsSearch();
                     break;
-                case 'searchText':
-                    await this._handleTextSearch((message as SearchTextMessage).query);
+                case 'searchText': {
+                    const searchMsg = message as SearchTextMessage;
+                    await this._handleTextSearch(searchMsg.query, {
+                        useRegex: searchMsg.useRegex,
+                        caseSensitive: searchMsg.caseSensitive
+                    });
                     break;
+                }
                 case 'navigateToElement':
                     this._handleNavigateToElement(message as NavigateToElementMessage);
                     break;
@@ -143,7 +148,7 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
     /**
      * Handle text search request
      */
-    private async _handleTextSearch(query: string): Promise<void> {
+    private async _handleTextSearch(query: string, options?: { useRegex?: boolean; caseSensitive?: boolean }): Promise<void> {
         if (!query || query.trim().length === 0) {
             this._sendSearchResults([], 'text');
             return;
@@ -184,7 +189,8 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
             const matches = scanner.searchText(
                 board,
                 query.trim(),
-                includeContentByPath.size > 0 ? includeContentByPath : undefined
+                includeContentByPath.size > 0 ? includeContentByPath : undefined,
+                options
             );
 
             const results: SearchResultItem[] = matches.map(match => ({
@@ -330,6 +336,9 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         <!-- Search Input (for text mode) -->
         <div class="search-input-container">
             <input type="text" class="search-input" placeholder="Search board content..." />
+            <button class="regex-toggle-btn" title="Use Regular Expression">
+                <span class="regex-icon">.*</span>
+            </button>
             <button class="search-btn" title="Search">
                 <span class="codicon codicon-search"></span>
             </button>

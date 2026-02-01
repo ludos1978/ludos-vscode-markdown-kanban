@@ -17,6 +17,7 @@
     const findBrokenContainer = document.querySelector('.find-broken-container');
     const searchInput = document.querySelector('.search-input');
     const searchBtn = document.querySelector('.search-btn');
+    const regexToggleBtn = document.querySelector('.regex-toggle-btn');
     const findBrokenBtn = document.querySelector('.find-broken-btn');
     const statusMessage = document.querySelector('.status-message');
     const resultsEmpty = document.querySelector('.results-empty');
@@ -29,6 +30,7 @@
     let currentResults = [];
     let resultElements = [];
     let currentResultIndex = -1;
+    let useRegex = false;
 
     // Icon mappings for element types
     const typeIcons = {
@@ -70,6 +72,18 @@
             vscode.postMessage({ type: 'searchBrokenElements' });
             showLoading('Scanning for broken elements...');
         });
+
+        // Regex toggle button
+        if (regexToggleBtn) {
+            regexToggleBtn.addEventListener('click', () => {
+                useRegex = !useRegex;
+                regexToggleBtn.classList.toggle('active', useRegex);
+                // Re-run search with new mode if there's a query
+                if (searchInput.value.trim().length >= 2) {
+                    performTextSearch();
+                }
+            });
+        }
 
         // Search button
         searchBtn.addEventListener('click', performTextSearch);
@@ -165,10 +179,14 @@
             return;
         }
 
-        vscode.postMessage({
+        const msg = {
             type: 'searchText',
             query: query
-        });
+        };
+        if (useRegex) {
+            msg.useRegex = true;
+        }
+        vscode.postMessage(msg);
         showLoading('Searching...');
     }
 

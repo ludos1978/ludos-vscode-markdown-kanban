@@ -40,7 +40,7 @@ export const MAX_SEARCH_RESULTS = 200;
 export const MAX_RESULTS_PER_PATTERN = 200;
 
 /** Maximum regex search results */
-export const MAX_REGEX_RESULTS = 1000;
+export const MAX_REGEX_RESULTS = 5000;
 
 // =============================================================================
 // FILE SYSTEM TIMEOUTS

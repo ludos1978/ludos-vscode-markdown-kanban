@@ -13,6 +13,8 @@ import {
     TagInfo,
     TagSearchResult
 } from './DashboardTypes';
+import { TextMatcher } from '../utils/textMatcher';
+import { logger } from '../utils/logger';
 
 // Date locale configuration - matches frontend tagUtils.js
 let dateLocale: string = 'de-DE';
@@ -116,34 +118,10 @@ function getDateOfISOWeek(week: number, year: number): Date {
 }
 
 /**
- * Extract all tags from text
+ * Extract all tags from text - delegates to TextMatcher.extractTags for canonical behaviour
  */
 function extractTags(text: string): { name: string; type: 'hash' | 'person' | 'temporal' }[] {
-    const tags: { name: string; type: 'hash' | 'person' | 'temporal' }[] = [];
-
-    // Hash tags: #tag
-    const hashMatches = text.matchAll(/#([^\s#@!]+)/g);
-    for (const match of hashMatches) {
-        const tag = match[1].toLowerCase();
-        // Skip layout tags
-        if (!tag.match(/^(row\d+|span\d+|stack|sticky|fold|archive|hidden|include:)/)) {
-            tags.push({ name: '#' + tag, type: 'hash' });
-        }
-    }
-
-    // Person tags: @person
-    const personMatches = text.matchAll(/@([^\s#@!]+)/g);
-    for (const match of personMatches) {
-        tags.push({ name: '@' + match[1].toLowerCase(), type: 'person' });
-    }
-
-    // Temporal tags: !date, !week, !time
-    const temporalMatches = text.matchAll(/!([^\s]+)/g);
-    for (const match of temporalMatches) {
-        tags.push({ name: '!' + match[1], type: 'temporal' });
-    }
-
-    return tags;
+    return TextMatcher.extractTags(text);
 }
 
 /**
@@ -199,7 +177,7 @@ export class DashboardScanner {
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        console.log('[DashboardScanner] START scan - today:', today.toISOString(), 'timeframeDays:', timeframeDays);
+        logger.debug('[DashboardScanner] START scan', { today: today.toISOString(), timeframeDays });
 
         // Scan all columns and tasks with hierarchical temporal gating
         let columnIndex = 0;
@@ -207,8 +185,6 @@ export class DashboardScanner {
             // Check column's temporal tag first (hierarchical gating)
             const columnTitle = column.title || '';
             const columnTemporal = this._extractTemporalInfo(columnTitle);
-
-            console.log('[DashboardScanner] Column[' + columnIndex + ']:', columnTitle, 'temporal:', columnTemporal);
 
             // If column has a date/week tag outside timeframe, skip all tasks in this column
             let columnWithinTimeframe = true;
@@ -220,7 +196,6 @@ export class DashboardScanner {
                     const isWeekBased = columnTemporal.week !== undefined;
                     columnWithinTimeframe = isWithinTimeframe(columnTemporal.date, timeframeDays, isWeekBased);
                     columnDate = columnTemporal.date;
-                    console.log('[DashboardScanner]   -> columnDate:', columnDate.toISOString(), 'isWeek:', isWeekBased, 'withinTimeframe:', columnWithinTimeframe);
                 }
             }
 
@@ -245,7 +220,6 @@ export class DashboardScanner {
 
                 if (taskTemporal) {
                     temporalTasks++;
-                    console.log('[DashboardScanner]   Task[' + taskIndex + ']:', task.title, 'temporal:', taskTemporal);
 
                     // Determine effective date for this task
                     let effectiveDate = taskTemporal.date;
@@ -257,28 +231,23 @@ export class DashboardScanner {
                             // Column has temporal tag - time slot inherits from column
                             if (!columnWithinTimeframe) {
                                 // Column is outside timeframe - gates this time slot
-                                console.log('[DashboardScanner]     -> SKIPPED (column gates time slot)');
                                 taskIndex++;
                                 continue;
                             }
                             effectiveDate = columnDate;
                             effectiveDateIsWeekBased = columnTemporal.week !== undefined;
-                            console.log('[DashboardScanner]     -> time slot inherits column date:', effectiveDate.toISOString(), 'isWeek:', effectiveDateIsWeekBased);
                         }
                         // If no column temporal tag, time slot uses "today" (already set)
                     } else if (taskTemporal.hasExplicitDate && columnTemporal && columnTemporal.date && !columnWithinTimeframe) {
                         // Task has explicit date/week tag, but column has temporal tag outside timeframe
                         // Column gates the task (hierarchical gating)
-                        console.log('[DashboardScanner]     -> SKIPPED (column gates task with explicit date)');
                         taskIndex++;
                         continue;
                     }
 
                     const withinTimeframe = effectiveDate ? isWithinTimeframe(effectiveDate, timeframeDays, effectiveDateIsWeekBased) : false;
-                    console.log('[DashboardScanner]     -> effectiveDate:', effectiveDate?.toISOString(), 'isWeek:', effectiveDateIsWeekBased, 'withinTimeframe:', withinTimeframe);
 
                     if (effectiveDate && withinTimeframe) {
-                        console.log('[DashboardScanner]     -> ADDED to upcoming (col:' + columnIndex + ', task:' + taskIndex + ')');
                         upcomingItems.push({
                             boardUri,
                             boardName,
@@ -293,8 +262,6 @@ export class DashboardScanner {
                             timeSlot: taskTemporal.timeSlot,
                             rawTitle: task.title || ''
                         });
-                    } else {
-                        console.log('[DashboardScanner]     -> NOT added (outside timeframe or no date)');
                     }
                 }
                 taskIndex++;
@@ -302,7 +269,7 @@ export class DashboardScanner {
             columnIndex++;
         }
 
-        console.log('[DashboardScanner] END scan - found', upcomingItems.length, 'upcoming items');
+        logger.debug('[DashboardScanner] END scan', { upcomingItems: upcomingItems.length });
 
         // Convert tag counts to sorted array
         const tags: TagInfo[] = Array.from(tagCounts.entries())
@@ -450,26 +417,15 @@ export class DashboardScanner {
         searchTag: string
     ): TagSearchResult[] {
         const results: TagSearchResult[] = [];
-        const normalizedSearch = searchTag.toLowerCase();
-        console.log('[DashboardScanner.searchByTag] START - Searching for:', searchTag, 'normalized:', normalizedSearch);
-        console.log('[DashboardScanner.searchByTag] Board object:', board ? 'exists' : 'null/undefined');
-        console.log('[DashboardScanner.searchByTag] Board valid:', board?.valid);
-        console.log('[DashboardScanner.searchByTag] Board title:', board?.title);
-        console.log('[DashboardScanner.searchByTag] Board columns:', board?.columns ? 'exists' : 'null/undefined');
-        console.log('[DashboardScanner.searchByTag] Board has', board?.columns?.length || 0, 'columns');
 
         let columnIndex = 0;
         for (const column of board.columns || []) {
             const columnTitle = column.title || '';
-            console.log('[DashboardScanner.searchByTag] Column[' + columnIndex + ']:', columnTitle, 'has', column.tasks?.length || 0, 'tasks');
 
-            // Check if column title contains the search tag
+            // Check if column title contains the search tag (exact match)
             const columnTags = extractTags(columnTitle);
-            const columnMatchingTag = columnTags.find(t => t.name.toLowerCase().includes(normalizedSearch));
+            const columnMatchingTag = columnTags.find(t => TextMatcher.tagExactMatch(t.name, searchTag));
             const columnHasTag = !!columnMatchingTag;
-            if (columnHasTag) {
-                console.log('[DashboardScanner.searchByTag] Column has matching tag in title:', columnMatchingTag?.name);
-            }
 
             // Track if any task in this column matched directly
             let anyTaskMatchedDirectly = false;
@@ -478,15 +434,10 @@ export class DashboardScanner {
             for (const task of column.tasks || []) {
                 const taskText = (task.title || '') + ' ' + (task.description || '');
                 const tags = extractTags(taskText);
-                if (tags.length > 0) {
-                    console.log('[DashboardScanner.searchByTag] Task[' + taskIndex + ']:', task.title?.substring(0, 50), 'tags:', tags.map(t => t.name).join(', '));
-                }
 
-                // Check if any tag in task matches the search
+                // Check if any tag in task matches the search (exact match)
                 for (const tag of tags) {
-                    const matches = tag.name.toLowerCase().includes(normalizedSearch);
-                    if (matches) {
-                        console.log('[DashboardScanner.searchByTag] MATCH (task):', tag.name, 'in task:', task.title);
+                    if (TextMatcher.tagExactMatch(tag.name, searchTag)) {
                         results.push({
                             boardUri,
                             boardName,
@@ -506,7 +457,6 @@ export class DashboardScanner {
             // If column has the tag but no tasks matched directly, add a column-level result
             // Use taskIndex = -1 to indicate this is a column match, not a task match
             if (columnHasTag && !anyTaskMatchedDirectly) {
-                console.log('[DashboardScanner.searchByTag] MATCH (column-level):', columnMatchingTag?.name, 'for column:', columnTitle);
                 results.push({
                     boardUri,
                     boardName,
@@ -521,7 +471,6 @@ export class DashboardScanner {
             columnIndex++;
         }
 
-        console.log('[DashboardScanner.searchByTag] Found', results.length, 'results');
         return results;
     }
 }

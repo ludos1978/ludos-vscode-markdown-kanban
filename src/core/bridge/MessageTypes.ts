@@ -1904,6 +1904,8 @@ export interface SearchBrokenElementsMessage extends BaseMessage {
 export interface SearchTextMessage extends BaseMessage {
     type: 'searchText';
     query: string;
+    useRegex?: boolean;
+    caseSensitive?: boolean;
 }
 
 /**
