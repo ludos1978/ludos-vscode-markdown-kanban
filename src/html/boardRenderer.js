@@ -2493,6 +2493,24 @@ function handleColumnTitleClick(event, columnId) {
         return; // Let event bubble to document-level event delegation
     }
 
+    // [[#tag]] / [](#tag) links navigate in-board without Alt — handle before edit mode
+    const internalWikiLink = event.target?.closest?.('.wiki-link');
+    const internalAnchor = !internalWikiLink && event.target?.closest?.('a');
+    const internalTag = internalWikiLink
+        ? internalWikiLink.getAttribute('data-document')
+        : internalAnchor && (internalAnchor.getAttribute('data-original-href') || internalAnchor.getAttribute('href'));
+    if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && window.kanbanSearch) {
+            window.kanbanSearch.openSearch();
+            searchInput.value = internalTag;
+            window.kanbanSearch.performSearch();
+        }
+        return;
+    }
+
     if (event.altKey) {
         // Alt+click: open link/image (no taskId for column titles)
         if (handleMediaOpen(event, event.target, null, columnId)) {return;}
@@ -2535,6 +2553,24 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
     const menuButton = event.target?.closest?.('.image-menu-btn, .video-menu-btn, .link-menu-btn, .wiki-menu-btn, .include-menu-btn, .diagram-menu-btn, .embed-menu-btn');
     if (menuButton) {
         return; // Let event bubble to document-level event delegation
+    }
+
+    // [[#tag]] / [](#tag) links navigate in-board without Alt — handle before edit mode
+    const internalWikiLink = event.target?.closest?.('.wiki-link');
+    const internalAnchor = !internalWikiLink && event.target?.closest?.('a');
+    const internalTag = internalWikiLink
+        ? internalWikiLink.getAttribute('data-document')
+        : internalAnchor && (internalAnchor.getAttribute('data-original-href') || internalAnchor.getAttribute('href'));
+    if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && window.kanbanSearch) {
+            window.kanbanSearch.openSearch();
+            searchInput.value = internalTag;
+            window.kanbanSearch.performSearch();
+        }
+        return;
     }
 
     if (event.altKey) {
@@ -2601,6 +2637,36 @@ function handleDescriptionClick(event, element, taskId, columnId) {
             clickedElementRect: element?.getBoundingClientRect()?.top,
             taskId
         });
+    }
+
+    // [[#tag]] / [](#tag) links navigate in-board without Alt — handle before edit mode
+    const internalWikiLink = event.target?.closest?.('.wiki-link');
+    const internalAnchor = !internalWikiLink && event.target?.closest?.('a');
+    const internalTag = internalWikiLink
+        ? internalWikiLink.getAttribute('data-document')
+        : internalAnchor && (internalAnchor.getAttribute('data-original-href') || internalAnchor.getAttribute('href'));
+    console.log('[CLICK-DEBUG] internal tag check', {
+        target: event.target?.tagName,
+        targetClass: event.target?.className,
+        internalWikiLink: !!internalWikiLink,
+        internalAnchor: !!internalAnchor,
+        internalTag,
+        hasSearchInput: !!document.getElementById('search-input'),
+        hasKanbanSearch: !!window.kanbanSearch
+    });
+    if (internalTag && internalTag.startsWith('#') && internalTag.length > 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && window.kanbanSearch) {
+            console.log('[CLICK-DEBUG] opening search for tag:', internalTag);
+            window.kanbanSearch.openSearch();
+            searchInput.value = internalTag;
+            window.kanbanSearch.performSearch();
+        } else {
+            console.warn('[CLICK-DEBUG] search not available:', { searchInput: !!searchInput, kanbanSearch: !!window.kanbanSearch });
+        }
+        return;
     }
 
     if (event.altKey) {

@@ -20,6 +20,7 @@ class KanbanSearch {
     openSearch() {
         const searchPanel = document.getElementById('search-panel');
         if (searchPanel) {
+            searchPanel.classList.remove('hidden');
             searchPanel.style.display = 'flex';
             const searchInput = document.getElementById('search-input');
             searchInput?.focus();
@@ -31,6 +32,7 @@ class KanbanSearch {
     closeSearch() {
         const searchPanel = document.getElementById('search-panel');
         if (searchPanel) {
+            searchPanel.classList.add('hidden');
             searchPanel.style.display = 'none';
             this.clearHighlights();
             this.searchResults = [];

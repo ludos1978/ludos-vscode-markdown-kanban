@@ -389,7 +389,15 @@ export class WebviewManager {
             'markdown-it-container-browser.js',
             'markdown-it-include-browser.js',
             'markdown-it-image-figures-browser.js',
-            'markdown-it-image-attrs-browser.js'
+            'markdown-it-image-attrs-browser.js',
+            'markdown-it-wiki-links-browser.js',
+            'markdown-it-tag-browser.js',
+            'markdown-it-task-checkbox-browser.js',
+            'markdown-it-date-person-tag-browser.js',
+            'markdown-it-temporal-tag-browser.js',
+            'markdown-it-enhanced-strikethrough-browser.js',
+            'markdown-it-speaker-note-browser.js',
+            'markdown-it-html-comment-browser.js'
         ];
 
         jsFiles.forEach(jsFile => {
