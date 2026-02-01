@@ -286,6 +286,21 @@ export class BoardContentScanner {
     }
 
     /**
+     * Strip internal tag references from content so that wiki-link references
+     * like [[#tag]] and markdown link references like [text](#tag) don't
+     * produce false-positive search matches when searching for a tag.
+     */
+    private _stripInternalTagRefs(content: string, tag: string): string {
+        // Escape special regex characters in the tag
+        const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Remove [[#tag]] wiki-link references (case-insensitive)
+        let stripped = content.replace(new RegExp(`\\[\\[${escaped}\\]\\]`, 'gi'), '');
+        // Remove [text](#tag) markdown link references — remove the (#tag) part
+        stripped = stripped.replace(new RegExp(`\\]\\(${escaped}\\)`, 'gi'), ']()');
+        return stripped;
+    }
+
+    /**
      * Search for text in board content
      */
     searchText(board: KanbanBoard, query: string, includeContentByPath?: Map<string, string>): TextMatch[] {
@@ -295,11 +310,28 @@ export class BoardContentScanner {
 
         const matches: TextMatch[] = [];
         const lowerQuery = query.toLowerCase();
+        // When the query is an internal tag (starts with #), strip wiki-link
+        // references so that [[#tag]] / [text](#tag) don't match themselves,
+        // and use whole-word matching so #1 doesn't match inside #10.
+        const isTagQuery = query.startsWith('#');
+        // Tags are space-delimited: #1 must not match #10, #1.1, #1a, etc.
+        // Match only when followed by whitespace or end-of-string.
+        const tagRegex = isTagQuery
+            ? new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s|$)', 'im')
+            : null;
+
+        const matchesContent = (text: string): boolean => {
+            if (tagRegex) {
+                return tagRegex.test(text);
+            }
+            return text.toLowerCase().includes(lowerQuery);
+        };
 
         for (const column of board.columns) {
             // Search column title
             const columnTitle = this._getColumnTitle(column);
-            if (columnTitle.toLowerCase().includes(lowerQuery)) {
+            const searchableColumnTitle = isTagQuery ? this._stripInternalTagRefs(columnTitle, query) : columnTitle;
+            if (matchesContent(searchableColumnTitle)) {
                 matches.push({
                     matchText: query,
                     context: this._buildSearchContext(columnTitle, lowerQuery),
@@ -312,7 +344,8 @@ export class BoardContentScanner {
                 const taskTitle = this._getTaskTitle(task);
 
                 // Search task title
-                if (taskTitle.toLowerCase().includes(lowerQuery)) {
+                const searchableTaskTitle = isTagQuery ? this._stripInternalTagRefs(taskTitle, query) : taskTitle;
+                if (matchesContent(searchableTaskTitle)) {
                     matches.push({
                         matchText: query,
                         context: this._buildSearchContext(taskTitle, lowerQuery),
@@ -321,12 +354,15 @@ export class BoardContentScanner {
                 }
 
                 // Search task description
-                if (task.description && task.description.toLowerCase().includes(lowerQuery)) {
-                    matches.push({
-                        matchText: query,
-                        context: this._buildSearchContext(task.description, lowerQuery),
-                        location: this._buildTaskLocation(column, task, 'description')
-                    });
+                if (task.description) {
+                    const searchableDesc = isTagQuery ? this._stripInternalTagRefs(task.description, query) : task.description;
+                    if (matchesContent(searchableDesc)) {
+                        matches.push({
+                            matchText: query,
+                            context: this._buildSearchContext(task.description, lowerQuery),
+                            location: this._buildTaskLocation(column, task, 'description')
+                        });
+                    }
                 }
 
                 if (includeContentByPath && task.regularIncludeFiles && task.regularIncludeFiles.length > 0) {
@@ -335,13 +371,16 @@ export class BoardContentScanner {
                         const resolvedPath = this._resolvePath(includePath);
                         const includeContent = includeContentByPath.get(resolvedPath);
 
-                        if (includeContent && includeContent.toLowerCase().includes(lowerQuery)) {
-                            const context = this._buildSearchContext(includeContent, lowerQuery);
-                            matches.push({
-                                matchText: query,
-                                context: `include: ${includePath}\n${context}`,
-                                location: this._buildTaskLocation(column, task, 'description')
-                            });
+                        if (includeContent) {
+                            const searchableInclude = isTagQuery ? this._stripInternalTagRefs(includeContent, query) : includeContent;
+                            if (matchesContent(searchableInclude)) {
+                                const context = this._buildSearchContext(includeContent, lowerQuery);
+                                matches.push({
+                                    matchText: query,
+                                    context: `include: ${includePath}\n${context}`,
+                                    location: this._buildTaskLocation(column, task, 'description')
+                                });
+                            }
                         }
                     }
                 }

@@ -251,7 +251,8 @@ class TagUtils {
         if (!text) return null;
 
         // Extract ALL numeric tags and return as array
-        const pattern = /#(\d+(?:\.\d+)?)\b/g;
+        // Tags are space-delimited: #1 must not match inside #1.1
+        const pattern = /#(\d+(?:\.\d+)*)(?=\s|$)/g;
         const tags = [];
         let match;
         while ((match = pattern.exec(text)) !== null) {
@@ -905,6 +906,7 @@ class TagUtils {
     isNumericTag(tag) {
         if (!tag) return false;
         const withHash = tag.startsWith('#') ? tag : `#${tag}`;
+        this.patterns.numericTag.lastIndex = 0;
         return this.patterns.numericTag.test(withHash);
     }
 
@@ -924,11 +926,17 @@ class TagUtils {
         }
 
         // Check pattern-based layout tags
+        // Reset lastIndex before .test() on global regexes to avoid stateful bugs
         const H = this.prefixes.HASH;
-        if (this.patterns.rowTag.test(`${H}${cleanTag}`)) return true;
-        if (this.patterns.spanTag.test(`${H}${cleanTag}`)) return true;
-        if (this.patterns.stackTag.test(`${H}${cleanTag}`)) return true;
-        if (this.patterns.includeTag.test(`${H}${cleanTag}`)) return true;
+        const testTag = `${H}${cleanTag}`;
+        this.patterns.rowTag.lastIndex = 0;
+        if (this.patterns.rowTag.test(testTag)) return true;
+        this.patterns.spanTag.lastIndex = 0;
+        if (this.patterns.spanTag.test(testTag)) return true;
+        this.patterns.stackTag.lastIndex = 0;
+        if (this.patterns.stackTag.test(testTag)) return true;
+        this.patterns.includeTag.lastIndex = 0;
+        if (this.patterns.includeTag.test(testTag)) return true;
 
         return false;
     }

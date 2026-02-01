@@ -7,11 +7,12 @@ export type TagVisibility = 'all' | 'allexcludinglayout' | 'customonly' | 'menti
 
 export class TagUtils {
     // Regular expressions for different tag patterns
-    private static readonly BASIC_TAG_PATTERN = /#[a-zA-Z0-9_-]+/g;
-    private static readonly AT_TAG_PATTERN = /@[a-zA-Z0-9_-]+/g;
-    private static readonly ROW_TAG_PATTERN = /#row\d*/gi;
-    private static readonly SPAN_TAG_PATTERN = /#span\d*/gi;
-    private static readonly STACK_TAG_PATTERN = /#stack\d*/gi;
+    // Tags are space-delimited: match up to whitespace or end-of-string
+    private static readonly BASIC_TAG_PATTERN = /#[^\s]+/g;
+    private static readonly AT_TAG_PATTERN = /@[^\s]+/g;
+    private static readonly ROW_TAG_PATTERN = /#row\d*(?=\s|$)/gi;
+    private static readonly SPAN_TAG_PATTERN = /#span\d*(?=\s|$)/gi;
+    private static readonly STACK_TAG_PATTERN = /#stack(?=\s|$)/gi;
 
     /**
      * Remove tags from text based on visibility setting
@@ -92,7 +93,7 @@ export class TagUtils {
 
         let result = text;
         for (const tag of configuredTags) {
-            const pattern = new RegExp(tag + '\\d*', 'gi');
+            const pattern = new RegExp(tag + '\\d*(?=\\s|$)', 'gi');
             result = result.replace(pattern, '');
         }
 

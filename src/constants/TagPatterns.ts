@@ -75,7 +75,7 @@ export const stickyTagPattern = () => /#sticky\b/gi;
 /**
  * Match #sticky tag for testing (case insensitive, non-global)
  */
-export const stickyTagPatternSingle = () => /#sticky(?:\s|$)/;
+export const stickyTagPatternSingle = () => /#sticky\b/i;
 
 // =============================================================================
 // HELPER FUNCTIONS
