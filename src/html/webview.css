@@ -1583,6 +1583,10 @@ figure:has(.diagram-placeholder .image-not-found) {
   background: var(--vscode-editor-background);
 }
 
+.embed-frame-wrapper:has(.web-preview-fallback) {
+  min-height: auto;
+}
+
 .embed-frame-wrapper iframe {
   display: block;
   width: 100%;
