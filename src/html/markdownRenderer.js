@@ -91,24 +91,21 @@ window._handleMediaError = function(mediaEl, path, mediaType) {
     mediaEl.style.display = 'none';
 };
 
+// Session-level cache of origins known to block iframe embedding (X-Frame-Options / CSP).
+// Caches at origin level (e.g. "https://www.youtube.com") because these headers are set server-wide.
+const _iframeBlockedOrigins = new Set();
+const _iframeSelector = '.web-preview-container iframe, .embed-frame-wrapper iframe';
+
 /**
  * Error handler for web preview iframes that fail to load (e.g. x-frame-options).
  * Replaces the iframe with a fallback message and "Open in browser" link.
  * @param {HTMLIFrameElement} iframeEl - The iframe element that failed
- * @param {string} url - The original URL
+ * @param {string} _url - Unused (kept for backward compat with onerror attribute)
  */
-window._handleIframeError = function(iframeEl, url) {
-    const container = iframeEl.parentElement;
-    if (!container) return;
-
-    const fallback = document.createElement('div');
-    fallback.className = 'web-preview-fallback';
-    fallback.innerHTML =
-        '<span class="web-preview-fallback-icon">⚠️</span>' +
-        '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
-        '<a class="web-preview-fallback-link" href="' + url + '" target="_blank" rel="noopener noreferrer">Open in browser</a>';
-
-    iframeEl.replaceWith(fallback);
+window._handleIframeError = function(iframeEl, _url) {
+    if (!iframeEl.parentElement) return;
+    // Read raw URL from src attribute (the onerror param may be pre-escaped)
+    _replaceIframeWithFallback(iframeEl, iframeEl.getAttribute('src') || _url);
 };
 
 /**
@@ -125,9 +122,9 @@ function _isIframeBlocked(url) {
 }
 
 /**
- * Render an iframe fallback as an HTML string (for use during markdown rendering).
- * Unlike _handleIframeError which operates on live DOM elements, this returns HTML
- * so it can be used in renderEmbed/renderWebPreview before the iframe is created.
+ * Render an iframe fallback as an HTML string.
+ * Single source of truth for fallback markup, used both during markdown rendering
+ * (returns string) and for live DOM replacement (via _replaceIframeWithFallback).
  * @param {string} url - The blocked URL
  * @returns {string} Fallback HTML string
  */
@@ -138,6 +135,17 @@ function _renderIframeFallback(url) {
         '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
         '<a class="web-preview-fallback-link" href="' + escapedUrl + '" target="_blank" rel="noopener noreferrer">Open in browser</a>' +
         '</div>';
+}
+
+/**
+ * Replace a live iframe element with the fallback DOM node.
+ * @param {HTMLIFrameElement} iframeEl - The iframe to replace
+ * @param {string} url - The URL for the fallback link
+ */
+function _replaceIframeWithFallback(iframeEl, url) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = _renderIframeFallback(url);
+    iframeEl.replaceWith(wrapper.firstChild);
 }
 
 /**
@@ -155,17 +163,11 @@ window._markIframeUrlBlocked = function(url) {
     }
 
     // Replace all live iframes whose origin matches the blocked one
-    const iframes = document.querySelectorAll('.web-preview-container iframe, .embed-frame-wrapper iframe');
+    const iframes = document.querySelectorAll(_iframeSelector);
     iframes.forEach(function(iframe) {
         const src = iframe.getAttribute('src');
         if (src && _isIframeBlocked(src)) {
-            const fallback = document.createElement('div');
-            fallback.className = 'web-preview-fallback';
-            fallback.innerHTML =
-                '<span class="web-preview-fallback-icon">⚠️</span>' +
-                '<span class="web-preview-fallback-text">Cannot display preview — this site doesn\'t allow iframe embedding</span>' +
-                '<a class="web-preview-fallback-link" href="' + src + '" target="_blank" rel="noopener noreferrer">Open in browser</a>';
-            iframe.replaceWith(fallback);
+            _replaceIframeWithFallback(iframe, src);
         }
     });
 };
@@ -176,8 +178,7 @@ window._markIframeUrlBlocked = function(url) {
  * Called after board rendering or single column rendering completes.
  */
 window._checkRenderedIframes = function() {
-    const iframes = document.querySelectorAll('.web-preview-container iframe, .embed-frame-wrapper iframe');
-    const originsToCheck = new Set();
+    const iframes = document.querySelectorAll(_iframeSelector);
     const urlPerOrigin = {};
 
     iframes.forEach(function(iframe) {
@@ -185,16 +186,15 @@ window._checkRenderedIframes = function() {
         if (!src || !src.startsWith('http') || _isIframeBlocked(src)) return;
         try {
             const origin = new URL(src).origin;
-            if (!originsToCheck.has(origin)) {
-                originsToCheck.add(origin);
+            if (!(origin in urlPerOrigin)) {
                 urlPerOrigin[origin] = src;
             }
         } catch { /* invalid URL, skip */ }
     });
 
     // Send one check per origin (using the first URL encountered for that origin)
-    originsToCheck.forEach(function(origin) {
-        vscode.postMessage({ type: 'checkIframeUrl', url: urlPerOrigin[origin] });
+    Object.values(urlPerOrigin).forEach(function(url) {
+        vscode.postMessage({ type: 'checkIframeUrl', url: url });
     });
 };
 
@@ -368,10 +368,6 @@ let webPreviewConfig = {
     sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups'
 };
 
-// Session-level cache of origins known to block iframe embedding (X-Frame-Options / CSP).
-// Caches at origin level (e.g. "https://www.youtube.com") because these headers are set server-wide.
-const _iframeBlockedOrigins = new Set();
-
 /**
  * Update embed configuration from settings
  * Called when configuration is received from the extension
@@ -540,6 +536,7 @@ function renderEmbed(embedInfo, originalSrc, alt, title) {
     if (referrerpolicy) {
         iframeAttrs += ` referrerpolicy="${escapeHtml(referrerpolicy)}"`;
     }
+    iframeAttrs += ` onerror="window._handleIframeError(this,'${escapeHtml(url).replace(/'/g, "\\'")}')"`;
 
     // Add custom attributes
     Object.keys(customAttrs).forEach(key => {

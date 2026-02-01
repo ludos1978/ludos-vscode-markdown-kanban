@@ -146,18 +146,19 @@ export class ProcessCommands extends SwitchBasedCommand {
     private handleCheckIframeUrl(url: string): void {
         if (!url) return;
 
+        const respond = (blocked: boolean) =>
+            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked });
+
         let parsedUrl: URL;
         try {
             parsedUrl = new URL(url);
         } catch {
-            // Invalid URL — not blocked, let iframe try
-            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
+            respond(false);
             return;
         }
 
         const transport = parsedUrl.protocol === 'https:' ? https : http;
         const req = transport.request(parsedUrl, { method: 'HEAD', timeout: 5000 }, (res) => {
-            let blocked = false;
             const headers = res.headers;
 
             // Check X-Frame-Options
@@ -165,40 +166,30 @@ export class ProcessCommands extends SwitchBasedCommand {
             if (xfo) {
                 const val = (typeof xfo === 'string' ? xfo : xfo[0]).toUpperCase();
                 if (val === 'DENY' || val === 'SAMEORIGIN') {
-                    blocked = true;
+                    respond(true);
+                    return;
                 }
             }
 
             // Check Content-Security-Policy frame-ancestors
-            if (!blocked) {
-                const csp = headers['content-security-policy'];
-                if (csp) {
-                    const cspStr = typeof csp === 'string' ? csp : csp.join('; ');
-                    const faMatch = cspStr.match(/frame-ancestors\s+([^;]+)/i);
-                    if (faMatch) {
-                        const ancestors = faMatch[1].trim().toLowerCase();
-                        // Blocked if 'none', 'self' only, or no wildcard *
-                        if (ancestors === "'none'" || ancestors === "'self'" || !ancestors.includes('*')) {
-                            blocked = true;
-                        }
+            const csp = headers['content-security-policy'];
+            if (csp) {
+                const cspStr = typeof csp === 'string' ? csp : csp.join('; ');
+                const faMatch = cspStr.match(/frame-ancestors\s+([^;]+)/i);
+                if (faMatch) {
+                    const ancestors = faMatch[1].trim().toLowerCase();
+                    if (ancestors === "'none'" || ancestors === "'self'" || !ancestors.includes('*')) {
+                        respond(true);
+                        return;
                     }
                 }
             }
 
-            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked });
+            respond(false);
         });
 
-        req.on('error', () => {
-            // Network error — not blocked, let iframe try
-            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
-        });
-
-        req.on('timeout', () => {
-            req.destroy();
-            // Timeout — not blocked, let iframe try
-            this.postMessage({ type: 'iframeUrlCheckResult', url, blocked: false });
-        });
-
+        req.on('error', () => respond(false));
+        req.on('timeout', () => { req.destroy(); respond(false); });
         req.end();
     }
 }

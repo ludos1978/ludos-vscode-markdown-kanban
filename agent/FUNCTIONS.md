@@ -22,11 +22,14 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ### Modified: `src/html/markdownRenderer.js`
 - `_iframeBlockedOrigins` — Session-level Set cache of origins (e.g. "https://www.youtube.com") known to block iframe embedding
+- `_iframeSelector` — CSS selector constant for embed/web-preview iframes, used by _markIframeUrlBlocked and _checkRenderedIframes
 - `_isIframeBlocked(url)` — Check if a URL's origin is in the blocked origin cache
-- `_renderIframeFallback(url)` — Returns fallback HTML string for blocked iframe URLs (used during markdown rendering)
-- `window._markIframeUrlBlocked(url)` — Extracts origin, adds to _iframeBlockedOrigins, replaces all live iframes from that origin with fallback
+- `_renderIframeFallback(url)` — Single source of truth for fallback HTML string (escapes URL internally)
+- `_replaceIframeWithFallback(iframeEl, url)` — Replace a live iframe DOM element with fallback node (uses _renderIframeFallback)
+- `window._handleIframeError(iframeEl, _url)` — (MODIFIED) Now delegates to _replaceIframeWithFallback
+- `window._markIframeUrlBlocked(url)` — Extracts origin, adds to _iframeBlockedOrigins, replaces all live iframes from that origin via _replaceIframeWithFallback
 - `window._checkRenderedIframes()` — Scans DOM for iframes, deduplicates by origin, sends one checkIframeUrl per unchecked origin
-- `renderEmbed()` — (MODIFIED) Checks _isIframeBlocked at top, returns fallback if origin is blocked
+- `renderEmbed()` — (MODIFIED) Checks _isIframeBlocked at top, returns fallback if origin is blocked; added onerror handler for consistency
 - `renderWebPreview()` — (MODIFIED) Checks _isIframeBlocked at top, returns fallback if origin is blocked
 
 ### Modified: `src/html/webview.js`
