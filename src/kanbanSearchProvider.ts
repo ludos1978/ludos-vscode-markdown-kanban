@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { BoardContentScanner, BrokenElement, TextMatch } from './services/BoardContentScanner';
+import { TextMatcher } from './utils/textMatcher';
 import {
     SearchResultItem,
     SearchBrokenElementsMessage,
@@ -171,6 +172,15 @@ export class KanbanSearchProvider implements vscode.WebviewViewProvider {
         if (!basePath) {
             this._sendError('Could not determine document path');
             return;
+        }
+
+        // Validate regex before scanning to surface errors to the user
+        if (options?.useRegex) {
+            const probe = new TextMatcher(query.trim(), options);
+            if (probe.regexError) {
+                this._sendError(`Invalid regex: ${probe.regexError}`);
+                return;
+            }
         }
 
         try {

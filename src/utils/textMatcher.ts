@@ -26,6 +26,7 @@ export class TextMatcher {
     private _lowerQuery: string;
     private _tagRegex: RegExp | null = null;
     private _userRegex: RegExp | null = null;
+    private _regexError: string | null = null;
 
     /**
      * @param query - The search string
@@ -54,9 +55,9 @@ export class TextMatcher {
         } else if (this._mode === 'regex') {
             try {
                 this._userRegex = new RegExp(query, this._caseSensitive ? '' : 'i');
-            } catch {
-                // Invalid regex - matches() will always return false
+            } catch (e) {
                 this._userRegex = null;
+                this._regexError = e instanceof Error ? e.message : 'Invalid regular expression';
             }
         }
     }
@@ -71,6 +72,41 @@ export class TextMatcher {
 
     get isTagMode(): boolean {
         return this._mode === 'tag';
+    }
+
+    /** Non-null when regex mode failed to compile the pattern. */
+    get regexError(): string | null {
+        return this._regexError;
+    }
+
+    /**
+     * Find the index and length of the first match in `text`.
+     * Returns `{ index, length }` or `null` if no match.
+     * Useful for building context snippets around the match.
+     */
+    findMatchIndex(text: string): { index: number; length: number } | null {
+        if (!text) {
+            return null;
+        }
+
+        switch (this._mode) {
+            case 'tag': {
+                const m = this._tagRegex!.exec(text);
+                return m ? { index: m.index, length: m[0].length } : null;
+            }
+            case 'regex': {
+                if (!this._userRegex) { return null; }
+                const m = this._userRegex.exec(text);
+                return m ? { index: m.index, length: m[0].length } : null;
+            }
+            case 'substring':
+            default: {
+                const haystack = this._caseSensitive ? text : text.toLowerCase();
+                const needle = this._caseSensitive ? this._query : this._lowerQuery;
+                const idx = haystack.indexOf(needle);
+                return idx >= 0 ? { index: idx, length: needle.length } : null;
+            }
+        }
     }
 
     /**

@@ -118,13 +118,6 @@ function getDateOfISOWeek(week: number, year: number): Date {
 }
 
 /**
- * Extract all tags from text - delegates to TextMatcher.extractTags for canonical behaviour
- */
-function extractTags(text: string): { name: string; type: 'hash' | 'person' | 'temporal' }[] {
-    return TextMatcher.extractTags(text);
-}
-
-/**
  * Check if a date is within the specified timeframe from today
  * @param date - The date to check
  * @param timeframeDays - Number of days in the future to include
@@ -205,7 +198,7 @@ export class DashboardScanner {
                 const taskText = (task.title || '') + ' ' + (task.description || '');
 
                 // Extract all tags from task (for tag summary)
-                const tags = extractTags(taskText);
+                const tags = TextMatcher.extractTags(taskText);
                 for (const tag of tags) {
                     const existing = tagCounts.get(tag.name);
                     if (existing) {
@@ -423,7 +416,7 @@ export class DashboardScanner {
             const columnTitle = column.title || '';
 
             // Check if column title contains the search tag (exact match)
-            const columnTags = extractTags(columnTitle);
+            const columnTags = TextMatcher.extractTags(columnTitle);
             const columnMatchingTag = columnTags.find(t => TextMatcher.tagExactMatch(t.name, searchTag));
             const columnHasTag = !!columnMatchingTag;
 
@@ -433,7 +426,7 @@ export class DashboardScanner {
             let taskIndex = 0;
             for (const task of column.tasks || []) {
                 const taskText = (task.title || '') + ' ' + (task.description || '');
-                const tags = extractTags(taskText);
+                const tags = TextMatcher.extractTags(taskText);
 
                 // Check if any tag in task matches the search (exact match)
                 for (const tag of tags) {

@@ -290,13 +290,15 @@ export class BoardContentScanner {
      * Search for text in board content
      */
     searchText(board: KanbanBoard, query: string, includeContentByPath?: Map<string, string>, options?: TextMatcherOptions): TextMatch[] {
-        if (!query || query.length === 0) {
+        if (!query) {
             return [];
         }
 
         const matcher = new TextMatcher(query, options);
+        if (matcher.regexError) {
+            return [];
+        }
         const matches: TextMatch[] = [];
-        const lowerQuery = query.toLowerCase();
 
         const prepareText = (text: string): string => {
             if (matcher.isTagMode) {
@@ -305,13 +307,24 @@ export class BoardContentScanner {
             return text;
         };
 
+        const buildContext = (content: string): string => {
+            const hit = matcher.findMatchIndex(content);
+            if (!hit) { return content.substring(0, 100); }
+            const start = Math.max(0, hit.index - 30);
+            const end = Math.min(content.length, hit.index + hit.length + 30);
+            let ctx = content.substring(start, end);
+            if (start > 0) { ctx = '...' + ctx; }
+            if (end < content.length) { ctx = ctx + '...'; }
+            return ctx;
+        };
+
         for (const column of board.columns) {
             // Search column title
             const columnTitle = this._getColumnTitle(column);
             if (matcher.matches(prepareText(columnTitle))) {
                 matches.push({
                     matchText: query,
-                    context: this._buildSearchContext(columnTitle, lowerQuery),
+                    context: buildContext(columnTitle),
                     location: this._buildColumnLocation(column, 'columnTitle')
                 });
             }
@@ -324,7 +337,7 @@ export class BoardContentScanner {
                 if (matcher.matches(prepareText(taskTitle))) {
                     matches.push({
                         matchText: query,
-                        context: this._buildSearchContext(taskTitle, lowerQuery),
+                        context: buildContext(taskTitle),
                         location: this._buildTaskLocation(column, task, 'taskTitle')
                     });
                 }
@@ -334,7 +347,7 @@ export class BoardContentScanner {
                     if (matcher.matches(prepareText(task.description))) {
                         matches.push({
                             matchText: query,
-                            context: this._buildSearchContext(task.description, lowerQuery),
+                            context: buildContext(task.description),
                             location: this._buildTaskLocation(column, task, 'description')
                         });
                     }
@@ -348,10 +361,9 @@ export class BoardContentScanner {
 
                         if (includeContent) {
                             if (matcher.matches(prepareText(includeContent))) {
-                                const context = this._buildSearchContext(includeContent, lowerQuery);
                                 matches.push({
                                     matchText: query,
-                                    context: `include: ${includePath}\n${context}`,
+                                    context: `include: ${includePath}\n${buildContext(includeContent)}`,
                                     location: this._buildTaskLocation(column, task, 'description')
                                 });
                             }
@@ -527,26 +539,6 @@ export class BoardContentScanner {
         }
 
         return resolved;
-    }
-
-    /**
-     * Build context around a match (for display)
-     */
-    private _buildSearchContext(content: string, lowerQuery: string): string {
-        const lowerContent = content.toLowerCase();
-        const index = lowerContent.indexOf(lowerQuery);
-
-        if (index === -1) return content.substring(0, 100);
-
-        const start = Math.max(0, index - 30);
-        const end = Math.min(content.length, index + lowerQuery.length + 30);
-
-        let context = content.substring(start, end);
-
-        if (start > 0) context = '...' + context;
-        if (end < content.length) context = context + '...';
-
-        return context;
     }
 
     /**
